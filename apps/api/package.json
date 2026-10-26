@@ -1,0 +1,39 @@
+{
+  "name": "@worklog/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun --watch src/index.ts",
+    "start": "bun src/index.ts",
+    "worker": "bun src/worker.ts",
+    "auth:generate": "auth generate --config src/auth/cli.ts --output src/db/auth-schema.ts --adapter drizzle --dialect postgresql --yes && sed -i -E 's/timestamp\\(\"([a-z_]+)\"\\)/timestamp(\"\\1\", { withTimezone: true })/g' src/db/auth-schema.ts",
+    "db:generate": "drizzle-kit generate",
+    "openapi": "bun src/scripts/openapi.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "bun test --timeout 60000"
+  },
+  "dependencies": {
+    "@electric-sql/pglite": "^0.5.11",
+    "@hono/zod-openapi": "^1.6.3",
+    "@openrouter/ai-sdk-provider": "^3.1.0",
+    "@scalar/hono-api-reference": "^0.12.14",
+    "ai": "^7.0.153",
+    "better-auth": "1.7.13",
+    "drizzle-orm": "^0.45.4",
+    "hono": "^4.13.14",
+    "marked": "^18.1.1",
+    "nodemailer": "^10.2.1",
+    "pg": "8",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite-socket": "^0.2.14",
+    "@types/bun": "^1.4.4",
+    "@types/nodemailer": "^8.0.2",
+    "@types/pg": "^8.23.1",
+    "auth": "1.7.13",
+    "drizzle-kit": "^0.31.11",
+    "typescript": "5"
+  }
+}

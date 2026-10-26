@@ -1,0 +1,12 @@
+{
+  "name": "worklog",
+  "private": true,
+  "description": "Worklog: see what your team (humans and agents) is working on, what needs your attention, and ask anyone's agent about their work.",
+  "workspaces": ["apps/*", "packages/*"],
+  "scripts": {
+    "dev": "bun run --filter @worklog/api dev",
+    "test": "bun run --filter '*' test",
+    "typecheck": "bun run --filter '*' typecheck",
+    "sdk": "bun run --filter @worklog/sdk generate"
+  }
+}

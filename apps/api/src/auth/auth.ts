@@ -1,0 +1,73 @@
+import { betterAuth } from "better-auth";
+import { drizzleAdapter } from "better-auth/adapters/drizzle";
+import { bearer, magicLink } from "better-auth/plugins";
+import { createHash } from "node:crypto";
+import type { Config } from "../config";
+import type { Mailer } from "../delivery/mailer";
+import { newId, type IdPrefix } from "../lib/ids";
+
+/**
+ * Human sign-in only: email magic links and GitHub / Discord / Slack accounts, with sessions as
+ * cookies (web) or bearer tokens (mobile). Better Auth answers "who is this person?"; Worklog keeps
+ * "which workspace, what role, which agents" in its own members table — agents can't be Better Auth
+ * users, and keeping tenancy ours avoids coupling workspaces to the organization plugin's lifecycle.
+ */
+const PREFIX: Record<string, IdPrefix> = { user: "usr", session: "ses", account: "acc", verification: "ver" };
+
+export type SocialProvider = "github" | "discord" | "slack";
+
+export function enabledSocialProviders(config: Config): SocialProvider[] {
+  const out: SocialProvider[] = [];
+  if (config.GITHUB_CLIENT_ID && config.GITHUB_CLIENT_SECRET) out.push("github");
+  if (config.DISCORD_CLIENT_ID && config.DISCORD_CLIENT_SECRET) out.push("discord");
+  if (config.SLACK_CLIENT_ID && config.SLACK_CLIENT_SECRET) out.push("slack");
+  return out;
+}
+
+export function webOrigins(config: Config): string[] {
+  return [config.PUBLIC_URL, ...(config.WEB_ORIGINS?.split(",").map((o) => o.trim()).filter(Boolean) ?? [])];
+}
+
+export function createAuth(db: unknown, config: Config, mailer: Mailer, hooks: { onSignIn?: (userId: string) => Promise<void> } = {}) {
+  const social = enabledSocialProviders(config);
+  return betterAuth({
+    appName: "Worklog",
+    baseURL: config.PUBLIC_URL,
+    basePath: "/api/auth",
+    secret: config.AUTH_SECRET ?? createHash("sha256").update("worklog-insecure-dev-auth-secret").digest("hex"),
+    trustedOrigins: webOrigins(config),
+    database: drizzleAdapter(db as Record<string, unknown>, { provider: "pg", transaction: true }),
+    advanced: { database: { generateId: ({ model }) => newId(PREFIX[model] ?? "usr") } },
+    socialProviders: {
+      ...(social.includes("github") ? { github: { clientId: config.GITHUB_CLIENT_ID!, clientSecret: config.GITHUB_CLIENT_SECRET! } } : {}),
+      ...(social.includes("discord") ? { discord: { clientId: config.DISCORD_CLIENT_ID!, clientSecret: config.DISCORD_CLIENT_SECRET! } } : {}),
+      ...(social.includes("slack") ? { slack: { clientId: config.SLACK_CLIENT_ID!, clientSecret: config.SLACK_CLIENT_SECRET! } } : {}),
+    },
+    // Signing in with GitHub after an email link (same verified address) lands on the same person.
+    account: { accountLinking: { enabled: true, trustedProviders: ["github", "discord", "slack"] } },
+    session: { cookieCache: { enabled: true, maxAge: 60 } },
+    databaseHooks: {
+      // Every sign-in claims pending invitations addressed to the person's verified email.
+      session: { create: { after: async (session) => void (await hooks.onSignIn?.(session.userId)) } },
+    },
+    plugins: [
+      magicLink({
+        // Not awaited: response timing must not reveal whether the address exists.
+        sendMagicLink: ({ email, url }) => {
+          void mailer
+            .send({
+              to: email,
+              subject: "Your Worklog sign-in link",
+              text: `Sign in to Worklog: ${url}\n\nThe link expires in 5 minutes. If you didn't ask for it, ignore this email.`,
+              html: `<p><a href="${url}">Sign in to Worklog</a></p><p>The link expires in 5 minutes. If you didn't ask for it, ignore this email.</p>`,
+            })
+            .catch((err) => console.error("[auth] magic link email failed", err));
+        },
+      }),
+      // Mobile and other non-browser clients: `Authorization: Bearer <session token>` (from the `set-auth-token` header).
+      bearer(),
+    ],
+  });
+}
+
+export type Auth = ReturnType<typeof createAuth>;
