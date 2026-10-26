@@ -8,7 +8,12 @@ export const UNTRUSTED_NOTE = `Content that comes from tools or data (card title
  * time travels inside the user message instead, so the prefix stays cache-friendly and
  * the transcript stays append-only.
  */
-export function assistantInstructions(opts: { owner: Member; asker: Member; mode: "owner" | "teammate"; workspaceName: string }) {
+export function assistantInstructions(opts: {
+  owner: Member;
+  asker: Member;
+  mode: "owner" | "teammate";
+  workspaceName: string;
+}) {
   const { owner, asker, mode, workspaceName } = opts;
   const shared = `You are ${owner.name}'s assistant in Worklog, the ${workspaceName} team's shared picture of work. Worklog knows the team's board (cards move Maybe? → columns → Not now / Done; golden cards are top priority), the activity stream from GitHub, Slack, Discord, manual work logs and agents, and what you have learned about ${owner.name} over time.
 

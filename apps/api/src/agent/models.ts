@@ -1,5 +1,6 @@
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import type { LanguageModel } from "ai";
+
 import type { Config } from "../config";
 
 /**
@@ -10,7 +11,9 @@ import type { Config } from "../config";
 export type Models = { main: LanguageModel; fast: LanguageModel };
 
 export function createModels(config: Config): Models | null {
-  if (!config.OPENROUTER_API_KEY) return null;
+  if (!config.OPENROUTER_API_KEY) {
+    return null;
+  }
   const openrouter = createOpenRouter({
     apiKey: config.OPENROUTER_API_KEY,
     appName: "Worklog",
@@ -25,10 +28,15 @@ export function createModels(config: Config): Models | null {
         // Work data never goes to providers that train on prompts.
         data_collection: "deny",
         // Prompt caches live per upstream: keep Claude conversations on Anthropic unless it's down.
-        ...(id.startsWith("anthropic/") ? { order: ["anthropic"], allow_fallbacks: true } : {}),
+        ...(id.startsWith("anthropic/")
+          ? { order: ["anthropic"], allow_fallbacks: true }
+          : {}),
       },
     });
-  return { main: model(config.WORKLOG_MODEL), fast: model(config.WORKLOG_FAST_MODEL) };
+  return {
+    main: model(config.WORKLOG_MODEL),
+    fast: model(config.WORKLOG_FAST_MODEL),
+  };
 }
 
 /** Per-call time limits, so one hung provider call can't stall a request or the scheduler. */
@@ -39,7 +47,9 @@ export const TIMEOUTS = {
 } as const;
 
 /** Conversations are append-only with stable instructions and tools, so every turn can read the previous ones from cache. */
-export const CACHED = { openrouter: { cacheControl: { type: "ephemeral" } } } as const;
+export const CACHED = {
+  openrouter: { cacheControl: { type: "ephemeral" } },
+} as const;
 
 export function modelIdOf(model: LanguageModel): string {
   return typeof model === "string" ? model : model.modelId;
