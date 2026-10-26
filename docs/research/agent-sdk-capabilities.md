@@ -7,12 +7,13 @@ Date: 2026-10-26. Scope: `apps/api` agent code (`src/agent/*`, `src/automations/
 Every API name, signature and behavior below was checked against the installed packages, not recalled from memory:
 
 | Package | Installed | Resolved path (from `apps/api/node_modules`, via `ls -L`) |
-|---|---|---|
+| --- | --- | --- |
 | `ai` | 7.0.153 | `../../../node_modules/.bun/ai@7.0.153+969a6d035afea0f4/node_modules/ai` |
 | `@openrouter/ai-sdk-provider` | 3.1.0 | `../../../node_modules/.bun/@openrouter+ai-sdk-provider@3.1.0+8d5b0ee88149da84/node_modules/@openrouter/ai-sdk-provider` |
 | `@ai-sdk/provider` / `@ai-sdk/provider-utils` | 4.0.34 / 5.0.68 | `node_modules/.bun/@ai-sdk+provider*` |
 
 Sources used:
+
 - Docs: `node_modules/ai/docs/**` (paths cited per section).
 - Types: `node_modules/ai/dist/index.d.ts` (11,149 lines), `node_modules/ai/dist/test/index.d.ts`, provider-utils `dist/index.d.ts`.
 - Runtime: `node_modules/ai/dist/index.js` (export list at line 21504) and `node_modules/@openrouter/ai-sdk-provider/dist/index.js`. I read the runtime wherever the docs and the provider could disagree (reasoning, caching, embeddings dimensions, audio, streaming usage).
@@ -27,7 +28,7 @@ Note: the codebase changed while this survey ran. `src/automations/service.ts` g
 ## Top recommendations at a glance
 
 | # | Area | Recommendation | Priority |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | A1 | Bug | Nightly consolidation leaks private activity into team-visible journal/profile memories | **P0** |
 | 7 | Prompt caching | Caching is never enabled today; add `providerOptions.openrouter.cacheControl` on chat calls only | **P1** |
 | 1 | Streaming | Add a `useChat`-compatible streaming endpoint (`toUIMessageStream` + `createUIMessageStreamResponse`), keeping the server-side ModelMessage store | **P1** |
@@ -45,6 +46,7 @@ Note: the codebase changed while this survey ran. `src/automations/service.ts` g
 ## Part A: Bugs and v7 misuse in the current code
 
 ### A1. Private activity leaks into team-visible memory (P0, privacy)
+
 - `src/automations/service.ts:304` loads yesterday's activity with `listActivities(ctx, ws, [member.id], …)`. The third argument (`privateFor`) includes the member's **private** activities (`src/activity/service.ts:79-83`).
 - `:326` `writeJournal(...)` and `:331` (profile lines) call `addMemory` **without** `visibility`. `addMemory` defaults to `"team"` (`src/memory/service.ts:54`). The no-AI fallback (`:313`) does the same with raw private titles.
 - Teammate-mode `recall` returns `visibility = "team"` rows (`src/agent/tools.ts:141`), so a teammate's question can surface the owner's private work logs, summarized into the journal.
@@ -56,64 +58,77 @@ Note: the codebase changed while this survey ran. `src/automations/service.ts` g
 - Add a regression test (see section 9).
 
 ### A2. Untrusted text can be persisted as durable memory (P1, prompt-injection persistence)
+
 - `runConsolidate` feeds Slack, Discord and GitHub text into a model whose output becomes `fact`/`profile` memories. Those are later rendered into every prompt via `renderMemory` and served to teammates.
 - `UNTRUSTED_NOTE` is the only defense. A poisoned message can become a "profile" line that persists.
 - Mitigation: see section 10 (reader subagent with a narrow schema), or restrict consolidation's `facts`/`profile` extraction to `source: "worklog"` (self-authored) rows.
 
 ### A3. Prompt caching is designed for but never enabled (P1, cost)
+
 - `prompts.ts` keeps instructions stable and moves the time into the user message "so the prefix stays cache-friendly". However, nothing sends a `cache_control` marker.
 - Anthropic only caches when a block-level or top-level `cache_control` is present (bundled Claude API reference, `shared/prompt-caching.md`). With the default `anthropic/claude-opus-5.5`, every chat turn currently re-bills the full history at the uncached rate.
 - Verify with `result.usage.inputTokenDetails.cacheReadTokens`; it should read 0 today. Fix in section 7.
 
 ### A4. Step-limit fallback message is wrong and never persisted (P2)
+
 - `src/agent/assistant.ts:63`: `result.text || "I ran out of steps…"`.
 - In v7, `text` is "the concatenation of all text parts generated in the **final step**" (d.ts:4992 `GenerateTextResult.text`). When `isStepCount(10)` cuts the loop mid-tool-call, the final step often still carries preamble text ("Let me check…"), so the user gets that fragment instead of the fallback.
 - Detect the cutoff with `result.finishReason === "tool-calls"` (final step's reason).
 - The fallback string is returned but not appended to history, so the transcript no longer matches what the user saw. Append it as an assistant message.
 
 ### A5. No timeouts on any model call (P1, reliability)
+
 - None of the seven `generateText` calls set `timeout` or `abortSignal`.
 - `runDueAutomations` (`src/automations/service.ts:126-140`) runs automations sequentially and only checks its 45s budget **between batches** (`:130`). One hung provider call stalls every automation behind it, and a hung chat call holds the HTTP request.
 - v7 has `timeout?: number | { totalMs, stepMs, firstChunkMs, chunkMs, toolMs, tools }` on every call (d.ts:777 `TimeoutConfiguration`, d.ts `RequestOptions`). Example: `timeout: { totalMs: 60_000, stepMs: 30_000 }` for automations.
 
 ### A6. Unbounded history replay (P2, cost and context)
+
 - `ask()` replays the entire conversation every turn (`assistant.ts:53`). The inbox conversation receives every brief and every 30-minute check ping (`postToInbox`), and owners are invited to reply to it. It grows without bound.
 - There is no compaction or windowing. See section 2 for a preserved-thinking-safe approach. Naive `pruneMessages({ reasoning: 'all' })` in the middle of history conflicts with Anthropic preserved thinking.
 
 ### A7. `createOpenRouter` defaults to `compatibility: "compatible"` (P1 once streaming lands)
+
 - In `dist/index.js` `createOpenRouter`: `const compatibility = options.compatibility ?? "compatible"`. Only the default `openrouter` export is `"strict"`.
 - In `doStream`, `stream_options: { include_usage: true }` is sent **only when `compatibility === "strict"`**, even if `usage: { include: true }` is set.
 - `src/agent/models.ts:14` doesn't set it, so as soon as you switch to `streamText`/`agent.stream()`, token usage and cost may be missing from streamed responses. Set `compatibility: "strict"`.
 
 ### A8. `openrouter(id)` is typed as the completion model (P3, typing)
+
 - `OpenRouterProvider`'s first call overload returns `OpenRouterCompletionLanguageModel`, the second `OpenRouterChatLanguageModel`. At runtime it returns the chat model unless the id is `openai/gpt-3.5-turbo-instruct`.
 - Harmless today. Use `openrouter.chat(id, settings)` so chat-only settings (`cache_control`, `provider`, `plugins`) type-check.
 
 ### A9. Top-level `reasoning` would be silently ignored (pitfall)
+
 - `doc: 03-ai-sdk-core/26-reasoning.mdx` presents `reasoning: 'low'` as portable.
 - The OpenRouter chat model's `getArgs` (dist/index.js, `OpenRouterChatLanguageModel.getArgs`) never reads the `reasoning` call option, and `doGenerate` returns `warnings: []`. The setting is dropped with no warning.
 - Use `providerOptions: { openrouter: { reasoning: { effort: "low" } } }` or the model setting `reasoning`. Type: `OpenRouterProviderOptions.reasoning = { enabled?, exclude? } & ({ max_tokens } | { effort: 'xhigh'|'high'|'medium'|'low'|'minimal'|'none' })`.
 - Per the bundled Claude reference, thinking cannot be disabled on Claude Opus 5.5, so don't send `effort: 'none'` to it.
 
 ### A10. Model-specific constraints for the default models (pitfall)
+
 - Per the bundled Claude reference (`shared/model-migration.md`, "Migrating to Claude Opus 5.5"), Claude Opus 5.5 rejects forced `tool_choice` (`any`/`tool`) with a 400.
 - Don't adopt the "forced tool calling with a `done` tool" pattern from `doc: 03-agents/04-loop-control.mdx`, or `prepareStep` returning `toolChoice: 'required'` / `{ type: 'tool' }`, while `WORKLOG_MODEL` is Opus 5.5.
 
 ### A11. `safe()` hides tool failures from observability (P3)
+
 - `src/agent/tools.ts:17-25` turns thrown errors into ordinary results. v7 already converts thrown `execute` errors into `tool-error` parts the model can read and recover from (`doc: 03-ai-sdk-core/15-tools-and-tool-calling.mdx`, "Handling Errors").
 - With `safe()`, `onToolExecutionEnd` and telemetry see `toolOutput.type === 'tool-result'` for every failure. Drop `safe()`, or log inside it.
 
 ### A12. `assistantTools(scope): ToolSet` erases tool types (P2 when adding UI)
+
 - The explicit return annotation at `tools.ts:34` widens to `ToolSet`, so `InferAgentUIMessage` / `useChat<…>` can't type tool parts (`part.type === 'tool-move_card'`, `part.input`).
 - Remove the annotation (use `satisfies ToolSet` on each branch) before building the client.
 
 ### A13. Smaller issues
+
 - `appendMessages` (`conversations.ts:53-58`) computes `max(seq)+1` then inserts. Two concurrent turns on one conversation, or a brief landing in the inbox mid-turn, hit `messages_seq_uq` **after** the model call was paid for. Use a transaction with a row lock on the conversation, or retry.
 - `runCheck` (`:284`) sends whatever `output.message` holds when `decision === "notify"`, even an empty string. Guard it.
 - `composeBrief` records `composedBy` from the configured id (`briefs/service.ts:129`). With OpenRouter fallbacks (section 8) the served model can differ. Use `result.finalStep.response.modelId`.
 - `ask()` dereferences `input.agent!` (`assistant.ts:33`) when no `conversationId` is passed.
 
 ### What the current code already gets right for v7
+
 - `isStepCount` (renamed from `stepCountIs`), `instructions` (renamed from `system`), and `output: Output.object(...)` with `result.output` (the `experimental_output` names were removed).
 - Persisting `result.responseMessages`, not `step.response.messages`, which v7 no longer accumulates (`doc: 08-migration-guides/23-migration-guide-7-0.mdx`, "Step Response Messages Are No Longer Accumulated").
 - No system messages inside `messages`, which v7 rejects by default.
@@ -128,6 +143,7 @@ Note: the codebase changed while this survey ran. `src/automations/service.ts` g
 **What:** a POST endpoint that streams the v7 UI message stream (SSE, header `x-vercel-ai-ui-message-stream: v1`) so `@ai-sdk/react` `useChat` (web, and Expo with `expo/fetch`) renders tokens, tool calls, approvals and reasoning live. Today `POST /v1/conversations[/{id}/messages]` (`src/api/routes/assistant.ts:32-75`) returns the finished reply only.
 
 **Verified APIs**
+
 - `streamText(...)` / `ToolLoopAgent.stream(...)`: `stream()` returns `Promise<StreamTextResult>`, so await it (d.ts:5818).
 - `toUIMessageStream({ stream, tools?, originalMessages?, generateMessageId?, messageMetadata?, sendReasoning?, sendSources?, onStepEnd?, onEnd?, onError? })` (d.ts:6884, `UIMessageStreamOptions` d.ts:2676).
 - `createUIMessageStreamResponse({ stream, status?, headers?, keepAliveMs?, consumeSseStream? })` returns a `Response` (d.ts:6801). Hono can return it directly.
@@ -139,6 +155,7 @@ Note: the codebase changed while this survey ran. `src/automations/service.ts` g
 - Persistence patterns: `doc: 04-ai-sdk-ui/03-chatbot-message-persistence.mdx`. Transports: `doc: 04-ai-sdk-ui/21-transport.mdx`. Wire format: `doc: 04-ai-sdk-ui/50-stream-protocol.mdx`. Expo: `doc: 02-getting-started/07-expo.mdx`.
 
 **Design decision: keep the server-side ModelMessage store as the source of truth.** Worklog loads history server-side, replays it verbatim (cache- and preserved-thinking-friendly), and must enforce privacy server-side. So:
+
 - The client sends **only the last message** (`prepareSendMessagesRequest`). The server never trusts client-sent history.
 - There is **no ModelMessage → UIMessage converter in `ai`**; the export list has `convertToModelMessages` only. To give `useChat({ messages })` an initial transcript, persist the UI message alongside, e.g. a nullable `ui jsonb` column on `messages` written from `toUIMessageStream`'s `onEnd`.
 - Rows written by Slack, Discord or `postToInbox` have no UI JSON. Synthesize `{ id, role, parts: [{ type: 'text', text }] }` from the existing `text` column.
@@ -147,10 +164,15 @@ Note: the codebase changed while this survey ran. `src/automations/service.ts` g
 **Where it plugs in:** a new route next to `src/api/routes/assistant.ts`. Reuse `getConversation`, `loadMessages`, `appendMessages`, `turnPreamble`, and the agent factory from section 2.
 
 **Server sketch (Hono)**
+
 ```ts
 import {
-  createIdGenerator, createUIMessageStreamResponse, toUIMessageStream,
-  validateUIMessages, type ModelMessage, type UIMessage,
+  createIdGenerator,
+  createUIMessageStreamResponse,
+  toUIMessageStream,
+  validateUIMessages,
+  type ModelMessage,
+  type UIMessage,
 } from "ai";
 
 app.post("/v1/conversations/:id/chat", async (c) => {
@@ -158,16 +180,22 @@ app.post("/v1/conversations/:id/chat", async (c) => {
   const asker = c.get("member");
   const { message } = await c.req.json<{ message: UIMessage }>();
   const conversation = await getConversation(ctx, asker, c.req.param("id")); // asker-only, as today
-  const scope = await loadScope(ctx, conversation, asker);                    // agent, owner, ws, mode
-  const assistant = buildAssistant(scope);                                    // section 2
-  const [validated] = await validateUIMessages({ messages: [message], tools: assistant.tools });
-  const history = (await loadMessages(ctx, conversation.id)).map((m) => m.content as ModelMessage);
+  const scope = await loadScope(ctx, conversation, asker); // agent, owner, ws, mode
+  const assistant = buildAssistant(scope); // section 2
+  const [validated] = await validateUIMessages({
+    messages: [message],
+    tools: assistant.tools,
+  });
+  const history = (await loadMessages(ctx, conversation.id)).map(
+    (m) => m.content as ModelMessage
+  );
   const incoming = toIncoming(validated, history, scope); // user text -> preamble+text; approvals -> tool msg (section 3)
 
   const result = await assistant.stream({
     messages: [...history, ...incoming],
     timeout: { totalMs: 120_000, stepMs: 60_000 },
-    onEnd: ({ responseMessages }) => appendMessages(ctx, conversation, [...incoming, ...responseMessages]),
+    onEnd: ({ responseMessages }) =>
+      appendMessages(ctx, conversation, [...incoming, ...responseMessages]),
   });
   result.consumeStream(); // finish and persist even if the phone drops the connection
 
@@ -175,34 +203,43 @@ app.post("/v1/conversations/:id/chat", async (c) => {
     keepAliveMs: 15_000, // SSE comments keep proxies/mobile networks from idling the stream out
     stream: toUIMessageStream({
       stream: result.stream,
-      originalMessages: [validated],            // an assistant message here => continuation (approvals)
+      originalMessages: [validated], // an assistant message here => continuation (approvals)
       generateMessageId: createIdGenerator({ prefix: "msg", size: 16 }),
-      onEnd: ({ responseMessage }) => saveUiMessage(ctx, conversation, responseMessage),
+      onEnd: ({ responseMessage }) =>
+        saveUiMessage(ctx, conversation, responseMessage),
     }),
   });
 });
 ```
 
 **Client sketch (React; Expo identical apart from `fetch`)**
+
 ```tsx
 import { useChat } from "@ai-sdk/react";
-import { DefaultChatTransport, lastAssistantMessageIsCompleteWithApprovalResponses } from "ai";
+import {
+  DefaultChatTransport,
+  lastAssistantMessageIsCompleteWithApprovalResponses,
+} from "ai";
 // Expo: import { fetch as expoFetch } from "expo/fetch";
 
-const { messages, sendMessage, addToolApprovalResponse } = useChat<AssistantUIMessage>({
-  id: conversationId,
-  messages: initialMessages, // from GET /v1/conversations/:id (UI form)
-  transport: new DefaultChatTransport({
-    api: `${API}/v1/conversations/${conversationId}/chat`,
-    headers: () => ({ Authorization: `Bearer ${token()}` }),
-    prepareSendMessagesRequest: ({ messages }) => ({ body: { message: messages.at(-1) } }),
-    // Expo: fetch: expoFetch as unknown as typeof globalThis.fetch,
-  }),
-  sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithApprovalResponses,
-});
+const { messages, sendMessage, addToolApprovalResponse } =
+  useChat<AssistantUIMessage>({
+    id: conversationId,
+    messages: initialMessages, // from GET /v1/conversations/:id (UI form)
+    transport: new DefaultChatTransport({
+      api: `${API}/v1/conversations/${conversationId}/chat`,
+      headers: () => ({ Authorization: `Bearer ${token()}` }),
+      prepareSendMessagesRequest: ({ messages }) => ({
+        body: { message: messages.at(-1) },
+      }),
+      // Expo: fetch: expoFetch as unknown as typeof globalThis.fetch,
+    }),
+    sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithApprovalResponses,
+  });
 ```
 
 **Platform notes (verified)**
+
 - `src/index.ts:14` already sets `Bun.serve({ idleTimeout: 0 })`. Bun's HTTP default is 10s (`bun-types@1.4.4/serve.d.ts`), so leave it at 0 for SSE.
 - `app.ts` has no compression middleware. Keep it that way for this route; buffering breaks streaming.
 - Expo: the guide's server sets `'Content-Type': 'application/octet-stream'` and `'Content-Encoding': 'none'` to prevent buffering in Expo API routes, and the client uses `expo/fetch` plus `@ungap/structured-clone` / `@stardazed/streams-text-encoding` polyfills (`07-expo.mdx`, "Polyfills"). Against a standalone Hono server, start with the default SSE headers and add those two only if the mobile client buffers.
@@ -210,6 +247,7 @@ const { messages, sendMessage, addToolApprovalResponse } = useChat<AssistantUIMe
 - Set `compatibility: "strict"` first (A7), or streamed calls lose usage and cost.
 
 **Optional later**
+
 - Resumable streams need Redis plus the `resumable-stream` package, a GET `/…/stream` endpoint and `consumeSseStream` (`doc: 04-ai-sdk-ui/03-chatbot-resume-streams.mdx`).
 - `WebSocketChatTransport` is available but needs a custom server protocol.
 - `DirectChatTransport({ agent })` runs `useChat` against an agent in-process; useful for tests.
@@ -221,6 +259,7 @@ const { messages, sendMessage, addToolApprovalResponse } = useChat<AssistantUIMe
 **What:** Worklog doesn't hand-roll a loop; it uses `generateText` with `stopWhen`, which is the same engine. `ToolLoopAgent` is a reusable configuration object over that engine: `generate()` returns `GenerateTextResult` and `stream()` returns `StreamTextResult`. The value is one definition shared by the Slack/Discord `ask()` path, the JSON endpoint, the streaming endpoint and tests. It also gives a client type (`InferAgentUIMessage`) and per-call lifecycle hooks.
 
 **Verified APIs** (d.ts:5584 `ToolLoopAgentSettings`, d.ts:5818 `class ToolLoopAgent`; `doc: 03-agents/02-building-agents.mdx`, `04-loop-control.mdx`, `05-configuring-call-options.mdx`)
+
 - `new ToolLoopAgent({ id?, model, instructions?, tools?, stopWhen?, toolApproval?, experimental_toolApprovalSecret?, prepareStep?, runtimeContext?, toolsContext?, telemetry?, providerOptions?, activeTools?, toolOrder?, toolCallConcurrency?, callOptionsSchema?, prepareCall?, output?, onStart?, onStepEnd?, onEnd?, … })`.
 - Default stop condition: `isStepCount(20)`. Keep Worklog's explicit `isStepCount(10)`; explicit conditions also suppress the SDK's default-limit warning.
 - `agent.generate({ prompt | messages, options?, abortSignal?, timeout?, on* })` and `agent.stream(...)`.
@@ -229,6 +268,7 @@ const { messages, sendMessage, addToolApprovalResponse } = useChat<AssistantUIMe
 - `activeTools` also gates execution, not just what the model sees: `executionTools` is derived from the `activeTools`-filtered set (dist/index.js:5572-5582).
 
 **Recommendation:** a per-request factory, the smallest change that keeps Worklog's "write tools don't exist for teammates" property. Constructing an agent is just configuration; doing it per request is fine.
+
 ```ts
 // src/agent/assistant-agent.ts
 import { ToolLoopAgent, isStepCount, type InferAgentUIMessage } from "ai";
@@ -237,29 +277,48 @@ export function buildAssistant(scope: Scope & { workspaceName: string }) {
   return new ToolLoopAgent({
     id: `worklog-assistant-${scope.mode}`,
     model: scope.ctx.models!.main,
-    instructions: assistantInstructions({ owner: scope.owner, asker: scope.asker, mode: scope.mode, workspaceName: scope.workspaceName }),
-    tools: assistantTools(scope),                        // drop the `: ToolSet` annotation (A12)
+    instructions: assistantInstructions({
+      owner: scope.owner,
+      asker: scope.asker,
+      mode: scope.mode,
+      workspaceName: scope.workspaceName,
+    }),
+    tools: assistantTools(scope), // drop the `: ToolSet` annotation (A12)
     stopWhen: isStepCount(10),
     toolApproval: scope.mode === "owner" ? ownerApprovalPolicy : undefined, // section 3
     providerOptions: { openrouter: { cacheControl: { type: "ephemeral" } } }, // section 7
-    runtimeContext: { workspaceId: scope.owner.workspaceId, memberId: scope.asker.id, feature: `chat.${scope.mode}` },
-    telemetry: { functionId: "assistant.chat", includeRuntimeContext: { workspaceId: true, memberId: true, feature: true } }, // section 8
+    runtimeContext: {
+      workspaceId: scope.owner.workspaceId,
+      memberId: scope.asker.id,
+      feature: `chat.${scope.mode}`,
+    },
+    telemetry: {
+      functionId: "assistant.chat",
+      includeRuntimeContext: {
+        workspaceId: true,
+        memberId: true,
+        feature: true,
+      },
+    }, // section 8
   });
 }
-export type AssistantUIMessage = InferAgentUIMessage<ReturnType<typeof buildAssistant>>;
+export type AssistantUIMessage = InferAgentUIMessage<
+  ReturnType<typeof buildAssistant>
+>;
 
 // ask(): const result = await buildAssistant(scope).generate({ messages: [...history, userMessage], timeout: { totalMs: 90_000 } });
 ```
+
 The `callOptionsSchema` + `prepareCall` alternative (one module-level agent) works too. It needs a `z.custom<Scope>()` option, and the TOOLS type is fixed at construction, which the factory avoids.
 
 **Context management (fixes A6) without breaking preserved thinking**
+
 - Per the bundled Claude reference, Opus 5.5 thinking blocks are bound to the conversation prefix. Blocks can be dropped **from the front** of the history but not edited in the middle. Enforcement applies to accounts created on or after 2026-08-31 and is decided per model. Through OpenRouter the relevant account is OpenRouter's, so verify behavior empirically.
 - So don't call `pruneMessages({ reasoning: 'all', toolCalls: 'before-last-3-messages' })` (d.ts:7052) on every step.
 - Instead, when a conversation's history exceeds a budget, start a new window at a turn boundary:
   1. Summarize everything before the cut once, with the fast model.
   2. Store the summary as a pinned user message (`[Earlier in this conversation: …]`).
-  3. Replay `summary + last N whole turns`.
-  This costs one cache miss per compaction instead of one per turn.
+  3. Replay `summary + last N whole turns`. This costs one cache miss per compaction instead of one per turn.
 - The inbox conversation needs this most.
 
 **Not recommended: `HarnessAgent`** (`doc: 03-ai-sdk-harnesses/*`). It runs coding-agent runtimes (Claude Code, Codex, Pi…) inside a sandbox. The packages are marked experimental. It is not a fit for a work-visibility assistant with a fixed tool surface.
@@ -273,6 +332,7 @@ The `callOptionsSchema` + `prepareCall` alternative (one module-level agent) wor
 **What:** pause before a write tool executes, show the user the exact input, and continue only on approval. `needsApproval` on `tool()` is deprecated in v7. Use `toolApproval` on the call or agent.
 
 **Verified APIs** (`doc: 03-agents/06-tool-approvals.mdx`, `03-ai-sdk-core/15-tools-and-tool-calling.mdx` "Tool Execution Approval", `04-ai-sdk-ui/03-chatbot-tool-usage.mdx`; d.ts:3339-3408)
+
 - `toolApproval?: ToolApprovalConfiguration`. Either a `GenericToolApprovalFunction` `({ toolCall, tools, toolsContext, runtimeContext, messages }) => ToolApprovalStatus`, or a per-tool map of statuses / `SingleToolApprovalFunction` `(input, { toolCallId, messages, toolContext, runtimeContext }) => …`.
 - `ToolApprovalStatus = undefined | 'not-applicable' | 'approved' | 'denied' | 'user-approval' | { type, reason? }`. The `reason` on `user-approval` is shown to the approver (`part.approval.requestReason`).
 - With `generateText`, the call returns `tool-approval-request` parts in `result.content` (`part.approvalId`, `part.toolCall`, `part.isAutomatic`). Resume by appending `{ role: 'tool', content: [{ type: 'tool-approval-response', approvalId, approved, reason? }] }` (provider-utils `ToolApprovalResponse`) and calling again. The resumed call's `responseMessages` include the approved tool's result.
@@ -284,28 +344,60 @@ The `callOptionsSchema` + `prepareCall` alternative (one module-level agent) wor
 **Where it plugs in:** `buildAssistant` (section 2) for owner mode. Teammate mode only has `leave_note_for_owner`, which needs no approval. On the streaming route, `toIncoming()` must accept an assistant message whose parts are `approval-responded`. It turns them into a `tool` message only if each `approvalId` matches an **unanswered** `tool-approval-request` in the stored history, so the server stays authoritative.
 
 **Policy sketch** (`TypedToolCall.input` is loosely typed while tools are `ToolSet`)
+
 ```ts
 import type { GenericToolApprovalFunction, ModelMessage } from "ai";
 
-const READS_UNTRUSTED = new Set(["search_activity", "get_card", "work_snapshot", "search_cards"]);
-const sinceLastUser = (ms: ModelMessage[]) => ms.slice(ms.findLastIndex((m) => m.role === "user") + 1);
+const READS_UNTRUSTED = new Set([
+  "search_activity",
+  "get_card",
+  "work_snapshot",
+  "search_cards",
+]);
+const sinceLastUser = (ms: ModelMessage[]) =>
+  ms.slice(ms.findLastIndex((m) => m.role === "user") + 1);
 
-export const ownerApprovalPolicy: GenericToolApprovalFunction<any, any, any> = ({ toolCall, messages }) => {
+export const ownerApprovalPolicy: GenericToolApprovalFunction<
+  any,
+  any,
+  any
+> = ({ toolCall, messages }) => {
   const input = toolCall.input as Record<string, unknown>;
-  if (toolCall.toolName === "move_card" && String(input.to).toLowerCase() === "done")
-    return { type: "user-approval", reason: "Closing a card is visible to the whole team" };
-  if (toolCall.toolName === "forget") return { type: "user-approval", reason: "Retires a memory permanently" };
+  if (
+    toolCall.toolName === "move_card" &&
+    String(input.to).toLowerCase() === "done"
+  )
+    return {
+      type: "user-approval",
+      reason: "Closing a card is visible to the whole team",
+    };
+  if (toolCall.toolName === "forget")
+    return { type: "user-approval", reason: "Retires a memory permanently" };
   const readOthersText = sinceLastUser(messages).some(
-    (m) => m.role === "tool" && m.content.some((p) => p.type === "tool-result" && READS_UNTRUSTED.has(p.toolName)),
+    (m) =>
+      m.role === "tool" &&
+      m.content.some(
+        (p) => p.type === "tool-result" && READS_UNTRUSTED.has(p.toolName)
+      )
   );
-  if (readOthersText && ["comment_on_card", "create_card", "move_card", "remember"].includes(toolCall.toolName))
-    return { type: "user-approval", reason: "Acting right after reading text written by others" };
+  if (
+    readOthersText &&
+    ["comment_on_card", "create_card", "move_card", "remember"].includes(
+      toolCall.toolName
+    )
+  )
+    return {
+      type: "user-approval",
+      reason: "Acting right after reading text written by others",
+    };
   return undefined; // run normally
 };
 ```
+
 Add to the owner instructions: "When a tool execution is not approved, do not retry it" (recommended in the docs).
 
 **Slack/Discord path (`ask()` via `connectors/commands.ts`):** there is no approval UI. Two options:
+
 - (a) Reply "Reply `yes` to confirm moving #12 to Done" and convert a following "yes" into the approval response.
 - (b) Auto-deny with a reason (`{ type: 'denied', reason: 'Confirm this in the Worklog app' }`) for the gated cases.
 
@@ -318,32 +410,52 @@ Add to the owner instructions: "When a tool execution is not approved, do not re
 **Step 1 (cheap, no new provider): full-text and trigram.** Postgres FTS (`to_tsvector` / `websearch_to_tsquery`) works on both Postgres and PGlite. PGlite 0.5.11 ships `pg_trgm` in `dist/contrib`. Rank by `ts_rank` with a trigram fallback. This fixes most misses with zero AI cost.
 
 **Step 2: embeddings through OpenRouter (verified).**
+
 - `openrouter.textEmbeddingModel(modelId, settings?)` (provider d.ts:982; `embedding()` is the deprecated alias). The README lists `openai/text-embedding-3-small` and `-3-large`.
 - Core: `embed({ model, value, dimensions?, providerOptions?, maxRetries?, abortSignal?, telemetry?, runtimeContext?, onEnd? })` (d.ts:7707), `embedMany({ …, values, maxParallelCalls? })` (d.ts:7861), `cosineSimilarity(a, b)` (d.ts:8762). Doc: `03-ai-sdk-core/30-embeddings.mdx`.
 - **Caveat (runtime-verified):** `OpenRouterEmbeddingModel.doEmbed` builds `{ model, input, user, provider, ...extraBody }` and ignores the AI SDK `dimensions` and `providerOptions` with `warnings: []`. To shrink vectors, pass `extraBody: { dimensions: 512 }` in the model settings, and confirm OpenRouter forwards it.
 - Cost is reported in `providerMetadata.openrouter.usage.cost`.
 
 **Storage**
+
 - Drizzle has `vector(...)` (`drizzle-orm/pg-core/columns/vector_extension/vector.d.ts`), but the installed PGlite 0.5.11 exports no pgvector extension (`exports`: `., ./template, ./live, ./worker, ./nodefs, ./opfs-ahp, ./basefs, ./contrib/*`; no `vector` in contrib).
 - Per-member memory sets are small (≤40 profile lines, a few hundred facts, one journal per day). Store `embedding jsonb` (number[]) plus `embedding_model text`, filter in SQL (member, status, **visibility**, kind), and score in-process with `cosineSimilarity`. That is DB-agnostic.
 - Use pgvector only for the large `activities` table, on Postgres deployments.
 
 **Sketch**
+
 ```ts
 // write path: addMemory() -> fire-and-forget, like structureLog
-const { embedding } = await embed({ model: ctx.models.embed, value: row.content, maxRetries: 1,
-  runtimeContext: { workspaceId: row.workspaceId, memberId: row.memberId, feature: "memory.embed" } });
-await ctx.db.update(memories).set({ embedding, embeddingModel: EMBED_ID }).where(eq(memories.id, row.id));
+const { embedding } = await embed({
+  model: ctx.models.embed,
+  value: row.content,
+  maxRetries: 1,
+  runtimeContext: {
+    workspaceId: row.workspaceId,
+    memberId: row.memberId,
+    feature: "memory.embed",
+  },
+});
+await ctx.db
+  .update(memories)
+  .set({ embedding, embeddingModel: EMBED_ID })
+  .where(eq(memories.id, row.id));
 
 // read path: recall(query)
-const candidates = await listMemories(ctx, owner.id, { includePrivate: mode === "owner", limit: 500 }); // visibility enforced here, before ranking
+const candidates = await listMemories(ctx, owner.id, {
+  includePrivate: mode === "owner",
+  limit: 500,
+}); // visibility enforced here, before ranking
 const { embedding: q } = await embed({ model: ctx.models.embed, value: query });
-const vec = candidates.filter((m) => m.embedding).map((m) => ({ m, s: cosineSimilarity(q, m.embedding!) }));
+const vec = candidates
+  .filter((m) => m.embedding)
+  .map((m) => ({ m, s: cosineSimilarity(q, m.embedding!) }));
 const fused = reciprocalRankFusion(ftsRank(candidates, query), vec); // combine lexical + semantic
 return fused.slice(0, 20);
 ```
 
 **Reranking:** `rerank({ model, documents, query, topN? })` (d.ts:10437; doc `03-ai-sdk-core/31-reranking.mdx`) needs a reranking model. **The OpenRouter provider has none**; its interface exposes chat, completion, textEmbeddingModel, imageModel, videoModel, evaluationModel and tools only. Options:
+
 - Add `@ai-sdk/cohere` (`cohere.reranking('rerank-v4.0-fast')`) with its own key.
 - Use Together.ai or Bedrock.
 - Skip it. At these corpus sizes, FTS + embeddings + RRF is enough. P3.
@@ -353,6 +465,7 @@ return fused.slice(0, 20);
 ### 5. Voice work logs — P2
 
 **Verified facts**
+
 - `transcribe({ model: TranscriptionModel, audio, providerOptions?, maxRetries?, abortSignal?, headers?, telemetry?, download? })` is stable in v7 (`experimental_transcribe` is a deprecated alias; d.ts:10663). `experimental_streamTranscribe` handles live audio. Doc: `03-ai-sdk-core/36-transcription.mdx`, with a provider table covering OpenAI `gpt-4o-transcribe` / `whisper-1`, Groq `whisper-large-v3-turbo`, ElevenLabs `scribe_v2`, Deepgram, Mistral Voxtral, AssemblyAI and others.
 - **`@openrouter/ai-sdk-provider@3.1.0` has no transcription model**, so `transcribe()` can't go through OpenRouter.
 - OpenRouter does accept audio as chat input. A user `file` part with `mediaType: 'audio/*'` becomes `{ type: 'input_audio', input_audio: { data, format } }` (`getInputAudioData`, dist/index.js:3639).
@@ -363,23 +476,44 @@ return fused.slice(0, 20);
 - Anthropic models don't take audio input, so this path needs a separate audio-capable OpenRouter model id (e.g. a Gemini Flash or GPT audio model; check `input_modalities` on openrouter.ai/models).
 
 **Two options**
+
 - **(A) OpenRouter-only, one call: transcribe and structure together.** Reuse `Structured` from `src/activity/worklog.ts` plus a `transcript` field:
   ```ts
   const { output } = await generateText({
     model: ctx.models.audio, // openrouter.chat(config.WORKLOG_AUDIO_MODEL)
     instructions: `Transcribe the voice note verbatim, then structure it. ${UNTRUSTED_NOTE}`,
-    messages: [{ role: "user", content: [
-      { type: "text", text: `Author @${author.handle}. Open cards:\n${cardList}\nTeammates: ${team}` },
-      { type: "file", mediaType: normalizeAudioMime(upload.type), data: new Uint8Array(await upload.arrayBuffer()) },
-    ] }],
-    output: Output.object({ schema: Structured.extend({ transcript: z.string() }) }),
+    messages: [
+      {
+        role: "user",
+        content: [
+          {
+            type: "text",
+            text: `Author @${author.handle}. Open cards:\n${cardList}\nTeammates: ${team}`,
+          },
+          {
+            type: "file",
+            mediaType: normalizeAudioMime(upload.type),
+            data: new Uint8Array(await upload.arrayBuffer()),
+          },
+        ],
+      },
+    ],
+    output: Output.object({
+      schema: Structured.extend({ transcript: z.string() }),
+    }),
     timeout: { totalMs: 60_000 },
   });
-  await logWork(ctx, author, { text: output.transcript, via: "voice", kind: output.kind, cardNumber: output.cardNumber });
+  await logWork(ctx, author, {
+    text: output.transcript,
+    via: "voice",
+    kind: output.kind,
+    cardNumber: output.cardNumber,
+  });
   ```
 - **(B) Dedicated STT provider:** `transcribe({ model: openai.transcription('gpt-4o-transcribe'), audio })` (adds `@ai-sdk/openai` and a key), then the existing `logWork` → `structureLog` path. Pick this if web clients send webm, if you need segments or timestamps, or if you want streaming transcription.
 
 **Where it plugs in:** a new multipart route, e.g. `POST /v1/logs/voice`, next to the existing logs route. `LogInput.via` already has `"voice"`. Client formats:
+
 - Safari records `audio/mp4`. Expo's high-quality preset records AAC in an MPEG-4/m4a container (confirm for your `expo-audio` version).
 - Chrome and Firefox record webm. Transcode server-side, record `audio/ogg` where supported, or use option (B).
 
@@ -388,6 +522,7 @@ return fused.slice(0, 20);
 ### 6. OpenRouter Decisions / evaluation models — P3 (alpha)
 
 **Verified**
+
 - The canonical core API in `ai@7.0.153` is **`experimental_decide`** (d.ts:8435). `experimental_evaluate` is now a **deprecated alias** (d.ts:8464-8465). The OpenRouter README still uses `experimental_evaluate`.
 - `DecisionModel = string | Experimental_DecisionModelV4 | Experimental_EvaluationModelV4` (d.ts:562). The runtime adapts `doEvaluate` models (dist/index.js:1140-1155), so `openrouter.evaluationModel(id, settings?)` (provider d.ts:999) plugs into `experimental_decide` directly.
 - Signature: `experimental_decide({ model, state, questions, maxOutputTokens?, reasoning?, maxRetries?, abortSignal?, headers?, providerOptions?, telemetry?, runtimeContext?, onStart?, onEnd? })`.
@@ -403,26 +538,55 @@ return fused.slice(0, 20);
 - Docs: `03-ai-sdk-core/32-decisions.mdx`; OpenRouter README "Evaluation". Test double: `Experimental_DecisionMockModelV4` from `ai/test`.
 
 **Use 1: gate the attention check.** In `runCheck`, the cheap, calibrated decision runs first and the fast LLM only writes the message when notifying. A per-person threshold gives users a real "sensitivity" knob, and stored probabilities make tuning measurable.
+
 ```ts
 import { experimental_decide as decide } from "ai";
 
 const d = await decide({
   model: ctx.models.decide, // openrouter.evaluationModel("typesafe/jev-1.13", { user: member.workspaceId })
-  state: { preferences: memory, lastNotification: automation.state.lastResult ?? null,
-           newItems: pending.map((p) => ({ kind: p.kind, title: p.title, detail: p.body, priority: p.priority, count: p.count })),
-           stillOpen: open.length - pending.length },
-  questions: {
-    interrupt: { type: "boolean", instructions: "Should the assistant interrupt this person now instead of waiting for their next brief?",
-      criteria: { true: "Something new is blocked on them or time-sensitive today, not already in the last notification",
-                  false: "It can wait for the next brief, or repeats the last notification" } },
-    urgency: { type: "score", instructions: "How time-sensitive is the most important new item?",
-      criteria: ["Can wait for the weekly wrap", "Can wait for tomorrow's brief", "Needs attention today", "Blocking someone right now"] },
+  state: {
+    preferences: memory,
+    lastNotification: automation.state.lastResult ?? null,
+    newItems: pending.map((p) => ({
+      kind: p.kind,
+      title: p.title,
+      detail: p.body,
+      priority: p.priority,
+      count: p.count,
+    })),
+    stillOpen: open.length - pending.length,
   },
-  timeout: undefined, abortSignal: AbortSignal.timeout(20_000),
+  questions: {
+    interrupt: {
+      type: "boolean",
+      instructions:
+        "Should the assistant interrupt this person now instead of waiting for their next brief?",
+      criteria: {
+        true: "Something new is blocked on them or time-sensitive today, not already in the last notification",
+        false:
+          "It can wait for the next brief, or repeats the last notification",
+      },
+    },
+    urgency: {
+      type: "score",
+      instructions: "How time-sensitive is the most important new item?",
+      criteria: [
+        "Can wait for the weekly wrap",
+        "Can wait for tomorrow's brief",
+        "Needs attention today",
+        "Blocking someone right now",
+      ],
+    },
+  },
+  timeout: undefined,
+  abortSignal: AbortSignal.timeout(20_000),
 });
-const notify = d.answers.interrupt.probability >= (member.settings.interruptThreshold ?? 0.7);
+const notify =
+  d.answers.interrupt.probability >=
+  (member.settings.interruptThreshold ?? 0.7);
 // only then: generateText({ model: ctx.models.fast, … }) to write the message
 ```
+
 Keep the existing `Output.object` path as the fallback when the Decisions API errors; it is alpha. Answers are not calibrated across providers, so pick thresholds from labeled examples (`32-decisions.mdx`).
 
 **Use 2: offline evals.** The `briefs` table already stores `data` (inputs) and `body` (output). A nightly or CI job can score faithfulness and usefulness with `score` and `boolean` questions, e.g. "Does every claim in the brief appear in the data?" and "Is anything blocked on the reader missing from 'Needs your attention'?". Do the same for consolidation (did a private item end up in team text?) and for `structureLog` classification against hand labels.
@@ -432,6 +596,7 @@ Keep the existing `Output.object` path as the fallback when the Decisions API er
 ### 7. Prompt caching for Anthropic models through OpenRouter — P1
 
 **Verified provider behavior** (dist/index.js)
+
 - **Top-level automatic caching:**
   - Model setting `cache_control: { type: 'ephemeral', ttl?: '5m' | '1h' }` (provider d.ts:165), or
   - per call `providerOptions.openrouter.cacheControl`. In `doGenerate` and `doStream`, `cacheControl` is lifted out and sent as the top-level body field `cache_control`.
@@ -445,6 +610,7 @@ Keep the existing `Output.object` path as the fallback when the Decisions API er
 - Usage mapping: `prompt_tokens_details.cached_tokens` → `usage.inputTokenDetails.cacheReadTokens`, `cache_write_tokens` → `cacheWriteTokens`.
 
 **Anthropic facts** (bundled Claude API reference, `shared/prompt-caching.md`)
+
 - Prefix match in render order tools → system → messages; any byte change invalidates everything after it.
 - Max 4 breakpoints. Top-level auto caching places one on the last cacheable block and moves it forward as the conversation grows.
 - Minimum cacheable prefix is **512 tokens** on Claude Opus 5.5 and Claude Haiku 5.5 (the reference says to check the docs before relying on this).
@@ -452,9 +618,16 @@ Keep the existing `Output.object` path as the fallback when the Decisions API er
 - A breakpoint looks back at most 20 positions.
 
 **Recommendation for Worklog**
+
 - **Chat (`ask` and the streaming route): enable top-level auto caching per call.** Worklog's transcript is already append-only, with stable instructions and tool definitions per conversation, so every turn reads the prior turns from cache.
   ```ts
-  providerOptions: { openrouter: { cacheControl: { type: "ephemeral" } } }
+  providerOptions: {
+    openrouter: {
+      cacheControl: {
+        type: "ephemeral";
+      }
+    }
+  }
   ```
 - **Briefs, custom automations, consolidation and `structureLog`: do not enable auto caching.** Their prompts end in unique per-run data, so the automatic breakpoint would land after the unique tail. You pay the 1.25× write premium on every call and never read it back. A daily brief also can't hit a 5-minute cache.
   - The only borderline case is the 30-minute check (stable instructions + memory). At Haiku 5.5 input prices ($0.10/MTok) and a 2× write for 1-hour TTL, it isn't worth it.
@@ -471,6 +644,7 @@ Keep the existing `Output.object` path as the fallback when the Decisions API er
 ### 8. Telemetry and per-workspace cost tracking — P1
 
 **Verified APIs** (`doc: 03-ai-sdk-core/60-telemetry.mdx`, `65-lifecycle-callbacks.mdx`; d.ts:4777 `Telemetry`, d.ts:1124 `TelemetryOptions`)
+
 - v7 telemetry is opt-out once an integration is registered: `registerTelemetry(...integrations)` (exported).
 - `Telemetry` hooks:
   - `onStart`, `onStepStart`, `onLanguageModelCallStart/End`, `onToolExecutionStart/End`, `onStepEnd`, `onEnd`, `onAbort`, `onError`;
@@ -485,6 +659,7 @@ Keep the existing `Output.object` path as the fallback when the Decisions API er
   - For streaming you also need `compatibility: "strict"` (A7).
 
 **Sketch**
+
 ```ts
 // src/agent/models.ts
 const openrouter = createOpenRouter({ apiKey, appName: "Worklog", appUrl: config.PUBLIC_URL, compatibility: "strict" });
@@ -524,6 +699,7 @@ telemetry: { functionId: "brief.compose", includeRuntimeContext: { workspaceId: 
 ```
 
 **Notes**
+
 - `recordInputs: false` matters because prompts contain private work.
 - `data_collection: "deny"` or `zdr: true` in OpenRouter `provider` routing are the privacy controls for a product that handles private notes. Both are typed in provider d.ts:209-257.
 - Fallbacks:
@@ -540,11 +716,13 @@ telemetry: { functionId: "brief.compose", includeRuntimeContext: { workspaceId: 
 **Current state:** `test/harness.ts` already wraps `MockLanguageModelV4` in `scriptedModel()` and injects it via `ctx.models`. `test/assistant.test.ts` covers owner tools, `remember`, teammate read-only access and log structuring. `test/proactive.test.ts` covers schedules, briefs, the check and consolidation. Build on that.
 
 **Verified test doubles** (`node_modules/ai/dist/test/index.d.ts`; doc `03-ai-sdk-core/55-testing.mdx`)
+
 - `MockLanguageModelV4({ provider?, modelId?, supportedUrls?, doGenerate?, doStream? })`. `doGenerate`/`doStream` accept a function, a single result, or an **array of results** consumed in order. `doGenerateCalls` and `doStreamCalls` record `LanguageModelV4CallOptions` (prompt, tools, providerOptions…).
 - Also exported: `MockEmbeddingModelV4`, `MockRerankingModelV4`, `MockTranscriptionModelV4`, `Experimental_DecisionMockModelV4({ supportedQuestionTypes?, doDecide? })`, `mockValues`, `mockId`, `convertArrayToReadableStream`. `simulateReadableStream` is exported from `ai`.
 - Stream chunks: `text-start`, `text-delta { id, delta }`, `text-end`, then `finish { finishReason: { unified, raw }, usage }`. Mock usage shape: `{ inputTokens: { total, noCache, cacheRead, cacheWrite }, outputTokens: { total, text, reasoning } }`.
 
 **Tests worth adding**
+
 1. **Privacy regression for A1:** a private work log by the owner, then consolidation runs, then a teammate asks the owner's assistant to `recall`. Assert the private content is absent.
 2. **Step limit (A4):** script 10 tool calls. Assert the reply is the fallback and the persisted transcript ends with it.
 3. **Approvals:**
@@ -562,12 +740,22 @@ import { simulateReadableStream } from "ai";
 export function streamingModel(text: string) {
   return new MockLanguageModelV4({
     doStream: async () => ({
-      stream: simulateReadableStream({ chunks: [
-        { type: "text-start", id: "t1" },
-        ...text.split(" ").map((w) => ({ type: "text-delta" as const, id: "t1", delta: w + " " })),
-        { type: "text-end", id: "t1" },
-        { type: "finish", finishReason: { unified: "stop", raw: undefined }, usage },
-      ] }),
+      stream: simulateReadableStream({
+        chunks: [
+          { type: "text-start", id: "t1" },
+          ...text.split(" ").map((w) => ({
+            type: "text-delta" as const,
+            id: "t1",
+            delta: w + " ",
+          })),
+          { type: "text-end", id: "t1" },
+          {
+            type: "finish",
+            finishReason: { unified: "stop", raw: undefined },
+            usage,
+          },
+        ],
+      }),
     }),
   });
 }
@@ -580,6 +768,7 @@ export function streamingModel(text: string) {
 **What:** quarantine. The main owner-mode agent can write (comment, move cards, remember), and its tools return text written by others (Slack, Discord, GitHub, comments). A reader subagent on the fast model, with **no tools**, turns raw untrusted text into a narrow structured digest. The main agent and memory consolidation see only the digest. Instructions embedded in the raw text never reach the model that holds write tools.
 
 **Verified patterns** (`doc: 03-agents/06-subagents.mdx`)
+
 - A tool whose `execute` calls `subagent.generate({ prompt, abortSignal })`. Pass `abortSignal` through.
 - Subagent context is isolated; it starts fresh unless you pass `messages`.
 - `toModelOutput: ({ output }) => ToolResultOutput` controls what the parent model sees (provider-utils `BaseTool.toModelOutput`).
@@ -587,6 +776,7 @@ export function streamingModel(text: string) {
 - Caveat: subagent tools cannot use tool approvals.
 
 **Sketch**
+
 ```ts
 const Digest = z.object({
   summary: z.string().max(600),
@@ -618,6 +808,7 @@ read_card_thread: tool({
 **Where else:** `runConsolidate` (A2). Pass yesterday's third-party-sourced rows through the reader and consolidate from digests. Only self-authored `worklog` rows should be able to create `profile` lines.
 
 **Trade-offs**
+
 - Adds one fast-model call per untrusted read; use it on long threads, not every title.
 - The digest is still model-generated from untrusted input, so keep its schema narrow (lengths, counts, handles only).
 - Pair it with the "acting after reading others' text" approval rule in section 3.
@@ -627,7 +818,7 @@ read_card_thread: tool({
 ## Part C: Other v7 capabilities evaluated, not recommended now
 
 | Capability | Doc | Why not (yet) |
-|---|---|---|
+| --- | --- | --- |
 | `HarnessAgent` (Claude Code, Codex, Pi…) | `03-ai-sdk-harnesses/*` | Experimental; coding-agent runtimes with sandboxes; Worklog has a fixed domain toolset |
 | `WorkflowAgent` | `03-agents/07-workflow-agent.mdx` | Requires the Workflow DevKit runtime; Worklog's DB scheduler already gives durability |
 | Code mode (`@ai-sdk/code-mode`) | `03-ai-sdk-core/18-code-mode.mdx` | Experimental QuickJS sandbox. It could parallelize read tools for briefs, but briefs already gather data deterministically, and code mode can't use approvals |

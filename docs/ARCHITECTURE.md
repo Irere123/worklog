@@ -58,7 +58,7 @@ Replays rebuild activity from the raw inbox. See [CONNECTORS.md](CONNECTORS.md).
 ## The board (Fizzy rules)
 
 | Stage | Meaning | API |
-|---|---|---|
+| --- | --- | --- |
 | `triage` | "Maybe?": new cards land here, waiting for a decision | `DELETE /cards/{n}/triage` sends back |
 | `active` | in one of the board's columns | `POST /cards/{n}/triage {columnId}` |
 | `not_now` | postponed (manually or by entropy) | `POST` / `DELETE /cards/{n}/not_now` |
@@ -93,7 +93,8 @@ The fields that drive this live on `attention_items`: `consideredAt`, `dispositi
   - **owner:** the full toolset, including writes: remember, log work, create and move cards, comment, resolve or answer attention items, give feedback.
   - **teammate:** read-only, team-visible data, plus `leave_note_for_owner`.
 
-  The mode is decided by *who asks*. The toolset and the queries enforce it; it is not left to the prompt.
+  The mode is decided by _who asks_. The toolset and the queries enforce it; it is not left to the prompt.
+
 - **Append-only history.** Model messages are stored verbatim and replayed in full. The instructions are built only from values that don't change within a conversation, and per-turn context (the time, who is asking) goes into the user message. That keeps Anthropic prompt caching effective (enabled through OpenRouter, with the provider pinned for cache locality) and satisfies the preserved-thinking checks.
 - **Inbox.** Briefs and pings are also written into the owner's inbox conversation, so replying "tell me more about #12" has context.
 - **Untrusted content.** Every prompt marks ingested text as data, not instructions. Outbound text is sanitized against the URLs present in its source data.
@@ -104,7 +105,7 @@ The fields that drive this live on `attention_items`: `consideredAt`, `dispositi
 ## Memory
 
 | Kind | Analogue in OpenClaw | Written by |
-|---|---|---|
+| --- | --- | --- |
 | `profile` | `USER.md` | you (`POST /v1/memories`), the assistant (`remember`), nightly consolidation |
 | `fact` | `MEMORY.md` | the same three |
 | `journal` | `memory/YYYY-MM-DD.md` | nightly consolidation, one entry per day and visibility |

@@ -15,7 +15,7 @@ Vendor metrics, such as Bugbot's resolution rate, are self-reported even when th
 ## 0. What the dictated names refer to
 
 | Dictated | Identified as | Confidence | Why |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | "cuss, cuss, the code editor" | **Cursor**, the AI code editor (cursor.com, made by Anysphere) | High | It is the obvious "code editor" match, and Grok Bot ships through Cursor. |
 | "Grobot" / "Grokboat" / "Grokbot" | **Grok Bot**, SpaceXAI's (xAI's) always-on agent product | High | "Grok Bot" is the literal product name. It entered early beta on **2026-08-11** and is distributed and operated through Cursor. It is not Cursor's Bugbot. It is also not the `@grok` reply bot on X, which is a separate product and out of scope. |
 | "Casa" | **Unresolved.** Best candidate: **Capx Casa**, an open-source "control plane for agent-run companies" | Low to medium | See §3. No AI or work product called "Casa" has a meaningful public footprint. |
@@ -58,7 +58,7 @@ Source: [cloud-agent docs](https://cursor.com/docs/cloud-agent.md) [P].
 - **Context.** "Cloud Agents read the entire thread for context when invoked."
 - **Plan first, only when it helps.** "Before Cursor starts changing code, it posts a short plan in the thread when you are fixing a bug or when implementation details would help you follow along. **Straightforward requests skip that note.**"
 - **Live status.** "While it works, Cursor updates a short status under the thread", for example "Cursor is reading code…".
-- **Completion.** An *Open in Cursor* button appears when the agent starts. When it finishes, a Slack notification arrives with *View PR in GitHub*.
+- **Completion.** An _Open in Cursor_ button appears when the agent starts. When it finishes, a Slack notification arrives with _View PR in GitHub_.
 - **Context menu (⋯)** on any agent message: Add follow-up, Switch repository, Delete, View request ID, Give feedback.
 - **Choosing a repository.** Cursor checks, in order:
   1. the message text;
@@ -90,7 +90,7 @@ Source: [Bugbot docs](https://cursor.com/docs/bugbot.md) [P] unless noted.
 
 - Bugbot reviews automatically on every PR update, or manually on command.
 - It leaves inline comments with explanations and fix suggestions.
-- Each comment has *Fix in Cursor* and *Fix in Web* links, which hand the finding to an agent. An optional **Autofix** has its own check.
+- Each comment has _Fix in Cursor_ and _Fix in Web_ links, which hand the finding to an agent. An optional **Autofix** has its own check.
 - It publishes a CI check called `Cursor Bugbot`.
 
 **Noise controls**
@@ -119,6 +119,7 @@ Source: [Bugbot docs](https://cursor.com/docs/bugbot.md) [P] unless noted.
   - **78.13%** by April 2026, against Greptile at 63%, CodeRabbit at 49% and Copilot at 47%.
 
   These are vendor-measured [P: [building-bugbot](https://cursor.com/blog/building-bugbot)].
+
 - **v1 design (July 2025).** Eight parallel passes, each with a different diff ordering, then majority agreement, then a validator model to remove false positives. Later versions became agentic. Cursor says early versions "needed to restrain the models to minimize false positives".
 
 ### 1.5 Memories and Rules: how Cursor learns preferences
@@ -166,9 +167,10 @@ Source: [Usage Analytics](https://cursor.com/docs/account/teams/analytics.md) [P
   - prompt Specificity.
 
   Teams and individuals can be compared.
+
 - **Grok Bot Conversation Insights.**
   - **Type of Work**: Inbox & Briefings, Sales & Pipeline, Customer Support, Engineering & Product, and others.
-  - **Level of Automation**: *Not automated* (the Bot recommended and a person did it), *Semi-automated with human review* (the Bot staged it and waited for approval), and *Fully automated*.
+  - **Level of Automation**: _Not automated_ (the Bot recommended and a person did it), _Semi-automated with human review_ (the Bot staged it and waited for approval), and _Fully automated_.
   - Counts are aggregate only; no conversation content is shown.
 - **Cloud Agent usage.**
   - Agents Created, broken down by originating source;
@@ -202,7 +204,7 @@ Source: [Usage Analytics](https://cursor.com/docs/account/teams/analytics.md) [P
 ### 1.9 How Cursor agents could report into Worklog
 
 | Path | What you get | Notes |
-|---|---|---|
+| --- | --- | --- |
 | **Cloud Agents API with webhook** [P: [webhooks](https://cursor.com/docs/cloud-agent/api/webhooks.md)] | A `statusChange` POST on `FINISHED` or `ERROR`, with `id`, `status`, repo/ref, `branchName`, `prUrl` and `summary`. Signed with HMAC-SHA256 in `X-Webhook-Signature`, plus `X-Webhook-ID`. | Only for agents created through the API with a webhook URL. Agents launched from Slack or the IDE don't call it. |
 | **Repo hooks** (`.cursor/hooks.json`) [P: [hooks](https://cursor.com/docs/hooks.md)] | Cloud agents run repo hooks. Events include `sessionStart`, `stop`, `subagentStart`/`subagentStop` and `afterFileEdit`. | A small script Worklog ships could POST to `/v1/activities`. It would read **agent metadata** [P, preview: [metadata](https://cursor.com/docs/cloud-agent/metadata.md)]: `agent/id`, `agent/source` (`SLACK`, `API`, `AUTOMATIONS`…), `owner/user-id`, `turn/user-id` (who asked this turn), `workspace/repo-url` and `branch-name`. This is the most complete path, because it covers every launch surface. |
 | **Polling** the API (list agents/runs, SSE stream) | Status for agents created elsewhere | Scope depends on the API key. Check whether a team or service-account key lists teammates' agents. |
@@ -245,8 +247,8 @@ Source: [Usage Analytics](https://cursor.com/docs/account/teams/analytics.md) [P
 **Documented mechanics** [P: [security](https://cursor.com/docs/grok-bot/security.md), [settings](https://cursor.com/docs/grok-bot/settings.md), [work](https://cursor.com/docs/grok-bot/work.md)]
 
 1. **Approval cards.**
-   - The card shows "the proposed operation and its inputs", with **Allow once / Always allow / Deny**. *Always allow* saves a matching rule.
-   - *Deny* means "the Bot doesn't try it again until the member sends another message."
+   - The card shows "the proposed operation and its inputs", with **Allow once / Always allow / Deny**. _Always allow_ saves a matching rule.
+   - _Deny_ means "the Bot doesn't try it again until the member sends another message."
    - "Nobody should approve an action whose target or effect they can't identify."
 2. **Auto Review.**
    - "An independent review model" reviews risky actions before they run: shell commands, app calls, computer use, changes to routines and triggers, and delegation to Cloud Agents or subagents.
@@ -260,6 +262,7 @@ Source: [Usage Analytics](https://cursor.com/docs/account/teams/analytics.md) [P
    - "**working** status".
 
    Per-Bot notifications fire only "when that Bot **finishes or is waiting for you**", and are "suppressed while Grok Bot is focused".
+
 4. **Drafts by default for autonomous output.** "Email the Bot writes on its own, including from routines, waits as a draft until the member presses Send." Email you asked for in chat sends after Auto Review or your approval [P: [teams](https://cursor.com/docs/grok-bot/teams.md)].
 5. **Explicit failure over stale data.** Routines should "report missing or stale sources instead of working around them". After "a long period away", Grok Bot asks whether to keep routines running and **pauses them if you don't respond**.
 6. **Reviewable results.** Bots are told to separate "facts found in source systems, assumptions, actions already completed, **actions waiting for approval**, and unresolved questions", and to include source links and a short action log.
@@ -285,7 +288,7 @@ Source: [Usage Analytics](https://cursor.com/docs/account/teams/analytics.md) [P
   - Record up to 10 minutes of screen interaction (no microphone). This produces a **draft skill**.
   - You add decision rules, failure handling and approval boundaries, then **Test** it on a safe input, then schedule it.
   - Recommended order: one-off task → skill → routine, adding the routine "only after retries and failure cases are defined".
-- **Approvals become rules.** *Always allow* writes a rule.
+- **Approvals become rules.** _Always allow_ writes a rule.
 - **Feedback etiquette.**
   - "Reply in a thread when feedback applies to one result."
   - "A reaction alone shouldn't carry a safety-critical decision."
@@ -382,20 +385,20 @@ Each item is labelled **Borrow** or **Avoid**, and maps to (a) agents in the str
    - Webhook targets compatible with Grok routines.
    - Don't depend on vendor analytics. They are aggregate, Enterprise-gated and admin-facing.
 
-3. **(a) Borrow: a "level of automation" tag** on agent activities, from Grok Bot Conversation Insights: *recommended*, *staged for review*, *done autonomously*.
+3. **(a) Borrow: a "level of automation" tag** on agent activities, from Grok Bot Conversation Insights: _recommended_, _staged for review_, _done autonomously_.
    - The weekly wrap and board can then answer "what did agents finish on their own vs. what's waiting on a human?"
    - This is more useful to a team than Cursor's lines-of-code leaderboards.
 
 4. **(b) Borrow: an agent's approval request becomes a first-class attention item** (`kind: approval`).
    - **Content:** the exact operation, target and inputs, because "nobody should approve an action whose target or effect they can't identify".
-   - **Actions:** **Allow once / Always allow / Deny**. *Always allow* writes a narrow rule. *Deny* blocks retries until there is a new instruction.
+   - **Actions:** **Allow once / Always allow / Deny**. _Always allow_ writes a narrow rule. _Deny_ blocks retries until there is a new instruction.
    - **Who can answer:** only the requester, as in Grok's Slack card.
    - **Gates:** approvals skip digest batching, but get their own small push budget. An approval nobody has touched falls back to the next digest instead of re-pinging.
    - The same object can carry Worklog's own planned "tool approvals for owner-mode writes".
    - **Avoid** emoji reactions as approval. Grok's docs say a reaction shouldn't carry a consequential decision.
 
 5. **(c) Borrow: three attention states, and notify only on two events.**
-   - Grok separates *needs you* (question, approval, handoff), *new result* and *working*. It notifies only when a Bot "finishes or is waiting for you", and stays quiet while the app is focused.
+   - Grok separates _needs you_ (question, approval, handoff), _new result_ and _working_. It notifies only when a Bot "finishes or is waiting for you", and stays quiet while the app is focused.
    - Worklog mapping:
      - "agent waiting on you" is high priority and push-eligible;
      - "agent finished" goes to the digest unless you subscribed to that card;

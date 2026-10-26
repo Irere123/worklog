@@ -21,7 +21,7 @@ tool ──webhook──▶ /hooks/{connectionId}[/{channel}]
 Each stage is visible from the API:
 
 | Question | Endpoint |
-|---|---|
+| --- | --- |
 | Is this connection producing signal? Why were things skipped? | `GET /v1/connections/{id}/health` |
 | What exactly arrived, and what happened to each delivery? | `GET /v1/connections/{id}/deliveries` |
 | Which accounts haven't been matched to anyone? | `GET /v1/identities?unlinked=true` |
@@ -33,7 +33,7 @@ Each stage is visible from the API:
 Every connector emits `WorklogEvent`s (`apps/api/src/ingest/types.ts`). The shape follows Activity Streams 2.0: an actor does a kind of thing to an object, inside a container.
 
 | Field | Meaning |
-|---|---|
+| --- | --- |
 | `id` | Built from the source's own ids and timestamps, never the delivery id. Redeliveries, replays and duplicate hooks then land on the same row. |
 | `kind` | `noun.verb`: `pr.opened`, `pr.merged`, `review.submitted`, `comment.created`, `issue.closed`, `code.pushed`, `message.posted`, `release.published`, `deploy.finished`, `agent.task`… |
 | `actor` | `{ id, handle?, name?, bot? }`. The `id` is the most stable one the source has: GitHub numeric id, Slack `U…`. |
@@ -52,7 +52,7 @@ Every connector emits `WorklogEvent`s (`apps/api/src/ingest/types.ts`). The shap
 
 **Shared by every connector** (`ingest/quality.ts`; per-connection settings `bots` and `ignoreKinds`):
 
-- **Bots:** by default only a bot's PRs, releases and deploys are kept, scored at 0.3× importance. Bots can never raise high-priority attention. An account linked to a Worklog *agent* member is a teammate, not a bot.
+- **Bots:** by default only a bot's PRs, releases and deploys are kept, scored at 0.3× importance. Bots can never raise high-priority attention. An account linked to a Worklog _agent_ member is a teammate, not a bot.
 - **Importance:** base scores by kind. A release is 0.9, a merge 0.8, a decision log 0.8, a push 0.3, a chat message 0.25. Briefs rank by importance.
 - **Self-signals:** nobody gets an attention item for their own action.
 
@@ -123,6 +123,7 @@ POST /v1/connections
 ```
 
 **Signature options:**
+
 - `hmac-sha256`: header, optional prefix, hex or base64;
 - `token`: a shared secret in a header;
 - `standard-webhooks`: the `webhook-id`, `webhook-timestamp` and `webhook-signature` headers used by GitLab 19+ and Svix-based services, with replay protection.
@@ -147,8 +148,13 @@ These events get the same identity matching, noise rules, merging and signals as
 Coding agents (Cursor, Grok Bot, Claude Code, OpenCode, your own) are members with API keys. They report with `POST /v1/activities`:
 
 ```json
-{ "kind": "agent.task", "title": "Should I also bump the retry limit to 5?", "thread": "cursor:bc-123",
-  "state": "needs_you", "url": "https://github.com/acme/api/pull/31" }
+{
+  "kind": "agent.task",
+  "title": "Should I also bump the retry limit to 5?",
+  "thread": "cursor:bc-123",
+  "state": "needs_you",
+  "url": "https://github.com/acme/api/pull/31"
+}
 ```
 
 - `onBehalfOf` defaults to the human the agent belongs to.
@@ -172,8 +178,12 @@ export const linearConnector: Connector = {
   settings: [{ key: "boardId", description: "..." }],
   endpoints: { webhook: "" },
   identityNamespace: () => "linear",
-  receive(req, conn) { /* verify signature; return { type: "event", deliveryId, eventType, payload } */ },
-  normalize({ eventType, payload, receivedAt }, conn) { /* pure: return { events } or { events: [], ignored: "why" } */ },
+  receive(req, conn) {
+    /* verify signature; return { type: "event", deliveryId, eventType, payload } */
+  },
+  normalize({ eventType, payload, receivedAt }, conn) {
+    /* pure: return { events } or { events: [], ignored: "why" } */
+  },
 };
 ```
 

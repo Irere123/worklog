@@ -1,6 +1,6 @@
 # Activity ingestion: event model, noise control, pipeline and connectors
 
-*Prepared 2026-10-26. Scope: the canonical event model, noise reduction and data quality, a reliable and scalable ingestion pipeline, connector extensibility (code and no-code), self-hosted forges, and a prioritized change list for Worklog's activity stream.*
+_Prepared 2026-10-26. Scope: the canonical event model, noise reduction and data quality, a reliable and scalable ingestion pipeline, connector extensibility (code and no-code), self-hosted forges, and a prioritized change list for Worklog's activity stream._
 
 ---
 
@@ -32,7 +32,7 @@
    - **pg-boss 12.38** now ships `fromBunSql`, `fromPglite` and `fromDrizzle` adapters. It works on Bun with PGlite [E], so it is a credible fallback.
    - **graphile-worker** needs `pg`. On PGlite it runs only through pglite-socket with `noPreparedStatements` [E]. Not recommended.
 6. **P0 finding (production-only data bug).**
-   - With Bun SQL and drizzle-orm 0.45.4, every `jsonb` value is stored as a JSON *string*, not an object. I reproduced this [E], and Bun issue oven-sh/bun#28819 is still open.
+   - With Bun SQL and drizzle-orm 0.45.4, every `jsonb` value is stored as a JSON _string_, not an object. I reproduced this [E], and Bun issue oven-sh/bun#28819 is still open.
    - Reads through Drizzle hide it. Any SQL-side `->>`, jsonb index or external tool sees strings.
    - Tests on in-process PGlite cannot catch it.
    - Fix it before the inbox starts storing payloads (§4.6).
@@ -49,6 +49,7 @@
 ## 1. How to read this brief
 
 **Evidence labels:**
+
 - **[P] Primary:** I (or a research sub-agent) read the official doc, spec or source code this session.
 - **[E] Experiment:** reproduced by running code in a scratch directory outside the project this session.
 - **[S] Secondary:** search snippet, third-party summary or community post.
@@ -57,11 +58,13 @@
 **Citation style:** works are cited by title and URL. Personal names are omitted under the organization's policy on personal data.
 
 **Effort sizes** match the other research docs:
+
 - **S:** about 1–2 dev-days.
 - **M:** about 3–7 dev-days.
 - **L:** more than 2 weeks.
 
 **Codebase snapshot.**
+
 - I read `apps/api/src/connectors/*`, `api/hooks.ts`, `activity/service.ts`, `members/service.ts`, `jobs/*` and `db/schema.ts`.
 - The code changed **during** this research. Between 12:00 and 12:15 CET another session added:
   - `src/ingest/{types,quality,identity,effects}.ts`
@@ -78,6 +81,7 @@
 ### 2.1 CloudEvents 1.0 as the envelope
 
 **Status** [P]
+
 - The latest core release is v1.0.2 (2022-02-06), and `specversion` stays `"1.0"`.
 - **Required attributes:** `id`, `source` (URI-reference), `specversion` and `type`.
 - **Optional attributes:** `datacontenttype`, `dataschema` (URI), `subject` and `time` (RFC 3339).
@@ -89,7 +93,7 @@
 **Extensions useful to Worklog** [P]. All of them are explicitly "no official standing" and may change.
 
 | Extension | Attribute(s) | Use in Worklog |
-|---|---|---|
+| --- | --- | --- |
 | recordedtime | `recordedtime` | When Worklog recorded the event, as distinct from `time` (when it happened). This is the CloudEvents name for `occurredAt` vs `recordedAt`. |
 | partitioning | `partitionkey` | The thread key, which drives per-thread ordering in the queue. |
 | dataref (claim check) | `dataref` | Points to the raw inbox row: `urn:worklog:inbound:inb_…#/review`. |
@@ -100,10 +104,12 @@
 | data-classification | `dataclassification` (`public`/`internal`/`confidential`/`restricted`) | A natural home for private-channel content. |
 
 **Related standards** [P]
+
 - CloudEvents SQL v1.0.0 (2024) defines filter expressions; consider it later for subscription filters.
 - xRegistry, the CloudEvents event catalog and schema registry, is still at release candidates (rc4, 2026-08-19).
 
 **How Worklog should use CloudEvents.** Use it at the boundaries, not as the storage format:
+
 - **Ingest:** `POST /v1/events` accepting `application/cloudevents+json` and batches. This would sit alongside today's `POST /v1/activities`, for agents and CI that already emit CloudEvents.
 - **Export:** SSE frames and outbound webhooks in CloudEvents structured mode, so consumers can use any CloudEvents SDK.
 - **Inside:** keep normal columns (§6), and render the envelope on the way out.
@@ -111,6 +117,7 @@
 ### 2.2 Activity Streams 2.0 as the vocabulary
 
 **Status** [P]
+
 - AS2 Core and Vocabulary are W3C Recommendations (2017), maintained by a new Social Web WG.
 - **Properties that matter:**
   - `actor`, `object`, `target` (the indirect object), `origin`, `result`, `instrument`
@@ -119,11 +126,13 @@
 - **28 activity types,** including Create, Update, Delete, Add, Remove, Accept, Reject, Invite, Join, Leave, Offer, Question, Undo and View.
 
 **Threading** [P]
+
 - FEP-7888, "Demystifying the context property", is a DRAFT. It says `context` SHOULD resolve to a collection and is kept separate from `inReplyTo`.
 - FEP-f228 (backfilling conversations) and FEP-171b (conversation containers) are also drafts.
 - Lesson: model **thread** (the conversation, e.g. a PR or Slack thread root) separately from **parent** (what this replies to).
 
 **ForgeFed** [P]
+
 - An AS2 extension for forges, still a draft (snapshot 2025-06-18).
 - **Activities:** `Push`, `Apply` (merge), `Resolve` (close a ticket), `Assign`, `Grant`.
 - **Object types:** `Repository`, `Ticket`, `Patch`, `Commit`, `Branch`, `Review`, `ReviewThread`.
@@ -133,6 +142,7 @@
 ### 2.3 Newer standards worth borrowing from
 
 **CDEvents** (CD Foundation) [P]
+
 - Latest is v0.5.1 (2026-04-15). It is pre-1.0, and v0.5.0 broke compatibility (snake_case → camelCase, `context.specversion`).
 - **Source-control events:**
   - `dev.cdevents.change.created.0.4.0`
@@ -145,21 +155,24 @@
 - **Recommendation:** align Worklog's kind names and states so that a future CDEvents exporter is a mapping table, but don't adopt the format.
 
 **OpenTelemetry semantic conventions, `vcs.*`** [P]
+
 - These became Release Candidate in semconv v1.43.0 (2026-07-03).
 - **Attributes:** `vcs.repository.url.full`, `vcs.repository.name`, `vcs.ref.head.name|revision|type`, `vcs.ref.base.*`, `vcs.change.id`, `vcs.change.title`, `vcs.change.state` (`open`, `wip`, `closed`, `merged`), `vcs.owner.name` and `vcs.provider.name` (`github`, `gitlab`, `gitea`, `bitbucket`).
 - `cicd.*` (pipeline run state, result, URL) is also Release Candidate.
 - **Recommendation:** use these exact keys in an `attrs` map on forge events. They are a ready-made, vendor-neutral dictionary, and agents emitting OTel can map 1:1.
 
 **Standard Webhooks** [P]
+
 - Headers: `webhook-id`, `webhook-timestamp` and `webhook-signature: v1,<base64>`, a space-separated list that allows key rotation.
 - **Signing:**
   - The signed string is `id.timestamp.body`.
   - `v1` is HMAC-SHA256 with a `whsec_` secret. `v1a` is ed25519.
   - The reference library allows ±5 minutes of clock skew.
 - **Adopters:** OpenAI, Anthropic, PagerDuty, Clerk, incident.io, Resend, Svix, Twilio and more. **GitLab 19.0+** also uses it (§7).
-- **Recommendation:** use it as Worklog's *outbound* webhook format and as a first-class *inbound* preset.
+- **Recommendation:** use it as Worklog's _outbound_ webhook format and as a first-class _inbound_ preset.
 
 **Others** (one line each)
+
 - **AsyncAPI 3.x** [P]: publish Worklog's event catalog, one message per `kind`.
 - **JSON Schema 2020-12** [P]: `dataschema` targets.
 - **xAPI 2.0** [S]: actor–verb–object statements with `stored` vs `timestamp` and an `authority`. It confirms the shape, and nothing more.
@@ -177,15 +190,15 @@ export const ACTIVITY_SCHEMA = "urn:worklog:schema:activity:1"; // placeholder U
 
 export type ActorRef = {
   /** Identity namespace: "github", "gitea:git.example.com", "gitlab:gitlab.example.com", "slack:T024BE7LD", "webhook:con_123". */
-  ns: string;                         // ★ (today implied by the connection)
+  ns: string; // ★ (today implied by the connection)
   /** The provider's most stable id: GitHub numeric id, Slack U…, GitLab user id. Never a login if an id exists. */
   id: string;
-  handle?: string | null;             // login/username; a hint for manual links and @mentions, not identity
+  handle?: string | null; // login/username; a hint for manual links and @mentions, not identity
   name?: string | null;
   /** user | bot | app (an integration acting as itself) | agent (AI coding agent) | unknown (ghost/deleted). */
-  kind?: "user" | "bot" | "app" | "agent" | "unknown";   // ★ replaces `bot?: boolean`
+  kind?: "user" | "bot" | "app" | "agent" | "unknown"; // ★ replaces `bot?: boolean`
   /** Only when the provider asserts it (Slack users:read.email); used for link suggestions, never displayed. */
-  email?: string | null;              // ★
+  email?: string | null; // ★
 };
 
 export type ObjectRef = {
@@ -196,12 +209,17 @@ export type ObjectRef = {
   title?: string | null;
   url?: string | null;
   /** Current state of the object as of this event: open | draft | merged | closed | approved | changes_requested … */
-  state?: string | null;              // ★
+  state?: string | null; // ★
   /** The object's author, when different from the actor (the PR author on a review event). */
-  author?: ActorRef | null;           // ★
+  author?: ActorRef | null; // ★
 };
 
-export type ContainerRef = { type: "repository" | "channel" | "project" | "service" | "workspace"; key: string; name?: string | null; url?: string | null };
+export type ContainerRef = {
+  type: "repository" | "channel" | "project" | "service" | "workspace";
+  key: string;
+  name?: string | null;
+  url?: string | null;
+};
 
 export type ActivityEventV1 = {
   /** Deterministic, semantic and unique within the provider namespace. The dedupe key for webhooks, redeliveries, backfill and replay. */
@@ -209,47 +227,76 @@ export type ActivityEventV1 = {
   /** "<object>.<verb>", e.g. pr.opened, pr.merged, review.submitted, comment.created, message.posted. See the vocabulary table. */
   kind: string;
   /** upsert (default) or delete: tombstones for deleted messages and comments; edits are upserts with a higher revision. */
-  op?: "upsert" | "delete";           // ★
+  op?: "upsert" | "delete"; // ★
   /** Source revision for last-writer-wins on edits/state changes (e.g. updated_at, Slack edited.ts). Zero-padded string. */
-  revision?: string | null;           // ★ (CloudEvents `sequence`)
-  occurredAt: Date;                   // from the source payload, never the receive time when the source has one
+  revision?: string | null; // ★ (CloudEvents `sequence`)
+  occurredAt: Date; // from the source payload, never the receive time when the source has one
   actor: ActorRef | null;
   /** For agent or automation work: the human it was done for. */
-  agent?: { onBehalfOf?: ActorRef | null; state?: "working" | "needs_you" | "finished" | "failed" } | null;
+  agent?: {
+    onBehalfOf?: ActorRef | null;
+    state?: "working" | "needs_you" | "finished" | "failed";
+  } | null;
   /** The app that produced it on the actor's behalf (GitHub performed_via_github_app, Slack app_id): AS2 `generator`. */
-  generator?: { ns: string; id: string; name?: string | null } | null;   // ★
+  generator?: { ns: string; id: string; name?: string | null } | null; // ★
   object: ObjectRef;
   /** What the object was added to or is about: review → PR, comment → issue, reply → thread root (AS2 `target`). */
-  target?: ObjectRef | null;          // ★
+  target?: ObjectRef | null; // ★
   container?: ContainerRef | null;
   /** The conversation it belongs to (AS2 `context`); also the queue partition key. `parent` is AS2 `inReplyTo`. */
-  thread?: { key: string; parent?: string | null } | null;   // ★ (today: `thread?: string`)
+  thread?: { key: string; parent?: string | null } | null; // ★ (today: `thread?: string`)
   /** Cross-thread grouping, e.g. "github:r612345/commit/9f2c…" shared by a merge and its push (CloudEvents correlationid). */
-  correlationKey?: string | null;     // ★
+  correlationKey?: string | null; // ★
   title: string;
-  body?: { text: string; format: "plain" | "markdown" | "slack_mrkdwn"; truncated: boolean } | null;
+  body?: {
+    text: string;
+    format: "plain" | "markdown" | "slack_mrkdwn";
+    truncated: boolean;
+  } | null;
   url?: string | null;
   /** Typed links: closes/refs to issues and cards, commits, deploys, related URLs. */
-  links?: { rel: "closes" | "refs" | "card" | "commit" | "deploy" | "related"; key?: string; href?: string }[];   // ★
+  links?: {
+    rel: "closes" | "refs" | "card" | "commit" | "deploy" | "related";
+    key?: string;
+    href?: string;
+  }[]; // ★
   /** Everyone mentioned (resolved later to members). Signals stay the "asks something of someone" subset. */
-  mentions?: ActorRef[];              // ★
-  signals?: Signal[];                 // as in src/ingest/types.ts
-  board?: BoardEffect[];              // as in src/ingest/types.ts
-  coalesce?: { key: string; windowMinutes: number; maxSpanMinutes?: number; units: number; template: string } | null;
+  mentions?: ActorRef[]; // ★
+  signals?: Signal[]; // as in src/ingest/types.ts
+  board?: BoardEffect[]; // as in src/ingest/types.ts
+  coalesce?: {
+    key: string;
+    windowMinutes: number;
+    maxSpanMinutes?: number;
+    units: number;
+    template: string;
+  } | null;
   /** Facts the gate and scorer use; set by the connector, so the gate stays connector-agnostic. */
-  quality?: { bot?: boolean; automated?: boolean; draft?: boolean; forced?: boolean; trivial?: boolean; flags?: string[] };   // ★
-  importance?: number;                // connector hint, 0..1
-  visibility?: "team" | "private" | "restricted";   // ★ restricted = private-channel content
+  quality?: {
+    bot?: boolean;
+    automated?: boolean;
+    draft?: boolean;
+    forced?: boolean;
+    trivial?: boolean;
+    flags?: string[];
+  }; // ★
+  importance?: number; // connector hint, 0..1
+  visibility?: "team" | "private" | "restricted"; // ★ restricted = private-channel content
   /** OpenTelemetry-style attributes (vcs.change.state, vcs.ref.head.name, cicd.pipeline.result …). */
-  attrs?: Record<string, string | number | boolean>;   // ★
+  attrs?: Record<string, string | number | boolean>; // ★
   /** Where it came from; recorded on the activity for audit and replay. */
-  source: {                           // ★
-    connector: string; connectorVersion: string; connectionId: string;
-    eventType: string; action?: string | null; deliveryId?: string | null;
+  source: {
+    // ★
+    connector: string;
+    connectorVersion: string;
+    connectionId: string;
+    eventType: string;
+    action?: string | null;
+    deliveryId?: string | null;
     via: "webhook" | "redelivery" | "backfill" | "stream" | "api" | "replay";
   };
   /** Claim-check pointer to the raw delivery (CloudEvents `dataref`). */
-  raw?: { inboundEventId: string; pointer?: string } | null;   // ★
+  raw?: { inboundEventId: string; pointer?: string } | null; // ★
 };
 ```
 
@@ -257,17 +304,17 @@ export type ActivityEventV1 = {
 
 1. **`id` is semantic, built from provider ids.** Some rename-safe templates:
 
-   | Event | `id` template |
-   |---|---|
-   | PR opened | `github:r{repo.id}/pr/{number}/opened` |
-   | PR merged | `github:r{repo.id}/pr/{number}/merged` |
-   | Review | `github:r{repo.id}/pr/{number}/review/{review.id}` |
-   | Issue comment | `github:r{repo.id}/comment/{comment.id}` |
-   | Push | `github:r{repo.id}/push/{ref}/{after}` |
-   | Slack message | `slack:{team}:{channel}:{ts}` |
-
+   | Event         | `id` template                                      |
+   | ------------- | -------------------------------------------------- |
+   | PR opened     | `github:r{repo.id}/pr/{number}/opened`             |
+   | PR merged     | `github:r{repo.id}/pr/{number}/merged`             |
+   | Review        | `github:r{repo.id}/pr/{number}/review/{review.id}` |
+   | Issue comment | `github:r{repo.id}/comment/{comment.id}`           |
+   | Push          | `github:r{repo.id}/push/{ref}/{after}`             |
+   | Slack message | `slack:{team}:{channel}:{ts}`                      |
    - `repository.full_name` changes on rename or transfer, so it goes in `container.name`, not the key.
    - Existing card `externalKey`s (`github:acme/api#42`) are rename-unsafe. Migrate them, or keep both forms in `links`.
+
 2. **`activities.source` must be the provider namespace (`github`, `gitea:host`), not the connection id.** Then two overlapping connections dedupe on `(workspace, source, external_id)`. One example is an org webhook plus a repo webhook, which each deliver the same event with different delivery GUIDs [U]. The in-progress unique index already has this shape.
 3. **`occurredAt` comes from the payload.** Use `merged_at`, `review.submitted_at`, `comment.created_at`, Slack `ts`, GitLab `object_attributes.updated_at`. The baseline uses `ctx.now()` throughout, which breaks backfill and replay ordering.
 4. **Bodies are capped and typed.** Keep 2,000–4,000 characters with `truncated: true`, and keep the raw in the inbox.
@@ -275,19 +322,19 @@ export type ActivityEventV1 = {
 **Vocabulary** (the `kind` set), mapped to standards so exporters are mechanical:
 
 | `kind` | AS2 / ForgeFed | CDEvents | Notes |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | `pr.drafted` | Create (state=draft) | change.created | "now" snapshot only (§3.4) |
 | `pr.opened` | Create / Offer | change.created | also emitted on `ready_for_review` |
 | `pr.updated` | Update | change.updated | pushes to a PR branch, coalesced |
-| `pr.merged` | Apply (ForgeFed) | change.merged | |
+| `pr.merged` | Apply (ForgeFed) | change.merged |  |
 | `pr.closed` | Reject | change.abandoned | closed without merge |
 | `review.requested` | Invite | — | signal → attention |
 | `review.submitted` | Create (Review), target = PR | change.reviewed | object.state = approved/changes_requested/commented |
 | `comment.created` | Create (Note), inReplyTo | — | coalesced per thread |
-| `issue.opened` / `issue.closed` / `issue.reopened` | Create / Resolve / Undo | ticket.created / closed / updated | |
-| `issue.assigned` | Assign (ForgeFed) | ticket.updated | |
+| `issue.opened` / `issue.closed` / `issue.reopened` | Create / Resolve / Undo | ticket.created / closed / updated |  |
+| `issue.assigned` | Assign (ForgeFed) | ticket.updated |  |
 | `code.pushed` | Push (ForgeFed) | (branch.*) | direct pushes only (§3.5) |
-| `release.published` | Create (Release) | — | |
+| `release.published` | Create (Release) | — |  |
 | `deploy.succeeded` / `deploy.failed` | — | (service/environment events) [U] | production only by default |
 | `ci.failed` | — | (pipelineRun.finished) [U] | only on a PR head or the default branch |
 | `message.posted` | Create (Note) | — | thread root; replies roll up into it |
@@ -316,7 +363,12 @@ The input is a `pull_request_review` webhook with `action: submitted` and `revie
     "kind": "review.submitted",
     "op": "upsert",
     "occurredAt": "2026-10-26T09:14:03Z",
-    "actor": { "ns": "github", "id": "583231", "handle": "octocat", "kind": "user" },
+    "actor": {
+      "ns": "github",
+      "id": "583231",
+      "handle": "octocat",
+      "kind": "user"
+    },
     "object": {
       "type": "review",
       "key": "github:r612345/pr/42/review/2398765432",
@@ -329,17 +381,39 @@ The input is a `pull_request_review` webhook with `action: submitted` and `revie
       "title": "Retry failed payments with backoff",
       "url": "https://github.com/acme/api/pull/42",
       "state": "open",
-      "author": { "ns": "github", "id": "1234567", "handle": "payments-dev", "kind": "user" }
+      "author": {
+        "ns": "github",
+        "id": "1234567",
+        "handle": "payments-dev",
+        "kind": "user"
+      }
     },
-    "container": { "type": "repository", "key": "github:r612345", "name": "acme/api", "url": "https://github.com/acme/api" },
+    "container": {
+      "type": "repository",
+      "key": "github:r612345",
+      "name": "acme/api",
+      "url": "https://github.com/acme/api"
+    },
     "thread": { "key": "github:r612345/pr/42" },
     "title": "Requested changes on acme/api#42: Retry failed payments with backoff",
-    "body": { "text": "The retry loop needs a cap; see the inline notes.", "format": "markdown", "truncated": false },
+    "body": {
+      "text": "The retry loop needs a cap; see the inline notes.",
+      "format": "markdown",
+      "truncated": false
+    },
     "url": "https://github.com/acme/api/pull/42#pullrequestreview-2398765432",
     "links": [{ "rel": "closes", "key": "github:r612345/issue/17" }],
     "signals": [
-      { "type": "review_result", "who": { "ns": "github", "id": "1234567" }, "state": "changes_requested" },
-      { "type": "resolve", "who": { "ns": "github", "id": "583231" }, "what": "review_requested" }
+      {
+        "type": "review_result",
+        "who": { "ns": "github", "id": "1234567" },
+        "state": "changes_requested"
+      },
+      {
+        "type": "resolve",
+        "who": { "ns": "github", "id": "583231" },
+        "what": "review_requested"
+      }
     ],
     "coalesce": null,
     "quality": { "bot": false, "automated": false },
@@ -353,9 +427,13 @@ The input is a `pull_request_review` webhook with `action: submitted` and `revie
       "vcs.ref.base.name": "main"
     },
     "source": {
-      "connector": "github", "connectorVersion": "1.3.0", "connectionId": "con_01JB7Q9GH2",
-      "eventType": "pull_request_review", "action": "submitted",
-      "deliveryId": "72d3162e-cc78-11e3-81ab-4c9367dc0958", "via": "webhook"
+      "connector": "github",
+      "connectorVersion": "1.3.0",
+      "connectionId": "con_01JB7Q9GH2",
+      "eventType": "pull_request_review",
+      "action": "submitted",
+      "deliveryId": "72d3162e-cc78-11e3-81ab-4c9367dc0958",
+      "via": "webhook"
     },
     "raw": { "inboundEventId": "inb_01JB7QA0XK", "pointer": "/review" }
   }
@@ -392,18 +470,37 @@ The root message is in opted-in `#eng-log`. Event `ts` `1793003643.000200` is 20
       "key": "slack:T024BE7LD:C04ENGLOG:1793003643.000200",
       "url": "https://acme.slack.com/archives/C04ENGLOG/p1793003643000200"
     },
-    "container": { "type": "channel", "key": "slack:T024BE7LD:C04ENGLOG", "name": "#eng-log" },
+    "container": {
+      "type": "channel",
+      "key": "slack:T024BE7LD:C04ENGLOG",
+      "name": "#eng-log"
+    },
     "thread": { "key": "slack:T024BE7LD:C04ENGLOG:1793003643.000200" },
     "title": "Posted in #eng-log: Referral FHIR R4 mapping is on staging",
-    "body": { "text": "Referral FHIR R4 mapping is on staging. <@U0G9QF9C6> can you smoke-test the consent flow?", "format": "slack_mrkdwn", "truncated": false },
+    "body": {
+      "text": "Referral FHIR R4 mapping is on staging. <@U0G9QF9C6> can you smoke-test the consent flow?",
+      "format": "slack_mrkdwn",
+      "truncated": false
+    },
     "mentions": [{ "ns": "slack:T024BE7LD", "id": "U0G9QF9C6" }],
-    "signals": [{ "type": "mentioned", "who": { "ns": "slack:T024BE7LD", "id": "U0G9QF9C6" }, "excerpt": "can you smoke-test the consent flow?" }],
+    "signals": [
+      {
+        "type": "mentioned",
+        "who": { "ns": "slack:T024BE7LD", "id": "U0G9QF9C6" },
+        "excerpt": "can you smoke-test the consent flow?"
+      }
+    ],
     "quality": { "bot": false, "automated": false, "trivial": false },
     "importance": 0.35,
     "visibility": "team",
     "source": {
-      "connector": "slack", "connectorVersion": "1.1.0", "connectionId": "con_01JB7SLK01",
-      "eventType": "message", "action": null, "deliveryId": "Ev08MFMKH6", "via": "webhook"
+      "connector": "slack",
+      "connectorVersion": "1.1.0",
+      "connectionId": "con_01JB7SLK01",
+      "eventType": "message",
+      "action": null,
+      "deliveryId": "Ev08MFMKH6",
+      "via": "webhook"
     },
     "raw": { "inboundEventId": "inb_01JB7SM3QZ", "pointer": "/event" }
   }
@@ -416,10 +513,21 @@ A reply at `1793005361.004100` (09:02:41Z) normalizes to a **roll-up**, not a ne
 {
   "id": "slack:T024BE7LD:C04ENGLOG:1793005361.004100",
   "kind": "message.replied",
-  "thread": { "key": "slack:T024BE7LD:C04ENGLOG:1793003643.000200", "parent": "slack:T024BE7LD:C04ENGLOG:1793003643.000200" },
-  "target": { "type": "message", "key": "slack:T024BE7LD:C04ENGLOG:1793003643.000200" },
-  "coalesce": { "key": "slack:T024BE7LD:C04ENGLOG:1793003643.000200", "windowMinutes": 1440, "maxSpanMinutes": 4320, "units": 1,
-                "template": "{root} · {n} repl{ies} from {people}" },
+  "thread": {
+    "key": "slack:T024BE7LD:C04ENGLOG:1793003643.000200",
+    "parent": "slack:T024BE7LD:C04ENGLOG:1793003643.000200"
+  },
+  "target": {
+    "type": "message",
+    "key": "slack:T024BE7LD:C04ENGLOG:1793003643.000200"
+  },
+  "coalesce": {
+    "key": "slack:T024BE7LD:C04ENGLOG:1793003643.000200",
+    "windowMinutes": 1440,
+    "maxSpanMinutes": 4320,
+    "units": 1,
+    "template": "{root} · {n} repl{ies} from {people}"
+  },
   "quality": { "trivial": true }
 }
 ```
@@ -443,16 +551,17 @@ The pipeline updates the root activity in place: count, participants, `updatedAt
 ### 3.2 What the established tools do
 
 | Tool | Bot handling | Drafts | Identity | Other rules |
-|---|---|---|---|---|
+| --- | --- | --- | --- | --- |
 | **Swarmia** [P] | Detects bots by GitHub account type, a `[bot]` suffix, names starting or ending in "bot"/"ci", known accounts (github-actions, dependabot) and bot noreply emails. GitLab bots are marked by hand. Manual toggle; auto-detection never clears the mark. Bots are excluded from review metrics, review-request DMs and "From others", but bot PRs still count in throughput. | Treated like other PRs. An optional exclusion rule `Draft status is Draft` applies to "metrics, alerts, work log". | Auto-merges authors that share an email "and complement each other". Never merges bots or AI tools. Remembers rejected pairs. Suggests merges from emails, usernames and names. | Personal DMs "only … when an action is required". A daily team digest. Review-request alerts are crossed out once done. |
 | **LinearB** [P] | Manual: support excludes bot addresses (in-product setting "planned"). | Labels or a title regex; draft time counts as coding time and is excluded from cycle time. | Auto-merge every 24 h. Confidence ≥ 95% merges automatically; 80–94% goes to an admin's Bulk Merge review. Merges are reversible. | Regex branch exclusion (`staging`, `develop`) and file-extension exclusion (lock files, bundles). |
 | **Haystack** [P] | Ignores bot PRs automatically (method not documented). | "Ignores all pull requests in draft" by default; draft time becomes dev time once ready. | PRs by authors on no team are ignored. | Label exclusion rules remove PRs "from all calculations including … notifications". |
 | **DX** [P] | — | — | Links by email by default. Notes that GitHub doesn't expose work emails, except Enterprise Cloud verified domains (`organizationVerifiedDomainEmails`), so it links by username or CSV/SCIM. Multiple accounts per person; an "unlinked users" filter. | — |
-| **Jellyfish** | No public docs found [U]. | | | |
-| **Linear's GitHub integration** [P] | Not documented. | A "drafted" status trigger. | Links by issue ID in the branch name or PR title, or magic words in the title, description or commits. "Magic words in PR comments won't create links." `skip`/`ignore` before the ID opts out. | With several PRs per issue, status changes only when the *last* one reaches the state. |
+| **Jellyfish** | No public docs found [U]. |  |  |  |
+| **Linear's GitHub integration** [P] | Not documented. | A "drafted" status trigger. | Links by issue ID in the branch name or PR title, or magic words in the title, description or commits. "Magic words in PR comments won't create links." `skip`/`ignore` before the ID opts out. | With several PRs per issue, status changes only when the _last_ one reaches the state. |
 | **Slack AI recaps** [P] | Not documented. | — | — | Daily recap of channels you "visit often, but don't tend to participate in". After an absence it covers the days you were away. Cites sources, and only uses what you can access. |
 
 What Worklog should take from them:
+
 - Bots get detected and quieted, not deleted.
 - Email linking is fine for suggestions; auto-linking needs a verified source.
 - Remember rejected links.
@@ -462,19 +571,20 @@ What Worklog should take from them:
 ### 3.3 Bot and automation detection
 
 **Facts** [P] unless marked:
+
 - GitHub user objects carry `type` (`User`, `Bot` or `Organization`).
 - Accounts checked in live API responses [P]:
 
-  | Login | Numeric id | `type` |
-  |---|---|---|
-  | `dependabot[bot]` | 49699333 | Bot |
-  | `github-actions[bot]` | 41898282 | Bot |
-  | `renovate[bot]` | 29139614 | Bot |
-  | `web-flow` (committer on web merges) | 19864447 | **User** |
-  | `ghost` (deleted users) | 10137 | User |
+  | Login                                | Numeric id | `type`   |
+  | ------------------------------------ | ---------- | -------- |
+  | `dependabot[bot]`                    | 49699333   | Bot      |
+  | `github-actions[bot]`                | 41898282   | Bot      |
+  | `renovate[bot]`                      | 29139614   | Bot      |
+  | `web-flow` (committer on web merges) | 19864447   | **User** |
+  | `ghost` (deleted users)              | 10137      | User     |
 
 - **Logins are unreliable for bots.** `copilot-swe-agent[bot]` and `copilot-pull-request-reviewer[bot]` both report login `Copilot` without the suffix [P]. Machine users such as `renovate-bot` are type `User` [P].
-- `performed_via_github_app` on issues and comments is non-null when an app acted with a *user* token [P].
+- `performed_via_github_app` on issues and comments is non-null when an app acted with a _user_ token [P].
 - "Don't assume `sender` always identifies the person who caused an event" [P].
 - **Slack:** current apps' bot messages carry `bot_id` and `bot_profile`, and older ones `subtype: bot_message` [P].
 - **Discord:** `author.bot` and `webhook_id` mark bot messages [U].
@@ -482,11 +592,11 @@ What Worklog should take from them:
 **Rules**
 
 | # | Rule | Result |
-|---|---|---|
+| --- | --- | --- |
 | B1 | `user.type == "Bot"` (GitHub, Gitea `type`) | `actor.kind = "bot"` |
 | B2 | Login matches `/\[bot\]$/i` | bot |
 | B3 | Numeric id in a shipped known-bot list (dependabot, renovate, github-actions, codecov, vercel …), keyed by **id** | bot |
-| B4 | Machine-user heuristic: login or name matches `/(^|[-_.])(bot|ci|automation|deploy|release)([-_.]|$)/i`, or the email is a bot noreply | **suggest** bot: set `identities.bot_source = 'heuristic'` and ask an admin; don't apply silently |
+| B4 | Machine-user heuristic: login or name matches `/(^ | [-_.])(bot | ci | automation | deploy | release)([-_.] | $)/i`, or the email is a bot noreply | **suggest** bot: set `identities.bot_source = 'heuristic'` and ask an admin; don't apply silently |
 | B5 | `performed_via_github_app != null`, Slack `app_id` without `bot_id` (Workflow Builder), GitLab system notes [U] | `quality.automated = true`, `generator` set, actor stays the human |
 | B6 | Commit committer `web-flow` / `noreply@github.com`, or a GitLab or Gitea system committer | never an actor; use the PR merger or pusher |
 | B7 | `sender.id == 10137` (`ghost`) | `actor.kind = "unknown"`; don't attribute |
@@ -494,6 +604,7 @@ What Worklog should take from them:
 | B9 | **The identity is linked to a Worklog agent member** (Copilot, Claude, Devin…) | `actor.kind = "agent"`: **not noise.** Keep at normal importance, set `agent.onBehalfOf` to the human who assigned or triggered it, and never let it raise high-priority attention (the in-progress `cap()` already does this) |
 
 **Policy** (the in-progress `bots: "quiet" | "drop" | "keep"` is the right shape):
+
 - `quiet` is the default. Keep `pr.opened`, `pr.merged`, `release.published` and `deploy.*` at ×0.3 importance, and drop the rest.
 - Coalesce per bot, repo and kind per day. "Dependabot opened 7 PRs in acme/api" becomes one line.
 - Bots can raise attention only through explicit review requests, and then at most at `normal` priority.
@@ -501,7 +612,7 @@ What Worklog should take from them:
 ### 3.4 Draft PRs
 
 | Event | Action |
-|---|---|
+| --- | --- |
 | `pull_request.opened` with `draft: true` | `pr.drafted`, importance 0.15, **not in the feed or briefs**. Shows in `now` ("drafting #42") and counts as card activity (resets entropy). No signals. |
 | `ready_for_review` | `pr.opened` (the moment the team should notice), importance 0.6. Requested reviewers become signals now. |
 | `converted_to_draft` | Update the object state; no activity. Close open `review.requested` attention items on that PR as `dismissed`, reason "back to draft". |
@@ -514,6 +625,7 @@ This combines Haystack (drafts hidden from metrics and notifications) with Linea
 ### 3.5 Pushes: force pushes, rebases, and push-vs-merge dedupe
 
 **Facts** [P]
+
 - A push payload has `ref`, `before`, `after`, `created`, `deleted`, `forced`, `base_ref`, `compare`, `commits[]` (each with `distinct`), `head_commit`, `pusher` and `sender`.
 - Payloads carry ≤ 2048 commits.
 - No event fires for more than 3 tags or more than 5000 branches pushed at once.
@@ -528,7 +640,7 @@ This combines Haystack (drafts hidden from metrics and notifications) with Linea
 **Rules**
 
 | # | Rule |
-|---|---|
+| --- | --- |
 | P1 | Ignore `deleted: true`. For `created: true` with no distinct commits, record the branch creation silently (card activity only). |
 | P2 | Count only `commits[].distinct == true`. If that leaves zero commits, the push carries no new work, so emit nothing. This catches merges into main of already-pushed commits, and fast-forwards. |
 | P3 | `forced: true` (a rebase or amend) produces no "pushed N commits" item. If the branch has an open PR, emit `pr.updated` with `quality.forced = true` at importance 0.1, which touches the PR thread and card clock. Otherwise do nothing. |
@@ -537,10 +649,11 @@ This combines Haystack (drafts hidden from metrics and notifications) with Linea
 | P6 | A push to the default branch with distinct commits and **no** PR is a direct push. Keep it as `code.pushed` with importance +0.15: it bypassed review, which is notable. |
 | P7 | A push to a branch with an open PR becomes `pr.updated`, coalesced per PR in a 2 h window ("pushed 9 commits"), importance 0.2. |
 | P8 | A push to a branch without a PR becomes `code.pushed`, coalesced per (actor, repo, branch): 2 h sliding window, 24 h maximum span. Show the last 5 distinct commit subjects. |
-| P9 | Branches matching workspace `ignoreBranches` regexes (LinearB's pattern, e.g. `^(gh-pages|dependabot/.*|renovate/.*)$`) are dropped. |
+| P9 | Branches matching workspace `ignoreBranches` regexes (LinearB's pattern, e.g. `^(gh-pages | dependabot/.* | renovate/.*)$`) are dropped. |
 | P10 | Ignore `synchronize` for counting, since the matching `push` already covers it. Use it only to refresh PR state (head SHA). |
 
 **Making P4 order-independent.**
+
 - Give `activities` a `correlation_key` and a `precedence` (`pr.merged` = 10, `code.pushed` = 1).
 - When an event's correlation key matches an existing row:
   - The higher precedence stays visible.
@@ -552,7 +665,7 @@ This combines Haystack (drafts hidden from metrics and notifications) with Linea
 The in-progress `coalesce { key, windowMinutes, units, template }` is the right primitive. Add `maxSpanMinutes`, so a busy branch can't grow one item forever, and take `importance = max(...)` across merged events.
 
 | Burst | Key | Window / max span | Result |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | Commits to a branch | actor + repo + branch | 2 h / 24 h | "Pushed 14 commits to feature/x" |
 | Comments by one person on a thread | actor + thread | 30 min / 4 h | "Left 4 comments on #42" |
 | A review and its inline comments | review id | — | One `review.submitted`. `pull_request_review_comment` with a known `pull_request_review_id` adds to its count and is never its own item [P: fields; U: arrival order] |
@@ -562,6 +675,7 @@ The in-progress `coalesce { key, windowMinutes, units, template }` is the right 
 | CI failures on one PR | thread + workflow name | 2 h | One "CI failing on #42" item, updated |
 
 **Mechanics**
+
 - Coalescing updates the existing row in place (`count`, `title`, `updatedAt`, `data.items[]` capped at about 20) and publishes `activity.updated`.
 - It never re-raises attention: signals carry their own dedupe keys.
 - Because the coalesce key sits inside the partition key for all rows above except "actor + channel" and bots, per-thread ordering serializes these updates and avoids lost updates. For the cross-thread keys, use `SELECT … FOR UPDATE` on the coalesced row.
@@ -569,7 +683,7 @@ The in-progress `coalesce { key, windowMinutes, units, template }` is the right 
 ### 3.7 Which GitHub events and actions signal work
 
 | Event | Keep (action → kind) | Drop / other use |
-|---|---|---|
+| --- | --- | --- |
 | `pull_request` | opened (non-draft) / ready_for_review → `pr.opened`; closed + merged → `pr.merged`; closed → `pr.closed`; review_requested → signal; assigned → signal | `edited` (refresh title silently), `labeled`/`unlabeled`, `milestoned`, `locked`, `auto_merge_*`, `enqueued`/`dequeued`, `synchronize` (§3.5), `converted_to_draft` (state only) [P: action list] |
 | `pull_request_review` | submitted → `review.submitted`; an empty-body `commented` review with only inline comments still counts once | `edited`; `dismissed` (state only, and resolves the author's "changes requested" item) |
 | `pull_request_review_comment` | folded into the review | standalone `created` without a review id: coalesce as a comment |
@@ -587,12 +701,13 @@ The in-progress `coalesce { key, windowMinutes, units, template }` is the right 
 ### 3.8 Slack signal extraction
 
 **Facts** [P]
+
 - **Delivery:** ack within 3 s. Up to 3 retries (immediately, after 1 min, after 5 min) with `X-Slack-Retry-Num` and `X-Slack-Retry-Reason`. Respond with `x-slack-no-retry: 1` to stop retries.
 - **Auto-disable:** subscriptions are disabled if more than 95% of deliveries fail within 60 min. Apps receiving fewer than 1,000 events per hour are exempt.
 - **Rate limit:** 30,000 events per workspace, per app, per 60 min. Beyond that Slack sends `app_rate_limited`.
 - **Subtypes:** there are 30+ message subtypes.
   - `message_changed` carries a nested `message` and `edited`.
-  - Replies (`message_replied`) arrive *without* a subtype over the Events API, so detect them by `thread_ts != ts`.
+  - Replies (`message_replied`) arrive _without_ a subtype over the Events API, so detect them by `thread_ts != ts`.
 - **Emails:** `users.info` returns `profile.email` with `users:read.email`.
 - **History limits:** for commercially distributed apps **not on the Slack Marketplace**, `conversations.history` and `conversations.replies` drop to 1 request per minute with `limit` ≤ 15. This applied from 2025-05-29 for new installs and from 2026-03-03 for existing ones. Internal custom apps keep 50+ requests per minute.
 - **API Terms** (2025-10-10), for apps used outside your organization: no "us[ing] API Data to train a large language model", no bulk export, and retention of other organizations' data limited to "the minimum necessary".
@@ -600,7 +715,7 @@ The in-progress `coalesce { key, windowMinutes, units, template }` is the right 
 **Rules**
 
 | # | Rule |
-|---|---|
+| --- | --- |
 | S1 | **Channel opt-in only** (already true). DMs and group DMs (`im`, `mpim`) never become activity, only attention for mentions (already true). |
 | S2 | **Private channels:** only on explicit opt-in, and activity gets `visibility: "restricted"`, readable only by members who are in that channel. When membership can't be checked, store only "active in a private channel" with no body. |
 | S3 | Drop subtypes `channel_join`/`leave`/`topic`/`purpose`/`name`/`archive`, `pinned_item`, `reminder_add`, `bot_message`, `ekm_access_denied`, `assistant_app_thread`. Keep `file_share` (title only: "shared a file", no file content), `thread_broadcast` (a reply, deduped by `ts`) and `me_message`. |
@@ -608,7 +723,7 @@ The in-progress `coalesce { key, windowMinutes, units, template }` is the right 
 | S5 | **Trivial filter.** First strip mentions, `:emoji:` codes, pictographs, punctuation and whitespace. Drop the message as its own item (it still counts toward the thread roll-up) if what remains is empty, or matches the workspace acknowledgement lexicon, or is shorter than 12 characters with no digit or URL. **Override:** never drop a message containing a keyword (`blocked`, `stuck`, `help`, `urgent`, `down`, `broken`, `failing`, `shipped`, `merged`, `deployed`, `released`, `decided`). |
 | S6 | **Thread roll-up:** replies coalesce into the root (§2.6). A reply in a non-opted-in channel still raises a mention signal. Summarize long threads (≥ 5 replies) at **brief time**, citing message ids, never at ingestion: that keeps ingestion cheap and keeps model calls off untrusted text on the hot path. |
 | S7 | Reactions (`reaction_added`) never become activity. Later, a ✅ from the person who asked can resolve that thread's attention item. |
-| S8 | **Bodies:** keep ≤ 2,000 chars. Never fetch files. Raw inbox retention defaults to 30 days for Slack. Never send Slack-derived text to model *training*. Inference for the customer's own briefs is a different matter, but document it in the privacy notice [U: legal reading of the terms]. |
+| S8 | **Bodies:** keep ≤ 2,000 chars. Never fetch files. Raw inbox retention defaults to 30 days for Slack. Never send Slack-derived text to model _training_. Inference for the customer's own briefs is a different matter, but document it in the privacy notice [U: legal reading of the terms]. |
 | S9 | **Self-hosters create their own (internal) Slack app,** today's model, so they are exempt from the non-Marketplace history limits. A hosted multi-tenant Worklog would need Marketplace listing for backfill to work. |
 
 The acknowledgement lexicon is a per-workspace setting. The default English set: `ok, okay, k, kk, thanks, thank you, thx, ty, tysm, cool, nice, great, awesome, sure, yes, yep, yeah, no, nope, np, done, lgtm, +1, will do, on it, got it, noted, sounds good, perfect, ack`. Add per-locale sets. For a Kigali team, that might include `merci`, `murakoze`, `yego` and `sawa` [U: locale choice].
@@ -616,6 +731,7 @@ The acknowledgement lexicon is a per-workspace setting. The default English set:
 ### 3.9 Identity resolution
 
 **Facts** [P]
+
 - GitHub: "Always use the `id` of the user… This value will never change". "Never use identifiers that can change… handles, organization slugs, or email addresses."
 - An old username "becomes available for anyone else to claim".
 - Noreply emails take two forms: `ID+USERNAME@users.noreply.github.com` (accounts since 2017-07-18) and legacy `USERNAME@users.noreply.github.com`.
@@ -627,15 +743,15 @@ The acknowledgement lexicon is a per-workspace setting. The default English set:
 **Rules**
 
 | # | Rule |
-|---|---|
+| --- | --- |
 | I1 | The identity key is `(workspace, namespace, stable_id)`. Self-hosted namespaces include the host (`gitea:git.example.com`, `gitlab:gitlab.example.com`). Slack includes the team (`slack:T…`). Declarative webhooks are per connection (`webhook:con_…`), so a generic webhook can never claim to be a GitHub user. |
 | I2 | Logins are hints. A manual link by login creates a `handle:<login>` placeholder, upgraded to the stable id the first time the pair is seen together. **Upgrade only placeholders:** see the defect in §5.2. |
 | I3 | Auto-link only at high confidence: (a) the person signed in with that provider, so the OAuth account id equals the webhook id (in-progress code does this); (b) the email is provider-verified and matches the member's verified email exactly (Slack `users.info`; GitHub Enterprise verified-domain email); (c) a GitHub noreply email `ID+login@…` whose `ID` is already linked. |
 | I4 | Medium confidence becomes a **suggestion**, never a link: a commit-author email equal to the member's email, a similar display name, the same login across providers. Store it in `identity_link_suggestions` with method and confidence. |
 | I5 | **Never auto-link a bot identity, and remember rejections** (Swarmia). A person may have several identities per provider (DX). |
-| I6 | **Unknown actors:** record the identity with `member_id = null`, keep its events, and show an "Unlinked accounts" queue sorted by event count with actions *Link to…*, *Bot*, *Not a person*, *Ignore*. Linking re-attributes history; the in-progress `linkIdentityToMember` does this. |
-| I7 | **Commit authors:** map author emails through an `email` namespace (a `.mailmap`-like table), using the noreply-email parse first. Never trust a commit author email for *authentication*, only for attribution suggestions. |
-| I8 | **Renames:** when a known stable id arrives with a new login, update `external_handle` and append to `previous_handles`. When a login arrives with a *different* stable id than the one on file for that login, it belongs to a **different person**. Create a new identity and flag the old one. |
+| I6 | **Unknown actors:** record the identity with `member_id = null`, keep its events, and show an "Unlinked accounts" queue sorted by event count with actions _Link to…_, _Bot_, _Not a person_, _Ignore_. Linking re-attributes history; the in-progress `linkIdentityToMember` does this. |
+| I7 | **Commit authors:** map author emails through an `email` namespace (a `.mailmap`-like table), using the noreply-email parse first. Never trust a commit author email for _authentication_, only for attribution suggestions. |
+| I8 | **Renames:** when a known stable id arrives with a new login, update `external_handle` and append to `previous_handles`. When a login arrives with a _different_ stable id than the one on file for that login, it belongs to a **different person**. Create a new identity and flag the old one. |
 
 ### 3.10 Importance scoring
 
@@ -660,6 +776,7 @@ relevance(viewer) = importance
 ```
 
 **Thresholds**
+
 - The feed shows ≥ 0.2.
 - Briefs include ≥ 0.5, plus the top K per person.
 - The assistant's "what is X working on" uses everything ≥ 0.15, including drafts.
@@ -707,10 +824,12 @@ worker(s) ◀── claim (SKIP LOCKED, FIFO per ordering_key) ─┘
 ### 4.2 The inbox (raw-first)
 
 **Why store raw bytes, not just parsed JSON:**
+
 - Signatures cover the exact bytes. JSONB reorders keys and collapses whitespace, so a parsed payload can't be re-verified, can't be used as a faithful test fixture, and can't be re-processed by a connector that needs the original.
 - It sidesteps the Bun jsonb bug (§4.6) for the most important column.
 
 **What to store** (extends the in-progress `inbound_events`):
+
 - `raw_body text`. Compress large bodies later if needed.
 - `headers jsonb`: an allowlist only (`x-github-*`, `x-gitlab-*`, `x-gitea-*`, `webhook-*`, `x-slack-*`, content-type, user-agent). Never `authorization`, never the token header.
 - `body_sha256`
@@ -722,22 +841,24 @@ worker(s) ◀── claim (SKIP LOCKED, FIFO per ordering_key) ─┘
 
 **Delivery id per source** (the inbox's unique key, together with `connection_id`):
 
-| Source | Delivery id |
-|---|---|
-| GitHub | `X-GitHub-Delivery`, stable across redeliveries [P] |
-| Slack | `event_id` [P] |
-| GitLab | `webhook-id` / `Idempotency-Key` (17.4+) [P] |
-| Gitea / Forgejo | `X-Gitea-Delivery` / `X-Forgejo-Delivery` [P] |
-| Standard Webhooks | `webhook-id` [P] |
-| Linear | `Linear-Delivery` [P] |
-| Jira | `X-Atlassian-Webhook-Identifier` [P] |
-| Bitbucket Cloud | `X-Request-UUID` [P] |
-| Fallback | `sha256(body)` |
+| Source            | Delivery id                                         |
+| ----------------- | --------------------------------------------------- |
+| GitHub            | `X-GitHub-Delivery`, stable across redeliveries [P] |
+| Slack             | `event_id` [P]                                      |
+| GitLab            | `webhook-id` / `Idempotency-Key` (17.4+) [P]        |
+| Gitea / Forgejo   | `X-Gitea-Delivery` / `X-Forgejo-Delivery` [P]       |
+| Standard Webhooks | `webhook-id` [P]                                    |
+| Linear            | `Linear-Delivery` [P]                               |
+| Jira              | `X-Atlassian-Webhook-Identifier` [P]                |
+| Bitbucket Cloud   | `X-Request-UUID` [P]                                |
+| Fallback          | `sha256(body)`                                      |
 
-**A failed delivery must be re-processable.** In the baseline, `claimDelivery` records the delivery *before* processing. A processing failure marks it `failed`, but a later GitHub redelivery of the same `X-GitHub-Delivery` then returns `duplicate: true` and is never processed. The failure is permanent, and because the payload was never stored, it can't be replayed either.
+**A failed delivery must be re-processable.** In the baseline, `claimDelivery` records the delivery _before_ processing. A processing failure marks it `failed`, but a later GitHub redelivery of the same `X-GitHub-Delivery` then returns `duplicate: true` and is never processed. The failure is permanent, and because the payload was never stored, it can't be replayed either.
+
 - **Inbox rule:** on conflict, if the existing row is `failed` or `dead`, re-enqueue it. If it is `processed` or `ignored`, answer 200 duplicate.
 
 **Retention:**
+
 - Keep `raw_body` for 30 days (Slack) to 90 days (forges), configurable.
 - After that, null the body and keep the metadata row, so "what happened" stays answerable.
 - Delete in daily batches.
@@ -747,17 +868,18 @@ worker(s) ◀── claim (SKIP LOCKED, FIFO per ordering_key) ─┘
 
 **Comparison** (versions as tested this session):
 
-| | Drizzle-native `jobs` (in progress) | pg-boss 12.38.0 (2026-10-13) | graphile-worker 0.18.0 (2026-09-08) | pgmq |
-|---|---|---|---|---|
+|  | Drizzle-native `jobs` (in progress) | pg-boss 12.38.0 (2026-10-13) | graphile-worker 0.18.0 (2026-09-08) | pgmq |
+| --- | --- | --- | --- | --- |
 | Driver | whatever Drizzle uses (Bun SQL / PGlite) | own `pg`, **or** adapters `fromBunSql`, `fromPglite`, `fromDrizzle`, `fromKnex`, `fromKysely`, `fromPrisma` [P] | `pg` only; PGlite and Bun support requested in open issues #441 and #477 [P] | SQL extension |
 | Bun | yes | README: "Node 22.12 or higher, or Bun"; LISTEN/NOTIFY needs Bun ≥ 1.4, otherwise polling [P]. Bun JSON bugs fixed 2026-09 (#880, #936) [P] | not official | yes (SQL) |
 | PGlite | yes | **works** via `fromPglite` + `backend:'pglite'`: send, fetch, work, complete, fail→retry, `key_strict_fifo` [E] | only through `@electric-sql/pglite-socket` with `noPreparedStatements: true` [E] | on PGlite's extension list; create, send and read worked [E] |
-| Per-key ordering | add `ordering_key` (below) | `key_strict_fifo` policy, but a *failed/dead* job blocks its key [P] | `queue_name` serializes [P] | not confirmed [U] |
+| Per-key ordering | add `ordering_key` (below) | `key_strict_fifo` policy, but a _failed/dead_ job blocks its key [P] | `queue_name` serializes [P] | not confirmed [U] |
 | Dedupe | add `dedupe_key` | `singletonKey`, policies | `job_key` (replace / preserve_run_at) | — |
 | Retries / dead letters | backoff, then `dead` | `retryLimit`/`retryDelay`/`retryBackoff`/`retryDelayMax`, `deadLetter` [P] | fixed `exp(min(attempts,10))` s, `max_attempts` 25 [P] | visibility timeout |
 | Footprint | 1 table, about 200 lines | `pgboss` schema with about 11 tables and partitions [E] | own schema | extension needed on prod Postgres |
 
 **Recommendation: keep the Drizzle-native queue.**
+
 - It runs the identical SQL on Bun SQL and PGlite.
 - It enqueues in the same transaction as the inbox insert.
 - It is small enough to own.
@@ -790,6 +912,7 @@ worker(s) ◀── claim (SKIP LOCKED, FIFO per ordering_key) ─┘
    - The partial unique index is the race backstop: catch `23505` and claim again.
    - Unlike pg-boss, a `dead` job does **not** block its thread. That is the right default for activity, since later events must not stall behind one poisoned payload.
    - Ordering matters for raise-then-resolve pairs. A `review_requested` and the review itself, processed out of order, would leave a stale "wants your review" item. Belt and braces: `resolve` also records a watermark, and `raise` skips if a resolve with a later `occurredAt` exists.
+
 2. **Fencing.** Settle with `WHERE id = $1 AND status = 'running' AND attempts = $2`. Today `settle()` deletes or updates by `id` alone, so a worker whose lease expired (and whose job another worker reclaimed) can delete or requeue the other worker's attempt.
 3. **Jitter:** `delay = min(1h, 10s · 2^(attempts−1)) · (0.75 + random() · 0.5)`.
 4. **Lease heartbeat** for long jobs (backfill pages); recovery of expired leases already exists.
@@ -803,6 +926,7 @@ worker(s) ◀── claim (SKIP LOCKED, FIFO per ordering_key) ─┘
 ### 4.4 Idempotency, ordering and state
 
 Idempotency comes in three layers:
+
 1. **Delivery:** the inbox `(connection_id, delivery_id)` key.
 2. **Semantic:** `activities (workspace, source, external_id)` with a deterministic id (§2.4). This catches redeliveries, backfill overlap and duplicate hooks.
 3. **Effects:** attention dedupe keys (present), board effects by `externalKey` (present), signals keyed on `thread`.
@@ -812,7 +936,7 @@ Idempotency comes in three layers:
 ### 4.5 Replay
 
 - **Endpoint:** `POST /v1/connections/{id}/replay` taking `{since, until, eventTypes?, dryRun: true}`.
-- **What it does:** re-runs `normalize` and `gate` over stored inbox rows with the *current* connector version. A dry run returns a diff: events added, changed (title, importance, kind) and removed.
+- **What it does:** re-runs `normalize` and `gate` over stored inbox rows with the _current_ connector version. A dry run returns a diff: events added, changed (title, importance, kind) and removed.
 - **Applying it:**
   - Rows re-emitted with the same id are updated.
   - Activities tied to an `inbound_event_id` that the new version no longer emits are deleted, or marked suppressed.
@@ -826,6 +950,7 @@ Idempotency comes in three layers:
 ### 4.6 P0: Bun SQL stores `jsonb` as strings
 
 **Reproduction** [E]:
+
 - Setup: drizzle-orm 0.45.4 with `drizzle-orm/bun-sql` on Bun 1.3.6 (the repo's versions), against a Postgres wire server (PGlite through pglite-socket).
 - Inserting `{ repo: "acme/api", n: 1 }` into a `jsonb` column:
   - read back through Drizzle as the correct object;
@@ -833,10 +958,12 @@ Idempotency comes in three layers:
 - The cause: Drizzle's `PgJsonb.mapToDriverValue` returns `JSON.stringify(value)`, and Bun encodes that string again.
 
 **Status of the Bun bug** [P]:
+
 - oven-sh/bun#28819 is **open**, with fix PR #40944 awaiting review.
 - Reported on Bun 1.3.11 through 1.4.3, and on Postgres 16, 17 and 18.
 
 **Impact on Worklog:**
+
 - Production Postgres stores all 13 `jsonb` columns as strings.
 - Nothing in `src` uses SQL-side jsonb operators yet, so today the bug is latent.
 - It will bite the moment the inbox is queried by payload, a jsonb index is added, or analytics or another tool reads the tables.
@@ -844,6 +971,7 @@ Idempotency comes in three layers:
 - PGlite (in-process) tests can't catch it.
 
 **Fixes:**
+
 1. A Drizzle `customType` jsonb that hands the driver the object rather than a string on Bun SQL. Passing the object directly stored a real object [E, via the queue research]. Verify on PGlite too.
 2. Or bind with `sql\`${JSON.stringify(v)}::text::jsonb\``.
 3. Add a startup self-check that inserts a probe row and asserts `jsonb_typeof = 'object'`.
@@ -853,6 +981,7 @@ Idempotency comes in three layers:
 ### 4.7 Backfill, reconcile and missed webhooks
 
 **GitHub** [P]
+
 - "GitHub does not automatically redeliver failed deliveries". Failed deliveries can be redelivered within **3 days**:
   - for a repo or org hook: `GET /repos/{o}/{r}/hooks/{hook_id}/deliveries?status=failure`, then `POST …/deliveries/{id}/attempts`;
   - for an App: `GET /app/hook/deliveries` (needs a JWT).
@@ -862,18 +991,21 @@ Idempotency comes in three layers:
   - `GET /repos/{o}/{r}/issues?state=all&sort=updated&since=…` (includes PRs)
   - `GET /repos/{o}/{r}/issues/comments?since=…&sort=updated`
   - `GET /repos/{o}/{r}/pulls?state=all&sort=updated&direction=desc`, paging until older (it has no `since`)
-  
+
   These synthesize inbox rows with `via: "backfill"`. Semantic ids make overlap harmless.
+
 - **Don't use the Events API for this:**
   - It is "not built to serve real-time use cases".
   - Latency is "30s to 6h", and it returns ≤ 300 events from ≤ 30 days.
   - Since 2025-10-07, PushEvent no longer carries commit summaries or counts, and PR payloads were trimmed.
 
 **Slack**
+
 - Retries cover short outages: 3 attempts over about 6 min.
 - For longer outages, backfill opted-in channels with `conversations.history` and `conversations.replies` since the last seen `ts` per channel. That works with internal-app limits; non-Marketplace distributed apps are throttled to 1 request per minute (§3.8).
 
 **Discord** [P]
+
 - Guild messages arrive **only over the Gateway** (`GUILD_MESSAGES`, plus `MESSAGE_CONTENT` for text).
 - HTTP "Webhook Events" (2024) cover app authorization, entitlements, lobby messages and game direct messages, but not guild messages.
 - The current Discord connector is interactions-only, which is fine for the MVP. Ingesting Discord messages needs a `stream` capability: a long-lived gateway worker.
@@ -884,6 +1016,7 @@ Idempotency comes in three layers:
 ### 4.8 Per-connection health
 
 **Expose `GET /v1/connections/{id}/health`, with hourly rollups:**
+
 - `received`, `processed`, `ignored` (top reasons), `failed`, `dead`
 - **`signature_failures`.** Today a bad signature returns 401 and leaves no trace. That is the most common setup error: a wrong secret.
 - `last_event_at` (present), `last_success_at`, `consecutive_failures`
@@ -907,7 +1040,7 @@ Idempotency comes in three layers:
 ### 5.1 Baseline (synchronous mapping, as described in the brief)
 
 | Area | What it does | Issue | Fix (section) |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | `api/hooks.ts` GitHub | verify, then `claimDelivery`, then `handleGithubEvent` inline | Work happens inside GitHub's 10 s budget. On failure the delivery is marked failed **and can never be reprocessed**: a redelivery is treated as a duplicate and nothing was stored | inbox and queue (§4.2) |
 | `api/hooks.ts` Slack | `void handleSlackEvent(...)` | Lost on restart; a Slack retry is deduped away | jobs (§4.1) |
 | `connectors/github.ts` ids | `pr:${ref}:${action}:${deliveryId}`, `review_requested:…:${deliveryId}` | Backfill and duplicate hooks can't dedupe; `ref` uses the renameable `full_name` | semantic ids (§2.4) |
@@ -922,6 +1055,7 @@ Idempotency comes in three layers:
 ### 5.2 In progress (snapshot 12:15): right direction, specific gaps
 
 **Already right:**
+
 - `inbound_events` as the inbox.
 - `jobs` with SKIP LOCKED.
 - A pure `normalize`.
@@ -931,6 +1065,7 @@ Idempotency comes in three layers:
 - `activities` gained `thread_key`, `coalesce_key`, `importance`, `actor_identity_id` and `inbound_event_id`.
 
 **Gaps to close before freezing v1:**
+
 1. **Identity defect in `resolveActor`.** When no candidate has the incoming stable id, it "upgrades" whichever candidate matched by handle (`candidates[0]`), even if that candidate already has a different stable id. After a GitHub rename, someone else can claim the old login [P], and their activity is then attributed to the original member, whose identity is re-keyed.
    - **Fix:** upgrade only rows whose `external_id` starts with `handle:`. Otherwise insert a new identity and flag the conflict (I8).
 2. **Queue:** no `ordering_key` or `dedupe_key`; `settle()` isn't fenced by attempt; no jitter (§4.3).
@@ -946,16 +1081,17 @@ Idempotency comes in three layers:
 ### 6.1 How other platforms define connectors
 
 | Platform | Definition | Auth / verification | Triggers / webhooks | Dedupe / state | Distribution and trust |
-|---|---|---|---|---|---|
+| --- | --- | --- | --- | --- | --- |
 | **Airbyte** [P] | Mostly a **declarative YAML manifest**, built in the Connector Builder. The Python CDK is for what the Builder can't do. The manifest has `streams`, `retriever` (`requester`, `record_selector` with `DpathExtractor`, `paginator`), `incremental_sync` (`DatetimeBasedCursor` with `cursor_field`, `lookback_window`) and Jinja interpolation (`config`, `stream_interval`, `response`). | `ApiKeyAuthenticator`, `BearerAuthenticator`, `OAuthAuthenticator`, `JwtAuthenticator`, … | Pull only: `spec`/`check`/`discover`/`read`, emitting RECORD and STATE messages. | STATE is opaque and handed back only after the destination commits. | `metadata.yaml` (`dockerImageTag`, `supportLevel`, **`allowedHosts`**, `releases.breakingChanges` with `upgradeDeadline`) generates registry JSON. Support levels: Airbyte, Enterprise, Marketplace, Custom. Contribution is via PR. |
 | **Nango** [P] | TypeScript functions: `createSync`, `createAction`, `createOnEvent`. Models are zod. `nango.yaml` was retired (2026-09-15). | Platform-managed OAuth and API keys. | `webhookSubscriptions` plus `onWebhook(nango, payload)`, which should be "short, idempotent, and resilient to duplicates or out-of-order delivery". Nango verifies provider signatures before forwarding and **never forwards an invalid signature**; "allow unverified" is for unsigned providers only. | `getCheckpoint`/`saveCheckpoint` after `batchSave`; `trackDeletesStart`/`End`. | `nango dryrun`, recorded mocks. |
 | **Pipedream** [P] | A JS component object: `key`, `version`, `props`, `hooks` (`activate`/`deactivate`/`deploy`), `run`, `dedupe`. | App props with `$auth`. | `$.interface.http` (raw body available); create the hook in `activate()`, store its id in `$.service.db`. "Always validate the incoming event signature." | `$emit(event, {id, summary, ts})` with **`dedupe: unique | greatest | last`**. | PRs to a monorepo; semver per component; a scrubbed `test-event.mjs`. |
 | **n8n** [P] | `INodeType` + `INodeTypeDescription`; **declarative** nodes (`requestDefaults`, `routing`) or programmatic nodes (`execute`). | `ICredentialType` with `authenticate` and a **`test`** request. | `webhookMethods.default.{checkExists, create, delete}`; a per-hook secret from `randomBytes(32)`; `webhook()` verifies, then returns `workflowData`. | `getWorkflowStaticData('node')` for cursors. | npm `n8n-nodes-*` with keyword `n8n-community-node-package`. **Verified** nodes must have no runtime deps, no env or fs access, provenance publishing from GitHub Actions (since 2026-05-01) and a scanner pass. Community nodes "have full access to the machine". |
-| **Backstage** [P] | `createBackendPlugin` / `createBackendModule`, extension points, `EntityProvider.connect()` → `applyMutation({type:'full'|'delta'})`. | Core services. | Providers push deltas. | `locationKey` resolves conflicts between providers. | npm plus a YAML directory entry; no code review. |
+| **Backstage** [P] | `createBackendPlugin` / `createBackendModule`, extension points, `EntityProvider.connect()` → `applyMutation({type:'full' | 'delta'})`. | Core services. | Providers push deltas. | `locationKey` resolves conflicts between providers. | npm plus a YAML directory entry; no code review. |
 | **Zapier** [P] | `triggers`, `searches`, `creates`, `authentication` (with a required `test`); CLI or Platform UI. | `basic`, `oauth2`, `session`, … | REST hooks: `performSubscribe`, `performUnsubscribe`, `perform`, `performList` (samples). | Polling dedupes on `id`, or `primary` output fields. **Changing the key makes old records fire again.** | Private → review (about 1 week) → 90-day Beta → Public. |
 | **Hookdeck / Svix / Segment / RudderStack** [P] | JS transforms. | Hookdeck HMAC presets per provider. | — | Hookdeck dedupe is "best-effort", up to 1 h. | Sandboxes: Hookdeck V8 isolate (1 s, 128 MB, no network); Svix **QuickJS** with memory limit and interrupt timeout; Segment 5 s; RudderStack 4 s, 128 MB. |
 
 **Lessons**
+
 1. Keep a static manifest separate from optional code.
 2. Make the subscribe lifecycle explicit and idempotent.
 3. Verify before parsing, declaratively, and never accept an invalid signature.
@@ -973,64 +1109,132 @@ This extends the in-progress `Connector` in `src/ingest/types.ts`. It keeps `rec
 import type { z } from "zod";
 
 export type VerifySpec =
-  | { scheme: "hmac"; header: string; algorithm: "sha256" | "sha1"; encoding: "hex" | "base64"; prefix?: string;
+  | {
+      scheme: "hmac";
+      header: string;
+      algorithm: "sha256" | "sha1";
+      encoding: "hex" | "base64";
+      prefix?: string;
       /** What is signed: the raw body, or a template over headers/body, e.g. "{h:x-slack-request-timestamp}:{body}". */
-      signed?: string; timestamp?: { header: string; toleranceSeconds: number; unit?: "s" | "ms" } }
-  | { scheme: "standard-webhooks"; toleranceSeconds?: number }          // webhook-id / -timestamp / -signature (v1, v1a)
-  | { scheme: "token"; header: string }                                  // GitLab X-Gitlab-Token, Gitea Authorization
+      signed?: string;
+      timestamp?: {
+        header: string;
+        toleranceSeconds: number;
+        unit?: "s" | "ms";
+      };
+    }
+  | { scheme: "standard-webhooks"; toleranceSeconds?: number } // webhook-id / -timestamp / -signature (v1, v1a)
+  | { scheme: "token"; header: string } // GitLab X-Gitlab-Token, Gitea Authorization
   | { scheme: "ed25519"; signatureHeader: string; timestampHeader: string } // Discord
-  | { scheme: "stripe"; header: string; toleranceSeconds: number }       // t=…,v1=…
-  | { scheme: "none" };                                                  // admin opt-in, flagged "unverified"
+  | { scheme: "stripe"; header: string; toleranceSeconds: number } // t=…,v1=…
+  | { scheme: "none" }; // admin opt-in, flagged "unverified"
 
 export type ConnectorManifest<C extends z.ZodType, S extends z.ZodType> = {
-  id: string;                       // "github", "gitea", "gitlab", "slack", "webhook"
-  version: string;                  // semver of the mapping; recorded on activities and inbox rows
+  id: string; // "github", "gitea", "gitlab", "slack", "webhook"
+  version: string; // semver of the mapping; recorded on activities and inbox rows
   name: string;
   description: string;
   tier: "core" | "verified" | "community";
-  config: C;                        // non-secret settings → JSON Schema for UIs
-  secrets: S;                       // sealed at rest; never passed to mapping expressions
+  config: C; // non-secret settings → JSON Schema for UIs
+  secrets: S; // sealed at rest; never passed to mapping expressions
   verify: VerifySpec | VerifySpec[]; // several presets (e.g. GitLab token OR standard-webhooks during migration)
-  capabilities: { webhook?: true; backfill?: true; stream?: true; subscribe?: true; commands?: true; deliver?: true };
-  allowedHosts?: string[];          // egress allowlist for io.fetch; may reference config ("${config.baseUrl}")
-  emits: Record<string, { description: string; fixtures: string[] }>;   // kind catalog → AsyncAPI export
+  capabilities: {
+    webhook?: true;
+    backfill?: true;
+    stream?: true;
+    subscribe?: true;
+    commands?: true;
+    deliver?: true;
+  };
+  allowedHosts?: string[]; // egress allowlist for io.fetch; may reference config ("${config.baseUrl}")
+  emits: Record<string, { description: string; fixtures: string[] }>; // kind catalog → AsyncAPI export
   identityNamespace(conn: ConnView<z.infer<C>>): string;
 };
 
-export type Connector<C extends z.ZodType = z.ZodType, S extends z.ZodType = z.ZodType> = ConnectorManifest<C, S> & {
+export type Connector<
+  C extends z.ZodType = z.ZodType,
+  S extends z.ZodType = z.ZodType,
+> = ConnectorManifest<C, S> & {
   /** Edge (in the HTTP request): classify an already-verified delivery. Fast, no DB, no network. */
   receive(req: InboundRequest, conn: ConnView<z.infer<C>>): Received;
   /** Edge: ordering key for the queue (thread), from a cheap look at the payload. */
   partitionKey?(eventType: string, payload: unknown): string | null;
   /** Worker: pure translation. No DB, no network, no clock: use receivedAt. Deterministic ids. */
-  normalize(input: { eventType: string; payload: unknown; receivedAt: Date }, conn: ConnView<z.infer<C>>): Normalized;
+  normalize(
+    input: { eventType: string; payload: unknown; receivedAt: Date },
+    conn: ConnView<z.infer<C>>
+  ): Normalized;
 
   /** Optional capabilities. All network goes through io.fetch (allowedHosts, timeouts, rate limits, retries). */
-  test?(conn: ConnView<z.infer<C>>, io: ConnectorIO): Promise<{ ok: boolean; message?: string }>;
-  subscribe?(conn: ConnView<z.infer<C>>, io: ConnectorIO, webhookUrl: string): Promise<{ hookId: string; secret?: string }>;
-  unsubscribe?(conn: ConnView<z.infer<C>>, io: ConnectorIO, hookId: string): Promise<void>;
+  test?(
+    conn: ConnView<z.infer<C>>,
+    io: ConnectorIO
+  ): Promise<{ ok: boolean; message?: string }>;
+  subscribe?(
+    conn: ConnView<z.infer<C>>,
+    io: ConnectorIO,
+    webhookUrl: string
+  ): Promise<{ hookId: string; secret?: string }>;
+  unsubscribe?(
+    conn: ConnView<z.infer<C>>,
+    io: ConnectorIO,
+    hookId: string
+  ): Promise<void>;
   /** Pull missed or historical events as raw inbox items; yield checkpoints, which are saved after commit. */
-  backfill?(conn: ConnView<z.infer<C>>, io: ConnectorIO, cursor: unknown): AsyncIterable<
-    { item: { deliveryId?: string; eventType: string; payload: unknown } } | { checkpoint: unknown }>;
+  backfill?(
+    conn: ConnView<z.infer<C>>,
+    io: ConnectorIO,
+    cursor: unknown
+  ): AsyncIterable<
+    | { item: { deliveryId?: string; eventType: string; payload: unknown } }
+    | { checkpoint: unknown }
+  >;
   /** Long-lived sources (Discord gateway, Slack Socket Mode): push raw items until aborted. */
-  stream?(conn: ConnView<z.infer<C>>, io: ConnectorIO, emit: (raw: { deliveryId: string; eventType: string; payload: unknown }) => Promise<void>, signal: AbortSignal): Promise<void>;
+  stream?(
+    conn: ConnView<z.infer<C>>,
+    io: ConnectorIO,
+    emit: (raw: {
+      deliveryId: string;
+      eventType: string;
+      payload: unknown;
+    }) => Promise<void>,
+    signal: AbortSignal
+  ): Promise<void>;
   /** Slash commands and interactions: synchronous reply (≤ 3 s), deferring slow work to jobs. */
-  interact?(ctx: CommandContext, conn: ConnView<z.infer<C>>, payload: unknown, channel: string): Promise<unknown>;
+  interact?(
+    ctx: CommandContext,
+    conn: ConnView<z.infer<C>>,
+    payload: unknown,
+    channel: string
+  ): Promise<unknown>;
   /** Outbound: post a brief or ping into the tool (Slack chat.postMessage, Discord channel). */
-  deliver?(conn: ConnView<z.infer<C>>, io: ConnectorIO, target: string, msg: OutboundMessage): Promise<{ externalId?: string }>;
+  deliver?(
+    conn: ConnView<z.infer<C>>,
+    io: ConnectorIO,
+    target: string,
+    msg: OutboundMessage
+  ): Promise<{ externalId?: string }>;
   /** Identity enrichment, e.g. Slack users.info → verified email (feeds link suggestions). */
-  enrichActor?(conn: ConnView<z.infer<C>>, io: ConnectorIO, actor: ActorRef): Promise<Partial<ActorRef>>;
+  enrichActor?(
+    conn: ConnView<z.infer<C>>,
+    io: ConnectorIO,
+    actor: ActorRef
+  ): Promise<Partial<ActorRef>>;
 };
 
 export type ConnectorIO = {
-  fetch(url: string, init?: RequestInit): Promise<Response>;   // enforces allowedHosts, 10 s timeout, 429 back-off
-  kv: { get<T>(k: string): Promise<T | null>; set(k: string, v: unknown): Promise<void> };   // hook ids, cursors
+  fetch(url: string, init?: RequestInit): Promise<Response>; // enforces allowedHosts, 10 s timeout, 429 back-off
+  kv: {
+    get<T>(k: string): Promise<T | null>;
+    set(k: string, v: unknown): Promise<void>;
+  }; // hook ids, cursors
   log: (msg: string, data?: Record<string, unknown>) => void;
   now(): Date;
 };
 ```
 
 **Conformance suite.** A shared `bun test` helper that every connector runs:
+
 - Each `emits[kind].fixtures` file (a recorded payload with headers) normalizes to its snapshot.
 - Normalizing the same input twice gives identical ids, so ids are deterministic.
 - `normalize` makes no network calls: run it with `fetch` stubbed to throw.
@@ -1055,23 +1259,39 @@ verify:
   encoding: hex
   # Sentry's docs sign re-serialized JSON, not the raw body [P]; a code connector may be needed if raw verification fails.
 delivery:
-  id: header("request-id")                       # fallback: sha256(body)
+  id: header("request-id") # fallback: sha256(body)
   eventType: header("sentry-hook-resource") + "." + body.action
-identity: per-connection                          # namespace webhook:<connectionId>; cannot claim github/slack identities
+identity: per-connection # namespace webhook:<connectionId>; cannot claim github/slack identities
 routes:
-  - when: eventType == "issue.created"            # CEL
+  - when: eventType == "issue.created" # CEL
     emit:
       kind: incident.opened
       id: '"sentry:issue/" + string(body.data.issue.id) + "/created"'
       occurredAt: body.data.issue.firstSeen
       actor: null
-      object: { type: incident, key: '"sentry:issue/" + string(body.data.issue.id)', title: $.data.issue.title, url: $.data.issue.web_url }
-      container: { type: project, key: '"sentry:project/" + body.data.issue.project.slug', name: $.data.issue.project.name }
+      object:
+        {
+          type: incident,
+          key: '"sentry:issue/" + string(body.data.issue.id)',
+          title: $.data.issue.title,
+          url: $.data.issue.web_url,
+        }
+      container:
+        {
+          type: project,
+          key: '"sentry:project/" + body.data.issue.project.slug',
+          name: $.data.issue.project.name,
+        }
       thread: '"sentry:issue/" + string(body.data.issue.id)'
       title: "New Sentry issue in {{ data.issue.project.name }}: {{ data.issue.title }}"
       importance: 0.7
   - when: eventType == "issue.resolved"
-    emit: { kind: incident.resolved, id: '"sentry:issue/" + string(body.data.issue.id) + "/resolved"', ... }
+    emit:
+      {
+        kind: incident.resolved,
+        id: '"sentry:issue/" + string(body.data.issue.id) + "/resolved"',
+        ...,
+      }
   - otherwise: { ignore: "unmapped event type" }
 ```
 
@@ -1093,7 +1313,7 @@ routes:
 **Security**
 
 | Risk | Control |
-|---|---|
+| --- | --- |
 | Forged deliveries | Verify **raw bytes** before parsing, with a constant-time compare (`safeEqual` exists). Require a secret. `scheme: none` needs an admin opt-in, is labeled "unverified" in the UI, is rate limited, and can be IP-allowlisted. **Never** accept an invalid signature (Nango's rule). |
 | Replay | Enforce the timestamp tolerance where the scheme has one (Standard Webhooks and Slack ±5 min, Linear ≤ 60 s recommended [P]). Always dedupe on the delivery id. |
 | Impersonation | A per-connection identity namespace. A mapper can't set an actor in `github` or `slack:*`, and can't set `visibility` above what the connection allows. |
@@ -1131,8 +1351,8 @@ routes:
 
 ### 7.1 Forges
 
-| | GitLab | Gitea (v28.2) | Forgejo (v17) / Codeberg | Gogs |
-|---|---|---|---|---|
+|  | GitLab | Gitea (v28.2) | Forgejo (v17) / Codeberg | Gogs |
+| --- | --- | --- | --- | --- |
 | Event header | `X-Gitlab-Event: "Merge Request Hook"` etc.; payload `object_kind` | `X-Gitea-Event` (coarse), `X-Gitea-Event-Type` (precise); **also** `X-GitHub-Event`, `X-GitHub-Event-Type`, `X-GitHub-Delivery`, `X-Gogs-*` | `X-Forgejo-Event`/`-Event-Type`/`-Delivery`, plus the same `X-Gitea-*`, `X-Gogs-*`, `X-GitHub-*` | `X-Gogs-Event`, `X-Github-Event` |
 | Auth | `X-Gitlab-Token`: plain shared token ("weaker"). **19.0+: Standard Webhooks** `webhook-signature: v1,<b64>` over `{webhook-id}.{webhook-timestamp}.{body}`, `whsec_` key; GA in 19.1 [P] | `X-Gitea-Signature`: hex HMAC-SHA256, no prefix; **and** `X-Hub-Signature-256: sha256=<hex>`; empty digest when no secret is set; optional `Authorization` header [P] | `X-Forgejo-Signature` (hex) plus the `X-Hub-Signature-256` set; `Authorization` stored encrypted [P] | `X-Gogs-Signature` (hex); no `X-Hub-*` [P] |
 | Delivery id | `webhook-id` = `Idempotency-Key` (17.4+), `X-Gitlab-Event-UUID`, `X-Gitlab-Webhook-UUID` | `X-Gitea-Delivery` | `X-Forgejo-Delivery` | `X-Gogs-Delivery` |
@@ -1142,6 +1362,7 @@ routes:
 | Users | `user{id, username, name, email:"[REDACTED]"}`; push uses flat `user_id`, `user_username` | `login` plus a `username` alias, numeric `id`; email always a noreply placeholder | same; no user `type` | `login` and `username` |
 
 **Can they share the GitHub mapper?**
+
 - **Gitea and Forgejo: yes, through an adapter** that rewrites deliveries into GitHub's shape before the shared mapper runs:
   - Route on `X-Gitea-Event-Type`, not `X-GitHub-Event`, which carries `pull_request_approved`/`rejected`/`comment`.
   - Turn `reviewed` plus `review.type` into `pull_request_review` / `submitted` / `state`, and synthesize a review id from the delivery id.
@@ -1157,7 +1378,7 @@ routes:
 ### 7.2 Signature presets for the declarative connector
 
 | Preset | Header(s) | Algorithm / encoding | Signed content | Replay protection |
-|---|---|---|---|---|
+| --- | --- | --- | --- | --- |
 | GitHub / Gitea / Forgejo / Bitbucket / Jira admin hooks | `X-Hub-Signature-256: sha256=` (Bitbucket and Jira: `X-Hub-Signature: sha256=`) | HMAC-SHA256, hex | raw body | none; dedupe on delivery id |
 | Gitea / Forgejo / Gogs native | `X-Gitea-Signature` / `X-Forgejo-Signature` / `X-Gogs-Signature` | HMAC-SHA256, hex, no prefix | raw body | none |
 | GitLab ≤ 18 | `X-Gitlab-Token` | shared token, constant-time compare | — | none |
@@ -1177,7 +1398,7 @@ Generalize `verifyGithub` into `verifyHmac({header, prefix, encoding, signed})`.
 ## 8. Prioritized recommendations
 
 | # | Change | Why | Effort |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | 1 | **Fix the Bun SQL jsonb encoding** with a custom jsonb type or a `::text::jsonb` bind, plus a startup self-check, a real-Postgres CI job and a one-off migration (§4.6) | Silent production-only data corruption across 13 columns | **S** |
 | 2 | **Finish raw-first ingestion.** Store raw body, allowlisted headers, sha256, partition key, `via` and connector version. Enqueue in the same transaction and ack in milliseconds. Re-enqueue `failed` duplicates. Move Slack's `void` paths to jobs (§4.1–4.2) | Fixes the permanently failed deliveries in the baseline; enables replay and audit | **M** (partly done) |
 | 3 | **Queue hardening:** `ordering_key` FIFO claim, `dedupe_key`, attempt fencing, jitter, heartbeat (§4.3) | Correctness under parallel workers; raise/resolve order | **S** |
@@ -1199,6 +1420,7 @@ Generalize `verifyGithub` into `verifyHmac({header, prefix, encoding, signed})`.
 | 19 | **Inbox retention** and later partitioning (§4.2) | Privacy and table size | **S** |
 
 **Suggested order:**
+
 - **Week 1:** 1, 3, 6, then 2.
 - **Week 2:** 4, 5.
 - **Week 3:** 7, 8, 9.
@@ -1285,7 +1507,7 @@ lastSuccessAt: ts("last_success_at"),
 
 ## 9. Open questions for the team
 
-1. **Draft visibility.** Should a teammate's draft PR show in *their* `now` snapshot when a colleague asks, or only to the author? The proposal is yes, with the draft clearly labeled.
+1. **Draft visibility.** Should a teammate's draft PR show in _their_ `now` snapshot when a colleague asks, or only to the author? The proposal is yes, with the draft clearly labeled.
 2. **Private Slack channels.** Should they be opt-in with `restricted` visibility, or not supported at all in v1? Restricted needs channel-membership checks (`conversations.members`).
 3. **Hosted vs self-hosted Slack.** A hosted multi-tenant Worklog needs a Marketplace listing for usable history backfill (§3.8), and must follow the API Terms on retention.
 4. **GitHub credentials.** Is a GitHub App the default (installation tokens, App-level failed-delivery API), or a webhook secret plus an optional token?
@@ -1309,6 +1531,7 @@ lastSuccessAt: ts("last_success_at"),
 ## 11. Sources
 
 **Standards**
+
 - CloudEvents spec (main and v1.0.2): https://github.com/cloudevents/spec/blob/main/cloudevents/spec.md · https://raw.githubusercontent.com/cloudevents/spec/ce@v1.0.2/cloudevents/spec.md
 - CloudEvents JSON format: https://github.com/cloudevents/spec/blob/main/cloudevents/formats/json-format.md
 - CloudEvents extensions: https://github.com/cloudevents/spec/tree/main/cloudevents/extensions (README, dataref, partitioning, sequence, recordedtime, authcontext, correlation, data-classification, distributed-tracing)
@@ -1323,6 +1546,7 @@ lastSuccessAt: ts("last_success_at"),
 - AsyncAPI 3.1.0: https://github.com/asyncapi/spec/releases/tag/v3.1.0 · JSON Schema: https://json-schema.org/specification · schema.org Action: https://schema.org/Action · OCSF: https://github.com/ocsf/ocsf-schema/releases · xAPI [S]: https://en.wikipedia.org/wiki/Experience_API
 
 **GitHub**
+
 - Best practices for using webhooks: https://docs.github.com/en/webhooks/using-webhooks/best-practices-for-using-webhooks
 - Handling failed webhook deliveries: https://docs.github.com/en/webhooks/using-webhooks/handling-failed-webhook-deliveries
 - Redelivering webhooks: https://docs.github.com/en/webhooks/testing-and-troubleshooting-webhooks/redelivering-webhooks
@@ -1334,6 +1558,7 @@ lastSuccessAt: ts("last_success_at"),
 - octokit webhook schemas: https://raw.githubusercontent.com/octokit/webhooks/main/payload-schemas/api.github.com/push/event.schema.json
 
 **Slack and Discord**
+
 - Events API: https://docs.slack.dev/apis/events-api/ · message event: https://docs.slack.dev/reference/events/message/ · bot_message, message_replied, message_changed (same section)
 - users.info: https://docs.slack.dev/reference/methods/users.info/ · users.lookupByEmail: https://docs.slack.dev/reference/methods/users.lookupByEmail/ · conversations.history: https://docs.slack.dev/reference/methods/conversations.history/
 - Rate-limit change for non-Marketplace apps (2025-05-29): https://docs.slack.dev/changelog/2025/05/29/rate-limit-changes-for-non-marketplace-apps · changelog with the 2026-03-03 date: https://api.slack.com/changelog/2026-02-real-time-search-api
@@ -1341,6 +1566,7 @@ lastSuccessAt: ts("last_success_at"),
 - Discord Webhook Events: https://docs.discord.com/developers/events/webhook-events · Gateway: https://docs.discord.com/developers/events/gateway · Interactions: https://docs.discord.com/developers/interactions/receiving-and-responding · Change log: https://docs.discord.com/developers/change-log · "A Note to App Developers" [S]: https://support-dev.discord.com/hc/articles/40281523410967
 
 **Vendors**
+
 - Swarmia: https://help.swarmia.com/configuration/teams-and-members/contributors · https://help.swarmia.com/features/metrics/code-metrics · https://help.swarmia.com/configuration/organization-setup/data-quality/pull-request-data-quality · https://help.swarmia.com/configuration/notifications/personal-notifications · https://help.swarmia.com/configuration/team-setup/team-notifications
 - LinearB: https://linearb.helpdocs.io/article/3i0ppmhfan-phase-2-configure-data-metrics-accuracy · https://linearb.helpdocs.io/article/5u3jzvjhbq-auto-merge · https://linearb.helpdocs.io/article/d0q6pz5emg-how-to-merge-accounts · https://linearb.helpdocs.io/article/1s38stsugw-glossary-metrics
 - Haystack: https://support.usehaystack.io/en/articles/6563738-why-are-some-of-my-pull-requests-missing · https://support.usehaystack.io/en/articles/5572281-how-does-haystack-calculate-draft-pull-requests · https://support.usehaystack.io/en/articles/4530721-setting-exclusion-rules
@@ -1349,12 +1575,14 @@ lastSuccessAt: ts("last_success_at"),
 - git mailmap: https://git-scm.com/docs/gitmailmap
 
 **Queues and runtime**
+
 - pg-boss: https://github.com/timgit/pg-boss · database backends: https://pgboss.io/database-backends · issues #880 https://github.com/timgit/pg-boss/issues/880 and #936 https://github.com/timgit/pg-boss/issues/936
 - graphile-worker: https://worker.graphile.org/docs/requirements · job keys: https://worker.graphile.org/docs/job-key · performance: https://worker.graphile.org/docs/performance · issues #441 https://github.com/graphile/worker/issues/441 and #477 https://github.com/graphile/worker/issues/477
 - Bun jsonb double encoding: https://github.com/oven-sh/bun/issues/28819
 - PGlite extensions: https://pglite.dev/extensions/ · Absurd: https://github.com/earendil-works/absurd · DBOS Transact TS: https://github.com/dbos-inc/dbos-transact-ts · River (JS): https://github.com/riverqueue/river/tree/master/js · Oban worker: https://oban.hexdocs.pm/Oban.Worker.html
 
 **Connector platforms and expression languages**
+
 - Airbyte: https://docs.airbyte.com/platform/connector-development/config-based/understanding-the-yaml-file/yaml-overview · reference: …/reference · incremental syncs: …/incremental-syncs · protocol: https://docs.airbyte.com/platform/understanding-airbyte/airbyte-protocol · support levels: https://docs.airbyte.com/integrations/connector-support-levels · metadata file: https://docs.airbyte.com/platform/connector-development/connector-metadata-file
 - Nango: https://nango.dev/docs/guides/functions/webhook-functions · https://nango.dev/docs/guides/platform/webhook-forwarding · https://nango.dev/docs/guides/functions/syncs/checkpoints · https://nango.dev/docs/guides/functions/syncs/deletion-detection · https://nango.dev/docs/guides/platform/migrations/migrate-to-zero-yaml
 - Pipedream: https://pipedream.com/docs/components/contributing/api · https://pipedream.com/docs/components/contributing/guidelines
@@ -1366,6 +1594,7 @@ lastSuccessAt: ts("last_success_at"),
 - Trust models: Grafana plugin signatures https://grafana.com/docs/grafana/latest/administration/plugin-management/plugin-sign/ · Home Assistant quality scale https://contributors.home-assistant.io/core/quality-scale/ · HACS https://hacs.xyz/docs/publish/include/ · Obsidian plugin security https://obsidian.md/help/plugin-security · Raycast store https://developers.raycast.com/basics/prepare-an-extension-for-store
 
 **Forges and SaaS webhooks**
+
 - GitLab Webhooks: https://docs.gitlab.com/user/project/integrations/webhooks/ · Webhook events: https://docs.gitlab.com/user/project/integrations/webhook_events/ · System hooks: https://docs.gitlab.com/administration/system_hooks/ · Instance limits: https://docs.gitlab.com/administration/instance_limits/
 - Gitea Webhooks: https://docs.gitea.com/usage/webhooks · source v28.2.0: https://github.com/go-gitea/gitea/tree/v28.2.0/services/webhook and https://github.com/go-gitea/gitea/tree/v28.2.0/modules/structs
 - Forgejo Webhooks: https://forgejo.org/docs/latest/user/webhooks/ · source v17.0.0: https://codeberg.org/forgejo/forgejo/src/tag/v17.0.0/services/webhook · forking post [S]: https://forgejo.org/2024-02-forking-forward/
@@ -1374,6 +1603,7 @@ lastSuccessAt: ts("last_success_at"),
 - Linear webhooks: https://linear.app/developers/webhooks · Jira Cloud webhooks: https://developer.atlassian.com/cloud/jira/platform/webhooks/ · Sentry webhooks: https://docs.sentry.io/organization/integrations/integration-platform/webhooks/ · Stripe webhooks: https://docs.stripe.com/webhooks · PagerDuty signatures: https://docs.pagerduty.com/developer/verifying-webhook-signatures · Shopify HTTPS delivery: https://shopify.dev/docs/apps/build/webhooks/subscribe/https
 
 **Experiments this session** (scratch directories outside the project; no project files touched):
+
 - Queue evaluation (scratch, not in this repo): pg-boss 12.38.0, graphile-worker 0.18.0 and pgmq on Bun 1.3.6 with PGlite 0.5.11 and pglite-socket 0.2.14.
 - jsonb check (scratch, not in this repo): drizzle-orm 0.45.4 with bun-sql against PGlite through pglite-socket, showing `jsonb_typeof = string`.
 - Not tested against a real Postgres server: none is available on this machine.
