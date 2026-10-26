@@ -1,8 +1,8 @@
 import { sql } from "drizzle-orm";
 import { Logger, runMigrations } from "graphile-worker";
 
-import type { AppContext } from "../context";
-import type { Db } from "../db";
+import type { AppContext } from "#context";
+import type { Db } from "#db";
 
 export type JobHandler = (
   ctx: AppContext,

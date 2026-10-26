@@ -2,9 +2,10 @@
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 
-import { loadConfig } from "../config";
-import { schema } from "../db";
-import { ConsoleMailer } from "../delivery/mailer";
+import { loadConfig } from "#config";
+import { schema } from "#db";
+import { ConsoleMailer } from "#delivery/mailer";
+
 import { createAuth } from "./auth";
 
 export const auth = createAuth(

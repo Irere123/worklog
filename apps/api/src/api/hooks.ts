@@ -1,8 +1,8 @@
 import { Hono } from "hono";
 import type { Context } from "hono";
 
-import type { AppContext } from "../context";
-import { receive } from "../ingest/pipeline";
+import type { AppContext } from "#context";
+import { receive } from "#ingest/pipeline";
 
 type HookEnv = { Variables: { ctx: AppContext } };
 

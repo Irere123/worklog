@@ -2,11 +2,12 @@ import { parseCrontab, run, runOnce } from "graphile-worker";
 import type { TaskList } from "graphile-worker";
 import { z } from "zod";
 
-import { runDueAutomations } from "../automations/run";
-import { nudgeDrifting, sweepEntropy } from "../board/service";
-import type { AppContext } from "../context";
-import { processInbound, replayConnection } from "../ingest/pipeline";
-import { DAY_MS } from "../lib/time";
+import { runDueAutomations } from "#automations/run";
+import { nudgeDrifting, sweepEntropy } from "#board/service";
+import type { AppContext } from "#context";
+import { processInbound, replayConnection } from "#ingest/pipeline";
+import { DAY_MS } from "#lib/time";
+
 import { logger } from "./queue";
 
 type Payload = Record<string, unknown>;

@@ -1,30 +1,13 @@
 import { createRoute, z } from "@hono/zod-openapi";
 
-import { ask, askStream, resolveAgent } from "../../agent/assistant";
+import { ask, askStream, resolveAgent } from "#agent/assistant";
 import {
   createConversation,
   getConversation,
   listConversations,
   loadMessages,
-} from "../../agent/conversations";
-import { runAutomation } from "../../automations/run";
-import * as automations from "../../automations/service";
-import {
-  AUTOMATION_KINDS,
-  MEMORY_KINDS,
-  TARGET_KINDS,
-  VISIBILITY,
-} from "../../db/schema";
-import {
-  createTarget,
-  deleteTarget,
-  deliver,
-  listTargets,
-} from "../../delivery/service";
-import { badRequest } from "../../lib/errors";
-import { resolveMember } from "../../members/service";
-import { addMemory, forgetMemory, listMemories } from "../../memory/service";
-import { body, errors, json, Ok, router } from "../router";
+} from "#agent/conversations";
+import { body, errors, json, Ok, router } from "#api/router";
 import {
   AutomationRunSchema,
   AutomationSchema,
@@ -39,7 +22,24 @@ import {
   toMessages,
   toRun,
   toTarget,
-} from "../schemas";
+} from "#api/schemas";
+import { runAutomation } from "#automations/run";
+import * as automations from "#automations/service";
+import {
+  AUTOMATION_KINDS,
+  MEMORY_KINDS,
+  TARGET_KINDS,
+  VISIBILITY,
+} from "#db/schema";
+import {
+  createTarget,
+  deleteTarget,
+  deliver,
+  listTargets,
+} from "#delivery/service";
+import { badRequest } from "#lib/errors";
+import { resolveMember } from "#members/service";
+import { addMemory, forgetMemory, listMemories } from "#memory/service";
 
 const Id = z.object({ id: z.string() });
 const Reply = z

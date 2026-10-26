@@ -1,19 +1,19 @@
 import { generateText } from "ai";
 import { and, desc, eq, gte, ne } from "drizzle-orm";
 
-import { listActivities } from "../activity/service";
-import { TIMEOUTS } from "../agent/models";
-import { UNTRUSTED_NOTE } from "../agent/prompts";
-import { listOpenAttention } from "../attention/service";
-import { listCards } from "../board/service";
-import type { AppContext } from "../context";
-import { briefs, cards, members } from "../db/schema";
-import { returned } from "../lib/assert";
-import { newId } from "../lib/ids";
-import { localParts, startOfLocalDay } from "../lib/time";
-import { getWorkspace, timezoneOf } from "../members/service";
-import type { Member } from "../members/service";
-import { renderMemory } from "../memory/service";
+import { listActivities } from "#activity/service";
+import { TIMEOUTS } from "#agent/models";
+import { UNTRUSTED_NOTE } from "#agent/prompts";
+import { listOpenAttention } from "#attention/service";
+import { listCards } from "#board/service";
+import type { AppContext } from "#context";
+import { briefs, cards, members } from "#db/schema";
+import { returned } from "#lib/assert";
+import { newId } from "#lib/ids";
+import { localParts, startOfLocalDay } from "#lib/time";
+import { getWorkspace, timezoneOf } from "#members/service";
+import type { Member } from "#members/service";
+import { renderMemory } from "#memory/service";
 
 export type Period = "daily" | "weekly";
 export type BriefRow = typeof briefs.$inferSelect;

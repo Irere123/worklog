@@ -1,10 +1,11 @@
 import { and, asc, eq, lte } from "drizzle-orm";
 
-import { raiseAttention } from "../attention/service";
-import type { AppContext } from "../context";
-import { automationRuns, automations, members } from "../db/schema";
-import { notFound } from "../lib/errors";
-import { newId } from "../lib/ids";
+import { raiseAttention } from "#attention/service";
+import type { AppContext } from "#context";
+import { automationRuns, automations, members } from "#db/schema";
+import { notFound } from "#lib/errors";
+import { newId } from "#lib/ids";
+
 import {
   runBrief,
   runCheck,

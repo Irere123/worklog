@@ -11,9 +11,9 @@ import {
 } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
 
-import { recordActivity } from "../activity/service";
-import { raiseAttention } from "../attention/service";
-import type { AppContext } from "../context";
+import { recordActivity } from "#activity/service";
+import { raiseAttention } from "#attention/service";
+import type { AppContext } from "#context";
 import {
   boards,
   cardAssignees,
@@ -25,12 +25,12 @@ import {
   members,
   tags,
   workspaces,
-} from "../db/schema";
-import type { CardStage } from "../db/schema";
-import { returned } from "../lib/assert";
-import { badRequest, notFound } from "../lib/errors";
-import { newId } from "../lib/ids";
-import { DAY_MS } from "../lib/time";
+} from "#db/schema";
+import type { CardStage } from "#db/schema";
+import { returned } from "#lib/assert";
+import { badRequest, notFound } from "#lib/errors";
+import { newId } from "#lib/ids";
+import { DAY_MS } from "#lib/time";
 
 export type Member = typeof members.$inferSelect;
 export type Board = typeof boards.$inferSelect;

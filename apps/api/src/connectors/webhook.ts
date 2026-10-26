@@ -7,8 +7,8 @@ import type {
   ExternalActor,
   Signal,
   WorklogEvent,
-} from "../ingest/types";
-import { safeEqual } from "../lib/crypto";
+} from "#ingest/types";
+import { safeEqual } from "#lib/crypto";
 
 const Template = z.string().max(500);
 const Rule = z.object({

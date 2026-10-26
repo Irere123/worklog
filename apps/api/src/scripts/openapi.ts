@@ -1,6 +1,6 @@
-import { createApp } from "../app";
-import { loadConfig } from "../config";
-import { createContext } from "../context";
+import { createApp } from "#app";
+import { loadConfig } from "#config";
+import { createContext } from "#context";
 
 const ctx = await createContext(
   loadConfig({

@@ -1,17 +1,18 @@
 import { z } from "zod";
 
-import type { AppContext } from "../context";
-import { toSlack } from "../delivery/service";
+import type { AppContext } from "#context";
+import { toSlack } from "#delivery/service";
 import type {
   ConnectionView,
   Connector,
   Normalized,
   Signal,
   WorklogEvent,
-} from "../ingest/types";
-import { hmacHex, safeEqual } from "../lib/crypto";
-import { memberByIdentity } from "../members/service";
-import type { Member } from "../members/service";
+} from "#ingest/types";
+import { hmacHex, safeEqual } from "#lib/crypto";
+import { memberByIdentity } from "#members/service";
+import type { Member } from "#members/service";
+
 import {
   HELP,
   leadingHandle,

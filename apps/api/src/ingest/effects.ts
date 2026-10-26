@@ -1,11 +1,12 @@
 import { and, eq, inArray } from "drizzle-orm";
 
-import { raiseAttention } from "../attention/service";
-import type { AttentionInput } from "../attention/service";
-import * as board from "../board/service";
-import type { AppContext } from "../context";
-import { attentionItems, cards, members } from "../db/schema";
-import type { Priority } from "../db/schema";
+import { raiseAttention } from "#attention/service";
+import type { AttentionInput } from "#attention/service";
+import * as board from "#board/service";
+import type { AppContext } from "#context";
+import { attentionItems, cards, members } from "#db/schema";
+import type { Priority } from "#db/schema";
+
 import { resolveActor } from "./identity";
 import type { BoardEffect, ExternalActor, Signal, WorklogEvent } from "./types";
 

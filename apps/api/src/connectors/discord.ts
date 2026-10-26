@@ -2,10 +2,11 @@ import { createPublicKey, verify } from "node:crypto";
 
 import { z } from "zod";
 
-import type { AppContext } from "../context";
-import type { ConnectionView, Connector } from "../ingest/types";
-import { memberByIdentity } from "../members/service";
-import type { Member } from "../members/service";
+import type { AppContext } from "#context";
+import type { ConnectionView, Connector } from "#ingest/types";
+import { memberByIdentity } from "#members/service";
+import type { Member } from "#members/service";
+
 import { needsDeferral, runCommand } from "./commands";
 
 const API = "https://discord.com/api/v10";

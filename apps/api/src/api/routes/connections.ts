@@ -1,23 +1,23 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import { and, desc, eq } from "drizzle-orm";
 
-import * as conns from "../../connectors/connections";
-import { PushedEvent } from "../../connectors/custom";
-import { registerDiscordCommands } from "../../connectors/discord";
-import { listConnectors } from "../../connectors/registry";
-import { inboundEvents } from "../../db/schema";
-import { linkIdentityToMember, listIdentities } from "../../ingest/identity";
-import { connectionHealth, receivePushed, viewOf } from "../../ingest/pipeline";
-import { enqueue } from "../../jobs/queue";
-import { badRequest, forbidden } from "../../lib/errors";
-import { resolveMember } from "../../members/service";
-import { body, errors, json, Ok, requireAdmin, router } from "../router";
+import { body, errors, json, Ok, requireAdmin, router } from "#api/router";
 import {
   ConnectionSchema,
   IdentitySchema,
   toConnection,
   toIdentity,
-} from "../schemas";
+} from "#api/schemas";
+import * as conns from "#connectors/connections";
+import { PushedEvent } from "#connectors/custom";
+import { registerDiscordCommands } from "#connectors/discord";
+import { listConnectors } from "#connectors/registry";
+import { inboundEvents } from "#db/schema";
+import { linkIdentityToMember, listIdentities } from "#ingest/identity";
+import { connectionHealth, receivePushed, viewOf } from "#ingest/pipeline";
+import { enqueue } from "#jobs/queue";
+import { badRequest, forbidden } from "#lib/errors";
+import { resolveMember } from "#members/service";
 
 const Id = z.object({ id: z.string() });
 

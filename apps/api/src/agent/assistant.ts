@@ -10,12 +10,13 @@ import {
 import type { ModelMessage } from "ai";
 import { eq } from "drizzle-orm";
 
-import { renderSnapshot, workSnapshot } from "../activity/snapshot";
-import type { AppContext } from "../context";
-import { members } from "../db/schema";
-import { badRequest, notFound } from "../lib/errors";
-import { getWorkspace, personalAgentOf, timezoneOf } from "../members/service";
-import type { Member } from "../members/service";
+import { renderSnapshot, workSnapshot } from "#activity/snapshot";
+import type { AppContext } from "#context";
+import { members } from "#db/schema";
+import { badRequest, notFound } from "#lib/errors";
+import { getWorkspace, personalAgentOf, timezoneOf } from "#members/service";
+import type { Member } from "#members/service";
+
 import {
   appendMessages,
   createConversation,

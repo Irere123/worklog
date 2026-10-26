@@ -1,11 +1,12 @@
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 
-import type { AppContext } from "../context";
-import { connections } from "../db/schema";
-import { returned } from "../lib/assert";
-import { badRequest, notFound } from "../lib/errors";
-import { newId } from "../lib/ids";
+import type { AppContext } from "#context";
+import { connections } from "#db/schema";
+import { returned } from "#lib/assert";
+import { badRequest, notFound } from "#lib/errors";
+import { newId } from "#lib/ids";
+
 import { getConnector } from "./registry";
 import { WebhookSettings } from "./webhook";
 

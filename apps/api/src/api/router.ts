@@ -1,9 +1,10 @@
 import { OpenAPIHono, z } from "@hono/zod-openapi";
 
-import type { AppContext } from "../context";
-import { forbidden } from "../lib/errors";
-import { canActFor } from "../members/service";
-import type { Member, SignedInUser } from "../members/service";
+import type { AppContext } from "#context";
+import { forbidden } from "#lib/errors";
+import { canActFor } from "#members/service";
+import type { Member, SignedInUser } from "#members/service";
+
 import { ErrorSchema } from "./schemas";
 
 export type Env = {

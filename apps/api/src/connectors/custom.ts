@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import type { Connector, WorklogEvent } from "../ingest/types";
+import type { Connector, WorklogEvent } from "#ingest/types";
 
 const Actor = z.object({
   id: z.string().min(1),

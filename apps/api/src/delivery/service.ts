@@ -1,11 +1,12 @@
 import { and, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 
-import type { AppContext } from "../context";
-import { connections, deliveryTargets } from "../db/schema";
-import type { TargetKind } from "../db/schema";
-import { badRequest, notFound } from "../lib/errors";
-import { newId } from "../lib/ids";
+import type { AppContext } from "#context";
+import { connections, deliveryTargets } from "#db/schema";
+import type { TargetKind } from "#db/schema";
+import { badRequest, notFound } from "#lib/errors";
+import { newId } from "#lib/ids";
+
 import { toEmailHtml } from "./sanitize";
 
 export type TargetRow = typeof deliveryTargets.$inferSelect;

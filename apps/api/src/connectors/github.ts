@@ -7,8 +7,8 @@ import type {
   Normalized,
   Signal,
   WorklogEvent,
-} from "../ingest/types";
-import { hmacHex, safeEqual } from "../lib/crypto";
+} from "#ingest/types";
+import { hmacHex, safeEqual } from "#lib/crypto";
 
 type User = { login: string; id?: number | null; type?: string; name?: string };
 type Repo = { full_name: string; html_url?: string; default_branch?: string };

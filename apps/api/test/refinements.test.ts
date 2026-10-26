@@ -1,8 +1,9 @@
 import { beforeAll, beforeEach, describe, expect, test } from "bun:test";
 
-import { nudgeDrifting } from "../src/board/service";
-import { sanitizeMarkdown, urlsIn } from "../src/delivery/sanitize";
-import { DAY_MS } from "../src/lib/time";
+import { nudgeDrifting } from "#board/service";
+import { sanitizeMarkdown, urlsIn } from "#delivery/sanitize";
+import { DAY_MS } from "#lib/time";
+
 import { scriptedModel, testEnv } from "./harness";
 import type { TestEnv } from "./harness";
 

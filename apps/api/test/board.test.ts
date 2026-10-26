@@ -1,7 +1,8 @@
 import { beforeAll, beforeEach, describe, expect, test } from "bun:test";
 
-import { sweepEntropy } from "../src/board/service";
-import { DAY_MS } from "../src/lib/time";
+import { sweepEntropy } from "#board/service";
+import { DAY_MS } from "#lib/time";
+
 import { testEnv } from "./harness";
 import type { TestEnv } from "./harness";
 

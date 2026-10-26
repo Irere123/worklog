@@ -1,9 +1,9 @@
 import { and, asc, eq, gt, isNull, lt, or } from "drizzle-orm";
 
-import type { Db } from "../db";
-import { events } from "../db/schema";
-import type { EventType } from "../db/schema";
-import { returned } from "../lib/assert";
+import type { Db } from "#db";
+import { events } from "#db/schema";
+import type { EventType } from "#db/schema";
+import { returned } from "#lib/assert";
 
 export type StoredEvent = typeof events.$inferSelect;
 

@@ -122,6 +122,7 @@ oxfmt and oxlint, with [Ultracite](https://www.ultracite.ai)'s presets, enforce 
 - **`type`, not `interface`:** shapes flow into jsonb columns typed `Record<string, unknown>`, and interfaces don't fit them.
 - **Function declarations:** top-level functions are declarations, and arrows are for callbacks. Put exports first and helpers below them.
 - **Key order is for the reader:** don't sort keys alphabetically.
+- **Imports:** across folders, use the `#` aliases from `apps/api/package.json` (`#lib/errors`, `#db/schema`, `#db`); within a folder, use `./`. Lint rejects `../`.
 - **Fix lint findings instead of silencing them.** Disable a rule for one line only when it really doesn't fit there, and give the reason.
 
 ## Commits

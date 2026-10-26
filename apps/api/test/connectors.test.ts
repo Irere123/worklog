@@ -1,7 +1,8 @@
 import { beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { generateKeyPairSync, sign } from "node:crypto";
 
-import { hmacHex } from "../src/lib/crypto";
+import { hmacHex } from "#lib/crypto";
+
 import { testEnv } from "./harness";
 import type { TestEnv } from "./harness";
 

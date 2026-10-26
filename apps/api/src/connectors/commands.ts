@@ -1,10 +1,10 @@
-import { renderSnapshot, workSnapshot } from "../activity/snapshot";
-import { logWork } from "../activity/worklog";
-import { ask, resolveAgent } from "../agent/assistant";
-import { generateBrief } from "../briefs/service";
-import type { AppContext } from "../context";
-import { resolveMember } from "../members/service";
-import type { Member } from "../members/service";
+import { renderSnapshot, workSnapshot } from "#activity/snapshot";
+import { logWork } from "#activity/worklog";
+import { ask, resolveAgent } from "#agent/assistant";
+import { generateBrief } from "#briefs/service";
+import type { AppContext } from "#context";
+import { resolveMember } from "#members/service";
+import type { Member } from "#members/service";
 
 export type Command = { name: string; text: string; target?: Member | null };
 

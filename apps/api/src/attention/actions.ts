@@ -1,7 +1,8 @@
-import * as board from "../board/service";
-import type { AppContext } from "../context";
-import { badRequest } from "../lib/errors";
-import type { Member } from "../members/service";
+import * as board from "#board/service";
+import type { AppContext } from "#context";
+import { badRequest } from "#lib/errors";
+import type { Member } from "#members/service";
+
 import { assertAction, getAttention, updateAttention } from "./service";
 
 export async function performAttentionAction(

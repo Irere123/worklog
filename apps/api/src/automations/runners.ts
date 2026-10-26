@@ -1,12 +1,12 @@
 import { generateText, Output } from "ai";
 import { z } from "zod";
 
-import { listActivities } from "../activity/service";
-import type { ActivityRow } from "../activity/service";
-import { workSnapshot } from "../activity/snapshot";
-import { postToInbox } from "../agent/conversations";
-import { TIMEOUTS } from "../agent/models";
-import { UNTRUSTED_NOTE } from "../agent/prompts";
+import { listActivities } from "#activity/service";
+import type { ActivityRow } from "#activity/service";
+import { workSnapshot } from "#activity/snapshot";
+import { postToInbox } from "#agent/conversations";
+import { TIMEOUTS } from "#agent/models";
+import { UNTRUSTED_NOTE } from "#agent/prompts";
 import {
   digestableAttention,
   listOpenAttention,
@@ -16,20 +16,21 @@ import {
   pushBudget,
   recordNotification,
   unconsideredAttention,
-} from "../attention/service";
-import type { AttentionRow } from "../attention/service";
-import { generateBrief } from "../briefs/service";
-import type { AppContext } from "../context";
+} from "#attention/service";
+import type { AttentionRow } from "#attention/service";
+import { generateBrief } from "#briefs/service";
+import type { AppContext } from "#context";
 import type {
   automationRuns,
   automations,
   members,
   Visibility,
-} from "../db/schema";
-import { sanitizeMarkdown, urlsIn } from "../delivery/sanitize";
-import { deliver } from "../delivery/service";
-import { DAY_MS, localDate, startOfLocalDay } from "../lib/time";
-import { addMemory, renderMemory, writeJournal } from "../memory/service";
+} from "#db/schema";
+import { sanitizeMarkdown, urlsIn } from "#delivery/sanitize";
+import { deliver } from "#delivery/service";
+import { DAY_MS, localDate, startOfLocalDay } from "#lib/time";
+import { addMemory, renderMemory, writeJournal } from "#memory/service";
+
 import { isActiveNow } from "./schedule";
 
 type Member = typeof members.$inferSelect;

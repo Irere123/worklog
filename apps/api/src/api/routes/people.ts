@@ -1,17 +1,6 @@
 import { createRoute, z } from "@hono/zod-openapi";
 
-import { workSnapshot } from "../../activity/snapshot";
-import { enabledSocialProviders } from "../../auth/auth";
-import type { AppContext } from "../../context";
-import { API_SCOPES, workspaces, MEMBER_KINDS, ROLES } from "../../db/schema";
-import {
-  linkByHandle,
-  linkIdentityToMember,
-  listIdentities,
-} from "../../ingest/identity";
-import { safeEqual } from "../../lib/crypto";
-import { forbidden, notFound } from "../../lib/errors";
-import * as people from "../../members/service";
+import { workSnapshot } from "#activity/snapshot";
 import {
   body,
   errors,
@@ -20,7 +9,7 @@ import {
   requireAdmin,
   requireSelfOrAdmin,
   router,
-} from "../router";
+} from "#api/router";
 import {
   IdentitySchema,
   MemberSchema,
@@ -35,7 +24,18 @@ import {
   toSnapshot,
   toWorkspace,
   WorkspaceSchema,
-} from "../schemas";
+} from "#api/schemas";
+import { enabledSocialProviders } from "#auth/auth";
+import type { AppContext } from "#context";
+import { API_SCOPES, workspaces, MEMBER_KINDS, ROLES } from "#db/schema";
+import {
+  linkByHandle,
+  linkIdentityToMember,
+  listIdentities,
+} from "#ingest/identity";
+import { safeEqual } from "#lib/crypto";
+import { forbidden, notFound } from "#lib/errors";
+import * as people from "#members/service";
 
 const Ref = z.object({
   ref: z

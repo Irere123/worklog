@@ -59,5 +59,8 @@ export default defineConfig({
       "error",
       { allowNullableString: true },
     ],
+    // Imports that leave their folder use the `#` aliases (apps/api/package.json), so they read
+    // the same from every file and one search finds every importer of a module.
+    "import/no-relative-parent-imports": "error",
   },
 });

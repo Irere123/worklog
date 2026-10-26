@@ -2,14 +2,15 @@ import { generateText, Output } from "ai";
 import { and, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 
-import { TIMEOUTS } from "../agent/models";
-import { UNTRUSTED_NOTE } from "../agent/prompts";
-import { raiseAttention } from "../attention/service";
-import { findCard, listCards } from "../board/service";
-import type { AppContext } from "../context";
-import { activities, cards, members } from "../db/schema";
-import type { Visibility } from "../db/schema";
-import type { Member } from "../members/service";
+import { TIMEOUTS } from "#agent/models";
+import { UNTRUSTED_NOTE } from "#agent/prompts";
+import { raiseAttention } from "#attention/service";
+import { findCard, listCards } from "#board/service";
+import type { AppContext } from "#context";
+import { activities, cards, members } from "#db/schema";
+import type { Visibility } from "#db/schema";
+import type { Member } from "#members/service";
+
 import { recordActivity } from "./service";
 
 export const LOG_KINDS = ["entry", "decision", "blocker", "win"] as const;

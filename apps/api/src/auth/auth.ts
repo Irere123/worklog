@@ -4,10 +4,10 @@ import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { bearer, magicLink } from "better-auth/plugins";
 
-import type { Config } from "../config";
-import type { Mailer } from "../delivery/mailer";
-import { newId } from "../lib/ids";
-import type { IdPrefix } from "../lib/ids";
+import type { Config } from "#config";
+import type { Mailer } from "#delivery/mailer";
+import { newId } from "#lib/ids";
+import type { IdPrefix } from "#lib/ids";
 
 const PREFIX: Record<string, IdPrefix> = {
   user: "usr",

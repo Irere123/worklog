@@ -2,12 +2,12 @@ import { simulateReadableStream } from "ai";
 import { MockLanguageModelV4 } from "ai/test";
 import { Client } from "pg";
 
-import { createApp } from "../src/app";
-import { loadConfig } from "../src/config";
-import { createContext } from "../src/context";
-import type { AppContext } from "../src/context";
-import { ConsoleMailer } from "../src/delivery/mailer";
-import { runJobsOnce } from "../src/jobs/worker";
+import { createApp } from "#app";
+import { loadConfig } from "#config";
+import { createContext } from "#context";
+import type { AppContext } from "#context";
+import { ConsoleMailer } from "#delivery/mailer";
+import { runJobsOnce } from "#jobs/worker";
 
 // One database for the whole run (bun runs every test file in one process), recreated at the start
 // so rows from an earlier run can't make a test pass. Isolation comes from each test creating its

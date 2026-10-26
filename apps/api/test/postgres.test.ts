@@ -2,7 +2,8 @@ import { expect, test } from "bun:test";
 
 import { sql } from "drizzle-orm";
 
-import { activities } from "../src/db/schema";
+import { activities } from "#db/schema";
+
 import { testEnv } from "./harness";
 
 // Guards against drivers that store jsonb as strings: reads look fine, but SQL can't see inside.

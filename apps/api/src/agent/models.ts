@@ -1,7 +1,7 @@
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import type { LanguageModel } from "ai";
 
-import type { Config } from "../config";
+import type { Config } from "#config";
 
 // `fast` is for high-volume background work (proactive checks, log structuring, memory consolidation).
 export type Models = { main: LanguageModel; fast: LanguageModel };

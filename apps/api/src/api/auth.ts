@@ -1,10 +1,11 @@
 import type { Context, Next } from "hono";
 import { createMiddleware } from "hono/factory";
 
-import type { AppContext } from "../context";
-import type { ApiScope } from "../db/schema";
-import { authenticate, membershipsOf } from "../members/service";
-import type { Member, SignedInUser } from "../members/service";
+import type { AppContext } from "#context";
+import type { ApiScope } from "#db/schema";
+import { authenticate, membershipsOf } from "#members/service";
+import type { Member, SignedInUser } from "#members/service";
+
 import type { Env } from "./router";
 
 const deny = (c: Context, status: 401 | 403, code: string, message: string) =>

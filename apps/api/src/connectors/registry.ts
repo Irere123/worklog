@@ -1,4 +1,5 @@
-import type { Connector } from "../ingest/types";
+import type { Connector } from "#ingest/types";
+
 import { customConnector } from "./custom";
 import { discordConnector } from "./discord";
 import { giteaConnector, githubConnector } from "./github";

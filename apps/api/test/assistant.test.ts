@@ -197,9 +197,8 @@ describe("assistant", () => {
     ]);
     env.ctx.models = { main: model, fast: model };
 
-    const { logWork } = await import("../src/activity/worklog");
-    const { personalAgentOf, resolveMember } =
-      await import("../src/members/service");
+    const { logWork } = await import("#activity/worklog");
+    const { personalAgentOf, resolveMember } = await import("#members/service");
     const emma = await resolveMember(
       env.ctx,
       await personalAgentOf(env.ctx, owner.member.id),

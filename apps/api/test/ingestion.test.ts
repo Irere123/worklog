@@ -3,10 +3,11 @@ import { createHmac } from "node:crypto";
 
 import { sql } from "drizzle-orm";
 
-import { normalizeGithubLike } from "../src/connectors/github";
-import { normalizeSlackMessage } from "../src/connectors/slack";
-import { webhookConnector } from "../src/connectors/webhook";
-import { hmacHex } from "../src/lib/crypto";
+import { normalizeGithubLike } from "#connectors/github";
+import { normalizeSlackMessage } from "#connectors/slack";
+import { webhookConnector } from "#connectors/webhook";
+import { hmacHex } from "#lib/crypto";
+
 import { testEnv } from "./harness";
 import type { TestEnv } from "./harness";
 

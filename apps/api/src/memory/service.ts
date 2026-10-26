@@ -1,11 +1,11 @@
 import { and, desc, eq, gte, ilike, inArray } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
 
-import type { AppContext } from "../context";
-import { memories } from "../db/schema";
-import type { MemoryKind, Visibility } from "../db/schema";
-import { notFound } from "../lib/errors";
-import { newId } from "../lib/ids";
+import type { AppContext } from "#context";
+import { memories } from "#db/schema";
+import type { MemoryKind, Visibility } from "#db/schema";
+import { notFound } from "#lib/errors";
+import { newId } from "#lib/ids";
 
 export type MemoryRow = typeof memories.$inferSelect;
 

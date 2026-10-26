@@ -1,13 +1,13 @@
 import { z } from "@hono/zod-openapi";
 
-import type { ActivityRow } from "../activity/service";
-import type { WorkSnapshot } from "../activity/snapshot";
-import type { ConversationRow, MessageRow } from "../agent/conversations";
-import type { AttentionRow } from "../attention/service";
-import type { AutomationRow } from "../automations/service";
-import type { CardView, Column } from "../board/service";
-import type { BriefRow } from "../briefs/service";
-import type { ConnectionRow } from "../connectors/connections";
+import type { ActivityRow } from "#activity/service";
+import type { WorkSnapshot } from "#activity/snapshot";
+import type { ConversationRow, MessageRow } from "#agent/conversations";
+import type { AttentionRow } from "#attention/service";
+import type { AutomationRow } from "#automations/service";
+import type { CardView, Column } from "#board/service";
+import type { BriefRow } from "#briefs/service";
+import type { ConnectionRow } from "#connectors/connections";
 import type {
   ApiScope,
   apiTokens,
@@ -15,7 +15,7 @@ import type {
   boards,
   comments,
   identities,
-} from "../db/schema";
+} from "#db/schema";
 import {
   API_SCOPES,
   AUTOMATION_KINDS,
@@ -27,10 +27,10 @@ import {
   ROLES,
   TARGET_KINDS,
   VISIBILITY,
-} from "../db/schema";
-import type { TargetRow } from "../delivery/service";
-import type { Member, Workspace } from "../members/service";
-import type { MemoryRow } from "../memory/service";
+} from "#db/schema";
+import type { TargetRow } from "#delivery/service";
+import type { Member, Workspace } from "#members/service";
+import type { MemoryRow } from "#memory/service";
 
 const iso = (d: Date) => d.toISOString();
 const isoOrNull = (d: Date | null) => (d ? d.toISOString() : null);

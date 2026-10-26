@@ -1,11 +1,8 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import type { Context } from "hono";
 
-import * as board from "../../board/service";
-import { CARD_STAGES } from "../../db/schema";
-import { resolveMember } from "../../members/service";
-import { body, errors, json, Ok, router } from "../router";
-import type { Env } from "../router";
+import { body, errors, json, Ok, router } from "#api/router";
+import type { Env } from "#api/router";
 import {
   BoardSchema,
   CardDetailSchema,
@@ -16,7 +13,10 @@ import {
   toColumn,
   toComment,
   CommentSchema,
-} from "../schemas";
+} from "#api/schemas";
+import * as board from "#board/service";
+import { CARD_STAGES } from "#db/schema";
+import { resolveMember } from "#members/service";
 
 const BoardId = z.object({ id: z.string() });
 const CardNumber = z.object({

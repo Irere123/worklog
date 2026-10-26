@@ -1,10 +1,11 @@
 import { and, asc, desc, eq } from "drizzle-orm";
 
-import type { AppContext } from "../context";
-import { automationRuns, automations, workspaces } from "../db/schema";
-import type { AutomationKind, members, Schedule } from "../db/schema";
-import { badRequest, notFound } from "../lib/errors";
-import { newId } from "../lib/ids";
+import type { AppContext } from "#context";
+import { automationRuns, automations, workspaces } from "#db/schema";
+import type { AutomationKind, members, Schedule } from "#db/schema";
+import { badRequest, notFound } from "#lib/errors";
+import { newId } from "#lib/ids";
+
 import { jitterFor, nextRun } from "./schedule";
 
 type Member = typeof members.$inferSelect;

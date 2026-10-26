@@ -1,12 +1,12 @@
 import type { ModelMessage } from "ai";
 import { and, asc, desc, eq, sql } from "drizzle-orm";
 
-import type { AppContext } from "../context";
-import { conversations, messages } from "../db/schema";
-import { forbidden, notFound } from "../lib/errors";
-import { newId } from "../lib/ids";
-import { personalAgentOf } from "../members/service";
-import type { Member } from "../members/service";
+import type { AppContext } from "#context";
+import { conversations, messages } from "#db/schema";
+import { forbidden, notFound } from "#lib/errors";
+import { newId } from "#lib/ids";
+import { personalAgentOf } from "#members/service";
+import type { Member } from "#members/service";
 
 export type ConversationRow = typeof conversations.$inferSelect;
 export type MessageRow = typeof messages.$inferSelect;

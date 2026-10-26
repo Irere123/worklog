@@ -2,23 +2,23 @@ import { tool } from "ai";
 import type { ToolSet } from "ai";
 import { z } from "zod";
 
-import { listActivities } from "../activity/service";
-import { workSnapshot } from "../activity/snapshot";
-import { logWork, LOG_KINDS } from "../activity/worklog";
-import { performAttentionAction } from "../attention/actions";
+import { listActivities } from "#activity/service";
+import { workSnapshot } from "#activity/snapshot";
+import { logWork, LOG_KINDS } from "#activity/worklog";
+import { performAttentionAction } from "#attention/actions";
 import {
   giveFeedback,
   listOpenAttention,
   raiseAttention,
   updateAttention,
-} from "../attention/service";
-import * as board from "../board/service";
-import type { AppContext } from "../context";
-import { CARD_STAGES } from "../db/schema";
-import { DAY_MS } from "../lib/time";
-import { listMembers, resolveMember } from "../members/service";
-import type { Member } from "../members/service";
-import { addMemory, forgetMemory, listMemories } from "../memory/service";
+} from "#attention/service";
+import * as board from "#board/service";
+import type { AppContext } from "#context";
+import { CARD_STAGES } from "#db/schema";
+import { DAY_MS } from "#lib/time";
+import { listMembers, resolveMember } from "#members/service";
+import type { Member } from "#members/service";
+import { addMemory, forgetMemory, listMemories } from "#memory/service";
 
 type Scope = {
   ctx: AppContext;

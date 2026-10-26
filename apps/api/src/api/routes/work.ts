@@ -4,29 +4,9 @@ import {
   deleteOwnActivity,
   listActivities,
   recordActivity,
-} from "../../activity/service";
-import { LOG_KINDS, logWork } from "../../activity/worklog";
-import { performAttentionAction } from "../../attention/actions";
-import {
-  attentionMetrics,
-  giveFeedback,
-  listAttention,
-  updateAttention,
-} from "../../attention/service";
-import { findCard } from "../../board/service";
-import { generateBrief, getBrief, listBriefs } from "../../briefs/service";
-import type { AppContext } from "../../context";
-import {
-  ATTENTION_STATES,
-  FEEDBACK_SIGNALS,
-  VISIBILITY,
-} from "../../db/schema";
-import { deliver } from "../../delivery/service";
-import { applyAgentState } from "../../ingest/effects";
-import { notFound } from "../../lib/errors";
-import { resolveMember } from "../../members/service";
-import type { Member } from "../../members/service";
-import { body, errors, json, Ok, router } from "../router";
+} from "#activity/service";
+import { LOG_KINDS, logWork } from "#activity/worklog";
+import { body, errors, json, Ok, router } from "#api/router";
 import {
   ActivitySchema,
   AttentionMetricsSchema,
@@ -35,7 +15,23 @@ import {
   toActivity,
   toAttention,
   toBrief,
-} from "../schemas";
+} from "#api/schemas";
+import { performAttentionAction } from "#attention/actions";
+import {
+  attentionMetrics,
+  giveFeedback,
+  listAttention,
+  updateAttention,
+} from "#attention/service";
+import { findCard } from "#board/service";
+import { generateBrief, getBrief, listBriefs } from "#briefs/service";
+import type { AppContext } from "#context";
+import { ATTENTION_STATES, FEEDBACK_SIGNALS, VISIBILITY } from "#db/schema";
+import { deliver } from "#delivery/service";
+import { applyAgentState } from "#ingest/effects";
+import { notFound } from "#lib/errors";
+import { resolveMember } from "#members/service";
+import type { Member } from "#members/service";
 
 export const workRoutes = router()
   .openapi(

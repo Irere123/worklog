@@ -1,8 +1,8 @@
 import { and, asc, desc, eq, gt, inArray, isNull, or, sql } from "drizzle-orm";
 
-import { createDefaultAutomations } from "../automations/service";
-import type { AppContext } from "../context";
-import { account } from "../db/auth-schema";
+import { createDefaultAutomations } from "#automations/service";
+import type { AppContext } from "#context";
+import { account } from "#db/auth-schema";
 import {
   API_SCOPES,
   apiTokens,
@@ -10,13 +10,13 @@ import {
   identities,
   members,
   workspaces,
-} from "../db/schema";
-import type { ApiScope, MemberSettings } from "../db/schema";
-import { returned } from "../lib/assert";
-import { generateToken, hashToken } from "../lib/crypto";
-import { badRequest, conflict, forbidden, notFound } from "../lib/errors";
-import { newId } from "../lib/ids";
-import { isValidTimeZone } from "../lib/time";
+} from "#db/schema";
+import type { ApiScope, MemberSettings } from "#db/schema";
+import { returned } from "#lib/assert";
+import { generateToken, hashToken } from "#lib/crypto";
+import { badRequest, conflict, forbidden, notFound } from "#lib/errors";
+import { newId } from "#lib/ids";
+import { isValidTimeZone } from "#lib/time";
 
 export type Member = typeof members.$inferSelect;
 export type Workspace = typeof workspaces.$inferSelect;

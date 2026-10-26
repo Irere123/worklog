@@ -11,11 +11,11 @@ import {
 } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
 
-import type { AppContext } from "../context";
-import { activities, cards } from "../db/schema";
-import type { Visibility } from "../db/schema";
-import { returned } from "../lib/assert";
-import { newId } from "../lib/ids";
+import type { AppContext } from "#context";
+import { activities, cards } from "#db/schema";
+import type { Visibility } from "#db/schema";
+import { returned } from "#lib/assert";
+import { newId } from "#lib/ids";
 
 export type ActivityRow = typeof activities.$inferSelect;
 

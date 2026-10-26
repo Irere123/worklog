@@ -1,4 +1,4 @@
-import type { AppContext } from "../context";
+import type { AppContext } from "#context";
 
 export const EVENT_SCHEMA_VERSION = 1;
 
