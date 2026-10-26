@@ -1,10 +1,12 @@
 import { z } from "zod";
 
 const Env = z.object({
-  NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
+  NODE_ENV: z
+    .enum(["development", "test", "production"])
+    .default("development"),
   PORT: z.coerce.number().int().default(4000),
   /** Public base URL of this server, used in links (emails, webhook URLs). */
-  PUBLIC_URL: z.string().url().default("http://localhost:4000"),
+  PUBLIC_URL: z.url().default("http://localhost:4000"),
   /**
    * postgres://... for a real Postgres server. Anything else is treated as an
    * embedded PGlite data directory ("memory://" keeps it in memory).
@@ -45,14 +47,23 @@ const Env = z.object({
 
 export type Config = z.infer<typeof Env>;
 
-export function loadConfig(env: Record<string, string | undefined> = process.env): Config {
+export function loadConfig(
+  env: Record<string, string | undefined> = process.env
+): Config {
   // `KEY=` in an .env file means "not set", not "set to an empty string".
-  const parsed = Env.safeParse(Object.fromEntries(Object.entries(env).filter(([, v]) => v !== "")));
+  const parsed = Env.safeParse(
+    Object.fromEntries(Object.entries(env).filter(([, v]) => v !== ""))
+  );
   if (!parsed.success) {
     throw new Error(`Invalid environment: ${z.prettifyError(parsed.error)}`);
   }
-  if (parsed.data.NODE_ENV === "production" && (!parsed.data.WORKLOG_SECRET_KEY || !parsed.data.AUTH_SECRET)) {
-    throw new Error("WORKLOG_SECRET_KEY and AUTH_SECRET are required in production");
+  if (
+    parsed.data.NODE_ENV === "production" &&
+    (!parsed.data.WORKLOG_SECRET_KEY || !parsed.data.AUTH_SECRET)
+  ) {
+    throw new Error(
+      "WORKLOG_SECRET_KEY and AUTH_SECRET are required in production"
+    );
   }
   return parsed.data;
 }

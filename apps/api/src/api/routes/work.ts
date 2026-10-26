@@ -1,17 +1,41 @@
 import { createRoute, z } from "@hono/zod-openapi";
-import { deleteOwnActivity, listActivities, recordActivity } from "../../activity/service";
+
+import {
+  deleteOwnActivity,
+  listActivities,
+  recordActivity,
+} from "../../activity/service";
 import { LOG_KINDS, logWork } from "../../activity/worklog";
 import { performAttentionAction } from "../../attention/actions";
-import { attentionMetrics, giveFeedback, listAttention, updateAttention } from "../../attention/service";
+import {
+  attentionMetrics,
+  giveFeedback,
+  listAttention,
+  updateAttention,
+} from "../../attention/service";
 import { findCard } from "../../board/service";
-import { applyAgentState } from "../../ingest/effects";
 import { generateBrief, getBrief, listBriefs } from "../../briefs/service";
-import { ATTENTION_STATES, FEEDBACK_SIGNALS, VISIBILITY } from "../../db/schema";
+import type { AppContext } from "../../context";
+import {
+  ATTENTION_STATES,
+  FEEDBACK_SIGNALS,
+  VISIBILITY,
+} from "../../db/schema";
 import { deliver } from "../../delivery/service";
+import { applyAgentState } from "../../ingest/effects";
 import { notFound } from "../../lib/errors";
 import { resolveMember } from "../../members/service";
+import type { Member } from "../../members/service";
 import { body, errors, json, Ok, router } from "../router";
-import { ActivitySchema, AttentionMetricsSchema, AttentionSchema, BriefSchema, toActivity, toAttention, toBrief } from "../schemas";
+import {
+  ActivitySchema,
+  AttentionMetricsSchema,
+  AttentionSchema,
+  BriefSchema,
+  toActivity,
+  toAttention,
+  toBrief,
+} from "../schemas";
 
 export const workRoutes = router()
   // ---- the activity stream ----
@@ -21,17 +45,27 @@ export const workRoutes = router()
       path: "/v1/activities",
       operationId: "activity.list",
       tags: ["Work"],
-      summary: "The team's work stream — every source, humans and agents, newest first",
+      summary:
+        "The team's work stream — every source, humans and agents, newest first",
       request: {
         query: z.object({
-          actor: z.string().optional().openapi({ description: 'Member id, handle or "me"' }),
+          actor: z
+            .string()
+            .optional()
+            .openapi({ description: 'Member id, handle or "me"' }),
           source: z.string().optional().openapi({ example: "github" }),
           kind: z.string().optional().openapi({ example: "log.decision" }),
-          card: z.coerce.number().int().optional().openapi({ description: "Card number" }),
-          since: z.string().datetime().optional(),
-          until: z.string().datetime().optional(),
+          card: z.coerce
+            .number()
+            .int()
+            .optional()
+            .openapi({ description: "Card number" }),
+          since: z.iso.datetime().optional(),
+          until: z.iso.datetime().optional(),
           q: z.string().optional(),
-          before: z.string().optional().openapi({ description: "Cursor: an activity id from the previous page" }),
+          before: z.string().optional().openapi({
+            description: "Cursor: an activity id from the previous page",
+          }),
           limit: z.coerce.number().int().min(1).max(500).optional(),
         }),
       },
@@ -42,7 +76,10 @@ export const workRoutes = router()
       const me = c.get("member");
       const q = c.req.valid("query");
       const actor = q.actor ? await resolveMember(ctx, me, q.actor) : null;
-      const card = q.card ? await findCard(ctx, me.workspaceId, q.card) : null;
+      const card =
+        q.card === undefined || q.card === 0
+          ? null
+          : await findCard(ctx, me.workspaceId, q.card);
       const rows = await listActivities(ctx, me.workspaceId, [me.id], {
         actorIds: actor ? [actor.id] : undefined,
         source: q.source,
@@ -55,7 +92,7 @@ export const workRoutes = router()
         limit: q.limit,
       });
       return c.json(rows.map(toActivity), 200);
-    },
+    }
   )
   .openapi(
     createRoute({
@@ -74,27 +111,41 @@ export const workRoutes = router()
           kind: z.string().min(1).openapi({ example: "agent.task" }),
           title: z.string().min(1).max(300),
           body: z.string().max(4000).optional(),
-          url: z.string().url().optional(),
+          url: z.url().optional(),
           cardNumber: z.number().int().optional(),
           visibility: z.enum(VISIBILITY).optional(),
           externalId: z.string().optional(),
-          occurredAt: z.string().datetime().optional(),
-          thread: z.string().max(300).optional().openapi({ description: "Groups updates on one task, e.g. cursor:bc-123" }),
+          occurredAt: z.iso.datetime().optional(),
+          thread: z.string().max(300).optional().openapi({
+            description: "Groups updates on one task, e.g. cursor:bc-123",
+          }),
           importance: z.number().min(0).max(1).optional(),
-          onBehalfOf: z.string().optional().openapi({ description: "Member id or handle of the human this was done for" }),
-          state: z.enum(["working", "needs_you", "finished", "failed"]).optional(),
+          onBehalfOf: z.string().optional().openapi({
+            description: "Member id or handle of the human this was done for",
+          }),
+          state: z
+            .enum(["working", "needs_you", "finished", "failed"])
+            .optional(),
           data: z.record(z.string(), z.unknown()).optional(),
-        }),
+        })
       ),
-      responses: { 201: json(ActivitySchema.nullable(), "Created (null if externalId was already recorded)"), ...errors },
+      responses: {
+        201: json(
+          ActivitySchema.nullable(),
+          "Created (null if externalId was already recorded)"
+        ),
+        ...errors,
+      },
     }),
     async (c) => {
       const ctx = c.get("ctx");
       const me = c.get("member");
       const input = c.req.valid("json");
-      const card = input.cardNumber ? await findCard(ctx, me.workspaceId, input.cardNumber) : null;
-      const forRef = input.onBehalfOf ?? (me.kind === "agent" ? me.ownerId : null);
-      const onBehalfOf = forRef ? await resolveMember(ctx, me, forRef) : null;
+      const card =
+        input.cardNumber === undefined || input.cardNumber === 0
+          ? null
+          : await findCard(ctx, me.workspaceId, input.cardNumber);
+      const onBehalfOf = await workingFor(ctx, me, input.onBehalfOf);
       const thread = input.thread ?? input.externalId ?? null;
       const row = await recordActivity(ctx, {
         workspaceId: me.workspaceId,
@@ -109,7 +160,8 @@ export const workRoutes = router()
         externalId: input.externalId,
         occurredAt: input.occurredAt ? new Date(input.occurredAt) : undefined,
         threadKey: thread,
-        importance: input.importance ?? (input.state === "needs_you" ? 0.8 : undefined),
+        importance:
+          input.importance ?? (input.state === "needs_you" ? 0.8 : undefined),
         onBehalfOfId: onBehalfOf?.id ?? null,
         agentState: input.state ?? null,
         data: input.data,
@@ -128,7 +180,7 @@ export const workRoutes = router()
         });
       }
       return c.json(row ? toActivity(row) : null, 201);
-    },
+    }
   )
   .openapi(
     createRoute({
@@ -142,9 +194,18 @@ export const workRoutes = router()
     }),
     async (c) => {
       const me = c.get("member");
-      if (!(await deleteOwnActivity(c.get("ctx"), me.workspaceId, me.id, c.req.valid("param").id))) throw notFound("Activity");
+      if (
+        !(await deleteOwnActivity(
+          c.get("ctx"),
+          me.workspaceId,
+          me.id,
+          c.req.valid("param").id
+        ))
+      ) {
+        throw notFound("Activity");
+      }
       return c.json({ ok: true as const }, 200);
-    },
+    }
   )
   .openapi(
     createRoute({
@@ -154,7 +215,7 @@ export const workRoutes = router()
       tags: ["Work"],
       summary: "Log work the connectors can't see — typed or dictated",
       description:
-        "Calls, WhatsApp threads, decisions, fixes done off the radar. Clients can transcribe voice on-device and send `via: \"voice\"`. With AI configured, entries are titled, classified (decision / blocker / win) and linked to the right card in the background; blockers that name a teammate land in that teammate's attention list.",
+        'Calls, WhatsApp threads, decisions, fixes done off the radar. Clients can transcribe voice on-device and send `via: "voice"`. With AI configured, entries are titled, classified (decision / blocker / win) and linked to the right card in the background; blockers that name a teammate land in that teammate\'s attention list.',
       request: body(
         z.object({
           text: z.string().min(1),
@@ -162,8 +223,8 @@ export const workRoutes = router()
           kind: z.enum(LOG_KINDS).optional(),
           cardNumber: z.number().int().optional(),
           visibility: z.enum(VISIBILITY).optional(),
-          occurredAt: z.string().datetime().optional(),
-        }),
+          occurredAt: z.iso.datetime().optional(),
+        })
       ),
       responses: { 201: json(ActivitySchema, "Logged"), ...errors },
     }),
@@ -174,7 +235,7 @@ export const workRoutes = router()
         occurredAt: input.occurredAt ? new Date(input.occurredAt) : undefined,
       });
       return c.json(toActivity(activity), 201);
-    },
+    }
   )
   // ---- attention ----
   .openapi(
@@ -184,13 +245,19 @@ export const workRoutes = router()
       operationId: "attention.list",
       tags: ["Attention"],
       summary: "What needs you — highest priority first",
-      request: { query: z.object({ state: z.enum(ATTENTION_STATES).optional() }) },
+      request: {
+        query: z.object({ state: z.enum(ATTENTION_STATES).optional() }),
+      },
       responses: { 200: json(z.array(AttentionSchema)), ...errors },
     }),
     async (c) => {
-      const rows = await listAttention(c.get("ctx"), c.get("member").id, c.req.valid("query").state);
+      const rows = await listAttention(
+        c.get("ctx"),
+        c.get("member").id,
+        c.req.valid("query").state
+      );
       return c.json(rows.map(toAttention), 200);
-    },
+    }
   )
   .openapi(
     createRoute({
@@ -201,18 +268,28 @@ export const workRoutes = router()
       summary: "Mark done, dismiss, snooze or re-open",
       request: {
         params: z.object({ id: z.string() }),
-        ...body(z.object({ state: z.enum(ATTENTION_STATES), snoozedUntil: z.string().datetime().optional() })),
+        ...body(
+          z.object({
+            state: z.enum(ATTENTION_STATES),
+            snoozedUntil: z.iso.datetime().optional(),
+          })
+        ),
       },
       responses: { 200: json(AttentionSchema), ...errors },
     }),
     async (c) => {
       const { state, snoozedUntil } = c.req.valid("json");
-      const row = await updateAttention(c.get("ctx"), c.get("member").id, c.req.valid("param").id, {
-        state,
-        snoozedUntil: snoozedUntil ? new Date(snoozedUntil) : null,
-      });
+      const row = await updateAttention(
+        c.get("ctx"),
+        c.get("member").id,
+        c.req.valid("param").id,
+        {
+          state,
+          snoozedUntil: snoozedUntil ? new Date(snoozedUntil) : null,
+        }
+      );
       return c.json(toAttention(row), 200);
-    },
+    }
   )
   .openapi(
     createRoute({
@@ -221,11 +298,27 @@ export const workRoutes = router()
       operationId: "attention.feedback",
       tags: ["Attention"],
       summary: "Was this worth your attention? Teaches the proactive check",
-      description: "`less_like_this` (or three `not_useful` without a `useful`) holds this kind of item for digests instead of pinging you.",
-      request: { params: z.object({ id: z.string() }), ...body(z.object({ signal: z.enum(FEEDBACK_SIGNALS) })) },
-      responses: { 200: json(z.object({ kind: z.string(), muted: z.boolean() })), ...errors },
+      description:
+        "`less_like_this` (or three `not_useful` without a `useful`) holds this kind of item for digests instead of pinging you.",
+      request: {
+        params: z.object({ id: z.string() }),
+        ...body(z.object({ signal: z.enum(FEEDBACK_SIGNALS) })),
+      },
+      responses: {
+        200: json(z.object({ kind: z.string(), muted: z.boolean() })),
+        ...errors,
+      },
     }),
-    async (c) => c.json(await giveFeedback(c.get("ctx"), c.get("member").id, c.req.valid("param").id, c.req.valid("json").signal), 200),
+    async (c) =>
+      c.json(
+        await giveFeedback(
+          c.get("ctx"),
+          c.get("member").id,
+          c.req.valid("param").id,
+          c.req.valid("json").signal
+        ),
+        200
+      )
   )
   .openapi(
     createRoute({
@@ -233,14 +326,25 @@ export const workRoutes = router()
       path: "/v1/attention/{id}/actions/{actionId}",
       operationId: "attention.act",
       tags: ["Attention"],
-      summary: "Answer an item's one-click question (e.g. a drifting card: keep / not now / done)",
+      summary:
+        "Answer an item's one-click question (e.g. a drifting card: keep / not now / done)",
       request: { params: z.object({ id: z.string(), actionId: z.string() }) },
       responses: { 200: json(AttentionSchema), ...errors },
     }),
     async (c) => {
       const { id, actionId } = c.req.valid("param");
-      return c.json(toAttention(await performAttentionAction(c.get("ctx"), c.get("member"), id, actionId)), 200);
-    },
+      return c.json(
+        toAttention(
+          await performAttentionAction(
+            c.get("ctx"),
+            c.get("member"),
+            id,
+            actionId
+          )
+        ),
+        200
+      );
+    }
   )
   .openapi(
     createRoute({
@@ -248,11 +352,24 @@ export const workRoutes = router()
       path: "/v1/attention/metrics",
       operationId: "attention.metrics",
       tags: ["Attention"],
-      summary: "How well your assistant's pings are doing: precision, engagement, muted kinds",
-      request: { query: z.object({ days: z.coerce.number().int().min(1).max(90).optional() }) },
+      summary:
+        "How well your assistant's pings are doing: precision, engagement, muted kinds",
+      request: {
+        query: z.object({
+          days: z.coerce.number().int().min(1).max(90).optional(),
+        }),
+      },
       responses: { 200: json(AttentionMetricsSchema), ...errors },
     }),
-    async (c) => c.json(await attentionMetrics(c.get("ctx"), c.get("member").id, c.req.valid("query").days), 200),
+    async (c) =>
+      c.json(
+        await attentionMetrics(
+          c.get("ctx"),
+          c.get("member").id,
+          c.req.valid("query").days
+        ),
+        200
+      )
   )
   // ---- briefs ----
   .openapi(
@@ -261,10 +378,19 @@ export const workRoutes = router()
       path: "/v1/briefs",
       operationId: "brief.list",
       tags: ["Briefs"],
-      request: { query: z.object({ period: z.enum(["daily", "weekly"]).optional() }) },
+      request: {
+        query: z.object({ period: z.enum(["daily", "weekly"]).optional() }),
+      },
       responses: { 200: json(z.array(BriefSchema)), ...errors },
     }),
-    async (c) => c.json((await listBriefs(c.get("ctx"), c.get("member").id, c.req.valid("query").period)).map(toBrief), 200),
+    async (c) => {
+      const rows = await listBriefs(
+        c.get("ctx"),
+        c.get("member").id,
+        c.req.valid("query").period
+      );
+      return c.json(rows.map(toBrief), 200);
+    }
   )
   .openapi(
     createRoute({
@@ -276,10 +402,16 @@ export const workRoutes = router()
       responses: { 200: json(BriefSchema), ...errors },
     }),
     async (c) => {
-      const row = await getBrief(c.get("ctx"), c.get("member").id, c.req.valid("param").id);
-      if (!row) throw notFound("Brief");
+      const row = await getBrief(
+        c.get("ctx"),
+        c.get("member").id,
+        c.req.valid("param").id
+      );
+      if (!row) {
+        throw notFound("Brief");
+      }
       return c.json(toBrief(row), 200);
-    },
+    }
   )
   .openapi(
     createRoute({
@@ -288,12 +420,16 @@ export const workRoutes = router()
       operationId: "brief.create",
       tags: ["Briefs"],
       summary: "Brief me now",
-      description: "Builds the brief for the current window (replacing today's if it exists). Optionally delivers it to some of your delivery targets.",
+      description:
+        "Builds the brief for the current window (replacing today's if it exists). Optionally delivers it to some of your delivery targets.",
       request: body(
         z.object({
           period: z.enum(["daily", "weekly"]).default("daily"),
-          deliverTo: z.array(z.string()).optional().openapi({ description: "Delivery target ids" }),
-        }),
+          deliverTo: z
+            .array(z.string())
+            .optional()
+            .openapi({ description: "Delivery target ids" }),
+        })
       ),
       responses: { 201: json(BriefSchema, "Created"), ...errors },
     }),
@@ -302,9 +438,24 @@ export const workRoutes = router()
       const me = c.get("member");
       const { period, deliverTo } = c.req.valid("json");
       const brief = await generateBrief(ctx, me, period);
-      if (deliverTo?.length) {
-        await deliver(ctx, me.id, deliverTo, { type: `brief.${period}`, subject: brief.title, markdown: brief.body, url: ctx.config.PUBLIC_URL });
+      if (deliverTo !== undefined && deliverTo.length > 0) {
+        await deliver(ctx, me.id, deliverTo, {
+          type: `brief.${period}`,
+          subject: brief.title,
+          markdown: brief.body,
+          url: ctx.config.PUBLIC_URL,
+        });
       }
       return c.json(toBrief(brief), 201);
-    },
+    }
   );
+
+/** Whom an entry is for: the member named, or by default the human an agent works for. */
+async function workingFor(
+  ctx: AppContext,
+  me: Member,
+  ref: string | undefined
+) {
+  const forRef = ref ?? (me.kind === "agent" ? me.ownerId : null);
+  return forRef ? await resolveMember(ctx, me, forRef) : null;
+}

@@ -7,10 +7,19 @@ const ctx = await createContext(loadConfig());
 const stop = startScheduler(ctx);
 console.log("Worklog worker running (automations, entropy)");
 
-const shutdown = async () => {
-  await stop();
-  await ctx.close();
-  process.exit(0);
-};
-process.on("SIGINT", shutdown);
-process.on("SIGTERM", shutdown);
+async function shutdown() {
+  try {
+    await stop();
+    await ctx.close();
+    process.exit(0);
+  } catch (error) {
+    console.error("Shutdown failed", error);
+    process.exit(1);
+  }
+}
+process.on("SIGINT", () => {
+  void shutdown();
+});
+process.on("SIGTERM", () => {
+  void shutdown();
+});

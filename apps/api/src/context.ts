@@ -1,9 +1,14 @@
-import { createModels, type Models } from "./agent/models";
-import { createAuth, type Auth } from "./auth/auth";
-import type { Config } from "./config";
-import { openDb, schema, type Db } from "./db";
 import { eq } from "drizzle-orm";
-import { createMailer, type Mailer } from "./delivery/mailer";
+
+import { createModels } from "./agent/models";
+import type { Models } from "./agent/models";
+import { createAuth } from "./auth/auth";
+import type { Auth } from "./auth/auth";
+import type { Config } from "./config";
+import { openDb, schema } from "./db";
+import type { Db } from "./db";
+import { createMailer } from "./delivery/mailer";
+import type { Mailer } from "./delivery/mailer";
 import { EventBus } from "./events/bus";
 import { SecretBox } from "./lib/crypto";
 import { claimMemberships } from "./members/service";
@@ -29,27 +34,35 @@ export type AppContext = {
 
 export async function createContext(
   config: Config,
-  overrides: Partial<Pick<AppContext, "models" | "mailer" | "fetch" | "now">> = {},
+  overrides: Partial<
+    Pick<AppContext, "models" | "mailer" | "fetch" | "now">
+  > = {}
 ): Promise<AppContext> {
   const { db, close } = await openDb(config.DATABASE_URL);
   const mailer = overrides.mailer ?? createMailer(config);
   const ctx: AppContext = {
     config,
     db,
-    auth: undefined as unknown as Auth,
+    auth: createAuth(db, config, mailer, {
+      // Runs after sign-in, long after ctx is built.
+      onSignIn: async (userId) => {
+        const [user] = await db
+          .select()
+          .from(schema.user)
+          .where(eq(schema.user.id, userId));
+        if (user) {
+          await claimMemberships(ctx, user);
+        }
+      },
+    }),
     bus: new EventBus(db),
     secrets: new SecretBox(config.WORKLOG_SECRET_KEY),
-    models: "models" in overrides ? (overrides.models ?? null) : createModels(config),
+    models:
+      "models" in overrides ? (overrides.models ?? null) : createModels(config),
     mailer,
     fetch: overrides.fetch ?? fetch,
     now: overrides.now ?? (() => new Date()),
     close,
   };
-  ctx.auth = createAuth(db, config, mailer, {
-    onSignIn: async (userId) => {
-      const [user] = await db.select().from(schema.user).where(eq(schema.user.id, userId));
-      if (user) await claimMemberships(ctx, user);
-    },
-  });
   return ctx;
 }

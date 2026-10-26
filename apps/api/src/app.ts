@@ -1,18 +1,25 @@
 import { Scalar } from "@scalar/hono-api-reference";
-import { HTTPException } from "hono/http-exception";
+import type { ErrorHandler } from "hono";
 import { cors } from "hono/cors";
+import { HTTPException } from "hono/http-exception";
+
+import { authMiddleware } from "./api/auth";
 import { hookRoutes } from "./api/hooks";
 import { router } from "./api/router";
 import { assistantRoutes } from "./api/routes/assistant";
 import { boardRoutes } from "./api/routes/board";
 import { connectionRoutes } from "./api/routes/connections";
 import { eventRoutes } from "./api/routes/events";
-import { authConfigRoutes, peopleRoutes, sessionRoutes, setupRoutes } from "./api/routes/people";
+import {
+  authConfigRoutes,
+  peopleRoutes,
+  sessionRoutes,
+  setupRoutes,
+} from "./api/routes/people";
 import { workRoutes } from "./api/routes/work";
+import { webOrigins } from "./auth/auth";
 import type { AppContext } from "./context";
 import { ApiError } from "./lib/errors";
-import { authMiddleware } from "./api/auth";
-import { webOrigins } from "./auth/auth";
 
 export const API_INFO = {
   title: "Worklog API",
@@ -31,6 +38,23 @@ export const API_INFO = {
   ].join("\n"),
 };
 
+const handleError: ErrorHandler = (err, c) => {
+  if (err instanceof ApiError) {
+    return c.json(
+      { error: { code: err.code, message: err.message } },
+      err.status
+    );
+  }
+  if (err instanceof HTTPException) {
+    return err.getResponse();
+  }
+  console.error("[api] unhandled error", err);
+  return c.json(
+    { error: { code: "internal", message: "Something went wrong" } },
+    500
+  );
+};
+
 export function createApp(ctx: AppContext) {
   const app = router();
 
@@ -41,9 +65,14 @@ export function createApp(ctx: AppContext) {
     cors({
       origin: (origin) => (trusted.has(origin) ? origin : "*"),
       credentials: true,
-      allowHeaders: ["authorization", "content-type", "x-worklog-workspace", "last-event-id"],
+      allowHeaders: [
+        "authorization",
+        "content-type",
+        "x-worklog-workspace",
+        "last-event-id",
+      ],
       exposeHeaders: ["set-auth-token", "x-worklog-conversation"],
-    }),
+    })
   );
   app.use("*", async (c, next) => {
     c.set("ctx", ctx);
@@ -51,18 +80,29 @@ export function createApp(ctx: AppContext) {
   });
 
   // Better Auth: /api/auth/sign-in/magic-link, /api/auth/sign-in/social, /api/auth/callback/:provider, ...
-  app.on(["GET", "POST"], "/api/auth/*", (c) => ctx.auth.handler(c.req.raw));
+  app.on(
+    ["GET", "POST"],
+    "/api/auth/*",
+    async (c) => await ctx.auth.handler(c.req.raw)
+  );
   app.use("/v1/*", authMiddleware(ctx));
 
-  app.onError((err, c) => {
-    if (err instanceof ApiError) return c.json({ error: { code: err.code, message: err.message } }, err.status);
-    if (err instanceof HTTPException) return err.getResponse();
-    console.error("[api] unhandled error", err);
-    return c.json({ error: { code: "internal", message: "Something went wrong" } }, 500);
-  });
-  app.notFound((c) => c.json({ error: { code: "not_found", message: `No route for ${c.req.method} ${c.req.path}` } }, 404));
+  app.onError(handleError);
+  app.notFound((c) =>
+    c.json(
+      {
+        error: {
+          code: "not_found",
+          message: `No route for ${c.req.method} ${c.req.path}`,
+        },
+      },
+      404
+    )
+  );
 
-  app.get("/health", (c) => c.json({ ok: true, ai: ctx.models !== null, mailer: ctx.mailer.kind }));
+  app.get("/health", (c) =>
+    c.json({ ok: true, ai: ctx.models !== null, mailer: ctx.mailer.kind })
+  );
 
   app
     .route("/", setupRoutes)
@@ -79,7 +119,8 @@ export function createApp(ctx: AppContext) {
   app.openAPIRegistry.registerComponent("securitySchemes", "bearerAuth", {
     type: "http",
     scheme: "bearer",
-    description: "An API token from POST /v1/setup or POST /v1/members/{ref}/tokens",
+    description:
+      "An API token from POST /v1/setup or POST /v1/members/{ref}/tokens",
   });
   app.doc31("/openapi.json", {
     openapi: "3.1.0",

@@ -1,4 +1,5 @@
 import { z } from "@hono/zod-openapi";
+
 import type { ActivityRow } from "../activity/service";
 import type { WorkSnapshot } from "../activity/snapshot";
 import type { ConversationRow, MessageRow } from "../agent/conversations";
@@ -7,14 +8,18 @@ import type { AutomationRow } from "../automations/service";
 import type { CardView, Column } from "../board/service";
 import type { BriefRow } from "../briefs/service";
 import type { ConnectionRow } from "../connectors/connections";
-import {
-  API_SCOPES,
+import type {
+  ApiScope,
   apiTokens,
-  AUTOMATION_KINDS,
   automationRuns,
-  CARD_STAGES,
+  boards,
   comments,
   identities,
+} from "../db/schema";
+import {
+  API_SCOPES,
+  AUTOMATION_KINDS,
+  CARD_STAGES,
   MEMBER_KINDS,
   MEMORY_KINDS,
   PRIORITIES,
@@ -22,7 +27,6 @@ import {
   ROLES,
   TARGET_KINDS,
   VISIBILITY,
-  type boards,
 } from "../db/schema";
 import type { TargetRow } from "../delivery/service";
 import type { Member, Workspace } from "../members/service";
@@ -30,10 +34,22 @@ import type { MemoryRow } from "../memory/service";
 
 const iso = (d: Date) => d.toISOString();
 const isoOrNull = (d: Date | null) => (d ? d.toISOString() : null);
-const Timestamp = z.string().openapi({ format: "date-time", example: "2026-10-26T08:30:00.000Z" });
+const Timestamp = z
+  .string()
+  .openapi({ format: "date-time", example: "2026-10-26T08:30:00.000Z" });
+// The OpenAPI generator publishes a regex with its flags appended (`…$/u`),
+// which no client can use, so patterns that reach the spec go without flags.
+// oxlint-disable-next-line require-unicode-regexp -- see above
+const HH_MM = /^\d{1,2}:\d{2}$/;
 
 export const ErrorSchema = z
-  .object({ error: z.object({ code: z.string(), message: z.string(), issues: z.array(z.unknown()).optional() }) })
+  .object({
+    error: z.object({
+      code: z.string(),
+      message: z.string(),
+      issues: z.array(z.unknown()).optional(),
+    }),
+  })
   .openapi("Error");
 
 // ---------------------------------------------------------------------------
@@ -42,16 +58,34 @@ export const ErrorSchema = z
 
 export const SettingsSchema = z
   .object({
-    activeHours: z.object({ start: z.string().regex(/^\d{1,2}:\d{2}$/), end: z.string().regex(/^\d{1,2}:\d{2}$/) }).optional(),
+    activeHours: z
+      .object({
+        start: z.string().regex(HH_MM),
+        end: z.string().regex(HH_MM),
+      })
+      .optional(),
     workdays: z.array(z.number().int().min(0).max(6)).optional(),
     notify: z
       .object({
         dailyPushCap: z.number().int().min(0).max(50).optional(),
-        minGapMinutes: z.number().int().min(0).max(24 * 60).optional(),
-        threadCooldownHours: z.number().int().min(0).max(24 * 7).optional(),
+        minGapMinutes: z
+          .number()
+          .int()
+          .min(0)
+          .max(24 * 60)
+          .optional(),
+        threadCooldownHours: z
+          .number()
+          .int()
+          .min(0)
+          .max(24 * 7)
+          .optional(),
       })
       .optional()
-      .openapi({ description: "Interruption budget for proactive pings (defaults: 4/day, 90 min apart, 4 h per thread)" }),
+      .openapi({
+        description:
+          "Interruption budget for proactive pings (defaults: 4/day, 90 min apart, 4 h per thread)",
+      }),
   })
   .openapi("MemberSettings");
 
@@ -65,9 +99,18 @@ export const MemberSchema = z
     email: z.string().nullable(),
     title: z.string().nullable(),
     timezone: z.string().nullable(),
-    ownerId: z.string().nullable().openapi({ description: "For agents: the human they work for" }),
-    agentProvider: z.string().nullable().openapi({ description: '"worklog" for personal assistants; e.g. "claude-code" for external agents' }),
-    signedUp: z.boolean().openapi({ description: "For humans: whether a signed-in account is attached (false = invited, not yet joined)" }),
+    ownerId: z
+      .string()
+      .nullable()
+      .openapi({ description: "For agents: the human they work for" }),
+    agentProvider: z.string().nullable().openapi({
+      description:
+        '"worklog" for personal assistants; e.g. "claude-code" for external agents',
+    }),
+    signedUp: z.boolean().openapi({
+      description:
+        "For humans: whether a signed-in account is attached (false = invited, not yet joined)",
+    }),
     settings: SettingsSchema,
     createdAt: Timestamp,
   })
@@ -90,7 +133,13 @@ export const toMember = (m: Member): z.infer<typeof MemberSchema> => ({
 });
 
 export const WorkspaceSchema = z
-  .object({ id: z.string(), name: z.string(), slug: z.string(), timezone: z.string(), entropyDays: z.number().int() })
+  .object({
+    id: z.string(),
+    name: z.string(),
+    slug: z.string(),
+    timezone: z.string(),
+    entropyDays: z.number().int(),
+  })
   .openapi("Workspace");
 
 export const toWorkspace = (w: Workspace): z.infer<typeof WorkspaceSchema> => ({
@@ -105,16 +154,24 @@ export const TokenSchema = z
   .object({
     id: z.string(),
     name: z.string(),
-    token: z.string().openapi({ description: "Shown once. Send as `Authorization: Bearer <token>`." }),
+    token: z.string().openapi({
+      description: "Shown once. Send as `Authorization: Bearer <token>`.",
+    }),
     prefix: z.string(),
     scopes: z.array(z.enum(API_SCOPES)),
     expiresAt: Timestamp.nullable(),
   })
   .openapi("ApiKey");
 
-export const toToken = (t: { id: string; name: string; token: string; prefix: string; scopes: string[]; expiresAt: Date | null }): z.infer<typeof TokenSchema> => ({
+export const toToken = (t: {
+  id: string;
+  name: string;
+  token: string;
+  prefix: string;
+  scopes: ApiScope[];
+  expiresAt: Date | null;
+}): z.infer<typeof TokenSchema> => ({
   ...t,
-  scopes: t.scopes as z.infer<typeof TokenSchema>["scopes"],
   expiresAt: isoOrNull(t.expiresAt),
 });
 
@@ -130,11 +187,13 @@ export const TokenInfoSchema = z
   })
   .openapi("ApiKeyInfo");
 
-export const toTokenInfo = (t: typeof apiTokens.$inferSelect): z.infer<typeof TokenInfoSchema> => ({
+export const toTokenInfo = (
+  t: typeof apiTokens.$inferSelect
+): z.infer<typeof TokenInfoSchema> => ({
   id: t.id,
   name: t.name,
   prefix: t.prefix,
-  scopes: t.scopes as z.infer<typeof TokenInfoSchema>["scopes"],
+  scopes: t.scopes,
   expiresAt: isoOrNull(t.expiresAt),
   lastUsedAt: isoOrNull(t.lastUsedAt),
   createdAt: iso(t.createdAt),
@@ -143,8 +202,13 @@ export const toTokenInfo = (t: typeof apiTokens.$inferSelect): z.infer<typeof To
 export const IdentitySchema = z
   .object({
     id: z.string(),
-    memberId: z.string().nullable().openapi({ description: "null = seen in events but not matched to anyone yet" }),
-    provider: z.string().openapi({ description: 'Identity namespace, e.g. "github", "slack", "gitea:git.example.com"' }),
+    memberId: z.string().nullable().openapi({
+      description: "null = seen in events but not matched to anyone yet",
+    }),
+    provider: z.string().openapi({
+      description:
+        'Identity namespace, e.g. "github", "slack", "gitea:git.example.com"',
+    }),
     externalId: z.string(),
     externalHandle: z.string().nullable(),
     displayName: z.string().nullable(),
@@ -154,7 +218,9 @@ export const IdentitySchema = z
   })
   .openapi("Identity");
 
-export const toIdentity = (i: typeof identities.$inferSelect): z.infer<typeof IdentitySchema> => ({
+export const toIdentity = (
+  i: typeof identities.$inferSelect
+): z.infer<typeof IdentitySchema> => ({
   id: i.id,
   memberId: i.memberId,
   provider: i.provider,
@@ -171,7 +237,13 @@ export const toIdentity = (i: typeof identities.$inferSelect): z.infer<typeof Id
 // ---------------------------------------------------------------------------
 
 export const ColumnSchema = z
-  .object({ id: z.string(), boardId: z.string(), name: z.string(), color: z.string(), position: z.number().int() })
+  .object({
+    id: z.string(),
+    boardId: z.string(),
+    name: z.string(),
+    color: z.string(),
+    position: z.number().int(),
+  })
   .openapi("Column");
 
 export const toColumn = (c: Column): z.infer<typeof ColumnSchema> => ({
@@ -187,14 +259,20 @@ export const BoardSchema = z
     id: z.string(),
     name: z.string(),
     description: z.string().nullable(),
-    entropyDays: z.number().int().nullable().openapi({ description: "null = inherit the workspace setting" }),
+    entropyDays: z
+      .number()
+      .int()
+      .nullable()
+      .openapi({ description: "null = inherit the workspace setting" }),
     archived: z.boolean(),
     createdAt: Timestamp,
     columns: z.array(ColumnSchema),
   })
   .openapi("Board");
 
-export const toBoard = (b: typeof boards.$inferSelect & { columns: Column[] }): z.infer<typeof BoardSchema> => ({
+export const toBoard = (
+  b: typeof boards.$inferSelect & { columns: Column[] }
+): z.infer<typeof BoardSchema> => ({
   id: b.id,
   name: b.name,
   description: b.description,
@@ -211,7 +289,10 @@ export const CardSchema = z
     boardId: z.string(),
     title: z.string(),
     body: z.string().nullable(),
-    stage: z.enum(CARD_STAGES).openapi({ description: "triage = Maybe?, active = in a column, not_now = postponed, done = closed" }),
+    stage: z.enum(CARD_STAGES).openapi({
+      description:
+        "triage = Maybe?, active = in a column, not_now = postponed, done = closed",
+    }),
     columnId: z.string().nullable(),
     columnName: z.string().nullable(),
     golden: z.boolean(),
@@ -227,9 +308,16 @@ export const CardSchema = z
     closedAt: Timestamp.nullable(),
     createdAt: Timestamp,
     entropy: z
-      .object({ days: z.number().int(), autoPostponeAt: Timestamp, postponingSoon: z.boolean() })
+      .object({
+        days: z.number().int(),
+        autoPostponeAt: Timestamp,
+        postponingSoon: z.boolean(),
+      })
       .nullable()
-      .openapi({ description: "For active cards: when it drifts to Not now without activity" }),
+      .openapi({
+        description:
+          "For active cards: when it drifts to Not now without activity",
+      }),
   })
   .openapi("Card");
 
@@ -254,14 +342,23 @@ export const toCard = (c: CardView): z.infer<typeof CardSchema> => ({
   autoPostponed: c.autoPostponed,
   closedAt: isoOrNull(c.closedAt),
   createdAt: iso(c.createdAt),
-  entropy: c.entropy ? { ...c.entropy, autoPostponeAt: iso(c.entropy.autoPostponeAt) } : null,
+  entropy: c.entropy
+    ? { ...c.entropy, autoPostponeAt: iso(c.entropy.autoPostponeAt) }
+    : null,
 });
 
 export const CommentSchema = z
-  .object({ id: z.string(), authorId: z.string().nullable(), body: z.string(), createdAt: Timestamp })
+  .object({
+    id: z.string(),
+    authorId: z.string().nullable(),
+    body: z.string(),
+    createdAt: Timestamp,
+  })
   .openapi("Comment");
 
-export const toComment = (c: typeof comments.$inferSelect): z.infer<typeof CommentSchema> => ({
+export const toComment = (
+  c: typeof comments.$inferSelect
+): z.infer<typeof CommentSchema> => ({
   id: c.id,
   authorId: c.authorId,
   body: c.body,
@@ -290,12 +387,25 @@ export const ActivitySchema = z
     visibility: z.enum(VISIBILITY),
     data: z.record(z.string(), z.unknown()),
     connectionId: z.string().nullable(),
-    actorIdentityId: z.string().nullable().openapi({ description: "The external account that did it (set even when not matched to a member yet)" }),
-    onBehalfOfId: z.string().nullable().openapi({ description: "For agent work: the person it was done for" }),
-    agentState: z.enum(["working", "needs_you", "finished", "failed"]).nullable(),
-    threadKey: z.string().nullable().openapi({ description: "Related events share a thread, e.g. github:acme/api#7" }),
+    actorIdentityId: z.string().nullable().openapi({
+      description:
+        "The external account that did it (set even when not matched to a member yet)",
+    }),
+    onBehalfOfId: z
+      .string()
+      .nullable()
+      .openapi({ description: "For agent work: the person it was done for" }),
+    agentState: z
+      .enum(["working", "needs_you", "finished", "failed"])
+      .nullable(),
+    threadKey: z.string().nullable().openapi({
+      description: "Related events share a thread, e.g. github:acme/api#7",
+    }),
     importance: z.number(),
-    count: z.number().int().openapi({ description: "How many events were merged into this one (bursts of commits, comments, replies)" }),
+    count: z.number().int().openapi({
+      description:
+        "How many events were merged into this one (bursts of commits, comments, replies)",
+    }),
     occurredAt: Timestamp,
     updatedAt: Timestamp,
   })
@@ -337,19 +447,30 @@ export const AttentionSchema = z
     state: z.enum(ATTENTION_STATES),
     count: z.number().int(),
     snoozedUntil: Timestamp.nullable(),
-    disposition: z.enum(["push", "digest", "drop"]).nullable().openapi({ description: "What the proactive check decided" }),
-    reason: z.string().nullable().openapi({ description: "Why am I seeing this" }),
+    disposition: z
+      .enum(["push", "digest", "drop"])
+      .nullable()
+      .openapi({ description: "What the proactive check decided" }),
+    reason: z
+      .string()
+      .nullable()
+      .openapi({ description: "Why am I seeing this" }),
     pushedAt: Timestamp.nullable(),
     actions: z
       .array(z.object({ id: z.string(), label: z.string() }))
       .nullable()
-      .openapi({ description: "One-click answers: POST /v1/attention/{id}/actions/{actionId}" }),
+      .openapi({
+        description:
+          "One-click answers: POST /v1/attention/{id}/actions/{actionId}",
+      }),
     createdAt: Timestamp,
     updatedAt: Timestamp,
   })
   .openapi("AttentionItem");
 
-export const toAttention = (a: AttentionRow): z.infer<typeof AttentionSchema> => ({
+export const toAttention = (
+  a: AttentionRow
+): z.infer<typeof AttentionSchema> => ({
   id: a.id,
   kind: a.kind,
   title: a.title,
@@ -377,17 +498,38 @@ export const AttentionMetricsSchema = z
     itemsPushed: z.number().int(),
     actedOnRate: z.number().nullable(),
     dismissalRate: z.number().nullable(),
-    feedback: z.object({ useful: z.number().int(), not_useful: z.number().int(), less_like_this: z.number().int() }),
-    precision: z.number().nullable().openapi({ description: "useful / all rated pushes" }),
-    mutedKinds: z.array(z.string()).openapi({ description: "Kinds now held for digests because of your feedback" }),
+    feedback: z.object({
+      useful: z.number().int(),
+      not_useful: z.number().int(),
+      less_like_this: z.number().int(),
+    }),
+    precision: z
+      .number()
+      .nullable()
+      .openapi({ description: "useful / all rated pushes" }),
+    mutedKinds: z.array(z.string()).openapi({
+      description: "Kinds now held for digests because of your feedback",
+    }),
   })
   .openapi("AttentionMetrics");
 
 export const SnapshotSchema = z
   .object({
-    person: z.object({ id: z.string(), name: z.string(), handle: z.string(), kind: z.enum(MEMBER_KINDS), title: z.string().nullable() }),
+    person: z.object({
+      id: z.string(),
+      name: z.string(),
+      handle: z.string(),
+      kind: z.enum(MEMBER_KINDS),
+      title: z.string().nullable(),
+    }),
     inProgress: z.array(
-      z.object({ number: z.number().int(), title: z.string(), column: z.string().nullable(), golden: z.boolean(), lastActiveAt: Timestamp }),
+      z.object({
+        number: z.number().int(),
+        title: z.string(),
+        column: z.string().nullable(),
+        golden: z.boolean(),
+        lastActiveAt: Timestamp,
+      })
     ),
     upNext: z.array(z.object({ number: z.number().int(), title: z.string() })),
     recent: z.array(
@@ -398,13 +540,14 @@ export const SnapshotSchema = z
         title: z.string(),
         detail: z.string().nullable(),
         url: z.string().nullable(),
-      }),
+      })
     ),
     lastActiveAt: Timestamp.nullable(),
   })
   .openapi("WorkSnapshot");
 
-export const toSnapshot = (s: WorkSnapshot): z.infer<typeof SnapshotSchema> => s;
+export const toSnapshot = (s: WorkSnapshot): z.infer<typeof SnapshotSchema> =>
+  s;
 
 // ---------------------------------------------------------------------------
 // Briefs, delivery, automations
@@ -418,7 +561,10 @@ export const BriefSchema = z
     periodEnd: Timestamp,
     title: z.string(),
     body: z.string().openapi({ description: "Markdown" }),
-    data: z.record(z.string(), z.unknown()).openapi({ description: "The structured data the brief was written from, for native rendering" }),
+    data: z.record(z.string(), z.unknown()).openapi({
+      description:
+        "The structured data the brief was written from, for native rendering",
+    }),
     composedBy: z.string(),
     createdAt: Timestamp,
   })
@@ -458,12 +604,24 @@ export const toTarget = (t: TargetRow): z.infer<typeof TargetSchema> => ({
   createdAt: iso(t.createdAt),
 });
 
-const HHMM = z.string().regex(/^\d{1,2}:\d{2}$/);
+const HHMM = z.string().regex(HH_MM);
 export const ScheduleSchema = z
   .discriminatedUnion("type", [
-    z.object({ type: z.literal("daily"), at: HHMM, weekdays: z.array(z.number().int().min(0).max(6)).optional() }),
-    z.object({ type: z.literal("weekly"), weekday: z.number().int().min(0).max(6), at: HHMM }),
-    z.object({ type: z.literal("interval"), minutes: z.number().int().min(5), activeHoursOnly: z.boolean().optional() }),
+    z.object({
+      type: z.literal("daily"),
+      at: HHMM,
+      weekdays: z.array(z.number().int().min(0).max(6)).optional(),
+    }),
+    z.object({
+      type: z.literal("weekly"),
+      weekday: z.number().int().min(0).max(6),
+      at: HHMM,
+    }),
+    z.object({
+      type: z.literal("interval"),
+      minutes: z.number().int().min(5),
+      activeHoursOnly: z.boolean().optional(),
+    }),
   ])
   .openapi("Schedule");
 
@@ -479,12 +637,16 @@ export const AutomationSchema = z
     nextRunAt: Timestamp.nullable(),
     lastRunAt: Timestamp.nullable(),
     lastStatus: z.string().nullable(),
-    lastResult: z.object({ status: z.string(), summary: z.string(), at: z.string() }).nullable(),
+    lastResult: z
+      .object({ status: z.string(), summary: z.string(), at: z.string() })
+      .nullable(),
     failureCount: z.number().int(),
   })
   .openapi("Automation");
 
-export const toAutomation = (a: AutomationRow): z.infer<typeof AutomationSchema> => ({
+export const toAutomation = (
+  a: AutomationRow
+): z.infer<typeof AutomationSchema> => ({
   id: a.id,
   kind: a.kind,
   name: a.name,
@@ -510,7 +672,9 @@ export const AutomationRunSchema = z
   })
   .openapi("AutomationRun");
 
-export const toRun = (r: typeof automationRuns.$inferSelect): z.infer<typeof AutomationRunSchema> => ({
+export const toRun = (
+  r: typeof automationRuns.$inferSelect
+): z.infer<typeof AutomationRunSchema> => ({
   id: r.id,
   status: r.status,
   summary: r.summary,
@@ -560,7 +724,9 @@ export const ConversationSchema = z
   })
   .openapi("Conversation");
 
-export const toConversation = (c: ConversationRow): z.infer<typeof ConversationSchema> => ({
+export const toConversation = (
+  c: ConversationRow
+): z.infer<typeof ConversationSchema> => ({
   id: c.id,
   agentId: c.agentId,
   askerId: c.askerId,
@@ -572,14 +738,31 @@ export const toConversation = (c: ConversationRow): z.infer<typeof ConversationS
 });
 
 export const MessageSchema = z
-  .object({ id: z.string(), seq: z.number().int(), role: z.enum(["user", "assistant"]), text: z.string(), createdAt: Timestamp })
+  .object({
+    id: z.string(),
+    seq: z.number().int(),
+    role: z.enum(["user", "assistant"]),
+    text: z.string(),
+    createdAt: Timestamp,
+  })
   .openapi("Message");
 
 /** Tool calls and results stay server-side; clients see the readable turns. */
-export const toMessages = (rows: MessageRow[]): z.infer<typeof MessageSchema>[] =>
+export const toMessages = (
+  rows: MessageRow[]
+): z.infer<typeof MessageSchema>[] =>
   rows
-    .filter((r): r is MessageRow & { role: "user" | "assistant"; text: string } => r.role !== "tool" && !!r.text)
-    .map((r) => ({ id: r.id, seq: r.seq, role: r.role, text: r.text, createdAt: iso(r.createdAt) }));
+    .filter(
+      (r): r is MessageRow & { role: "user" | "assistant"; text: string } =>
+        r.role !== "tool" && !!r.text
+    )
+    .map((r) => ({
+      id: r.id,
+      seq: r.seq,
+      role: r.role,
+      text: r.text,
+      createdAt: iso(r.createdAt),
+    }));
 
 // ---------------------------------------------------------------------------
 // Connections
@@ -594,11 +777,16 @@ export const ConnectionSchema = z
     settings: z.record(z.string(), z.unknown()),
     lastEventAt: Timestamp.nullable(),
     createdAt: Timestamp,
-    webhookUrls: z.record(z.string(), z.string()).openapi({ description: "Paste these into the provider's app settings" }),
+    webhookUrls: z
+      .record(z.string(), z.string())
+      .openapi({ description: "Paste these into the provider's app settings" }),
   })
   .openapi("Connection");
 
-export const toConnection = (c: ConnectionRow, webhookUrls: Record<string, string>): z.infer<typeof ConnectionSchema> => ({
+export const toConnection = (
+  c: ConnectionRow,
+  webhookUrls: Record<string, string>
+): z.infer<typeof ConnectionSchema> => ({
   id: c.id,
   provider: c.provider,
   name: c.name,

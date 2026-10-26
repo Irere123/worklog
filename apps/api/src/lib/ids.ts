@@ -1,6 +1,7 @@
 import { randomBytes } from "node:crypto";
 
-const ALPHABET = "0123456789abcdefghjkmnpqrstvwxyz"; // Crockford base32, lowercase
+// Crockford base32, lowercase
+const ALPHABET = "0123456789abcdefghjkmnpqrstvwxyz";
 
 /**
  * Time-sortable, prefixed IDs (ULID layout: 48-bit ms timestamp + 80 random bits),
@@ -9,13 +10,14 @@ const ALPHABET = "0123456789abcdefghjkmnpqrstvwxyz"; // Crockford base32, lowerc
 export function newId(prefix: IdPrefix): string {
   let time = Date.now();
   let ts = "";
-  for (let i = 0; i < 10; i++) {
-    ts = ALPHABET[time % 32] + ts;
+  for (let i = 0; i < 10; i += 1) {
+    ts = ALPHABET.charAt(time % 32) + ts;
     time = Math.floor(time / 32);
   }
-  const bytes = randomBytes(16);
   let rand = "";
-  for (let i = 0; i < 16; i++) rand += ALPHABET[bytes[i]! % 32];
+  for (const byte of randomBytes(16)) {
+    rand += ALPHABET.charAt(byte % 32);
+  }
   return `${prefix}_${ts}${rand}`;
 }
 

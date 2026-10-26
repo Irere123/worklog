@@ -4,8 +4,13 @@
  */
 import { PGlite } from "@electric-sql/pglite";
 import { drizzle } from "drizzle-orm/pglite";
+
 import { loadConfig } from "../config";
 import { ConsoleMailer } from "../delivery/mailer";
 import { createAuth } from "./auth";
 
-export const auth = createAuth(drizzle({ client: new PGlite() }), loadConfig({ DATABASE_URL: "memory://" }), new ConsoleMailer());
+export const auth = createAuth(
+  drizzle({ client: new PGlite() }),
+  loadConfig({ DATABASE_URL: "memory://" }),
+  new ConsoleMailer()
+);

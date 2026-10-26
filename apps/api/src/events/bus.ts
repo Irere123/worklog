@@ -1,6 +1,13 @@
 import { and, asc, eq, gt, isNull, lt, or } from "drizzle-orm";
+
 import type { Db } from "../db";
 import { events } from "../db/schema";
+import type { EventType } from "../db/schema";
+import { returned } from "../lib/assert";
+
+export type StoredEvent = typeof events.$inferSelect;
+
+type Listener = (event: StoredEvent) => void;
 
 /**
  * Every change clients may care about is written to the `events` table with a monotonically
@@ -9,44 +16,35 @@ import { events } from "../db/schema";
  *
  * Single-process fan-out for now; with several API replicas, swap `notify` for Postgres LISTEN/NOTIFY.
  */
-export const EVENT_TYPES = [
-  "activity.created",
-  "activity.updated",
-  "card.updated",
-  "attention.updated",
-  "brief.created",
-  "message.created",
-  "automation.ran",
-] as const;
-export type EventType = (typeof EVENT_TYPES)[number];
-
-export type StoredEvent = {
-  seq: number;
-  workspaceId: string;
-  audienceId: string | null;
-  type: EventType;
-  data: Record<string, unknown>;
-  createdAt: Date;
-};
-
-type Listener = (event: StoredEvent) => void;
-
 export class EventBus {
   private readonly listeners = new Set<Listener>();
+  private readonly db: Db;
 
-  constructor(private readonly db: Db) {}
+  constructor(db: Db) {
+    this.db = db;
+  }
 
-  async publish(input: { workspaceId: string; audienceId?: string | null; type: EventType; data: Record<string, unknown> }) {
-    const [row] = await this.db
+  async publish(input: {
+    workspaceId: string;
+    audienceId?: string | null;
+    type: EventType;
+    data: Record<string, unknown>;
+  }) {
+    const rows = await this.db
       .insert(events)
-      .values({ workspaceId: input.workspaceId, audienceId: input.audienceId ?? null, type: input.type, data: input.data })
+      .values({
+        workspaceId: input.workspaceId,
+        audienceId: input.audienceId ?? null,
+        type: input.type,
+        data: input.data,
+      })
       .returning();
-    const event = row as StoredEvent;
+    const event = returned(rows, "event");
     for (const listener of this.listeners) {
       try {
         listener(event);
-      } catch (err) {
-        console.error("[bus] listener failed", err);
+      } catch (error) {
+        console.error("[bus] listener failed", error);
       }
     }
     return event;
@@ -54,24 +52,30 @@ export class EventBus {
 
   subscribe(listener: Listener): () => void {
     this.listeners.add(listener);
-    return () => this.listeners.delete(listener);
+    return () => {
+      this.listeners.delete(listener);
+    };
   }
 
   /** Events after `afterSeq` that `memberId` may see. */
-  async replay(workspaceId: string, memberId: string, afterSeq: number, limit = 500): Promise<StoredEvent[]> {
-    const rows = await this.db
+  async replay(
+    workspaceId: string,
+    memberId: string,
+    afterSeq: number,
+    limit = 500
+  ): Promise<StoredEvent[]> {
+    return await this.db
       .select()
       .from(events)
       .where(
         and(
           eq(events.workspaceId, workspaceId),
           gt(events.seq, afterSeq),
-          or(isNull(events.audienceId), eq(events.audienceId, memberId)),
-        ),
+          or(isNull(events.audienceId), eq(events.audienceId, memberId))
+        )
       )
       .orderBy(asc(events.seq))
       .limit(limit);
-    return rows as StoredEvent[];
   }
 
   async prune(olderThan: Date) {
@@ -79,6 +83,13 @@ export class EventBus {
   }
 }
 
-export function canSee(event: StoredEvent, workspaceId: string, memberId: string): boolean {
-  return event.workspaceId === workspaceId && (event.audienceId === null || event.audienceId === memberId);
+export function canSee(
+  event: StoredEvent,
+  workspaceId: string,
+  memberId: string
+): boolean {
+  return (
+    event.workspaceId === workspaceId &&
+    (event.audienceId === null || event.audienceId === memberId)
+  );
 }
