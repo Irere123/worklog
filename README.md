@@ -4,7 +4,7 @@
 
 **The shared picture of work for teams of humans and AI agents.**
 
-See what everyone is working on · know what needs *you* · ask anyone's assistant
+See what everyone is working on · know what needs _you_ · ask anyone's assistant
 
 </div>
 
@@ -16,8 +16,8 @@ Worklog pulls the **signal, not the noise,** into one place and keeps a living b
 
 ## A day with Worklog
 
-| | |
-|---|---|
+|  |  |
+| --- | --- |
 | **08:30** | Your **morning brief** lands in Slack or email before stand-up: what you did yesterday, what the team moved forward, and what needs you. |
 | **10:12** | Sam asks for your review on GitHub. You get **one ping, with a reason** ("Sam is waiting on your review to ship today"). The chatter in `#random` stays out. |
 | **11:05** | A decision gets made on a call. You type `/log Agreed on FHIR R4 for referrals` and it lands on the right card. |
@@ -27,7 +27,7 @@ Worklog pulls the **signal, not the noise,** into one place and keeps a living b
 
 ## What's inside
 
-- 🗂 **A board that stays honest.** Inspired by [Fizzy](https://fizzy.do): cards flow from *Maybe?* through your columns to *Not now* / *Done*. Golden tickets replace priority fields, and untouched cards drift away on their own. Before a card drifts, the assistant asks *"still on it?"*.
+- 🗂 **A board that stays honest.** Inspired by [Fizzy](https://fizzy.do): cards flow from _Maybe?_ through your columns to _Not now_ / _Done_. Golden tickets replace priority fields, and untouched cards drift away on their own. Before a card drifts, the assistant asks _"still on it?"_.
 - 🌊 **An activity stream built for signal.** GitHub, Slack, Discord, self-hosted forges, manual and voice logs, and agents become one feed. Every delivery is stored, deduplicated, matched to the right person, filtered for noise and merged into readable items, and you can see why anything was skipped.
 - 🔔 **Attention that respects your time.** Pings only for what's blocked on you, inside a daily budget, each with a "why now". Everything else arrives in the morning brief or one of two daily digests, delivered where you choose: email, Slack, Discord or a webhook.
 - 🤖 **An assistant that knows your work.** Talk to it about your day. Teammates can ask it about your work when you're away (read-only, team-visible data). It learns how you work, and keeps private things private.
@@ -85,20 +85,20 @@ curl -X POST localhost:4000/v1/briefs -H "$WL" -H 'content-type: application/jso
 ## Connect your tools
 
 | Tool | What Worklog picks up | How |
-|---|---|---|
+| --- | --- | --- |
 | **GitHub** | PRs, reviews, issues, comments, pushes, releases. Review requests reach the reviewer; issues can become cards. | Webhook + secret |
 | **Slack** | Work updates from the channels you choose, @mentions, edits and deletes; `/log`, `/worklog`, and `@worklog` in any thread. | Slack app |
 | **Discord** | `/log`, `/now`, `/ask`, `/brief`, and delivery of briefs to a channel. | Interactions URL |
 | **Gitea / Forgejo** | Same as GitHub, for self-hosted forges. | Webhook + secret |
 | **Anything with webhooks** | Map payloads to events with rules: GitLab, Sentry, CI, deploy bots. | `webhook` connector, no code |
 | **Your own code** | Push events from scripts and sync jobs. | `custom` connector + an `ingest` key |
-| **Agents** | Progress reports with *working / needs you / finished / failed*. | `POST /v1/activities` |
+| **Agents** | Progress reports with _working / needs you / finished / failed_. | `POST /v1/activities` |
 
 `GET /v1/connectors` lists every connector and what it needs. See [docs/CONNECTORS.md](docs/CONNECTORS.md) for the pipeline, the noise rules, and how to add your own.
 
 ## Under the hood
 
-- **Stack:** [Bun](https://bun.sh), [Hono](https://hono.dev) with `@hono/zod-openapi`, [Drizzle](https://orm.drizzle.team) on Postgres, [better-auth](https://better-auth.com), and the [Vercel AI SDK](https://ai-sdk.dev) with OpenRouter.
+- **Stack:** [Bun](https://bun.sh), [Hono](https://hono.dev) with `@hono/zod-openapi`, [Drizzle](https://orm.drizzle.team) on Postgres, [better-auth](https://better-auth.com), and the [Vercel AI SDK](https://ai-sdk.dev) with OpenRouter. Code style comes from [oxlint and oxfmt](https://oxc.rs) with [Ultracite](https://www.ultracite.ai)'s presets.
 - **API:** 83 endpoints with stable operation ids (`card.close`, `conversation.chat`…). The spec is at `/openapi.json` and interactive docs at `/docs`.
 - **Realtime:** Server-Sent Events with sequence ids, so a client that reconnects misses nothing. Chat streams in the AI SDK UI protocol, so `useChat` works on web and Expo.
 - **Background work:** a Postgres job queue processes deliveries in order per connection, with retries. A scheduler runs briefs, digests, checks and nightly memory per person, on their local clock.
@@ -126,12 +126,14 @@ docs/                architecture, connectors, research notes
 ```bash
 bun run test         # the full suite (~40 s; embedded Postgres, scripted AI model)
 bun run typecheck
+bun run lint         # oxlint with Ultracite's rules, type-aware
+bun run format       # oxfmt
 cd apps/api
 bun run db:generate  # migrations after schema changes
 bun run openapi      # print the OpenAPI spec (for client SDKs)
 ```
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for conventions.
+Git hooks (via [Lefthook](https://lefthook.dev)) lint and format staged files and check that commit messages follow [Conventional Commits](https://www.conventionalcommits.org). See [CONTRIBUTING.md](CONTRIBUTING.md) for conventions.
 
 ## Docs
 
