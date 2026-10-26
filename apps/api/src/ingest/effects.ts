@@ -18,7 +18,6 @@ type Scope = {
   source: string;
 };
 
-/** Cards an event refers to: external keys (from issue trackers) and Worklog numbers (WL-12). */
 export async function findCardIds(
   ctx: AppContext,
   workspaceId: string,
@@ -72,10 +71,7 @@ async function memberFor(
   return m ?? null;
 }
 
-/**
- * Board effects from issue trackers. They run before the activity is written so it can link to the
- * card, and they're silent: the source event's own activity is the record of what happened.
- */
+// Run before the activity is written so it can link to the card. Silent: the source event's own activity is the record.
 export async function applyBoardEffects(
   ctx: AppContext,
   scope: Scope,
@@ -105,7 +101,6 @@ export async function applyBoardEffects(
   return touched;
 }
 
-/** One effect on the card it names (if that card exists yet). Returns the card it touched, if any. */
 async function applyBoardEffect(
   ctx: AppContext,
   scope: Scope,
@@ -197,7 +192,7 @@ type Notice = Pick<
   "kind" | "title" | "body" | "priority" | "dedupeKey"
 >;
 
-/** Signals become attention items for the people they concern — never for the person who acted. */
+// Never raises attention for the person who acted.
 export async function applySignals(
   ctx: AppContext,
   scope: Scope,
@@ -244,7 +239,6 @@ function capForBots(priority: Priority, actorIsBot: boolean): Priority {
   return actorIsBot && priority === "high" ? "normal" : priority;
 }
 
-/** What a signal asks of the person it names, as an attention item. */
 function describeSignal(
   signal: Exclude<Signal, { type: "resolve" }>,
   event: WorklogEvent,
@@ -286,7 +280,6 @@ function describeSignal(
   };
 }
 
-/** ": PR title", " in #channel" (chat), or ": headline". */
 function mentionPlace(event: WorklogEvent, what: string) {
   if (event.object?.title) {
     return `: ${event.object.title}`;
@@ -325,10 +318,7 @@ async function resolveItems(
     );
 }
 
-/**
- * Agent work: tell the human it was done for — loudly only when the agent is waiting on them
- * (Grok Bot / Cursor pattern: never notify while it's working).
- */
+// Loud only when the agent is waiting on the human; never notify while it's working.
 export async function applyAgentState(
   ctx: AppContext,
   input: {

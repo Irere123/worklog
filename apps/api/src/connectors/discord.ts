@@ -42,7 +42,6 @@ export function verifyDiscord(
   }
 }
 
-/** The slash commands we register. Same verbs as Slack. */
 export const DISCORD_COMMANDS = [
   {
     name: "log",
@@ -84,7 +83,7 @@ export const DISCORD_COMMANDS = [
   { name: "brief", description: "Your brief, right now" },
 ];
 
-/** The fields we read from an interaction. Options are strings: text (3) and user ids (6). */
+// Options are strings: text (type 3) and user ids (type 6).
 const InteractionSchema = z.object({
   type: z.number(),
   id: z.string(),
@@ -111,7 +110,6 @@ const UNSUPPORTED = {
 const clip = (text: string) =>
   text.length > 1990 ? `${text.slice(0, 1985)}…` : text;
 
-/** Returns the immediate HTTP response body. Slow commands are deferred and finished via the follow-up webhook. */
 async function handleInteraction(
   ctx: AppContext,
   conn: ConnectionView,
@@ -164,11 +162,11 @@ async function handleInteraction(
     i,
     async () => await runCommand(ctx, author, "discord", userId, cmd)
   );
-  // "Worklog is thinking…"
+  // Type 5: deferred response, shown to the user as "Worklog is thinking…".
   return { type: 5, data: { flags: EPHEMERAL } };
 }
 
-/** Finishes a deferred interaction by editing the original response. Already acknowledged, so failures are only logged. */
+// Already acknowledged, so failures are only logged.
 async function followUp(
   ctx: AppContext,
   i: Interaction,
@@ -197,7 +195,6 @@ async function followUp(
   }
 }
 
-/** Registers (overwrites) the global slash commands for this application. */
 export async function registerDiscordCommands(
   ctx: AppContext,
   conn: ConnectionView
@@ -217,10 +214,6 @@ export async function registerDiscordCommands(
   return DISCORD_COMMANDS.map((c) => c.name);
 }
 
-/**
- * Discord only pushes interactions over HTTP (reading channel messages needs a Gateway bot — a
- * separate worker on the roadmap), so in the MVP it's a command surface and a delivery channel.
- */
 export const discordConnector: Connector = {
   id: "discord",
   name: "Discord",
@@ -263,7 +256,7 @@ export const discordConnector: Connector = {
     } catch {
       return { type: "reject", status: 400, error: "body is not JSON" };
     }
-    // PING → PONG
+    // Discord pings the endpoint to verify it; it expects a PONG (type 1).
     if (Ping.safeParse(payload).success) {
       return { type: "respond", body: { type: 1 } };
     }

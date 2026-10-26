@@ -91,7 +91,7 @@ export async function deleteTarget(
   }
 }
 
-/** Sends to every listed (enabled) target. Failures are collected, not thrown, so one bad channel can't block the rest. */
+// Failures are collected, not thrown, so one bad channel can't block the rest.
 export async function deliver(
   ctx: AppContext,
   memberId: string,
@@ -151,7 +151,6 @@ async function botToken(
   return token;
 }
 
-/** The part of a Slack Web API reply we rely on. */
 const SlackReply = z.object({ ok: z.boolean(), error: z.string().optional() });
 
 async function sendTo(ctx: AppContext, target: TargetRow, message: Outgoing) {
@@ -244,7 +243,6 @@ async function sendTo(ctx: AppContext, target: TargetRow, message: Outgoing) {
   }
 }
 
-/** Markdown → Slack mrkdwn (the common subset). */
 export function toSlack(md: string): string {
   return md
     .replaceAll(/^#{1,6}\s+(?<text>.*)$/gmu, "*$<text>*")

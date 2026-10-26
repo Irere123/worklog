@@ -171,7 +171,6 @@ describe("board (Fizzy rules)", () => {
     expect(attention.map((a: any) => a.kind)).toEqual(
       expect.arrayContaining(["card.assigned", "mention"])
     );
-    // Mention sorts first
     expect(attention[0].priority).toBe("high");
   });
 

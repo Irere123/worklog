@@ -16,11 +16,7 @@ const handleKey = (handle: string) => `handle:${handle.toLowerCase()}`;
 /** Sign-in providers whose account ids are the same ids their webhooks carry. */
 const SIGN_IN_NAMESPACES = new Set(["github", "slack", "discord"]);
 
-/**
- * Find or record the identity behind an actor, and the member it belongs to (if any).
- * Matching order: stable id → login → the account the person signed in with. Unknown actors are
- * still recorded (memberId null) so admins can link them later and get their history attributed.
- */
+// Unknown actors are still recorded (memberId null) so admins can link them later and get their history attributed.
 export async function resolveActor(
   ctx: AppContext,
   workspaceId: string,
@@ -54,7 +50,6 @@ export async function resolveActor(
   };
 }
 
-/** The identity already recorded for this actor, by stable id or by a manual link to its login. */
 async function matchIdentity(
   ctx: AppContext,
   workspaceId: string,
@@ -105,7 +100,6 @@ async function matchIdentity(
   return exact;
 }
 
-/** First sighting of an actor: record it, unlinked, so it can be linked (and credited) later. */
 async function recordIdentity(
   ctx: AppContext,
   workspaceId: string,
@@ -145,7 +139,6 @@ async function recordIdentity(
   return returned(winner, "identity");
 }
 
-/** The member who signed in with this account, for providers whose sign-in ids match their webhook ids. */
 async function signedInMember(
   ctx: AppContext,
   workspaceId: string,
@@ -171,7 +164,6 @@ async function signedInMember(
   return signedIn?.id ?? null;
 }
 
-/** Attach an identity to a member — and retroactively attribute everything it already did. */
 export async function linkIdentityToMember(
   ctx: AppContext,
   workspaceId: string,
@@ -199,7 +191,6 @@ export async function linkIdentityToMember(
   return { identity: row, reattributed: updated.length };
 }
 
-/** Manual link from the API: by stable id and/or login. Re-attributes history if the identity was already seen. */
 export async function linkByHandle(
   ctx: AppContext,
   workspaceId: string,

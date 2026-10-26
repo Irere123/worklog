@@ -52,10 +52,6 @@ export const ErrorSchema = z
   })
   .openapi("Error");
 
-// ---------------------------------------------------------------------------
-// People
-// ---------------------------------------------------------------------------
-
 export const SettingsSchema = z
   .object({
     activeHours: z
@@ -232,10 +228,6 @@ export const toIdentity = (
   lastSeenAt: isoOrNull(i.lastSeenAt),
 });
 
-// ---------------------------------------------------------------------------
-// Board
-// ---------------------------------------------------------------------------
-
 export const ColumnSchema = z
   .object({
     id: z.string(),
@@ -369,10 +361,6 @@ export const CardDetailSchema = CardSchema.extend({
   comments: z.array(CommentSchema),
   watcherIds: z.array(z.string()),
 }).openapi("CardDetail");
-
-// ---------------------------------------------------------------------------
-// Work stream & attention
-// ---------------------------------------------------------------------------
 
 export const ActivitySchema = z
   .object({
@@ -549,10 +537,6 @@ export const SnapshotSchema = z
 export const toSnapshot = (s: WorkSnapshot): z.infer<typeof SnapshotSchema> =>
   s;
 
-// ---------------------------------------------------------------------------
-// Briefs, delivery, automations
-// ---------------------------------------------------------------------------
-
 export const BriefSchema = z
   .object({
     id: z.string(),
@@ -683,10 +667,6 @@ export const toRun = (
   finishedAt: iso(r.finishedAt),
 });
 
-// ---------------------------------------------------------------------------
-// Memory & conversations
-// ---------------------------------------------------------------------------
-
 export const MemorySchema = z
   .object({
     id: z.string(),
@@ -763,10 +743,6 @@ export const toMessages = (
       text: r.text,
       createdAt: iso(r.createdAt),
     }));
-
-// ---------------------------------------------------------------------------
-// Connections
-// ---------------------------------------------------------------------------
 
 export const ConnectionSchema = z
   .object({

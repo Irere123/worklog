@@ -42,10 +42,6 @@ export function viewOf(ctx: AppContext, conn: ConnectionRow): ConnectionView {
   };
 }
 
-// ---------------------------------------------------------------------------
-// 1. Receive: authenticate, store raw, acknowledge. Interpretation happens off the request path.
-// ---------------------------------------------------------------------------
-
 export async function receive(
   ctx: AppContext,
   connectionId: string,
@@ -110,7 +106,6 @@ export async function receive(
   return { status: 200, body: { ok: true } };
 }
 
-/** Code integrations push canonical events straight into the same pipeline (POST /v1/connections/{id}/events). */
 export async function receivePushed(
   ctx: AppContext,
   conn: ConnectionRow,
@@ -142,10 +137,6 @@ export async function receivePushed(
   ctx.kickQueue?.();
   return { duplicate: false, inboundEventId: stored.id };
 }
-
-// ---------------------------------------------------------------------------
-// 2. Process: normalize → identity → gate → board effects and card refs → merge and persist → signals
-// ---------------------------------------------------------------------------
 
 export async function processInbound(
   ctx: AppContext,
@@ -227,7 +218,6 @@ function actsOnPeople(event: WorklogEvent) {
   return event.hidden === true || (event.signals ?? []).length > 0;
 }
 
-/** Where an event came from: the connection, its identity namespace, and the raw delivery. */
 type Source = {
   conn: ConnectionView;
   namespace: string;
@@ -236,7 +226,7 @@ type Source = {
   replay: boolean;
 };
 
-/** Who did it: the identity (recorded even if unknown) and the member it belongs to, if linked. */
+/** `member` is null unless the identity is linked. */
 type Who = {
   resolved: Awaited<ReturnType<typeof resolveActor>> | null;
   member: Member | null;
@@ -244,7 +234,6 @@ type Who = {
   isBot: boolean;
 };
 
-/** One canonical event through the pipeline stages documented in docs/CONNECTORS.md. */
 async function ingestEvent(
   ctx: AppContext,
   source: Source,
@@ -289,7 +278,6 @@ async function ingestEvent(
   await notify(ctx, scope, event, { who, cardId, onBehalfOfId, activityId });
 }
 
-/** Stage: identity. Every actor gets an identity row; linked ones resolve to a member. */
 async function identify(
   ctx: AppContext,
   source: Source,
@@ -329,7 +317,7 @@ function scopeOf(source: Source) {
   };
 }
 
-/** Stage: board effects, then card refs. Effects run first so the activity can link to the card. */
+/** Effects run before card refs so the activity can link to the card they create. */
 async function linkCard(
   ctx: AppContext,
   scope: ReturnType<typeof scopeOf>,
@@ -355,7 +343,6 @@ async function linkCard(
   return referenced ?? touched[0] ?? null;
 }
 
-/** Stage: merge and persist. Records the activity (or folds it into a burst) and tallies the outcome. */
 async function persist(
   ctx: AppContext,
   source: Source,
@@ -415,7 +402,6 @@ function activityData(event: WorklogEvent, who: Who) {
   };
 }
 
-/** Stage: signals and agent state become attention for the people they concern. */
 async function notify(
   ctx: AppContext,
   scope: ReturnType<typeof scopeOf>,
@@ -449,7 +435,6 @@ async function notify(
   }
 }
 
-/** Edits and deletions at the source (a Slack message edited or deleted) are applied — deletions especially. */
 async function applyRevision(
   ctx: AppContext,
   conn: ConnectionView,
@@ -498,11 +483,6 @@ registerJob("ingest.process", async (ctx, payload) => {
   await processInbound(ctx, String(payload.inboundEventId));
 });
 
-// ---------------------------------------------------------------------------
-// 3. Replay: rebuild a connection's activity from the raw inbox after fixing a connector.
-//    Side effects (attention, board) are not re-run.
-// ---------------------------------------------------------------------------
-
 export async function replayConnection(
   ctx: AppContext,
   workspaceId: string,
@@ -542,10 +522,6 @@ registerJob("ingest.replay", async (ctx, payload) => {
     typeof payload.since === "string" ? new Date(payload.since) : undefined
   );
 });
-
-// ---------------------------------------------------------------------------
-// 4. Health: is this connection producing signal, and why was anything dropped?
-// ---------------------------------------------------------------------------
 
 export async function connectionHealth(
   ctx: AppContext,
@@ -628,7 +604,7 @@ export async function connectionHealth(
     lastEventAt: conn.lastEventAt?.toISOString() ?? null,
     deliveries: statuses,
     activities: { kept, merged },
-    /** Share of deliveries that became (or merged into) activity — low isn't bad; it means noise was filtered. */
+    /** Low isn't bad: it means noise was filtered. */
     signalRate: recent.length ? (kept + merged) / recent.length : null,
     topSkipReasons: [...reasons.entries()]
       .toSorted((a, b) => b[1] - a[1])

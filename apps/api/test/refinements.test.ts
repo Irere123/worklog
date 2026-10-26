@@ -14,7 +14,6 @@ beforeEach(() => {
   env.reset();
 });
 
-/** Owner + teammate Sam on a shared board, with Sam's attention-check automation at hand. */
 async function team() {
   const owner = await env.workspace();
   const sam = await env.teammate(owner.token, "Sam");
@@ -296,7 +295,6 @@ describe("drift nudges", () => {
     const after = (
       await env.call("GET", `/v1/cards/${card.number}`, { token: owner.token })
     ).body;
-    // The clock restarted
     expect(after.entropy.postponingSoon).toBe(false);
   });
 });

@@ -2,11 +2,6 @@ import { z } from "zod";
 
 import type { Connector, WorklogEvent } from "../ingest/types";
 
-/**
- * For integrations written as code (a sync script for an internal tool, a CLI, an agent harness):
- * push canonical events to `POST /v1/connections/{id}/events` with an API key that has the `ingest`
- * scope. They go through the same pipeline as webhooks — identities, noise rules, merging, signals.
- */
 const Actor = z.object({
   id: z.string().min(1),
   handle: z.string().nullish(),
@@ -53,7 +48,6 @@ export const PushedEvent = z.object({
   data: z.record(z.string(), z.unknown()).optional(),
 });
 
-/** What the push endpoint stores: the request body, each event validated again on processing. */
 const PushedBatch = z.object({ events: z.array(z.unknown()).optional() });
 
 export const customConnector: Connector = {

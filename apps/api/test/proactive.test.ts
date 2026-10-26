@@ -94,7 +94,6 @@ describe("automations", () => {
       "digest",
     ]);
     const morning = autos.find((a: any) => a.kind === "brief.daily");
-    // Their email
     expect(morning.targetIds).toHaveLength(1);
   });
 
@@ -168,7 +167,6 @@ describe("automations", () => {
         })
       ).body;
 
-    // Nothing new
     expect((await run()).status).toBe("skipped");
 
     await env.call("POST", `/v1/cards/${card.number}/comments`, {
@@ -185,7 +183,6 @@ describe("automations", () => {
     const pinged = await run();
     expect(pinged.status).toBe("delivered");
 
-    // Already pushed; no repeat
     expect((await run()).status).toBe("skipped");
   });
 

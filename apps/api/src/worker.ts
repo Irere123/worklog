@@ -2,7 +2,7 @@ import { loadConfig } from "./config";
 import { createContext } from "./context";
 import { startScheduler } from "./jobs/scheduler";
 
-/** Scheduler-only process, for deployments that run API replicas with RUN_SCHEDULER=false. */
+// Scheduler-only process, for deployments that run API replicas with RUN_SCHEDULER=false.
 const ctx = await createContext(loadConfig());
 const stop = startScheduler(ctx);
 console.log("Worklog worker running (automations, entropy)");

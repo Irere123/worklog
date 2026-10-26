@@ -16,7 +16,6 @@ beforeEach(() => {
 
 const mailbox = () => (env.ctx.mailer as ConsoleMailer).sent;
 
-/** Signs in through the real magic-link flow and returns the session token (as a mobile client would). */
 async function signIn(email: string) {
   const start = await env.app.request("/api/auth/sign-in/magic-link", {
     method: "POST",

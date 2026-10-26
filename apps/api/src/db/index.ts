@@ -6,7 +6,6 @@ import type { PgDatabase, PgQueryResultHKT } from "drizzle-orm/pg-core";
 import * as authSchema from "./auth-schema";
 import * as appSchema from "./schema";
 
-/** Worklog's tables plus Better Auth's (user, session, account, verification) — one schema, one migration set. */
 export const schema = { ...appSchema, ...authSchema };
 export type Db = PgDatabase<PgQueryResultHKT, typeof schema>;
 
@@ -14,14 +13,9 @@ const migrationsFolder = fileURLToPath(
   new URL("../../drizzle", import.meta.url)
 );
 
-/**
- * `postgres://...` connects to a real Postgres server through node-postgres (which runs on Bun).
- * Not Bun's native SQL driver: with Drizzle 0.45 it stores jsonb values as JSON *strings*
- * (oven-sh/bun#28819) — reads look fine, but `data->>'repo'` is null in SQL. test/postgres.test.ts
- * guards this over the real wire protocol.
- * Anything else is an embedded PGlite directory — zero-setup local dev; "memory://" for tests.
- * Both speak the same SQL dialect and share one set of migrations.
- */
+// node-postgres, not Bun's native SQL driver: with Drizzle 0.45 it stores jsonb values as JSON
+// *strings* (oven-sh/bun#28819) — reads look fine, but `data->>'repo'` is null in SQL.
+// test/postgres.test.ts guards this.
 export async function openDb(
   url: string
 ): Promise<{ db: Db; close: () => Promise<void> }> {

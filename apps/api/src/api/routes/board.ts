@@ -32,13 +32,7 @@ const Entropy = z
 
 const ws = (c: Context<Env>) => c.get("member").workspaceId;
 
-/**
- * Card state changes are sub-resources, like Fizzy's API:
- *   POST/DELETE /cards/{n}/triage    — into a column / back to Maybe?
- *   POST/DELETE /cards/{n}/not_now   — postpone / resume
- *   POST/DELETE /cards/{n}/closure   — done / reopen
- *   POST/DELETE /cards/{n}/goldness  — golden ticket on/off
- */
+// Card state changes are sub-resources (POST sets, DELETE undoes), like Fizzy's API.
 function cardAction(opts: {
   method: "post" | "delete";
   path: string;
@@ -57,7 +51,6 @@ function cardAction(opts: {
 }
 
 export const boardRoutes = router()
-  // ---- boards ----
   .openapi(
     createRoute({
       method: "get",
@@ -159,7 +152,6 @@ export const boardRoutes = router()
         200
       )
   )
-  // ---- columns ----
   .openapi(
     createRoute({
       method: "post",
@@ -236,7 +228,6 @@ export const boardRoutes = router()
       return c.json({ ok: true as const }, 200);
     }
   )
-  // ---- cards ----
   .openapi(
     createRoute({
       method: "get",

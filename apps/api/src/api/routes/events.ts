@@ -17,7 +17,6 @@ export const EventSchema = z
   })
   .openapi("Event");
 
-/** Waits up to `ms`, or until `wake()` is called — whichever comes first. */
 function createWaiter() {
   let wake: (() => void) | null = null;
   return {
@@ -46,11 +45,6 @@ const frame = (e: StoredEvent) => ({
   }),
 });
 
-/**
- * One realtime stream for every client. Frames carry `id: <seq>`; reconnect with
- * `Last-Event-ID` (EventSource does this automatically) or `?after=<seq>` and missed
- * events are replayed first. Browsers can't set headers on EventSource, so `?token=` is accepted here.
- */
 export const eventRoutes = router().openapi(
   createRoute({
     method: "get",
@@ -119,7 +113,6 @@ export const eventRoutes = router().openapi(
       }
 
       while (!stream.aborted) {
-        // Events that arrive while we write are picked up by the next pass.
         while (queue.length > 0) {
           for (const e of queue.splice(0)) {
             // Skip what the replay already sent.

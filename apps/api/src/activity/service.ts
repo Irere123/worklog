@@ -40,7 +40,6 @@ export type ActivityInput = {
   agentState?: ActivityRow["agentState"];
   threadKey?: string | null;
   importance?: number;
-  /** Merge into a recent activity with the same key instead of adding a row (see WorklogEvent.coalesce). */
   coalesce?: {
     key: string;
     windowMinutes: number;
@@ -61,10 +60,7 @@ function clamp(n: number) {
   return Math.max(0, Math.min(1, n));
 }
 
-/**
- * The one write path for the work stream. Returns null when the event was already recorded;
- * `merged: true` when it was folded into an existing activity (a burst of commits, comments, messages).
- */
+// Null when the event was already recorded; `merged: true` when folded into an existing activity.
 export async function recordActivity(
   ctx: AppContext,
   input: ActivityInput
@@ -84,7 +80,6 @@ export async function recordActivity(
   if (!created) {
     return null;
   }
-  // Any activity on a card resets its entropy clock.
   if (created.cardId) {
     await ctx.db
       .update(cards)
@@ -224,10 +219,7 @@ export type ActivityFilters = {
   limit?: number;
 };
 
-/**
- * Team-visible activity, plus private entries authored by anyone in `privateFor`
- * (the viewer themself; their personal agent acting in owner mode).
- */
+// Team-visible activity plus private entries authored by anyone in `privateFor` (the viewer and their personal agent in owner mode).
 export async function listActivities(
   ctx: AppContext,
   workspaceId: string,
@@ -299,7 +291,6 @@ export async function deleteOwnActivity(
   return deleted.length > 0;
 }
 
-/** Activities with no attributed actor (e.g. a GitHub user not linked to anyone yet). */
 export function unattributed() {
   return isNull(activities.actorId);
 }

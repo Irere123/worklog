@@ -10,17 +10,6 @@ import type {
 } from "../ingest/types";
 import { hmacHex, safeEqual } from "../lib/crypto";
 
-/**
- * GitHub, and GitHub-compatible forges (Gitea, Forgejo — self-hosted). One normalizer, explicit noise
- * rules: only events that mean work moved or someone is waiting become activity.
- *
- * Kept: PR opened / ready / merged / closed / reopened; reviews (approve, changes requested, commented
- * with a body); review & issue comments (merged per person per thread); issues opened / closed /
- * reopened; pushes (merged per branch per person, minus merge commits already covered by a PR); releases.
- * Signals: review requests, assignments, @mentions, review results, resolutions.
- * Dropped (with a reason): drafts, PR syncs/edits/labels, tag & delete pushes, stars, forks, CI statuses…
- */
-
 type User = { login: string; id?: number | null; type?: string; name?: string };
 type Repo = { full_name: string; html_url?: string; default_branch?: string };
 type Issue = {
@@ -75,7 +64,7 @@ type Payload = {
   forced?: boolean;
   compare?: string;
   commits?: { id: string; message: string; distinct?: boolean }[];
-  /** Gitea/Forgejo: commit lists are capped, this is the real count. */
+  /** Gitea/Forgejo cap the commit list; this is the real count. */
   total_commits?: number;
   head_commit?: { timestamp?: string } | null;
 };
@@ -99,13 +88,12 @@ const actorFor = (u: User): ExternalActor => ({
 const actorOf = (u?: User | null): ExternalActor | null =>
   u ? actorFor(u) : null;
 
-/** A mentioned login, as an actor reference (resolved by login since mentions carry no id). */
+// Mentions carry no id, so they resolve by login.
 const byLogin = (login: string): ExternalActor => ({
   id: `handle:${login.toLowerCase()}`,
   handle: login,
 });
 
-/** Every value a named group captured across the text's matches. */
 const captures = (
   text: string | null | undefined,
   pattern: RegExp,
@@ -139,7 +127,6 @@ const ignore = (reason: string): Normalized => ({
   ignored: reason,
 });
 
-/** One delivery being normalized, with the helpers every handler needs. */
 type Delivery = {
   /** Key prefix: "github" or "gitea:git.example.com". */
   ns: string;
@@ -148,9 +135,9 @@ type Delivery = {
   p: Payload;
   receivedAt: Date;
   actor: ExternalActor | null;
-  /** The source's timestamp, or when the delivery arrived. */
+  /** The source's timestamp, or the arrival time when it has none. */
   at: (iso?: string | null) => Date;
-  /** The source's timestamp as an id part, or the arrival time. */
+  /** Same fallback as `at`, as a string for event ids. */
   stamp: (iso?: string | null) => string;
   /** "acme/api#7", for titles. */
   ref: (n: number) => string;
@@ -159,10 +146,8 @@ type Delivery = {
   event: (e: Omit<WorklogEvent, "actor" | "container">) => WorklogEvent;
 };
 
-/** What a PR or issue event shares across its actions. */
 type Common = Pick<WorklogEvent, "thread" | "object" | "url" | "cardRefs">;
 
-/** What each event becomes. Anything not listed here is dropped as "not a work signal". */
 const EVENTS = new Map<string, (d: Delivery) => Normalized>([
   ["push", onPush],
   ["pull_request", onPullRequest],
@@ -173,7 +158,7 @@ const EVENTS = new Map<string, (d: Delivery) => Normalized>([
   ["release", onRelease],
 ]);
 
-/** Pull request actions that mean work moved or someone is waiting. Syncs, edits and labels aren't. */
+// Syncs, edits and labels are deliberately absent: they aren't work signals.
 const PR_ACTIONS = new Map<
   string,
   (d: Delivery, pr: Issue, common: Common) => Normalized
@@ -202,7 +187,6 @@ const REVIEW_VERBS = new Map([
   ["changes_requested", "Requested changes on"],
 ]);
 
-/** Normalizer shared by GitHub and GitHub-compatible forges. `ns` prefixes keys: "github" or "gitea:git.example.com". */
 export function normalizeGithubLike(
   ns: string,
   eventType: string,
@@ -240,10 +224,6 @@ export function normalizeGithubLike(
     event: (e) => ({ actor, container, ...e }),
   });
 }
-
-// ---------------------------------------------------------------------------
-// Pushes
-// ---------------------------------------------------------------------------
 
 function onPush({ ns, repo, p, actor, at, event }: Delivery): Normalized {
   if (p.deleted === true) {
@@ -303,10 +283,6 @@ function onPush({ ns, repo, p, actor, at, event }: Delivery): Normalized {
     ],
   };
 }
-
-// ---------------------------------------------------------------------------
-// Pull requests
-// ---------------------------------------------------------------------------
 
 function onPullRequest(d: Delivery): Normalized {
   const { ns, repo, p, ref, key } = d;
@@ -463,10 +439,6 @@ function onPrAssigned(
   };
 }
 
-// ---------------------------------------------------------------------------
-// Reviews and comments
-// ---------------------------------------------------------------------------
-
 function onReview({ ns, p, actor, at, ref, key, event }: Delivery): Normalized {
   const { review, pull_request: pr } = p;
   if (p.action !== "submitted" || !review || !pr) {
@@ -565,10 +537,6 @@ function onComment({
     ],
   };
 }
-
-// ---------------------------------------------------------------------------
-// Issues
-// ---------------------------------------------------------------------------
 
 function onIssue(d: Delivery): Normalized {
   const { p, ref, key } = d;
@@ -688,10 +656,6 @@ function onIssueAssigned(
   };
 }
 
-// ---------------------------------------------------------------------------
-// Releases
-// ---------------------------------------------------------------------------
-
 function onRelease({ ns, repo, p, receivedAt, event }: Delivery): Normalized {
   const r = p.release;
   if (p.action !== "published" || !r || r.draft === true) {
@@ -713,10 +677,6 @@ function onRelease({ ns, repo, p, receivedAt, event }: Delivery): Normalized {
     ],
   };
 }
-
-// ---------------------------------------------------------------------------
-// Connectors
-// ---------------------------------------------------------------------------
 
 const SETTINGS_DOC = [
   {
@@ -742,10 +702,7 @@ const SETTINGS_DOC = [
 const digest = (s: string) =>
   createHash("sha256").update(s).digest("hex").slice(0, 32);
 
-/**
- * The signature-verified body, read as GitHub documents it. Every top-level field is optional and
- * handlers check the ones they need, so a body that isn't an object simply has none.
- */
+// The body is only signature-verified, not schema-validated: handlers must treat every field as optional.
 const asPayload = (payload: unknown): Payload =>
   typeof payload === "object" && payload !== null ? payload : {};
 
@@ -804,7 +761,6 @@ function hostOf(conn: ConnectionView) {
   }
 }
 
-/** Self-hosted Gitea / Forgejo: same payloads, different headers, and its own identity namespace per server. */
 export const giteaConnector: Connector = {
   id: "gitea",
   name: "Gitea / Forgejo (self-hosted)",

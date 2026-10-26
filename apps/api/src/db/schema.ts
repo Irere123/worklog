@@ -20,18 +20,13 @@ const ts = (name: string) =>
   timestamp(name, { withTimezone: true, mode: "date" });
 const createdAt = () => ts("created_at").notNull().defaultNow();
 
-// ---------------------------------------------------------------------------
-// Tenancy, people and agents
-// ---------------------------------------------------------------------------
-
 export const workspaces = pgTable("workspaces", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
   slug: text("slug").notNull().unique(),
   timezone: text("timezone").notNull().default("UTC"),
-  /** Fizzy-style entropy: active cards untouched this long drift to "Not now". Boards may override. */
+  /** Days untouched before active cards drift to "Not now". */
   entropyDays: integer("entropy_days").notNull().default(30),
-  /** Card numbers are per workspace (#1, #2, ...), like Fizzy. */
   cardSeq: integer("card_seq").notNull().default(0),
   createdAt: createdAt(),
 });
@@ -39,11 +34,7 @@ export const workspaces = pgTable("workspaces", {
 export const MEMBER_KINDS = ["human", "agent"] as const;
 export const ROLES = ["owner", "admin", "member"] as const;
 
-/**
- * Humans and agents are both members: agents can own cards, comment, log work and be asked
- * questions. Every human gets a personal assistant agent (ownerId = the human).
- * External agents (Claude Code, Devin, OpenClaw, CI bots...) are agents with an agentProvider.
- */
+// Every human gets a personal assistant agent (ownerId = the human).
 export const members = pgTable(
   "members",
   {
@@ -60,7 +51,7 @@ export const members = pgTable(
     timezone: text("timezone"),
     ownerId: text("owner_id"),
     agentProvider: text("agent_provider"),
-    /** The signed-in person (Better Auth user) behind a human member; null for agents and not-yet-claimed invites. */
+    /** Null for agents and not-yet-claimed invites. */
     userId: text("user_id").references(() => user.id, { onDelete: "set null" }),
     settings: jsonb("settings").$type<MemberSettings>().notNull().default({}),
     createdAt: createdAt(),
@@ -86,11 +77,7 @@ export type MemberSettings = {
   };
 };
 
-/**
- * Accounts on other platforms (GitHub user, Slack user, GitLab user...). Every actor the ingestion
- * pipeline sees gets a row — matched to a member or not. Linking an unmatched identity later
- * re-attributes all of its past activity, so nothing is lost while people aren't set up yet.
- */
+// Linking an unmatched identity later re-attributes all of its past activity.
 export const identities = pgTable(
   "identities",
   {
@@ -98,12 +85,12 @@ export const identities = pgTable(
     workspaceId: text("workspace_id")
       .notNull()
       .references(() => workspaces.id),
-    /** null = seen in events but not matched to anyone yet. */
+    /** Null = seen in events but not matched to a member. */
     memberId: text("member_id").references(() => members.id, {
       onDelete: "set null",
     }),
     provider: text("provider").notNull(),
-    /** Stable id from the provider (GitHub numeric id, Slack U…, GitLab id); falls back to `handle:<login>` when only a login is known. */
+    /** Provider's stable id; `handle:<login>` when only a login is known. */
     externalId: text("external_id").notNull(),
     externalHandle: text("external_handle"),
     displayName: text("display_name"),
@@ -126,10 +113,7 @@ export const identities = pgTable(
 export const API_SCOPES = ["read", "write", "ingest"] as const;
 export type ApiScope = (typeof API_SCOPES)[number];
 
-/**
- * API keys for agents, bots, scripts and integrations (humans use sign-in sessions). Each key acts as
- * one member, with scopes: read (GET), write (other changes), ingest (report activity / logs only).
- */
+// Scopes: read (GET), write (other changes), ingest (report activity / logs only).
 export const apiTokens = pgTable("api_tokens", {
   id: text("id").primaryKey(),
   workspaceId: text("workspace_id")
@@ -139,7 +123,6 @@ export const apiTokens = pgTable("api_tokens", {
     .notNull()
     .references(() => members.id),
   name: text("name").notNull(),
-  /** First characters of the key, shown in lists so people can tell keys apart. */
   prefix: text("prefix").notNull().default(""),
   tokenHash: text("token_hash").notNull().unique(),
   scopes: text("scopes", { enum: API_SCOPES })
@@ -152,11 +135,7 @@ export const apiTokens = pgTable("api_tokens", {
   revokedAt: ts("revoked_at"),
 });
 
-// ---------------------------------------------------------------------------
-// Connectors (GitHub, Slack, Discord...)
-// ---------------------------------------------------------------------------
-
-/** Connector ids are open-ended (the registry decides what exists); these ship built in. */
+/** Open-ended: the connector registry decides which ids exist. */
 export type Provider = string;
 
 export const connections = pgTable("connections", {
@@ -169,22 +148,17 @@ export const connections = pgTable("connections", {
   status: text("status", { enum: ["active", "paused"] })
     .notNull()
     .default("active"),
-  /** Non-secret settings, e.g. { boardId, channels }. */
   settings: jsonb("settings")
     .$type<Record<string, unknown>>()
     .notNull()
     .default({}),
-  /** AES-GCM sealed JSON of secrets (webhook secret, bot token...). */
+  /** AES-GCM sealed JSON. */
   secrets: text("secrets").notNull(),
   lastEventAt: ts("last_event_at"),
   createdAt: createdAt(),
 });
 
-/**
- * The raw inbox: every delivery from every connector is stored before it's interpreted, so ingestion
- * is idempotent (provider retries are no-ops), auditable ("why didn't this show up?"), and replayable
- * after a connector bug is fixed.
- */
+// Deliveries are stored before they are interpreted, so ingestion is idempotent and replayable after a connector fix.
 export const inboundEvents = pgTable(
   "inbound_events",
   {
@@ -216,7 +190,6 @@ export const inboundEvents = pgTable(
   ]
 );
 
-/** A small Postgres job queue (FOR UPDATE SKIP LOCKED), so any number of workers can drain it. */
 export const jobs = pgTable(
   "jobs",
   {
@@ -240,10 +213,6 @@ export const jobs = pgTable(
     index("jobs_ordering_idx").on(t.orderingKey, t.id),
   ]
 );
-
-// ---------------------------------------------------------------------------
-// The board (Fizzy-inspired): Maybe? -> your columns -> Not now / Done
-// ---------------------------------------------------------------------------
 
 export const boards = pgTable("boards", {
   id: text("id").primaryKey(),
@@ -332,7 +301,6 @@ export const cardAssignees = pgTable(
   ]
 );
 
-/** Creators, assignees and commenters auto-watch a card; watchers get attention on activity. */
 export const cardWatchers = pgTable(
   "card_watchers",
   {
@@ -385,10 +353,6 @@ export const comments = pgTable(
   (t) => [index("comments_card_idx").on(t.cardId)]
 );
 
-// ---------------------------------------------------------------------------
-// The work stream: everything anyone (human or agent) did, from every source
-// ---------------------------------------------------------------------------
-
 export const VISIBILITY = ["team", "private"] as const;
 export type Visibility = (typeof VISIBILITY)[number];
 
@@ -402,7 +366,6 @@ export const activities = pgTable(
     actorId: text("actor_id").references(() => members.id),
     /** worklog | github | slack | discord | api */
     source: text("source").notNull(),
-    /** e.g. card.created, card.closed, log.entry, log.decision, pr.merged, review.requested */
     kind: text("kind").notNull(),
     title: text("title").notNull(),
     body: text("body"),
@@ -415,7 +378,6 @@ export const activities = pgTable(
       .default("team"),
     externalId: text("external_id"),
     data: jsonb("data").$type<Record<string, unknown>>().notNull().default({}),
-    /** Where it came from: the connection, the raw delivery, and the external account that did it. */
     connectionId: text("connection_id").references(() => connections.id, {
       onDelete: "set null",
     }),
@@ -423,18 +385,15 @@ export const activities = pgTable(
     actorIdentityId: text("actor_identity_id").references(() => identities.id, {
       onDelete: "set null",
     }),
-    /** For agent work: the human it was done for, and where it stands. */
     onBehalfOfId: text("on_behalf_of_id").references(() => members.id, {
       onDelete: "set null",
     }),
     agentState: text("agent_state", {
       enum: ["working", "needs_you", "finished", "failed"],
     }),
-    /** Related events share a thread (e.g. every event on PR acme/api#7). */
     threadKey: text("thread_key"),
-    /** 0..1 — how much this matters in briefs and summaries. */
+    /** 0..1. */
     importance: real("importance").notNull().default(0.5),
-    /** Bursts (commits, comments, messages) merge into one activity; count says how many. */
     coalesceKey: text("coalesce_key"),
     count: integer("count").notNull().default(1),
     occurredAt: ts("occurred_at").notNull().defaultNow(),
@@ -459,10 +418,6 @@ export const activities = pgTable(
     index("activities_identity_idx").on(t.actorIdentityId),
   ]
 );
-
-// ---------------------------------------------------------------------------
-// Attention: "this needs you" — collapsed per (member, dedupe key) like Fizzy notifications
-// ---------------------------------------------------------------------------
 
 export const ATTENTION_STATES = [
   "open",
@@ -506,17 +461,12 @@ export const attentionItems = pgTable(
     resolvedAt: ts("resolved_at"),
     /** When the proactive check last evaluated it (reset when something new happens on it). */
     consideredAt: ts("considered_at"),
-    /** What the check decided: push now, hold for the next digest, or drop. */
     disposition: text("disposition", { enum: ["push", "digest", "drop"] }),
-    /** One line on why — shown as "why am I seeing this". */
     reason: text("reason"),
     /** Last time it was actually pushed to the person (drives the per-thread cooldown). */
     pushedAt: ts("pushed_at"),
-    /** Last time it was included in a brief or digest. */
     digestedAt: ts("digested_at"),
-    /** When the person acted on it (done, or one of its actions). */
     actedAt: ts("acted_at"),
-    /** One-click actions, e.g. [{ id: "keep", label: "Still on it" }]; executed via POST /attention/{id}/actions/{actionId}. */
     actions: jsonb("actions").$type<{ id: string; label: string }[]>(),
     meta: jsonb("meta").$type<Record<string, unknown>>(),
   },
@@ -553,10 +503,6 @@ export const attentionFeedback = pgTable(
   (t) => [index("attention_feedback_member_idx").on(t.memberId, t.kind)]
 );
 
-// ---------------------------------------------------------------------------
-// Realtime: durable, sequenced event log every client can replay (OpenCode v2 style)
-// ---------------------------------------------------------------------------
-
 export const EVENT_TYPES = [
   "activity.created",
   "activity.updated",
@@ -581,10 +527,6 @@ export const events = pgTable(
   },
   (t) => [index("events_ws_seq_idx").on(t.workspaceId, t.seq)]
 );
-
-// ---------------------------------------------------------------------------
-// Briefs, delivery and automations (proactive agent)
-// ---------------------------------------------------------------------------
 
 export const briefs = pgTable(
   "briefs",
@@ -613,7 +555,6 @@ export const briefs = pgTable(
 export const TARGET_KINDS = ["email", "slack", "discord", "webhook"] as const;
 export type TargetKind = (typeof TARGET_KINDS)[number];
 
-/** Where a member wants things delivered: an email address, a Slack channel/DM, a Discord channel, a webhook. */
 export const deliveryTargets = pgTable("delivery_targets", {
   id: text("id").primaryKey(),
   workspaceId: text("workspace_id")
@@ -641,11 +582,6 @@ export const AUTOMATION_KINDS = [
 ] as const;
 export type AutomationKind = (typeof AUTOMATION_KINDS)[number];
 
-/**
- * Scheduled agent work, modelled as ordinary job rows (what OpenClaw converged on after retiring
- * its special "heartbeat"): the morning brief, the weekly wrap, the proactive attention check,
- * nightly memory consolidation, and user-written custom automations.
- */
 export const automations = pgTable(
   "automations",
   {
@@ -664,9 +600,7 @@ export const automations = pgTable(
       .array()
       .notNull()
       .default(sql`'{}'::text[]`),
-    /** Extra instructions / checklist for the agent (custom automations, tone for briefs). */
     instructions: text("instructions"),
-    /** Per-automation scratch: watermarks, last meaningful result... */
     state: jsonb("state").$type<AutomationState>().notNull().default({}),
     enabled: boolean("enabled").notNull().default(true),
     nextRunAt: ts("next_run_at"),
@@ -706,7 +640,6 @@ export const automationRuns = pgTable(
   (t) => [index("automation_runs_idx").on(t.automationId, t.startedAt)]
 );
 
-/** Every proactive push, with what it contained and why — the basis for measuring push precision. */
 export const notifications = pgTable(
   "notifications",
   {
@@ -731,14 +664,10 @@ export const notifications = pgTable(
   (t) => [index("notifications_member_idx").on(t.memberId, t.createdAt)]
 );
 
-// ---------------------------------------------------------------------------
-// Memory: what each person's agent knows about them (OpenClaw's USER.md / MEMORY.md /
-// memory/YYYY-MM-DD.md, as rows with visibility enforced in queries, not prompts)
-// ---------------------------------------------------------------------------
-
 export const MEMORY_KINDS = ["profile", "fact", "journal"] as const;
 export type MemoryKind = (typeof MEMORY_KINDS)[number];
 
+/** Visibility is enforced in queries, not in prompts. */
 export const memories = pgTable(
   "memories",
   {
@@ -746,7 +675,6 @@ export const memories = pgTable(
     workspaceId: text("workspace_id")
       .notNull()
       .references(() => workspaces.id),
-    /** The human this memory is about. */
     memberId: text("member_id")
       .notNull()
       .references(() => members.id),
@@ -767,10 +695,6 @@ export const memories = pgTable(
   (t) => [index("memories_member_idx").on(t.memberId, t.kind, t.status)]
 );
 
-// ---------------------------------------------------------------------------
-// Conversations with agents
-// ---------------------------------------------------------------------------
-
 export const conversations = pgTable(
   "conversations",
   {
@@ -778,17 +702,14 @@ export const conversations = pgTable(
     workspaceId: text("workspace_id")
       .notNull()
       .references(() => workspaces.id),
-    /** The agent being talked to. */
     agentId: text("agent_id")
       .notNull()
       .references(() => members.id),
-    /** Who is talking to it. */
     askerId: text("asker_id")
       .notNull()
       .references(() => members.id),
     /** owner = the agent's own human (full access); teammate = read-only, team-visible data only. */
     mode: text("mode", { enum: ["owner", "teammate"] }).notNull(),
-    /** The owner's inbox: briefs and proactive pings land here so replies have context. */
     inbox: boolean("inbox").notNull().default(false),
     title: text("title"),
     createdAt: createdAt(),
@@ -808,7 +729,7 @@ export const messages = pgTable(
     role: text("role", { enum: ["user", "assistant", "tool"] }).notNull(),
     /** The AI SDK ModelMessage, replayed verbatim (append-only history). */
     content: jsonb("content").$type<unknown>().notNull(),
-    /** Plain text for display; null for tool messages. */
+    /** Null for tool messages. */
     text: text("text"),
     createdAt: createdAt(),
   },

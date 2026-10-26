@@ -9,13 +9,7 @@ import { newId } from "../lib/ids";
 
 export type MemoryRow = typeof memories.$inferSelect;
 
-/**
- * Three layers, after OpenClaw's workspace files but stored as rows:
- *  - profile  (USER.md): how this person works, what they own, preferences — short, curated
- *  - fact     (MEMORY.md): durable knowledge — decisions, context, "why"
- *  - journal  (memory/YYYY-MM-DD.md): one entry per day, written by nightly consolidation
- * Visibility is enforced here, in the query, never by prompt: teammates only ever get `team` rows.
- */
+// Visibility is enforced here, in the query, never by prompt: teammates only ever get `team` rows.
 export async function listMemories(
   ctx: AppContext,
   memberId: string,
@@ -93,7 +87,6 @@ export async function addMemory(
   return row;
 }
 
-/** One journal entry per day and visibility: writing again replaces that day's entry. */
 export async function writeJournal(
   ctx: AppContext,
   workspaceId: string,
@@ -142,7 +135,6 @@ export async function forgetMemory(
   return row;
 }
 
-/** Markdown rendering of what the agent knows, for prompts. */
 export async function renderMemory(
   ctx: AppContext,
   memberId: string,

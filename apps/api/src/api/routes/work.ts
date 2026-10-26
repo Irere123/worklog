@@ -38,7 +38,6 @@ import {
 } from "../schemas";
 
 export const workRoutes = router()
-  // ---- the activity stream ----
   .openapi(
     createRoute({
       method: "get",
@@ -237,7 +236,6 @@ export const workRoutes = router()
       return c.json(toActivity(activity), 201);
     }
   )
-  // ---- attention ----
   .openapi(
     createRoute({
       method: "get",
@@ -371,7 +369,6 @@ export const workRoutes = router()
         200
       )
   )
-  // ---- briefs ----
   .openapi(
     createRoute({
       method: "get",
@@ -450,7 +447,6 @@ export const workRoutes = router()
     }
   );
 
-/** Whom an entry is for: the member named, or by default the human an agent works for. */
 async function workingFor(
   ctx: AppContext,
   me: Member,

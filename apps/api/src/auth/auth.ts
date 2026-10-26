@@ -9,12 +9,6 @@ import type { Mailer } from "../delivery/mailer";
 import { newId } from "../lib/ids";
 import type { IdPrefix } from "../lib/ids";
 
-/**
- * Human sign-in only: email magic links and GitHub / Discord / Slack accounts, with sessions as
- * cookies (web) or bearer tokens (mobile). Better Auth answers "who is this person?"; Worklog keeps
- * "which workspace, what role, which agents" in its own members table — agents can't be Better Auth
- * users, and keeping tenancy ours avoids coupling workspaces to the organization plugin's lifecycle.
- */
 const PREFIX: Record<string, IdPrefix> = {
   user: "usr",
   session: "ses",
@@ -47,6 +41,8 @@ export function webOrigins(config: Config): string[] {
   ];
 }
 
+// Agents can't be Better Auth users, and keeping tenancy in our members table avoids coupling
+// workspaces to the organization plugin's lifecycle.
 export function createAuth(
   db: Parameters<typeof drizzleAdapter>[0],
   config: Config,
@@ -90,7 +86,6 @@ export function createAuth(
     },
     session: { cookieCache: { enabled: true, maxAge: 60 } },
     databaseHooks: {
-      // Every sign-in claims pending invitations addressed to the person's verified email.
       session: {
         create: {
           after: async (session) => await hooks.onSignIn?.(session.userId),
@@ -104,7 +99,6 @@ export function createAuth(
           void sendSignInLink(mailer, email, url);
         },
       }),
-      // Mobile and other non-browser clients: `Authorization: Bearer <session token>` (from the `set-auth-token` header).
       bearer(),
     ],
   });
@@ -112,7 +106,6 @@ export function createAuth(
 
 export type Auth = ReturnType<typeof createAuth>;
 
-/** OAuth app credentials, when both halves are configured. */
 function oauthApp(
   clientId: string | undefined,
   clientSecret: string | undefined

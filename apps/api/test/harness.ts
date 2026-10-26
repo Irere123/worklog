@@ -9,10 +9,8 @@ import { ConsoleMailer } from "../src/delivery/mailer";
 import { drainQueue } from "../src/jobs/queue";
 import "../src/ingest/pipeline";
 
-/**
- * One embedded Postgres for the whole test run (PGlite boots slowly; bun runs every test file in
- * one process). Isolation comes from every test creating its own workspace — all data is tenant-scoped.
- */
+// One embedded Postgres for the whole run (PGlite boots slowly; bun runs every test file in one
+// process). Isolation comes from each test creating its own workspace.
 let shared: Promise<AppContext> | null = null;
 
 export type TestEnv = Awaited<ReturnType<typeof testEnv>>;
@@ -28,7 +26,6 @@ export async function testEnv() {
     { models: null, mailer: new ConsoleMailer() }
   );
   const ctx = await shared;
-  /** Per-test knobs (clock, model, outbound HTTP, mail); call from beforeEach. */
   const reset = () => {
     ctx.models = null;
     ctx.now = () => new Date();
@@ -68,7 +65,6 @@ export async function testEnv() {
     return { status: res.status, body: json };
   }
 
-  /** A fresh workspace with an owner (email set) and a token. */
   async function workspace(
     name = "Acme",
     owner: { name?: string; email?: string; timezone?: string } = {}
@@ -93,7 +89,6 @@ export async function testEnv() {
     };
   }
 
-  /** Adds a human teammate and returns their token. */
   async function teammate(
     ownerToken: string,
     name: string,
@@ -109,7 +104,6 @@ export async function testEnv() {
     return { token: res.body.token.token as string, member: res.body.member };
   }
 
-  /** Process queued ingestion jobs (the scheduler does this continuously in a real server). */
   const drain = async () => await drainQueue(ctx);
 
   return { ctx, app, call, workspace, teammate, reset, drain };
@@ -122,7 +116,6 @@ function urlOf(input: string | URL | Request) {
   return input instanceof URL ? input.href : input.url;
 }
 
-/** Records outbound HTTP (Slack, Discord, webhooks) and answers like the real APIs would. */
 export function fetchStub() {
   const calls: { url: string; init?: RequestInit; body: any }[] = [];
   const fn = (async (input: string | URL | Request, init?: RequestInit) => {
@@ -148,10 +141,6 @@ const usage = {
 
 type Step = { text: string } | { tool: string; input: unknown };
 
-/**
- * A scripted model: each call returns the next step (a tool call or a final text).
- * `prompts` records what the model was sent, including which tools it was offered.
- */
 export function scriptedModel(steps: Step[]) {
   const prompts: any[] = [];
   let i = 0;

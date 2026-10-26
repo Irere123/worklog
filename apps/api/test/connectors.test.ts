@@ -154,7 +154,6 @@ describe("GitHub", () => {
       kind: "review.requested",
       priority: "high",
     });
-    // Linked through "Fixes #3"
     expect(samItems[0].cardId).not.toBeNull();
 
     await send("pull_request_review", {
@@ -202,7 +201,6 @@ describe("GitHub", () => {
   });
 });
 
-/** Slack's signature headers for a raw body. */
 function slackHeaders(raw: string, ts = Math.floor(Date.now() / 1000)) {
   return {
     "x-slack-request-timestamp": String(ts),
@@ -234,7 +232,6 @@ async function slack() {
   return { owner, conn, post };
 }
 
-/** A /log slash command, form-encoded like Slack sends it. */
 function slashLog(user: string, text: string) {
   return new URLSearchParams({
     command: "/log",
@@ -244,7 +241,6 @@ function slashLog(user: string, text: string) {
   }).toString();
 }
 
-/** A message event callback in a channel. */
 function slackMessage(id: string, text: string, channel: string) {
   return JSON.stringify({
     type: "event_callback",

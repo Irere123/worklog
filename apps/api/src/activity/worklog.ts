@@ -17,7 +17,6 @@ export type LogKind = (typeof LOG_KINDS)[number];
 
 export type LogInput = {
   text: string;
-  /** How it was captured: typed, dictated (client-side speech-to-text), or from a chat command. */
   via?: "text" | "voice" | "slack" | "discord" | "agent" | "api";
   kind?: LogKind;
   cardNumber?: number | null;
@@ -25,11 +24,6 @@ export type LogInput = {
   occurredAt?: Date;
 };
 
-/**
- * Manual work logging — for everything connectors can't see (calls, WhatsApp threads, decisions).
- * The entry is recorded immediately; when AI is configured, a background pass gives it a crisp title,
- * classifies it (decision / blocker / win), links the card it's about, and pings anyone it's blocked on.
- */
 export async function logWork(
   ctx: AppContext,
   author: Member,

@@ -11,7 +11,7 @@ import { z } from "zod";
 
 const SecretsSchema = z.record(z.string(), z.string());
 
-/** API tokens look like `wl_<43 chars>`; only their SHA-256 is stored. */
+// Format `wl_<43 chars>`; only the SHA-256 is stored.
 export function generateToken(): string {
   return `wl_${randomBytes(32).toString("base64url")}`;
 }
@@ -30,7 +30,6 @@ export function safeEqual(a: string, b: string): boolean {
   return ab.length === bb.length && timingSafeEqual(ab, bb);
 }
 
-/** AES-256-GCM box for connector secrets stored in the database. */
 export class SecretBox {
   private readonly key: Buffer;
 

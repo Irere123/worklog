@@ -1,5 +1,3 @@
-/** Time-zone helpers built on Intl, so schedules follow each person's local clock (DST included). */
-
 export type LocalParts = {
   year: number;
   month: number;
@@ -48,7 +46,7 @@ export function isValidTimeZone(tz: string): boolean {
   }
 }
 
-/** Wall-clock parts of `date` in `timeZone`. weekday: 0 = Sunday. */
+// weekday: 0 = Sunday.
 export function localParts(date: Date, timeZone: string): LocalParts {
   const parts: Record<string, string> = {};
   for (const p of formatter(timeZone).formatToParts(date)) {
@@ -72,7 +70,6 @@ function weekdayNumber(name: string | undefined): number {
   return weekday;
 }
 
-/** The UTC instant at which the wall clock in `timeZone` reads the given local date/time. */
 export function zonedToUtc(
   year: number,
   month: number,
@@ -100,7 +97,6 @@ export function parseHHMM(value: string): { hour: number; minute: number } {
   return { hour: Number(m.groups.hour), minute: Number(m.groups.minute) };
 }
 
-/** Start of the local day containing `date`, shifted by `offsetDays`. */
 export function startOfLocalDay(
   date: Date,
   timeZone: string,
@@ -118,7 +114,7 @@ export function startOfLocalDay(
   );
 }
 
-/** Local calendar date (YYYY-MM-DD) of `date` in `timeZone`. */
+// Formatted YYYY-MM-DD.
 export function localDate(date: Date, timeZone: string): string {
   const p = localParts(date, timeZone);
   return `${p.year}-${String(p.month).padStart(2, "0")}-${String(p.day).padStart(2, "0")}`;

@@ -39,10 +39,7 @@ export type RunOutcome = {
   summary: string;
 };
 
-/**
- * Sends model- or data-built text to the inbox and the automation's targets. Every outbound body is
- * sanitized against the URLs present in its source data, so injected content can't smuggle links out.
- */
+// Every outbound body is sanitized against the URLs in its source data, so injected content can't smuggle links out.
 async function send(
   ctx: AppContext,
   automation: AutomationRow,
@@ -91,10 +88,6 @@ async function send(
   }
   return { delivered, failed };
 }
-
-// ---------------------------------------------------------------------------
-// Briefs and digests: the batches (morning brief + midday + afternoon digests ≈ 3 a day)
-// ---------------------------------------------------------------------------
 
 export async function runBrief(
   ctx: AppContext,
@@ -161,11 +154,8 @@ function digestLine(a: AttentionRow) {
   return `- ${bold}${a.title}${bold}${a.count > 1 ? ` (×${a.count})` : ""}${a.url ? ` — ${a.url}` : ""}`;
 }
 
-// ---------------------------------------------------------------------------
-// The attention check. Deterministic gates first (the evidence: models over-trigger, ~50% false
-// alarms), then the model as a classifier inside them. Pushes are built from rows, not model prose.
-// ---------------------------------------------------------------------------
-
+// Deterministic gates first (models over-trigger: ~50% false alarms), then the model as a
+// classifier inside them.
 const DEFAULT_LIMITS = {
   dailyPushCap: 4,
   minGapMinutes: 90,
@@ -252,7 +242,6 @@ export async function runCheck(
 
 type Limits = typeof DEFAULT_LIMITS;
 
-/** The first gate: why an item waits for the digest, or null if it may interrupt. */
 function digestReason(
   item: AttentionRow,
   muted: Set<string>,
@@ -274,7 +263,6 @@ function digestReason(
   return null;
 }
 
-/** The interruption budget: a daily cap and a minimum gap between pings. */
 async function pingBudget(
   ctx: AppContext,
   memberId: string,
@@ -299,10 +287,7 @@ async function pingBudget(
   return "ok";
 }
 
-/**
- * The model as a classifier inside the gates: it may only demote a push to the digest. Without a
- * model, everything that got this far is pushed.
- */
+// The model may only demote a push to the digest; without one, everything that got this far is pushed.
 async function classify(
   ctx: AppContext,
   automation: AutomationRow,
@@ -344,7 +329,6 @@ ${automation.instructions ? `Their instructions for this check: ${automation.ins
   });
 }
 
-/** Pushes are built from rows, not model prose; each one carries its "why now". */
 async function pushDecided(
   ctx: AppContext,
   automation: AutomationRow,
@@ -389,7 +373,6 @@ async function pushDecided(
   };
 }
 
-/** Model-written reasons are shown to the user: keep them short and link-free. */
 function plainReason(reason?: string) {
   const clean = reason
     ?.replaceAll(/https?:\/\/\S+/gu, "")
@@ -422,11 +405,8 @@ function defaultReason(item: AttentionRow) {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Nightly consolidation. Privacy by construction: team-visible memory is only ever written from
-// team-visible activity; private activity produces private memory, in a separate pass.
-// ---------------------------------------------------------------------------
-
+// Privacy by construction: team-visible memory is only ever written from team-visible activity;
+// private activity produces private memory, in a separate pass.
 const Consolidation = z.object({
   journal: z
     .string()
@@ -547,10 +527,6 @@ async function consolidatePart(
   }
   return `${visibility}: journal +${output.facts.length} fact(s) +${output.profile.length} profile`;
 }
-
-// ---------------------------------------------------------------------------
-// Custom automations: "every Friday, tell me which of my PRs are still waiting on review"
-// ---------------------------------------------------------------------------
 
 const CustomResult = z.object({
   decision: z.enum(["notify", "quiet"]),

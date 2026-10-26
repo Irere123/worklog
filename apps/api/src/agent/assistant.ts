@@ -31,10 +31,6 @@ const MAX_STEPS = 10;
 const OUT_OF_STEPS =
   "I ran out of steps before finishing — could you narrow the question?";
 
-/**
- * Resolve who the asker wants to talk to. `target` may be an agent member, or a human —
- * in which case we route to that human's personal assistant.
- */
 export async function resolveAgent(
   ctx: AppContext,
   target: Member
@@ -50,7 +46,6 @@ export async function resolveAgent(
 
 type TurnInput = { conversationId?: string; agent?: Member; message: string };
 
-/** Everything both the JSON and the streaming endpoints need for one turn. */
 async function prepareTurn(ctx: AppContext, asker: Member, input: TurnInput) {
   let conversation: ConversationRow;
   if (input.conversationId) {
@@ -103,7 +98,6 @@ async function prepareTurn(ctx: AppContext, asker: Member, input: TurnInput) {
   return { conversation, owner, userMessage, params };
 }
 
-/** Without a model, still answer — with the data we have. */
 async function offlineReply(
   ctx: AppContext,
   conversation: ConversationRow,
@@ -115,7 +109,7 @@ async function offlineReply(
   return `AI isn't configured on this server yet (set OPENROUTER_API_KEY), so here is ${owner.name}'s current snapshot:\n\n${renderSnapshot(snapshot)}`;
 }
 
-/** The step limit cut the loop off mid-tool-call: say so, and record it so the transcript matches what they saw. */
+// Step limit hit mid-tool-call: record it so the transcript matches what the user saw.
 function closing(finishReason: string, text: string) {
   const cutOff = finishReason === "tool-calls";
   return {
@@ -154,11 +148,7 @@ export async function ask(
   return { conversation, reply };
 }
 
-/**
- * The same turn, streamed in the AI SDK UI-message protocol, so web (`useChat`) and Expo clients
- * render tokens and tool activity live. The server's stored history stays the source of truth:
- * clients send only their new message.
- */
+// Stored history is the source of truth: clients send only their new message.
 export async function askStream(
   ctx: AppContext,
   asker: Member,

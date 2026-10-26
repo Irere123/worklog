@@ -10,7 +10,6 @@ import type { Env } from "./router";
 const deny = (c: Context, status: 401 | 403, code: string, message: string) =>
   c.json({ error: { code, message } }, status);
 
-/** Which key scope a request needs: reads, reporting work, or everything else. */
 function requiredScope(method: string, path: string): ApiScope {
   if (method === "GET" || method === "HEAD") {
     return "read";
@@ -26,13 +25,6 @@ function requiredScope(method: string, path: string): ApiScope {
   return "write";
 }
 
-/**
- * One front door for every client:
- *  - `Authorization: Bearer wl_…` → an API key (agents, bots, scripts, integrations), acting as one member;
- *  - a Better Auth session — cookie (web) or `Authorization: Bearer <session token>` (mobile) — acting as
- *    the signed-in person in the workspace chosen by `x-worklog-workspace` (or `?workspace=`), defaulting
- *    to their first workspace.
- */
 async function identify(
   ctx: AppContext,
   c: Context<Env>
@@ -77,7 +69,6 @@ async function identify(
   return { member: chosen?.member ?? null, user };
 }
 
-/** An API key from `Authorization: Bearer wl_…`, or `?token=` on the event stream. */
 function apiKeyOf(c: Context<Env>): string | undefined {
   const header = c.req.header("authorization");
   const bearer =
@@ -94,7 +85,6 @@ function apiKeyOf(c: Context<Env>): string | undefined {
   return undefined;
 }
 
-/** Routes that work before you belong to a workspace (see your session, create one). */
 const IDENTITY_ONLY = new Set(["GET /v1/session", "POST /v1/workspaces"]);
 const PUBLIC = new Set(["POST /v1/setup", "GET /v1/auth/config"]);
 
@@ -109,7 +99,6 @@ export function authMiddleware(ctx: AppContext) {
   });
 }
 
-/** Sets `user` and `member` for the request, or returns the response that turns it away. */
 async function admit(
   ctx: AppContext,
   c: Context<Env>

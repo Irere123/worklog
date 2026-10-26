@@ -29,10 +29,8 @@ type Scope = {
   conversationId: string;
 };
 
-/**
- * Expected failures (unknown card, bad column name) become results the model can read and recover
- * from; they're logged so they still show up in observability.
- */
+// Expected failures (unknown card, bad column name) become results the model can recover from;
+// they're logged so they still show up in observability.
 function safe<I, O>(fn: (input: I) => Promise<O>) {
   return async (input: I) => {
     try {
@@ -45,13 +43,10 @@ function safe<I, O>(fn: (input: I) => Promise<O>) {
   };
 }
 
-/**
- * The assistant's toolset. Board changes are attributed to the assistant (an agent member) so the
- * team can see which moves an agent made; work logs are attributed to the owner, whose work it is.
- * Read tools are shared; write tools exist only in owner mode, and
- * teammates get exactly one write: leaving a note for the owner. Privacy is enforced by what
- * these functions query (`includePrivate` is false for teammates), not by the prompt.
- */
+// Board changes are attributed to the assistant so the team can see which moves an agent made;
+// work logs are attributed to the owner. Write tools exist only in owner mode, except one for
+// teammates: leaving a note for the owner. Privacy is enforced by what these functions query
+// (`includePrivate` is false for teammates), not by the prompt.
 export function assistantTools(scope: Scope): ToolSet {
   const { ctx, agent, owner, asker, mode } = scope;
   const ws = owner.workspaceId;
@@ -465,7 +460,7 @@ export function assistantTools(scope: Scope): ToolSet {
   };
 }
 
-/** `to` is "maybe", "not_now" or "done", or else the name of a column. */
+// `to` is "maybe", "not_now" or "done", or else the name of a column.
 async function moveCard(
   ctx: AppContext,
   agent: Member,

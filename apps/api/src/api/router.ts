@@ -6,14 +6,12 @@ import { canActFor } from "../members/service";
 import type { Member, SignedInUser } from "../members/service";
 import { ErrorSchema } from "./schemas";
 
-/** `member` is set on every workspace route; `user` is the signed-in person (null for API keys). */
 export type Env = {
   Variables: { ctx: AppContext; member: Member; user: SignedInUser | null };
 };
 
 export function router() {
   return new OpenAPIHono<Env>({
-    // Validation failures get the same error shape as every other error.
     defaultHook: (result, c) =>
       result.success
         ? undefined
@@ -30,7 +28,6 @@ export function router() {
   });
 }
 
-/** `{ content: { "application/json": { schema } }, description }` */
 export const json = <T extends z.ZodType>(schema: T, description = "OK") => ({
   content: { "application/json": { schema } },
   description,

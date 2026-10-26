@@ -43,10 +43,6 @@ const Ref = z.object({
     .openapi({ description: 'Member id, handle, or "me"', example: "me" }),
 });
 
-// ---------------------------------------------------------------------------
-// Public: first-run setup
-// ---------------------------------------------------------------------------
-
 export const setupRoutes = router().openapi(
   createRoute({
     method: "post",
@@ -262,10 +258,6 @@ export const sessionRoutes = router()
       );
     }
   );
-
-// ---------------------------------------------------------------------------
-// Authenticated
-// ---------------------------------------------------------------------------
 
 export const peopleRoutes = router()
   .openapi(

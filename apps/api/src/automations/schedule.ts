@@ -1,10 +1,7 @@
 import type { MemberSettings, Schedule } from "../db/schema";
 import { isWithinHours, localParts, parseHHMM, zonedToUtc } from "../lib/time";
 
-/**
- * Next time a schedule fires strictly after `after`, on the member's local clock.
- * `jitterMs` spreads top-of-the-hour jobs (OpenClaw staggers its crons the same way).
- */
+// Strictly after `after`, on the member's local clock.
 export function nextRun(
   schedule: Schedule,
   timeZone: string,
@@ -47,7 +44,6 @@ export function nextRun(
   throw new Error("Schedule never fires");
 }
 
-/** Move `date` forward to the next moment inside the member's active hours on a workday. */
 export function nextActive(
   date: Date,
   timeZone: string,
@@ -96,7 +92,6 @@ export function isActiveNow(
 
 const UINT32 = 2 ** 32;
 
-/** Stable per-id offset in [0, maxMs). */
 export function jitterFor(id: string, maxMs = 120_000): number {
   let h = 0;
   for (const ch of id) {

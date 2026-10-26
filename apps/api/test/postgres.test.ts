@@ -8,10 +8,7 @@ import { openDb } from "../src/db";
 import type { Db } from "../src/db";
 import { activities, workspaces } from "../src/db/schema";
 
-/**
- * The production driver path (postgres:// → node-postgres, migrations included) over the real
- * Postgres wire protocol, served by PGlite. Guards against drivers that store jsonb as strings.
- */
+// Runs the production driver path over the real wire protocol, served by PGlite. Guards against drivers that store jsonb as strings.
 let server: PGLiteSocketServer;
 let pg: PGlite;
 let opened: { db: Db; close: () => Promise<void> };

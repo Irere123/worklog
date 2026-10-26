@@ -3,11 +3,7 @@ import type { LanguageModel } from "ai";
 
 import type { Config } from "../config";
 
-/**
- * Two tiers: `main` for conversations and briefs, `fast` for high-volume background work
- * (proactive checks, log structuring, nightly memory consolidation). Any OpenRouter model id
- * works, so swapping providers is a config change.
- */
+// `fast` is for high-volume background work (proactive checks, log structuring, memory consolidation).
 export type Models = { main: LanguageModel; fast: LanguageModel };
 
 export function createModels(config: Config): Models | null {
@@ -39,14 +35,14 @@ export function createModels(config: Config): Models | null {
   };
 }
 
-/** Per-call time limits, so one hung provider call can't stall a request or the scheduler. */
+// One hung provider call must not stall a request or the scheduler.
 export const TIMEOUTS = {
   chat: { totalMs: 120_000, stepMs: 60_000 },
   background: { totalMs: 90_000, stepMs: 60_000 },
   quick: { totalMs: 30_000 },
 } as const;
 
-/** Conversations are append-only with stable instructions and tools, so every turn can read the previous ones from cache. */
+// Conversations are append-only with stable instructions and tools, so every turn can read the previous ones from cache.
 export const CACHED = {
   openrouter: { cacheControl: { type: "ephemeral" } },
 } as const;

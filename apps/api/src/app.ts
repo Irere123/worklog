@@ -79,7 +79,6 @@ export function createApp(ctx: AppContext) {
     await next();
   });
 
-  // Better Auth: /api/auth/sign-in/magic-link, /api/auth/sign-in/social, /api/auth/callback/:provider, ...
   app.on(
     ["GET", "POST"],
     "/api/auth/*",

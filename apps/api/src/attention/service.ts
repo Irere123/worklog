@@ -91,7 +91,6 @@ export async function raiseAttention(
             activityId: input.activityId ?? null,
             fromId: input.fromId ?? null,
             ...(replace ? { kind: input.kind } : {}),
-            // Keep the highest priority seen for this item (unless replacing).
             priority: replace
               ? priority
               : sql`case when ${rank(priority)} > ${rankSql()} then ${priority} else ${attentionItems.priority} end`,
@@ -174,7 +173,6 @@ async function applySenderQuota(
   return (sent?.n ?? 0) >= quota ? "normal" : "high";
 }
 
-/** Open items, including snoozed ones whose snooze has expired. Highest priority, then newest. */
 export async function listOpenAttention(
   ctx: AppContext,
   memberId: string,
@@ -278,11 +276,6 @@ export async function updateAttention(
   return row;
 }
 
-// ---------------------------------------------------------------------------
-// The proactive check's bookkeeping
-// ---------------------------------------------------------------------------
-
-/** Open items the proactive check hasn't evaluated since they last changed. */
 export async function unconsideredAttention(ctx: AppContext, memberId: string) {
   return await ctx.db
     .select()
@@ -318,7 +311,6 @@ export async function markConsidered(
   }
 }
 
-/** Open items with something new since they were last pushed or digested — what a digest should list. */
 export async function digestableAttention(ctx: AppContext, memberId: string) {
   return await ctx.db
     .select()
@@ -405,10 +397,6 @@ export async function pushBudget(
   return { pushesToday: stats?.n ?? 0, lastPushAt: latest?.at ?? null };
 }
 
-// ---------------------------------------------------------------------------
-// Feedback: the learning signal
-// ---------------------------------------------------------------------------
-
 export async function giveFeedback(
   ctx: AppContext,
   memberId: string,
@@ -429,10 +417,6 @@ export async function giveFeedback(
   return { kind: item.kind, muted: muted.has(item.kind) };
 }
 
-/**
- * Kinds this person keeps rejecting are held for digests instead of pushed: one explicit
- * "less like this", or 3+ "not useful" with no "useful" in the last 14 days.
- */
 export async function mutedKinds(
   ctx: AppContext,
   memberId: string
@@ -470,7 +454,6 @@ export async function mutedKinds(
   return muted;
 }
 
-/** How well the proactive side is doing for this person — push precision and engagement. */
 export async function attentionMetrics(
   ctx: AppContext,
   memberId: string,

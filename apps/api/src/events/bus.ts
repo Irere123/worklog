@@ -9,13 +9,8 @@ export type StoredEvent = typeof events.$inferSelect;
 
 type Listener = (event: StoredEvent) => void;
 
-/**
- * Every change clients may care about is written to the `events` table with a monotonically
- * increasing `seq`, then fanned out to live subscribers (SSE). Clients that drop their connection
- * resume with `?after=<seq>` (or Last-Event-ID) and lose nothing — the gap OpenCode v1 had and v2 fixed.
- *
- * Single-process fan-out for now; with several API replicas, swap `notify` for Postgres LISTEN/NOTIFY.
- */
+// Persisted with a monotonic `seq` before fan-out, so clients resuming with `?after=<seq>` (or Last-Event-ID) lose nothing.
+// Single-process fan-out; with several API replicas, swap `notify` for Postgres LISTEN/NOTIFY.
 export class EventBus {
   private readonly listeners = new Set<Listener>();
   private readonly db: Db;
@@ -57,7 +52,6 @@ export class EventBus {
     };
   }
 
-  /** Events after `afterSeq` that `memberId` may see. */
   async replay(
     workspaceId: string,
     memberId: string,

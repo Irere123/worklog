@@ -56,7 +56,6 @@ describe("assistant", () => {
     expect(first.body.reply).toBe("You're on #1 Draft the Q4 plan.");
     expect(first.body.conversation.mode).toBe("owner");
     expect(toolNames(prompts[0])).toContain("remember");
-    // The tool result fed back to the model contains the real card.
     expect(JSON.stringify(prompts[1].prompt)).toContain("Draft the Q4 plan");
 
     const second = await env.call(
@@ -164,7 +163,6 @@ describe("assistant", () => {
       fromId: sam.member.id,
     });
 
-    // Emma can't read Sam's conversation with her assistant.
     expect(
       (
         await env.call("GET", `/v1/conversations/${res.body.conversation.id}`, {

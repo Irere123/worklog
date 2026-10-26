@@ -4,7 +4,6 @@ import { DAY_MS } from "../lib/time";
 import type { Member } from "../members/service";
 import { listActivities } from "./service";
 
-/** "What is X working on right now?" — the shared answer for the API, chat commands and the agent. */
 export async function workSnapshot(
   ctx: AppContext,
   person: Member,

@@ -48,12 +48,7 @@ export type CardView = CardRow & {
   } | null;
 };
 
-/** Entropy options borrowed from Fizzy's dial. */
 export const ENTROPY_DAYS = [3, 7, 30, 90, 365] as const;
-
-// ---------------------------------------------------------------------------
-// Boards & columns
-// ---------------------------------------------------------------------------
 
 export async function createBoard(
   ctx: AppContext,
@@ -151,7 +146,6 @@ export async function addColumn(
 ) {
   const board = await getBoard(ctx, workspaceId, boardId);
   const position = input.position ?? board.columns.length;
-  // Shift later columns right to make room.
   await ctx.db
     .update(columns)
     .set({ position: sql`${columns.position} + 1` })
@@ -201,7 +195,6 @@ export async function updateColumn(
   return returned(rows, "column");
 }
 
-/** Deleting a column sends its cards back to triage ("Maybe?"). */
 export async function deleteColumn(
   ctx: AppContext,
   workspaceId: string,
@@ -224,10 +217,6 @@ export async function deleteColumn(
     );
 }
 
-// ---------------------------------------------------------------------------
-// Cards
-// ---------------------------------------------------------------------------
-
 export type CardInput = {
   boardId: string;
   title: string;
@@ -242,7 +231,7 @@ export type CardInput = {
   externalUrl?: string | null;
 };
 
-/** `silent`: don't write activity (used when an ingested event — e.g. an issue opening — is the record). */
+// `silent` skips the activity write when the ingested event is itself the record.
 export type EffectOpts = { silent?: boolean };
 
 export async function createCard(
@@ -284,7 +273,6 @@ export async function createCard(
   return await getCard(ctx, workspaceId, card.number);
 }
 
-/** Cards are numbered per workspace (#1, #2, …), like issues. */
 async function nextCardNumber(ctx: AppContext, workspaceId: string) {
   const rows = await ctx.db
     .update(workspaces)
@@ -337,7 +325,6 @@ export type CardFilters = {
   limit?: number;
 };
 
-/** Cards sort like Fizzy: golden tickets first, then most recently active. No manual ordering. */
 export async function listCards(
   ctx: AppContext,
   workspaceId: string,
@@ -449,7 +436,6 @@ async function hydrate(
           ? {
               days,
               autoPostponeAt,
-              // Fizzy warns during the final quarter of the period.
               postponingSoon:
                 now >= card.lastActiveAt.getTime() + 0.75 * days * DAY_MS,
             }
@@ -839,7 +825,6 @@ export async function addComment(
     cardId: card.id,
   });
 
-  // @mentions are direct asks: high priority, one item per comment.
   const handles = [...body.matchAll(MENTION)]
     .map((m) => m.groups?.handle?.toLowerCase())
     .filter((handle) => handle !== undefined);
@@ -872,7 +857,6 @@ export async function addComment(
     });
   }
 
-  // Other watchers get one collapsed, low-key item per card (Fizzy's one-notification-per-card).
   const watchers = await ctx.db
     .select()
     .from(cardWatchers)
@@ -923,7 +907,6 @@ async function setTags(
     .values(rows.map((t) => ({ cardId, tagId: t.id })));
 }
 
-/** "Still on it" — counts as activity, so the entropy clock restarts. */
 export async function keepAlive(
   ctx: AppContext,
   actor: Member,
@@ -942,20 +925,13 @@ export async function keepAlive(
   return await getCard(ctx, actor.workspaceId, number);
 }
 
-// ---------------------------------------------------------------------------
-// Entropy: untouched active cards drift to "Not now" so the board stays honest
-// ---------------------------------------------------------------------------
-
 const DRIFT_ACTIONS = [
   { id: "keep", label: "Still on it" },
   { id: "not_now", label: "Not now" },
   { id: "done", label: "It's done" },
 ];
 
-/**
- * Before a card drifts, ask the people on it — once per quiet spell — with one-click answers.
- * Fizzy shows a warning bubble; an assistant can ask.
- */
+// Asks once per quiet spell.
 export async function nudgeDrifting(ctx: AppContext): Promise<number> {
   const now = ctx.now();
   const rows = await ctx.db

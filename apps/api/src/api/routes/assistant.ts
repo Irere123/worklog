@@ -52,7 +52,7 @@ const Reply = z
   })
   .openapi("AgentReply");
 
-/** Plain text, or an AI SDK UIMessage as sent by useChat (only its text parts are used). */
+// A useChat UIMessage is accepted, but only its text parts are used.
 const ChatMessage = z.union([
   z.string().min(1),
   z
@@ -73,7 +73,6 @@ const textOf = (m: z.infer<typeof ChatMessage>) =>
         .trim();
 
 export const assistantRoutes = router()
-  // ---- conversations with agents ----
   .openapi(
     createRoute({
       method: "post",
@@ -220,7 +219,6 @@ export const assistantRoutes = router()
       );
     }
   )
-  // ---- memory: what your assistant knows about you ----
   .openapi(
     createRoute({
       method: "get",
@@ -294,7 +292,6 @@ export const assistantRoutes = router()
       return c.json({ ok: true as const }, 200);
     }
   )
-  // ---- delivery targets: where briefs and pings go ----
   .openapi(
     createRoute({
       method: "get",
@@ -394,7 +391,6 @@ export const assistantRoutes = router()
       return c.json({ ok: true as const }, 200);
     }
   )
-  // ---- automations: the proactive side of your assistant ----
   .openapi(
     createRoute({
       method: "get",

@@ -4,7 +4,6 @@ import { badRequest } from "../lib/errors";
 import type { Member } from "../members/service";
 import { assertAction, getAttention, updateAttention } from "./service";
 
-/** One-click answers to an agent's question (from the app, an email link, or a chat reply). */
 export async function performAttentionAction(
   ctx: AppContext,
   member: Member,

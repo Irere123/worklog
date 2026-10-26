@@ -32,7 +32,7 @@ export async function createConversation(
   return row;
 }
 
-/** Only the asker can read or continue a conversation. */
+// Only the asker can read or continue a conversation.
 export async function getConversation(
   ctx: AppContext,
   viewer: Member,
@@ -73,7 +73,6 @@ export async function loadMessages(ctx: AppContext, conversationId: string) {
     .orderBy(asc(messages.seq));
 }
 
-/** The conversation so far, as the model sees it. */
 export async function loadHistory(
   ctx: AppContext,
   conversationId: string
@@ -82,7 +81,6 @@ export async function loadHistory(
   return rows.map((row) => row.content).filter(isModelMessage);
 }
 
-/** Stored content is a ModelMessage written by appendMessages; this guards the jsonb boundary. */
 function isModelMessage(value: unknown): value is ModelMessage {
   return (
     typeof value === "object" &&
@@ -92,11 +90,9 @@ function isModelMessage(value: unknown): value is ModelMessage {
   );
 }
 
-/**
- * Append-only: history is replayed verbatim on every turn, never edited. The conversation row is
- * locked while sequence numbers are assigned, so a brief landing in the inbox mid-turn (or two
- * concurrent turns) can't collide after the model call was already paid for.
- */
+// Append-only: history is replayed verbatim every turn. The conversation row is locked while
+// sequence numbers are assigned, so a brief landing mid-turn (or two concurrent turns) can't
+// collide after the model call was already paid for.
 export async function appendMessages(
   ctx: AppContext,
   conversation: ConversationRow,
@@ -173,11 +169,7 @@ function displayText(m: ModelMessage): string | null {
   return text || null;
 }
 
-/**
- * The owner's inbox conversation with their assistant: briefs and proactive pings are written
- * here (OpenClaw writes deliveries into the destination transcript) so "tell me more about #12"
- * has context.
- */
+// Deliveries are written into the transcript so follow-ups like "tell me more about #12" have context.
 export async function postToInbox(
   ctx: AppContext,
   owner: Member,

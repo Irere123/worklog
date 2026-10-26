@@ -49,12 +49,12 @@ export default defineConfig({
     // Shapes flow into jsonb columns typed as Record<string, unknown>;
     // interfaces have no implicit index signature, so they don't fit.
     "typescript/consistent-type-definitions": ["error", "type"],
-    // `if (name)` meaning "present and non-empty" is the intent wherever a
-    // string is nullable. Nullable numbers and booleans stay strict: 0 and
-    // false are where the real bugs hide.
     // Written for Node-style callbacks; Hono's `await next()` middleware can't
     // satisfy it without tripping no-confusing-void-expression.
     "node/callback-return": "off",
+    // `if (name)` meaning "present and non-empty" is the intent wherever a
+    // string is nullable. Nullable numbers and booleans stay strict: 0 and
+    // false are where the real bugs hide.
     "typescript/strict-boolean-expressions": [
       "error",
       { allowNullableString: true },

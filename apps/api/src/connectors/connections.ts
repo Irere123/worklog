@@ -147,7 +147,6 @@ export async function deleteConnection(
   await ctx.db.delete(connections).where(eq(connections.id, id));
 }
 
-/** The URLs to paste into the provider's app settings. */
 export function webhookUrls(
   ctx: AppContext,
   conn: ConnectionRow

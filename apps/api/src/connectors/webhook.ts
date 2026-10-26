@@ -10,29 +10,6 @@ import type {
 } from "../ingest/types";
 import { safeEqual } from "../lib/crypto";
 
-/**
- * A no-code connector for any tool that sends webhooks (self-hosted GitLab, Sentry, Jenkins, an
- * internal deploy bot…). The connection's settings say how to verify a delivery and how to map it:
- *
- *   {
- *     "verify":     { "type": "hmac-sha256", "header": "X-Signature", "prefix": "sha256=" },   // or { "type": "token", "header": "X-Gitlab-Token" }
- *     "eventType":  { "header": "X-Gitlab-Event" },                                             // or { "path": "object_kind" }
- *     "deliveryId": { "header": "X-Gitlab-Event-UUID" },                                        // default: hash of the body
- *     "rules": [{
- *       "when": { "eventType": "Merge Request Hook", "equals": { "object_attributes.action": "merge" } },
- *       "emit": {
- *         "kind": "pr.merged", "id": "mr:{{project.path_with_namespace}}!{{object_attributes.iid}}:merged",
- *         "title": "Merged MR {{project.path_with_namespace}}!{{object_attributes.iid}}: {{object_attributes.title}}",
- *         "url": "{{object_attributes.url}}", "thread": "mr:{{project.path_with_namespace}}!{{object_attributes.iid}}",
- *         "actor": { "id": "{{user.id}}", "handle": "{{user.username}}", "name": "{{user.name}}" }
- *       }
- *     }]
- *   }
- *
- * Templates only read values (`{{a.b.0.c}}`) — no expressions, nothing executes. Unsigned webhooks are
- * refused unless the connection explicitly allows them.
- */
-
 const Template = z.string().max(500);
 const Rule = z.object({
   when: z
@@ -82,7 +59,7 @@ export const WebhookSettings = z.object({
       encoding: z.enum(["hex", "base64"]).optional(),
     }),
     z.object({ type: z.literal("token"), header: z.string() }),
-    /** https://www.standardwebhooks.com — webhook-id / webhook-timestamp / webhook-signature (GitLab 19+, Svix, many SaaS). */
+    // https://www.standardwebhooks.com
     z.object({
       type: z.literal("standard-webhooks"),
       toleranceSeconds: z.number().int().min(30).max(3600).optional(),
@@ -117,7 +94,6 @@ export function readPath(data: unknown, path: string): unknown {
   return cur;
 }
 
-/** A scalar as text; objects and anything else have no text form here. */
 function scalarText(v: unknown): string | undefined {
   if (typeof v === "string") {
     return v;
@@ -168,7 +144,7 @@ function matches(
   return (w.exists ?? []).every((path) => !isMissing(readPath(payload, path)));
 }
 
-/** Standard Webhooks: base64 HMAC-SHA256 of `${id}.${timestamp}.${body}` with the `whsec_` key; replay window enforced. */
+// Signed content is `${id}.${timestamp}.${body}`, HMAC-SHA256 with the `whsec_` key, base64.
 export function verifyStandardWebhook(
   secret: string,
   headers: Headers,
@@ -208,7 +184,7 @@ function pick(
   return src?.path ? scalarText(readPath(payload, src.path)) : undefined;
 }
 
-/** A rendered handle as an actor reference (resolved by handle; rules carry no ids for it). */
+// Rules carry no ids, so actors resolve by handle.
 const byHandle = (handle: string | null): ExternalActor | null =>
   handle ? { id: `handle:${handle.toLowerCase()}`, handle } : null;
 

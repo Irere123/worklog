@@ -419,7 +419,6 @@ export const connectionRoutes = router()
       );
     }
   )
-  // ---- identities: who is who across tools ----
   .openapi(
     createRoute({
       method: "get",

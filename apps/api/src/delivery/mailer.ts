@@ -7,7 +7,6 @@ export type Mailer = {
   send: (email: Email) => Promise<void>;
 };
 
-/** Development and tests: prints mail to the console and keeps it in `sent`. */
 export class ConsoleMailer implements Mailer {
   readonly kind = "console";
   readonly sent: Email[] = [];

@@ -13,7 +13,6 @@ const LEASE = "scheduler";
 const LEASE_MS = 3 * 60_000;
 const HOUR_MS = 60 * 60_000;
 
-/** Take or renew the scheduler lease. Only the holder runs jobs. */
 async function acquireLease(ctx: AppContext, holder: string): Promise<boolean> {
   const now = ctx.now();
   const expiresAt = new Date(now.getTime() + LEASE_MS);
@@ -40,14 +39,13 @@ export type SchedulerTick = {
   nudged: number;
 };
 
-/** When the hourly and daily chores last ran (ms since epoch). */
+// Timestamps in ms since epoch.
 export type TickState = { lastEntropy: number; lastPrune: number };
 
 function initialTickState(): TickState {
   return { lastEntropy: 0, lastPrune: 0 };
 }
 
-/** One pass: due automations, plus hourly entropy and daily event-log pruning. */
 export async function tick(
   ctx: AppContext,
   state: TickState = initialTickState()
@@ -98,7 +96,6 @@ export function startScheduler(ctx: AppContext, intervalMs = 60_000) {
   }, intervalMs);
   void run();
 
-  // The job queue (ingestion) runs on its own fast loop, and wakes immediately when work arrives.
   let draining = false;
   const drain = async () => {
     if (draining) {

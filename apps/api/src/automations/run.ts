@@ -22,7 +22,6 @@ type Member = typeof members.$inferSelect;
 const FAILURE_ALERT_AT = 3;
 const FAILURE_DISABLE_AT = 10;
 
-/** Called by the scheduler every minute: drains everything due, in batches, within a time budget. */
 export async function runDueAutomations(
   ctx: AppContext,
   opts: { batch?: number; budgetMs?: number } = {}

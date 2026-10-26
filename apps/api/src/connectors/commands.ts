@@ -6,13 +6,6 @@ import type { AppContext } from "../context";
 import { resolveMember } from "../members/service";
 import type { Member } from "../members/service";
 
-/**
- * One command surface for every chat platform:
- *   log <text>            — record work the connectors can't see
- *   now [@person]         — what someone is working on
- *   ask [@person] <q>     — ask someone's assistant (yours if no one is named)
- *   brief                 — your brief, right now
- */
 export type Command = { name: string; text: string; target?: Member | null };
 
 export const HELP = [
@@ -27,7 +20,6 @@ export function needsDeferral(name: string) {
   return name === "ask" || name === "brief";
 }
 
-/** Splits "/worklog ask @sam why ..." style input. Platform-specific mention syntax is resolved by the caller. */
 export function parseCommand(input: string): { name: string; rest: string } {
   const trimmed = input.trim();
   const [first = "", ...rest] = trimmed.split(/\s+/u);
@@ -35,7 +27,6 @@ export function parseCommand(input: string): { name: string; rest: string } {
   if (["log", "now", "ask", "brief", "help"].includes(name)) {
     return { name, rest: rest.join(" ") };
   }
-  // Bare text is a question for your assistant.
   return trimmed ? { name: "ask", rest: trimmed } : { name: "help", rest: "" };
 }
 
@@ -88,7 +79,6 @@ export async function runCommand(
   }
 }
 
-/** Resolve a leading "@handle" (Worklog handle) from free text. */
 export async function leadingHandle(
   ctx: AppContext,
   author: Member | null,

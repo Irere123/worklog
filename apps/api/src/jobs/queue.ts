@@ -13,12 +13,7 @@ export type JobHandler = (
 const handlers = new Map<string, JobHandler>();
 const LOCK_MS = 5 * 60_000;
 
-/**
- * A minimal durable queue on Postgres: `FOR UPDATE SKIP LOCKED` lets any number of workers claim jobs
- * without stepping on each other; stuck jobs are reclaimed after their lock expires; failures retry
- * with exponential backoff and end up "dead" (inspectable, replayable) after maxAttempts.
- * Works the same on PGlite, so tests exercise the real thing.
- */
+// `FOR UPDATE SKIP LOCKED` lets any number of workers claim jobs safely; PGlite runs the same SQL, so tests exercise the real thing.
 export function registerJob(type: string, handler: JobHandler) {
   handlers.set(type, handler);
 }
@@ -121,7 +116,6 @@ async function fail(ctx: AppContext, job: Job, error: unknown) {
     .where(heldAttempt(job));
 }
 
-/** Runs due jobs until none are left (or the budget runs out). Returns how many ran. */
 export async function drainQueue(
   ctx: AppContext,
   opts: { batch?: number; budgetMs?: number } = {}

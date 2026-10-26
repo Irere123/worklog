@@ -2,7 +2,6 @@ import { createApp } from "../app";
 import { loadConfig } from "../config";
 import { createContext } from "../context";
 
-/** Prints the OpenAPI document — the contract every client (web, mobile, bots, SDK) is generated from. */
 const ctx = await createContext(
   loadConfig({
     ...process.env,

@@ -6,11 +6,7 @@ import { receive } from "../ingest/pipeline";
 
 type HookEnv = { Variables: { ctx: AppContext } };
 
-/**
- * Inbound webhooks for every connector: `/hooks/{connectionId}` plus an optional channel
- * (`/events`, `/commands`, `/interactions`). Not bearer-authenticated — each connection has its own
- * URL and the provider's signature over the raw body is what authenticates the request.
- */
+// Not bearer-authenticated: the provider's signature over the raw body authenticates the request.
 export function hookRoutes() {
   const app = new Hono<HookEnv>();
   app.post("/hooks/:id", async (c) => await handle(c));

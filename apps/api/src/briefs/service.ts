@@ -52,10 +52,7 @@ type Item = {
 
 const TEAM_PER_PERSON = 6;
 
-/**
- * The window a brief covers. Daily briefs cover the previous workday — so a Monday
- * stand-up brief includes Friday and the weekend. Weekly briefs cover the last 7 days.
- */
+// Daily briefs cover the previous workday, so a Monday brief includes Friday and the weekend; weekly briefs cover the last 7 days.
 export function briefWindow(
   now: Date,
   timeZone: string,
@@ -296,7 +293,6 @@ export function templateBrief(data: BriefData): string {
   return out.join("\n");
 }
 
-/** Builds (or rebuilds) the brief for the current window and announces it. */
 export async function generateBrief(
   ctx: AppContext,
   member: Member,

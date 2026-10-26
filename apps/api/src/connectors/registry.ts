@@ -5,10 +5,6 @@ import { giteaConnector, githubConnector } from "./github";
 import { slackConnector } from "./slack";
 import { webhookConnector } from "./webhook";
 
-/**
- * Every connector this server knows. Adding a tool = implementing `Connector` and registering it
- * here (or, for webhook-only tools, configuring the generic "webhook" connector — no code).
- */
 const registry = new Map<string, Connector>();
 
 export function registerConnector(connector: Connector) {

@@ -12,11 +12,6 @@ const now = new Date("2026-10-26T09:00:00Z");
 const repo = { full_name: "acme/api", default_branch: "main" };
 const emma = { login: "emma-gh", id: 101 };
 
-// ---------------------------------------------------------------------------
-// Pure normalizers: what counts as work, and what's noise
-// ---------------------------------------------------------------------------
-
-/** A GitHub delivery from Emma in acme/api, normalized. */
 function gh(type: string, payload: object, settings = {}) {
   return normalizeGithubLike(
     "github",
@@ -296,10 +291,6 @@ describe("Slack normalizer", () => {
     ).toBe("private");
   });
 });
-
-// ---------------------------------------------------------------------------
-// The pipeline, end to end
-// ---------------------------------------------------------------------------
 
 let env: TestEnv;
 beforeAll(async () => {
@@ -915,7 +906,6 @@ describe("agents as teammates", () => {
     const [after] = (
       await env.call("GET", "/v1/attention", { token: owner.token })
     ).body;
-    // Same thread, one item: it now says the agent finished, and waits for the digest instead of interrupting.
     expect(after).toMatchObject({
       kind: "agent.finished",
       priority: "low",

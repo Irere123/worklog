@@ -34,7 +34,6 @@ function slugify(value: string) {
   );
 }
 
-/** The part of an email address before the @. */
 function localPart(email: string) {
   const [local = email] = email.split("@");
   return local;
@@ -82,10 +81,6 @@ async function createWorkspace(
   return workspace;
 }
 
-/**
- * Headless bootstrap (self-hosting, scripts, tests): a workspace, its owner, the owner's assistant
- * and an API key. When the owner later signs in with the same verified email, they claim the member.
- */
 export async function setupWorkspace(
   ctx: AppContext,
   input: {
@@ -124,7 +119,6 @@ export type SignedInUser = {
   emailVerified: boolean;
 };
 
-/** A signed-in person creates a workspace and becomes its owner. */
 export async function createWorkspaceForUser(
   ctx: AppContext,
   user: SignedInUser,
@@ -143,10 +137,7 @@ export async function createWorkspaceForUser(
   return { workspace, member: owner };
 }
 
-/**
- * Invitations are members with an email and no user yet. When someone signs in with that verified
- * email (magic link, or GitHub/Discord/Slack reporting a verified address), they claim them.
- */
+// Claimed on sign-in with the same verified email (magic link, or a provider reporting a verified address).
 export async function claimMemberships(ctx: AppContext, user: SignedInUser) {
   if (!user.emailVerified) {
     return 0;
@@ -202,10 +193,6 @@ export type NewMember = {
   userId?: string | null;
 };
 
-/**
- * Humans automatically get a personal assistant agent and default automations
- * (morning brief, weekly wrap, attention check, nightly memory consolidation).
- */
 export async function createMember(
   ctx: AppContext,
   workspaceId: string,
@@ -315,7 +302,6 @@ export async function listMembers(
     .orderBy(members.createdAt);
 }
 
-/** Accepts a member id, a handle (with or without @), or "me". */
 export async function resolveMember(
   ctx: AppContext,
   viewer: Member,
@@ -364,10 +350,6 @@ export async function updateMember(
 export function timezoneOf(member: Member, workspace: Workspace) {
   return member.timezone ?? workspace.timezone;
 }
-
-// ---------------------------------------------------------------------------
-// Tokens
-// ---------------------------------------------------------------------------
 
 export async function createToken(
   ctx: AppContext,
@@ -441,7 +423,6 @@ function isApiScope(scope: string): scope is ApiScope {
   return API_SCOPES.some((known) => known === scope);
 }
 
-/** You can act for yourself, for agents you own, and (as an admin) for anyone in the workspace. */
 export function canActFor(viewer: Member, target: Member) {
   return (
     viewer.id === target.id ||
@@ -478,15 +459,8 @@ export async function revokeToken(
     .where(eq(apiTokens.id, tokenId));
 }
 
-// ---------------------------------------------------------------------------
-// Identities: who is who on GitHub / Slack / Discord
-// ---------------------------------------------------------------------------
-
-/**
- * Who is this account on GitHub / Slack / Discord? Explicit links (identities) first, then the
- * accounts people signed in with — so signing in with GitHub is all it takes to be attributed.
- * Pass every id the event carries (e.g. GitHub's numeric id and login).
- */
+// Explicit links first, then sign-in accounts, so signing in with GitHub is enough to be attributed.
+// Pass every id the event carries (e.g. GitHub's numeric id and login).
 export async function memberByIdentity(
   ctx: AppContext,
   workspaceId: string,

@@ -42,7 +42,6 @@ export function verifySlack(
   );
 }
 
-/** The fields we read from Slack's `message` and `app_mention` events. */
 const SlackEventSchema = z.object({
   type: z.string(),
   subtype: z.string().nullish(),
@@ -67,13 +66,11 @@ const SlackEventSchema = z.object({
 });
 type SlackEvent = z.infer<typeof SlackEventSchema>;
 
-/** What `receive` stores for an `event_callback`. */
 const EventCallback = z.object({
   event: SlackEventSchema,
   event_id: z.string(),
 });
 
-/** The outer envelope of everything Slack posts to the events endpoint. */
 const Envelope = z.object({
   type: z.string(),
   challenge: z.string().optional(),
@@ -83,22 +80,16 @@ const Envelope = z.object({
 
 const ChannelNames = z.record(z.string(), z.string());
 
-/** `<@U123>` or `<@U123|name>` → U123 */
 const USER_MENTION = /<@(?<id>[A-Z0-9]+)(?:\|[^>]*)?>/gu;
 const WL_REF = /\bWL-(?<number>\d+)\b/giu;
-/** Acknowledgements and chatter that never mean work moved. */
 const ACK =
   /^(?:ok(?:ay)?|k|thanks?(?: you)?|thx|ty|cool|nice|great|lol|haha|yes|yep|no|nope|sure|done|\+1|same|agreed|got it|on it|ack)[.!]*$/iu;
 const NOISE_CHARS = /<[^>]+>|:[a-z0-9_+-]+:|[\p{Extended_Pictographic}️]/gu;
-/** Short, but news: keep these even under the length threshold. */
 const SHORT_BUT_NEWS =
   /\b(?:blocked|unblocked|deployed|shipped|merged|released|fixed|reverted|rolled back|on call|down|outage)\b/iu;
-/** A leading mention of the bot: `@worklog ask …` */
 const LEADING_MENTION = /^\s*<@[A-Z0-9]+(?:\|[^>]*)?>\s*/u;
-/** A leading mention of a person in a command: `<@U123> what's up` */
 const MENTIONED_PERSON = /^<@(?<id>[A-Z0-9]+)(?:\|[^>]*)?>\s*(?<text>.*)$/su;
 
-/** Slack markup → readable plain text. */
 function plain(text: string) {
   return text
     .replaceAll(
@@ -116,19 +107,16 @@ function plain(text: string) {
     .trim();
 }
 
-/** Display name for a channel id: settings.channelNames, or the id itself. */
 function channelNameOf(settings: Record<string, unknown>, channel: string) {
   const names = ChannelNames.safeParse(settings.channelNames);
   return (names.success ? names.data[channel] : undefined) ?? channel;
 }
 
-/** Slack user ids mentioned in raw message text, without repeats. */
 function mentionedUserIds(text: string) {
   const ids = [...text.matchAll(USER_MENTION)].map((m) => m.groups?.id);
   return [...new Set(ids.filter((id) => id !== undefined))];
 }
 
-/** "ok", "thanks 🙏", emoji-only: too little to be a work update. Short news still counts. */
 function isChatter(text: string) {
   const substance = text.replaceAll(NOISE_CHARS, "").trim();
   return (
@@ -137,7 +125,7 @@ function isChatter(text: string) {
   );
 }
 
-/** Edits and deletions are applied to what we recorded — a deleted message must not linger here. */
+// A deleted message must not linger in what we recorded.
 function revisionOf(
   e: SlackEvent,
   settings: Record<string, unknown>,
@@ -168,7 +156,6 @@ function revisionOf(
   return null;
 }
 
-/** Who posted where, or why this message is not one we read. */
 function sourceOf(
   e: SlackEvent
 ): { user: string; channel: string } | { ignored: string } {
@@ -187,7 +174,6 @@ function sourceOf(
   return { user: e.user, channel: e.channel };
 }
 
-/** The stream item for a message, before deciding whether it's news, a mention, or a thread reply. */
 function messageEvent(
   e: SlackEvent,
   source: { user: string; channel: string; channelName: string },
@@ -238,14 +224,6 @@ function messageEvent(
   };
 }
 
-/**
- * Slack is where most chatter lives, so the rules are strict:
- *  - direct messages are never ingested;
- *  - @mentions of people always become signals (attention), wherever the bot can see them;
- *  - messages become activity only in channels the team opted in to (settings.channels, e.g. #standup),
- *    and only if they carry substance — "ok", "thanks 🙏", emoji-only don't;
- *  - thread replies merge per person per thread into one activity.
- */
 export function normalizeSlackMessage(
   e: SlackEvent,
   eventId: string,
@@ -282,7 +260,7 @@ export function normalizeSlackMessage(
           : "channel not opted in",
       };
     }
-    // Mentions still reach people.
+    // Hidden from the stream, but the mention signals still reach people.
     return { events: [{ ...base, hidden: true }] };
   }
   if (e.thread_ts && e.thread_ts !== e.ts) {
@@ -304,7 +282,6 @@ export function normalizeSlackMessage(
   return { events: [{ ...base, importance: 0.3 }] };
 }
 
-/** What `receive` hands to `interact`: a slash command's form, or an @mention of the bot. */
 const Interaction = z.discriminatedUnion("kind", [
   z.object({
     kind: z.literal("command"),
@@ -313,7 +290,6 @@ const Interaction = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("mention"), event: SlackEventSchema }),
 ]);
 
-/** Slack Web API responses all carry `ok`, and `error` when it's false. */
 const ApiResult = z.object({ ok: z.boolean(), error: z.string().optional() });
 
 async function runSlackCommand(
@@ -327,7 +303,6 @@ async function runSlackCommand(
   if (name === "help") {
     return HELP;
   }
-  // A leading Slack mention (<@U123>) or Worklog handle (@sam) names the person.
   let target: Member | null = null;
   let text = rest;
   const person = MENTIONED_PERSON.exec(rest)?.groups;
@@ -370,7 +345,7 @@ async function postMessage(
   }
 }
 
-/** Answers an @mention in its thread. Slack has already been acknowledged, so failures are only logged. */
+// Slack has already been acknowledged, so failures are only logged.
 async function replyInThread(
   ctx: AppContext,
   conn: ConnectionView,
@@ -391,7 +366,6 @@ async function replyInThread(
   }
 }
 
-/** Finishes a deferred slash command by posting the answer to its response_url. */
 async function answerLater(
   ctx: AppContext,
   conn: ConnectionView,

@@ -13,21 +13,17 @@ import { EventBus } from "./events/bus";
 import { SecretBox } from "./lib/crypto";
 import { claimMemberships } from "./members/service";
 
-/** Everything a request handler, connector or automation needs. Built once per process. */
 export type AppContext = {
   config: Config;
   db: Db;
-  /** Better Auth: human sign-in (magic link, GitHub, Discord, Slack) and sessions. */
   auth: Auth;
   bus: EventBus;
   secrets: SecretBox;
-  /** null when no OPENROUTER_API_KEY: AI features fall back to deterministic templates. */
+  // null when no OPENROUTER_API_KEY: AI features fall back to deterministic templates.
   models: Models | null;
   mailer: Mailer;
-  /** Outbound HTTP (Slack, Discord, webhooks) — injectable for tests. */
   fetch: typeof fetch;
   now: () => Date;
-  /** Set by the scheduler: wakes the job queue right away (e.g. after a webhook is stored). */
   kickQueue?: () => void;
   close: () => Promise<void>;
 };

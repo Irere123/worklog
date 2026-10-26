@@ -1,7 +1,4 @@
-/**
- * Side-effect-free entry point for the Better Auth CLI (`bun run auth:generate`). It only needs the
- * configuration to know which tables to generate; the database here is a throwaway in-memory one.
- */
+// Side-effect-free: the CLI only needs the config to know which tables to generate, so the database is a throwaway in-memory one.
 import { PGlite } from "@electric-sql/pglite";
 import { drizzle } from "drizzle-orm/pglite";
 

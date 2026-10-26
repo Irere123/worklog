@@ -10,10 +10,6 @@ import { jitterFor, nextRun } from "./schedule";
 type Member = typeof members.$inferSelect;
 export type AutomationRow = typeof automations.$inferSelect;
 
-// ---------------------------------------------------------------------------
-// CRUD
-// ---------------------------------------------------------------------------
-
 export async function createDefaultAutomations(
   ctx: AppContext,
   member: Member,
