@@ -1,30 +1,26 @@
 import { simulateReadableStream } from "ai";
 import { MockLanguageModelV4 } from "ai/test";
+import { Client } from "pg";
 
 import { createApp } from "../src/app";
 import { loadConfig } from "../src/config";
 import { createContext } from "../src/context";
 import type { AppContext } from "../src/context";
 import { ConsoleMailer } from "../src/delivery/mailer";
-import { drainQueue } from "../src/jobs/queue";
-import "../src/ingest/pipeline";
+import { runJobsOnce } from "../src/jobs/worker";
 
-// One embedded Postgres for the whole run (PGlite boots slowly; bun runs every test file in one
-// process). Isolation comes from each test creating its own workspace.
+// One database for the whole run (bun runs every test file in one process), recreated at the start
+// so rows from an earlier run can't make a test pass. Isolation comes from each test creating its
+// own workspace.
+const TEST_DATABASE_URL =
+  process.env.TEST_DATABASE_URL ??
+  "postgres://postgres:postgres@localhost:5432/worklog_test";
 let shared: Promise<AppContext> | null = null;
 
 export type TestEnv = Awaited<ReturnType<typeof testEnv>>;
 
 export async function testEnv() {
-  shared ??= createContext(
-    loadConfig({
-      NODE_ENV: "test",
-      DATABASE_URL: "memory://",
-      SETUP_SECRET: "test-secret",
-      PUBLIC_URL: "http://worklog.test",
-    }),
-    { models: null, mailer: new ConsoleMailer() }
-  );
+  shared ??= openTestContext();
   const ctx = await shared;
   const reset = () => {
     ctx.models = null;
@@ -104,9 +100,34 @@ export async function testEnv() {
     return { token: res.body.token.token as string, member: res.body.member };
   }
 
-  const drain = async () => await drainQueue(ctx);
+  const drain = async () => {
+    await runJobsOnce(ctx);
+  };
 
   return { ctx, app, call, workspace, teammate, reset, drain };
+}
+
+async function openTestContext() {
+  const name = new URL(TEST_DATABASE_URL).pathname.slice(1);
+  const server = new URL(TEST_DATABASE_URL);
+  server.pathname = "/postgres";
+  const admin = new Client({ connectionString: server.href });
+  await admin.connect();
+  try {
+    await admin.query(`drop database if exists "${name}" with (force)`);
+    await admin.query(`create database "${name}"`);
+  } finally {
+    await admin.end();
+  }
+  return await createContext(
+    loadConfig({
+      NODE_ENV: "test",
+      DATABASE_URL: TEST_DATABASE_URL,
+      SETUP_SECRET: "test-secret",
+      PUBLIC_URL: "http://worklog.test",
+    }),
+    { models: null, mailer: new ConsoleMailer() }
+  );
 }
 
 function urlOf(input: string | URL | Request) {

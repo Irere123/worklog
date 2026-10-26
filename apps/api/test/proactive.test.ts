@@ -3,7 +3,8 @@ import { beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { nextRun } from "../src/automations/schedule";
 import { briefWindow } from "../src/briefs/service";
 import type { ConsoleMailer } from "../src/delivery/mailer";
-import { tick } from "../src/jobs/scheduler";
+import { enqueue } from "../src/jobs/queue";
+import { startWorker } from "../src/jobs/worker";
 import { localParts } from "../src/lib/time";
 import { testEnv } from "./harness";
 import type { TestEnv } from "./harness";
@@ -191,8 +192,8 @@ describe("automations", () => {
     const autos = (await env.call("GET", "/v1/automations", { token })).body;
     const morning = autos.find((a: any) => a.kind === "brief.daily");
     env.ctx.now = () => new Date(new Date(morning.nextRunAt).getTime() + 1000);
-    const result = await tick(env.ctx);
-    expect(result.automations).toBeGreaterThanOrEqual(1);
+    await enqueue(env.ctx, "automations:run", {});
+    await env.drain();
     const after = (
       await env.call("GET", "/v1/automations", { token })
     ).body.find((a: any) => a.id === morning.id);
@@ -200,6 +201,11 @@ describe("automations", () => {
     expect(new Date(after.nextRunAt).getTime()).toBeGreaterThan(
       new Date(morning.nextRunAt).getTime()
     );
+  });
+
+  test("the worker starts with its cron schedule", async () => {
+    const stop = await startWorker(env.ctx);
+    await stop();
   });
 
   test("nightly consolidation writes yesterday's journal", async () => {

@@ -10,7 +10,7 @@ import {
   inboundEvents,
   members,
 } from "../db/schema";
-import { enqueue, registerJob } from "../jobs/queue";
+import { enqueue } from "../jobs/queue";
 import { newId } from "../lib/ids";
 import {
   applyAgentState,
@@ -98,11 +98,10 @@ export async function receive(
   // One connection's deliveries are processed in order (merging and thread state depend on it).
   await enqueue(
     ctx,
-    "ingest.process",
+    "ingest:process",
     { inboundEventId: stored.id },
-    { orderingKey: `ingest:${conn.id}` }
+    { queue: `ingest:${conn.id}` }
   );
-  ctx.kickQueue?.();
   return { status: 200, body: { ok: true } };
 }
 
@@ -130,11 +129,10 @@ export async function receivePushed(
   }
   await enqueue(
     ctx,
-    "ingest.process",
+    "ingest:process",
     { inboundEventId: stored.id },
-    { orderingKey: `ingest:${conn.id}` }
+    { queue: `ingest:${conn.id}` }
   );
-  ctx.kickQueue?.();
   return { duplicate: false, inboundEventId: stored.id };
 }
 
@@ -479,10 +477,6 @@ async function applyRevision(
   }
 }
 
-registerJob("ingest.process", async (ctx, payload) => {
-  await processInbound(ctx, String(payload.inboundEventId));
-});
-
 export async function replayConnection(
   ctx: AppContext,
   workspaceId: string,
@@ -513,15 +507,6 @@ export async function replayConnection(
   }
   return { reprocessed: raw.length, rebuiltFrom: removed.length };
 }
-
-registerJob("ingest.replay", async (ctx, payload) => {
-  await replayConnection(
-    ctx,
-    String(payload.workspaceId),
-    String(payload.connectionId),
-    typeof payload.since === "string" ? new Date(payload.since) : undefined
-  );
-});
 
 export async function connectionHealth(
   ctx: AppContext,

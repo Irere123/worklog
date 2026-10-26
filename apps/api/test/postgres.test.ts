@@ -1,48 +1,26 @@
-import { afterAll, beforeAll, expect, test } from "bun:test";
+import { expect, test } from "bun:test";
 
-import { PGlite } from "@electric-sql/pglite";
-import { PGLiteSocketServer } from "@electric-sql/pglite-socket";
 import { sql } from "drizzle-orm";
 
-import { openDb } from "../src/db";
-import type { Db } from "../src/db";
-import { activities, workspaces } from "../src/db/schema";
+import { activities } from "../src/db/schema";
+import { testEnv } from "./harness";
 
-// Runs the production driver path over the real wire protocol, served by PGlite. Guards against drivers that store jsonb as strings.
-let server: PGLiteSocketServer;
-let pg: PGlite;
-let opened: { db: Db; close: () => Promise<void> };
-
-beforeAll(async () => {
-  pg = new PGlite();
-  server = new PGLiteSocketServer({ db: pg, port: 55_433 });
-  await server.start();
-  opened = await openDb(
-    "postgres://postgres:postgres@127.0.0.1:55433/postgres"
-  );
-});
-
-afterAll(async () => {
-  await opened?.close();
-  await server?.stop();
-  await pg?.close();
-});
-
-test("migrations run, and jsonb is stored as JSON (queryable in SQL), not as a string", async () => {
-  const { db } = opened;
-  await db.insert(workspaces).values({ id: "ws_pg", name: "PG", slug: "pg" });
+// Guards against drivers that store jsonb as strings: reads look fine, but SQL can't see inside.
+test("jsonb is stored as JSON (queryable in SQL), not as a string", async () => {
+  const env = await testEnv();
+  const { workspace } = await env.workspace();
+  const { db } = env.ctx;
   await db.insert(activities).values({
     id: "act_pg",
-    workspaceId: "ws_pg",
+    workspaceId: workspace.id,
     actorId: null,
     source: "github",
     kind: "pr.merged",
     title: "t",
     data: { repo: "acme/api" },
   });
-  const result = await db.execute(
+  const result = await db.execute<{ type: string; repo: string }>(
     sql`select jsonb_typeof(data) as type, data->>'repo' as repo from activities where id = 'act_pg'`
   );
-  const row = (result as { rows: { type: string; repo: string }[] }).rows[0]!;
-  expect(row).toEqual({ type: "object", repo: "acme/api" });
+  expect(result.rows[0]).toEqual({ type: "object", repo: "acme/api" });
 });

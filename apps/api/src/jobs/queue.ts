@@ -1,163 +1,37 @@
-import { and, eq, inArray, lt, or, sql } from "drizzle-orm";
+import { sql } from "drizzle-orm";
+import { Logger, runMigrations } from "graphile-worker";
 
 import type { AppContext } from "../context";
-import { jobs } from "../db/schema";
-import { returned } from "../lib/assert";
+import type { Db } from "../db";
 
-export type Job = typeof jobs.$inferSelect;
 export type JobHandler = (
   ctx: AppContext,
   payload: Record<string, unknown>
 ) => Promise<void>;
 
-const handlers = new Map<string, JobHandler>();
-const LOCK_MS = 5 * 60_000;
+export const logger = new Logger(() => (level, message) => {
+  if (level === "error" || level === "warning") {
+    console.error(`[jobs] ${message}`);
+  }
+});
 
-// `FOR UPDATE SKIP LOCKED` lets any number of workers claim jobs safely; PGlite runs the same SQL, so tests exercise the real thing.
-export function registerJob(type: string, handler: JobHandler) {
-  handlers.set(type, handler);
+export async function installQueue(db: Db) {
+  await runMigrations({ pgPool: db.$client, logger });
 }
 
+/** Jobs in the same `queue` run one at a time, oldest first, but a failed job retries after the ones behind it. */
 export async function enqueue(
   ctx: AppContext,
-  type: string,
+  task: string,
   payload: Record<string, unknown>,
-  opts: { runAt?: Date; maxAttempts?: number; orderingKey?: string } = {}
+  opts: { queue?: string; maxAttempts?: number } = {}
 ) {
-  const rows = await ctx.db
-    .insert(jobs)
-    .values({
-      type,
-      payload,
-      orderingKey: opts.orderingKey ?? null,
-      runAt: opts.runAt ?? ctx.now(),
-      maxAttempts: opts.maxAttempts ?? 5,
-    })
-    .returning({ id: jobs.id });
-  return returned(rows, "job").id;
-}
-
-async function claim(ctx: AppContext, limit: number): Promise<Job[]> {
-  const now = ctx.now();
-  return await ctx.db.transaction(async (tx) => {
-    const nowSql = sql`${now.toISOString()}::timestamptz`;
-    const due = await tx
-      .select({ id: jobs.id })
-      .from(jobs)
-      .where(
-        and(
-          or(
-            and(eq(jobs.status, "queued"), sql`${jobs.runAt} <= ${nowSql}`),
-            and(eq(jobs.status, "running"), lt(jobs.lockedUntil, now))
-          ),
-          // Ordered jobs: only the oldest unfinished job per key is eligible, and only if none is running.
-          sql`(${jobs.orderingKey} is null or ${jobs.id} = (
-            select min(j2.id) from jobs j2
-            where j2.ordering_key = ${jobs.orderingKey} and j2.status in ('queued', 'running')
-          ) and not exists (
-            select 1 from jobs j3
-            where j3.ordering_key = ${jobs.orderingKey} and j3.status = 'running' and j3.locked_until > ${nowSql} and j3.id <> ${jobs.id}
-          ))`
-        )
-      )
-      .orderBy(jobs.id)
-      .limit(limit)
-      .for("update", { skipLocked: true });
-    if (!due.length) {
-      return [];
-    }
-    return await tx
-      .update(jobs)
-      .set({
-        status: "running",
-        attempts: sql`${jobs.attempts} + 1`,
-        lockedUntil: new Date(now.getTime() + LOCK_MS),
-      })
-      .where(
-        inArray(
-          jobs.id,
-          due.map((d) => d.id)
-        )
-      )
-      .returning();
-  });
-}
-
-/** Only the worker holding this attempt may settle it (a reclaimed job belongs to its new holder). */
-function heldAttempt(job: Job) {
-  return and(
-    eq(jobs.id, job.id),
-    eq(jobs.attempts, job.attempts),
-    eq(jobs.status, "running")
-  );
-}
-
-async function complete(ctx: AppContext, job: Job) {
-  await ctx.db.delete(jobs).where(heldAttempt(job));
-}
-
-async function fail(ctx: AppContext, job: Job, error: unknown) {
-  const dead = job.attempts >= job.maxAttempts;
-  // Exponential backoff with ±20% jitter, so a provider outage doesn't retry in lockstep.
-  const backoffMs =
-    Math.min(10_000 * 2 ** (job.attempts - 1), 60 * 60_000) *
-    (0.8 + Math.random() * 0.4);
-  await ctx.db
-    .update(jobs)
-    .set({
-      status: dead ? "dead" : "queued",
-      runAt: new Date(ctx.now().getTime() + backoffMs),
-      lockedUntil: null,
-      lastError: (error instanceof Error
-        ? `${error.message}\n${error.stack ?? ""}`
-        : Bun.inspect(error)
-      ).slice(0, 4000),
-    })
-    .where(heldAttempt(job));
-}
-
-export async function drainQueue(
-  ctx: AppContext,
-  opts: { batch?: number; budgetMs?: number } = {}
-) {
-  const deadline = Date.now() + (opts.budgetMs ?? 20_000);
-  let ran = 0;
-  while (Date.now() < deadline) {
-    const batch = await claim(ctx, opts.batch ?? 20);
-    if (!batch.length) {
-      break;
-    }
-    for (const job of batch) {
-      const handler = handlers.get(job.type);
-      try {
-        if (!handler) {
-          throw new Error(`No handler for job type ${job.type}`);
-        }
-        await handler(ctx, job.payload);
-        await complete(ctx, job);
-      } catch (error) {
-        console.error(
-          `[queue] ${job.type} #${job.id} failed (attempt ${job.attempts}/${job.maxAttempts})`,
-          error
-        );
-        await fail(ctx, job, error);
-      }
-      ran += 1;
-    }
-  }
-  return ran;
-}
-
-export async function queueStats(ctx: AppContext) {
-  const rows = await ctx.db
-    .select({
-      status: jobs.status,
-      n: sql<number>`count(*)::int`.mapWith(Number),
-      oldest: sql<string | null>`min(${jobs.runAt})`,
-    })
-    .from(jobs)
-    .groupBy(jobs.status);
-  return Object.fromEntries(
-    rows.map((r) => [r.status, { count: r.n, oldest: r.oldest }])
+  await ctx.db.execute(
+    sql`select graphile_worker.add_job(
+      ${task}::text,
+      ${JSON.stringify(payload)}::json,
+      queue_name => ${opts.queue ?? null}::text,
+      max_attempts => ${opts.maxAttempts ?? 5}::int
+    )`
   );
 }

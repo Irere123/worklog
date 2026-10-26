@@ -20,11 +20,11 @@
  │ connectors/   GitHub · Gitea · Slack · Discord · webhook (no-code) · custom   │
  │ ingest/       pipeline: normalize · identity · gates · merge · effects        │
  │ events/bus.ts durable, sequenced event log + live fan-out                     │
- │ jobs/         queue (SKIP LOCKED, ordered per connection) · scheduler (lease) │
+ │ jobs/         Graphile Worker: queues per connection · cron schedule          │
  └───────────────────────────────────────────────────────────────────────────────┘
         │ Drizzle ORM (one schema, one migration set)
         ▼
-  Postgres (node-postgres) in production · PGlite (embedded) in dev and tests
+  Postgres (node-postgres), which also holds the Graphile Worker job queue
         │
   OpenRouter via the Vercel AI SDK v7 (main + fast model tiers)
 ```
@@ -116,7 +116,7 @@ Consolidation runs **twice**: once over team-visible activity (producing team me
 
 - **Automations are rows** with a schedule (`daily` / `weekly` / `interval` with `activeHoursOnly`), evaluated on the member's local clock with DST handled.
 - **Spreading load:** a deterministic per-automation jitter keeps jobs from all firing on the same minute.
-- **Single runner:** the scheduler holds a lease in the `leases` table. Each tick drains due jobs in batches within a time budget.
+- **Cron:** Graphile Worker's crontab (`jobs/worker.ts`) runs due automations every minute, the entropy sweep hourly and event pruning daily. Each run fires once across all workers, and the scheduled tasks share one queue, so they never overlap.
 - **Failure handling:** an attention item after 3 consecutive failures; the automation is disabled after 10.
 - **Deployment:** run it in the API process (`RUN_SCHEDULER=true`) or as a separate worker (`bun run worker`).
 

@@ -326,15 +326,14 @@ export const connectionRoutes = router()
       );
       await enqueue(
         ctx,
-        "ingest.replay",
+        "ingest:replay",
         {
           workspaceId: me.workspaceId,
           connectionId: conn.id,
           since: c.req.valid("json").since ?? null,
         },
-        { maxAttempts: 1 }
+        { queue: `ingest:${conn.id}`, maxAttempts: 1 }
       );
-      ctx.kickQueue?.();
       return c.json({ queued: true as const }, 202);
     }
   )

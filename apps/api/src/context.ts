@@ -10,6 +10,7 @@ import type { Db } from "./db";
 import { createMailer } from "./delivery/mailer";
 import type { Mailer } from "./delivery/mailer";
 import { EventBus } from "./events/bus";
+import { installQueue } from "./jobs/queue";
 import { SecretBox } from "./lib/crypto";
 import { claimMemberships } from "./members/service";
 
@@ -24,7 +25,6 @@ export type AppContext = {
   mailer: Mailer;
   fetch: typeof fetch;
   now: () => Date;
-  kickQueue?: () => void;
   close: () => Promise<void>;
 };
 
@@ -35,6 +35,7 @@ export async function createContext(
   > = {}
 ): Promise<AppContext> {
   const { db, close } = await openDb(config.DATABASE_URL);
+  await installQueue(db);
   const mailer = overrides.mailer ?? createMailer(config);
   const ctx: AppContext = {
     config,

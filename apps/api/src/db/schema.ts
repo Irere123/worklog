@@ -190,30 +190,6 @@ export const inboundEvents = pgTable(
   ]
 );
 
-export const jobs = pgTable(
-  "jobs",
-  {
-    id: bigserial("id", { mode: "number" }).primaryKey(),
-    type: text("type").notNull(),
-    payload: jsonb("payload").$type<Record<string, unknown>>().notNull(),
-    /** Jobs with the same key run one at a time, in order (e.g. one connection's deliveries). */
-    orderingKey: text("ordering_key"),
-    status: text("status", { enum: ["queued", "running", "done", "dead"] })
-      .notNull()
-      .default("queued"),
-    attempts: integer("attempts").notNull().default(0),
-    maxAttempts: integer("max_attempts").notNull().default(5),
-    runAt: ts("run_at").notNull().defaultNow(),
-    lockedUntil: ts("locked_until"),
-    lastError: text("last_error"),
-    createdAt: createdAt(),
-  },
-  (t) => [
-    index("jobs_due_idx").on(t.status, t.runAt),
-    index("jobs_ordering_idx").on(t.orderingKey, t.id),
-  ]
-);
-
 export const boards = pgTable("boards", {
   id: text("id").primaryKey(),
   workspaceId: text("workspace_id")
@@ -735,10 +711,3 @@ export const messages = pgTable(
   },
   (t) => [uniqueIndex("messages_seq_uq").on(t.conversationId, t.seq)]
 );
-
-/** Leader lease so only one process runs the scheduler when several API replicas are up. */
-export const leases = pgTable("leases", {
-  name: text("name").primaryKey(),
-  holder: text("holder").notNull(),
-  expiresAt: ts("expires_at").notNull(),
-});

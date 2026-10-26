@@ -1,12 +1,12 @@
 import { createApp } from "./app";
 import { loadConfig } from "./config";
 import { createContext } from "./context";
-import { startScheduler } from "./jobs/scheduler";
+import { startWorker } from "./jobs/worker";
 
 const config = loadConfig();
 const ctx = await createContext(config);
 const app = createApp(ctx);
-const stopScheduler = config.RUN_SCHEDULER ? startScheduler(ctx) : null;
+const stopWorker = config.RUN_SCHEDULER ? await startWorker(ctx) : null;
 
 const server = Bun.serve({
   port: config.PORT,
@@ -21,13 +21,17 @@ console.log(
 console.log(
   `  AI: ${ctx.models ? `${config.WORKLOG_MODEL} / ${config.WORKLOG_FAST_MODEL} via OpenRouter` : "off (set OPENROUTER_API_KEY)"}`
 );
-console.log(
-  `  Mail: ${ctx.mailer.kind} · Scheduler: ${stopScheduler ? "on" : "off"} · DB: ${config.DATABASE_URL.startsWith("postgres") ? "postgres" : "pglite"}`
-);
+console.log(`  Mail: ${ctx.mailer.kind} · Jobs: ${stopWorker ? "on" : "off"}`);
 
+// A second signal (Ctrl-C twice, `docker stop`) must not close everything again.
+let shuttingDown = false;
 async function shutdown() {
+  if (shuttingDown) {
+    return;
+  }
+  shuttingDown = true;
   try {
-    await stopScheduler?.();
+    await stopWorker?.();
     await server.stop();
     await ctx.close();
     process.exit(0);

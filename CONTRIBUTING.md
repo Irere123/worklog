@@ -6,7 +6,7 @@ Thanks for helping out! A few conventions keep the codebase easy to work in.
 
 ```bash
 bun install         # also installs the git hooks
-bun run test        # ~40 s; no services needed (embedded Postgres, scripted AI model)
+bun run test        # recreates the worklog_test database on your Postgres (or TEST_DATABASE_URL)
 bun run typecheck   # strict TypeScript, no unused symbols
 bun run lint        # oxlint, type-aware
 bun run format      # oxfmt

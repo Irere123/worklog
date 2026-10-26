@@ -21,7 +21,13 @@ Work is scattered across GitHub, Slack, Discord and calls, and agents now do a g
 
 ## Quick start
 
-You need [Bun](https://bun.sh). Development uses embedded Postgres, so there's nothing else to install.
+You need [Bun](https://bun.sh) and [Postgres](https://www.postgresql.org). The default `DATABASE_URL` is `postgres://postgres:postgres@localhost:5432/worklog`, which this container matches:
+
+```bash
+docker run -d --name worklog-db -p 5432:5432 -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=worklog postgres:18
+```
+
+Then:
 
 ```bash
 bun install

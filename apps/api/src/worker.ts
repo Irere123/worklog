@@ -1,13 +1,19 @@
 import { loadConfig } from "./config";
 import { createContext } from "./context";
-import { startScheduler } from "./jobs/scheduler";
+import { startWorker } from "./jobs/worker";
 
-// Scheduler-only process, for deployments that run API replicas with RUN_SCHEDULER=false.
+// Jobs-only process, for deployments that run API replicas with RUN_SCHEDULER=false.
 const ctx = await createContext(loadConfig());
-const stop = startScheduler(ctx);
-console.log("Worklog worker running (automations, entropy)");
+const stop = await startWorker(ctx);
+console.log("Worklog worker running (ingestion, automations, entropy)");
 
+// A second signal (Ctrl-C twice, `docker stop`) must not close everything again.
+let shuttingDown = false;
 async function shutdown() {
+  if (shuttingDown) {
+    return;
+  }
+  shuttingDown = true;
   try {
     await stop();
     await ctx.close();

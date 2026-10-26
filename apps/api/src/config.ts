@@ -6,8 +6,9 @@ const Env = z.object({
     .default("development"),
   PORT: z.coerce.number().int().default(4000),
   PUBLIC_URL: z.url().default("http://localhost:4000"),
-  // postgres://... for a real server; anything else is an embedded PGlite directory ("memory://" for in-memory).
-  DATABASE_URL: z.string().default("./.data/pglite"),
+  DATABASE_URL: z
+    .string()
+    .default("postgres://postgres:postgres@localhost:5432/worklog"),
   // 32 bytes, hex or base64.
   WORKLOG_SECRET_KEY: z.string().optional(),
   // Allows POST /v1/setup after the first workspace exists (multi-workspace hosting).

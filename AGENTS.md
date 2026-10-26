@@ -42,8 +42,8 @@ Run these from the repo root unless noted. Use Bun only: no npm, yarn or pnpm, a
 
 ```bash
 bun install            # dependencies and git hooks
-bun run dev            # API on :4000 with embedded Postgres (PGlite); no services needed
-bun run test           # all tests, ~45 s
+bun run dev            # API on :4000; needs Postgres (DATABASE_URL in apps/api/.env)
+bun run test           # all tests; recreates the worklog_test database (TEST_DATABASE_URL) each run
 bun run typecheck
 bun run lint           # oxlint, type-aware; `bun run lint:fix` applies safe fixes
 bun run format         # oxfmt; `bun run format:check` only checks
@@ -70,7 +70,8 @@ apps/api/              the API server (Bun + Hono)
     attention/         "needs you": raise, collapse, quotas, feedback, actions
     automations/       scheduled routines: service.ts (CRUD), run.ts (execution), runners.ts (the routines)
     agent/             the assistant: prompts, tools, models, conversations
-    briefs/ memory/ delivery/ members/ auth/ events/ jobs/
+    jobs/              Graphile Worker: queue.ts (enqueue), worker.ts (tasks and cron)
+    briefs/ memory/ delivery/ members/ auth/ events/
     db/                schema.ts (ours), auth-schema.ts (generated)
     lib/               small shared helpers: errors, ids, crypto, time, assert
     context.ts         AppContext: everything a handler needs, built once per process
@@ -91,6 +92,7 @@ docs/                  ARCHITECTURE.md, CONNECTORS.md, research notes
   - `raiseAttention` for attention items;
   - `appendMessages` for conversation messages.
 - **Events after writes.** Publish to the event bus after the write it describes.
+- **Background work goes through `enqueue`,** and each task is listed in `jobs/worker.ts`.
 - **Inject the outside world.** Use `ctx.now()`, not `new Date()`, and `ctx.fetch` for outbound HTTP, so tests control time and the network.
 - **AI is optional.** `ctx.models` is null when no `OPENROUTER_API_KEY` is set, so every AI feature needs a deterministic fallback. Models are called through the Vercel AI SDK with OpenRouter.
 - **Config:** read environment variables only in `config.ts`, and add new ones to `apps/api/.env.example`.
