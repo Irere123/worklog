@@ -1,3 +1,5 @@
+import type { AppContext } from "../context";
+
 /**
  * The canonical event every connector produces (schema v1). Shaped after Activity Streams 2.0
  * (actor → kind → object, in a container) so any tool's events fit, and carrying everything the
@@ -19,17 +21,36 @@ export type Signal =
   /** Someone's review is wanted (→ high-priority attention for them). */
   | { type: "review_requested"; who: ExternalActor }
   /** Someone was @mentioned. High priority by default; chat platforms pass "normal" (conversation, not a request). */
-  | { type: "mentioned"; who: ExternalActor; excerpt?: string; priority?: "normal" | "high" }
+  | {
+      type: "mentioned";
+      who: ExternalActor;
+      excerpt?: string;
+      priority?: "normal" | "high";
+    }
   /** Someone was assigned the object. */
   | { type: "assigned"; who: ExternalActor }
   /** A review landed on the object's author. */
-  | { type: "review_result"; who: ExternalActor; state: "approved" | "changes_requested" | "commented" }
+  | {
+      type: "review_result";
+      who: ExternalActor;
+      state: "approved" | "changes_requested" | "commented";
+    }
   /** The thing someone was asked for is done — close their attention item for this thread. */
-  | { type: "resolve"; who?: ExternalActor; what: "review_requested" | "assigned" };
+  | {
+      type: "resolve";
+      who?: ExternalActor;
+      what: "review_requested" | "assigned";
+    };
 
 export type BoardEffect =
   /** An issue in the source tracker becomes (or updates) a card in "Maybe?" on the connection's board. */
-  | { type: "upsert_card"; externalKey: string; title: string; body?: string | null; url?: string | null }
+  | {
+      type: "upsert_card";
+      externalKey: string;
+      title: string;
+      body?: string | null;
+      url?: string | null;
+    }
   | { type: "close_card"; externalKey: string }
   | { type: "reopen_card"; externalKey: string }
   | { type: "assign_card"; externalKey: string; who: ExternalActor };
@@ -51,7 +72,12 @@ export type WorklogEvent = {
   body?: string | null;
   url?: string | null;
   /** What it's about (a PR, issue, message, deploy...). */
-  object?: { type: string; key: string; title?: string | null; url?: string | null } | null;
+  object?: {
+    type: string;
+    key: string;
+    title?: string | null;
+    url?: string | null;
+  } | null;
   /** Where it happened (repo, channel, project). */
   container?: { type: string; key: string; name?: string | null } | null;
   /** Related events share a thread, e.g. everything on one PR. Also scopes attention items. */
@@ -64,14 +90,22 @@ export type WorklogEvent = {
    * Bursts merge: events with the same key inside the window become one activity whose title is
    * re-rendered from `template` (`{n}` = total units, `{s}` = plural suffix).
    */
-  coalesce?: { key: string; windowMinutes: number; units: number; template: string } | null;
+  coalesce?: {
+    key: string;
+    windowMinutes: number;
+    units: number;
+    template: string;
+  } | null;
   /** Connector's hint, 0..1. The pipeline adjusts it (bots, merges). */
   importance?: number;
   visibility?: "team" | "private";
   /** Signals and board effects only — not shown in the stream (e.g. "assigned" is a nudge, not news). */
   hidden?: boolean;
   /** Agent work: who it was done for and where it stands. */
-  agent?: { onBehalfOf?: ExternalActor | null; state?: "working" | "needs_you" | "finished" | "failed" } | null;
+  agent?: {
+    onBehalfOf?: ExternalActor | null;
+    state?: "working" | "needs_you" | "finished" | "failed";
+  } | null;
   data?: Record<string, unknown>;
 };
 
@@ -117,14 +151,24 @@ export type Connector = {
   /** Documented settings (non-secret). */
   settings: { key: string; description: string }[];
   /** Identity namespace for actors from this connection (e.g. "github", or "gitea:git.example.com" for self-hosted). */
-  identityNamespace(conn: ConnectionView): string;
+  identityNamespace: (conn: ConnectionView) => string;
   /** Authenticate and classify one HTTP delivery. */
-  receive(req: InboundRequest, conn: ConnectionView): Promise<Received> | Received;
+  receive: (
+    req: InboundRequest,
+    conn: ConnectionView
+  ) => Promise<Received> | Received;
   /** Translate one stored delivery into canonical events. Pure. */
-  normalize(input: { eventType: string; payload: unknown; receivedAt: Date }, conn: ConnectionView): Normalized;
+  normalize: (
+    input: { eventType: string; payload: unknown; receivedAt: Date },
+    conn: ConnectionView
+  ) => Normalized;
   /** Synchronous interactions (slash commands). Return the HTTP response body. */
-  interact?(ctx: unknown, conn: ConnectionView, payload: unknown, channel: string): Promise<unknown>;
+  interact?: (
+    ctx: AppContext,
+    conn: ConnectionView,
+    payload: unknown,
+    channel: string
+  ) => Promise<unknown>;
   /** Channels (URL suffixes) this connector listens on, for showing webhook URLs. */
   endpoints: Record<string, string>;
 };
-

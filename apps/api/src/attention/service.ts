@@ -1,4 +1,17 @@
-import { and, count, desc, eq, gte, inArray, isNotNull, isNull, lte, ne, or, sql } from "drizzle-orm";
+import {
+  and,
+  count,
+  desc,
+  eq,
+  gte,
+  inArray,
+  isNull,
+  lte,
+  ne,
+  or,
+  sql,
+} from "drizzle-orm";
+
 import type { AppContext } from "../context";
 import {
   attentionFeedback,
@@ -6,9 +19,8 @@ import {
   automations,
   members,
   notifications,
-  FEEDBACK_SIGNALS,
-  type Priority,
 } from "../db/schema";
+import type { FEEDBACK_SIGNALS, Priority } from "../db/schema";
 import { badRequest, notFound } from "../lib/errors";
 import { newId } from "../lib/ids";
 import { DAY_MS } from "../lib/time";
@@ -42,8 +54,12 @@ const SENDER_HIGH_QUOTA = { human: 2, agent: 1 } as const;
 /** An urgent item pulls that person's attention check forward to now + this, merging bursts. */
 const URGENT_DEBOUNCE_MS = 3 * 60_000;
 
-export async function raiseAttention(ctx: AppContext, input: AttentionInput): Promise<AttentionRow | null> {
+export async function raiseAttention(
+  ctx: AppContext,
+  input: AttentionInput
+): Promise<AttentionRow | null> {
   const now = ctx.now();
+  const { onlyIfNew = false, replace = false } = input;
   const priority = await applySenderQuota(ctx, input);
   const values = {
     id: newId("att"),
@@ -64,7 +80,7 @@ export async function raiseAttention(ctx: AppContext, input: AttentionInput): Pr
     updatedAt: now,
   };
   const insert = ctx.db.insert(attentionItems).values(values);
-  const [row] = input.onlyIfNew
+  const [row] = onlyIfNew
     ? await insert.onConflictDoNothing().returning()
     : await insert
         .onConflictDoUpdate({
@@ -74,9 +90,11 @@ export async function raiseAttention(ctx: AppContext, input: AttentionInput): Pr
             body: input.body ?? null,
             activityId: input.activityId ?? null,
             fromId: input.fromId ?? null,
-            ...(input.replace ? { kind: input.kind } : {}),
+            ...(replace ? { kind: input.kind } : {}),
             // Keep the highest priority seen for this item (unless replacing).
-            priority: input.replace ? priority : sql`case when ${rank(priority)} > ${rankSql()} then ${priority} else ${attentionItems.priority} end`,
+            priority: replace
+              ? priority
+              : sql`case when ${rank(priority)} > ${rankSql()} then ${priority} else ${attentionItems.priority} end`,
             count: sql`${attentionItems.count} + 1`,
             state: "open",
             resolvedAt: null,
@@ -88,31 +106,60 @@ export async function raiseAttention(ctx: AppContext, input: AttentionInput): Pr
           },
         })
         .returning();
-  if (!row) return null;
+  if (!row) {
+    return null;
+  }
 
   if (row.priority === "high") {
     await ctx.db
       .update(automations)
-      .set({ nextRunAt: sql`least(${automations.nextRunAt}, ${new Date(now.getTime() + URGENT_DEBOUNCE_MS).toISOString()}::timestamptz)` })
-      .where(and(eq(automations.memberId, input.memberId), eq(automations.kind, "check"), eq(automations.enabled, true)));
+      .set({
+        nextRunAt: sql`least(${automations.nextRunAt}, ${new Date(now.getTime() + URGENT_DEBOUNCE_MS).toISOString()}::timestamptz)`,
+      })
+      .where(
+        and(
+          eq(automations.memberId, input.memberId),
+          eq(automations.kind, "check"),
+          eq(automations.enabled, true)
+        )
+      );
   }
   await ctx.bus.publish({
     workspaceId: input.workspaceId,
     audienceId: input.memberId,
     type: "attention.updated",
-    data: { id: row.id, kind: row.kind, title: row.title, priority: row.priority, state: row.state },
+    data: {
+      id: row.id,
+      kind: row.kind,
+      title: row.title,
+      priority: row.priority,
+      state: row.state,
+    },
   });
   return row;
 }
 
-const rank = (p: Priority) => ({ low: 0, normal: 1, high: 2 })[p];
-const rankSql = () => sql`(case ${attentionItems.priority} when 'high' then 2 when 'normal' then 1 else 0 end)`;
+function rank(p: Priority) {
+  return { low: 0, normal: 1, high: 2 }[p];
+}
 
-async function applySenderQuota(ctx: AppContext, input: AttentionInput): Promise<Priority> {
-  if (input.priority !== "high" || !input.fromId) return input.priority;
-  const [sender] = await ctx.db.select({ kind: members.kind }).from(members).where(eq(members.id, input.fromId));
+function rankSql() {
+  return sql`(case ${attentionItems.priority} when 'high' then 2 when 'normal' then 1 else 0 end)`;
+}
+
+async function applySenderQuota(
+  ctx: AppContext,
+  input: AttentionInput
+): Promise<Priority> {
+  if (input.priority !== "high" || !input.fromId) {
+    return input.priority;
+  }
+  const [sender] = await ctx.db
+    .select({ kind: members.kind })
+    .from(members)
+    .where(eq(members.id, input.fromId));
   const quota = SENDER_HIGH_QUOTA[sender?.kind ?? "human"];
-  const [{ n }] = (await ctx.db
+  const [sent] = await ctx.db
     .select({ n: count() })
     .from(attentionItems)
     .where(
@@ -121,41 +168,74 @@ async function applySenderQuota(ctx: AppContext, input: AttentionInput): Promise
         eq(attentionItems.fromId, input.fromId),
         eq(attentionItems.priority, "high"),
         ne(attentionItems.dedupeKey, input.dedupeKey),
-        gte(attentionItems.updatedAt, new Date(ctx.now().getTime() - DAY_MS)),
-      ),
-    )) as [{ n: number }];
-  return n >= quota ? "normal" : "high";
+        gte(attentionItems.updatedAt, new Date(ctx.now().getTime() - DAY_MS))
+      )
+    );
+  return (sent?.n ?? 0) >= quota ? "normal" : "high";
 }
 
 /** Open items, including snoozed ones whose snooze has expired. Highest priority, then newest. */
-export async function listOpenAttention(ctx: AppContext, memberId: string, limit = 100) {
-  return ctx.db
+export async function listOpenAttention(
+  ctx: AppContext,
+  memberId: string,
+  limit = 100
+) {
+  return await ctx.db
     .select()
     .from(attentionItems)
     .where(and(eq(attentionItems.memberId, memberId), openOrWoken(ctx)))
-    .orderBy(sql`case ${attentionItems.priority} when 'high' then 0 when 'normal' then 1 else 2 end`, desc(attentionItems.updatedAt))
+    .orderBy(
+      sql`case ${attentionItems.priority} when 'high' then 0 when 'normal' then 1 else 2 end`,
+      desc(attentionItems.updatedAt)
+    )
     .limit(limit);
 }
 
-const openOrWoken = (ctx: AppContext) =>
-  or(eq(attentionItems.state, "open"), and(eq(attentionItems.state, "snoozed"), lte(attentionItems.snoozedUntil, ctx.now())))!;
+function openOrWoken(ctx: AppContext) {
+  return or(
+    eq(attentionItems.state, "open"),
+    and(
+      eq(attentionItems.state, "snoozed"),
+      lte(attentionItems.snoozedUntil, ctx.now())
+    )
+  );
+}
 
-export async function listAttention(ctx: AppContext, memberId: string, state?: AttentionRow["state"]) {
-  if (!state || state === "open") return listOpenAttention(ctx, memberId);
-  return ctx.db
+export async function listAttention(
+  ctx: AppContext,
+  memberId: string,
+  state?: AttentionRow["state"]
+) {
+  if (!state || state === "open") {
+    return await listOpenAttention(ctx, memberId);
+  }
+  return await ctx.db
     .select()
     .from(attentionItems)
-    .where(and(eq(attentionItems.memberId, memberId), eq(attentionItems.state, state)))
+    .where(
+      and(
+        eq(attentionItems.memberId, memberId),
+        eq(attentionItems.state, state)
+      )
+    )
     .orderBy(desc(attentionItems.updatedAt))
     .limit(100);
 }
 
-export async function getAttention(ctx: AppContext, memberId: string, id: string) {
+export async function getAttention(
+  ctx: AppContext,
+  memberId: string,
+  id: string
+) {
   const [row] = await ctx.db
     .select()
     .from(attentionItems)
-    .where(and(eq(attentionItems.id, id), eq(attentionItems.memberId, memberId)));
-  if (!row) throw notFound("Attention item");
+    .where(
+      and(eq(attentionItems.id, id), eq(attentionItems.memberId, memberId))
+    );
+  if (!row) {
+    throw notFound("Attention item");
+  }
   return row;
 }
 
@@ -163,26 +243,37 @@ export async function updateAttention(
   ctx: AppContext,
   memberId: string,
   id: string,
-  patch: { state: AttentionRow["state"]; snoozedUntil?: Date | null },
+  patch: { state: AttentionRow["state"]; snoozedUntil?: Date | null }
 ) {
   const resolved = patch.state === "done" || patch.state === "dismissed";
   const [row] = await ctx.db
     .update(attentionItems)
     .set({
       state: patch.state,
-      snoozedUntil: patch.state === "snoozed" ? (patch.snoozedUntil ?? null) : null,
+      snoozedUntil:
+        patch.state === "snoozed" ? (patch.snoozedUntil ?? null) : null,
       resolvedAt: resolved ? ctx.now() : null,
       ...(patch.state === "done" ? { actedAt: ctx.now() } : {}),
       updatedAt: ctx.now(),
     })
-    .where(and(eq(attentionItems.id, id), eq(attentionItems.memberId, memberId)))
+    .where(
+      and(eq(attentionItems.id, id), eq(attentionItems.memberId, memberId))
+    )
     .returning();
-  if (!row) throw notFound("Attention item");
+  if (!row) {
+    throw notFound("Attention item");
+  }
   await ctx.bus.publish({
     workspaceId: row.workspaceId,
     audienceId: memberId,
     type: "attention.updated",
-    data: { id: row.id, kind: row.kind, title: row.title, priority: row.priority, state: row.state },
+    data: {
+      id: row.id,
+      kind: row.kind,
+      title: row.title,
+      priority: row.priority,
+      state: row.state,
+    },
   });
   return row;
 }
@@ -193,14 +284,27 @@ export async function updateAttention(
 
 /** Open items the proactive check hasn't evaluated since they last changed. */
 export async function unconsideredAttention(ctx: AppContext, memberId: string) {
-  return ctx.db
+  return await ctx.db
     .select()
     .from(attentionItems)
-    .where(and(eq(attentionItems.memberId, memberId), openOrWoken(ctx), isNull(attentionItems.consideredAt)))
+    .where(
+      and(
+        eq(attentionItems.memberId, memberId),
+        openOrWoken(ctx),
+        isNull(attentionItems.consideredAt)
+      )
+    )
     .orderBy(desc(attentionItems.updatedAt));
 }
 
-export async function markConsidered(ctx: AppContext, decisions: { id: string; disposition: "push" | "digest" | "drop"; reason: string }[]) {
+export async function markConsidered(
+  ctx: AppContext,
+  decisions: {
+    id: string;
+    disposition: "push" | "digest" | "drop";
+    reason: string;
+  }[]
+) {
   for (const d of decisions) {
     await ctx.db
       .update(attentionItems)
@@ -216,54 +320,101 @@ export async function markConsidered(ctx: AppContext, decisions: { id: string; d
 
 /** Open items with something new since they were last pushed or digested — what a digest should list. */
 export async function digestableAttention(ctx: AppContext, memberId: string) {
-  return ctx.db
+  return await ctx.db
     .select()
     .from(attentionItems)
     .where(
       and(
         eq(attentionItems.memberId, memberId),
         openOrWoken(ctx),
-        or(isNull(attentionItems.digestedAt), sql`${attentionItems.digestedAt} < ${attentionItems.updatedAt}`),
-        or(isNull(attentionItems.pushedAt), sql`${attentionItems.pushedAt} < ${attentionItems.updatedAt}`),
-      ),
+        or(
+          isNull(attentionItems.digestedAt),
+          sql`${attentionItems.digestedAt} < ${attentionItems.updatedAt}`
+        ),
+        or(
+          isNull(attentionItems.pushedAt),
+          sql`${attentionItems.pushedAt} < ${attentionItems.updatedAt}`
+        )
+      )
     )
-    .orderBy(sql`case ${attentionItems.priority} when 'high' then 0 when 'normal' then 1 else 2 end`, desc(attentionItems.updatedAt));
+    .orderBy(
+      sql`case ${attentionItems.priority} when 'high' then 0 when 'normal' then 1 else 2 end`,
+      desc(attentionItems.updatedAt)
+    );
 }
 
 export async function markDigested(ctx: AppContext, ids: string[]) {
-  if (!ids.length) return;
+  if (!ids.length) {
+    return;
+  }
   await ctx.db
     .update(attentionItems)
-    .set({ digestedAt: ctx.now(), consideredAt: sql`coalesce(${attentionItems.consideredAt}, ${ctx.now().toISOString()}::timestamptz)` })
+    .set({
+      digestedAt: ctx.now(),
+      consideredAt: sql`coalesce(${attentionItems.consideredAt}, ${ctx.now().toISOString()}::timestamptz)`,
+    })
     .where(inArray(attentionItems.id, ids));
 }
 
 export async function recordNotification(
   ctx: AppContext,
-  input: { workspaceId: string; memberId: string; automationId?: string | null; kind: string; itemIds: string[]; subject: string; body: string; reason?: string | null; deliveredTo: string[] },
+  input: {
+    workspaceId: string;
+    memberId: string;
+    automationId?: string | null;
+    kind: string;
+    itemIds: string[];
+    subject: string;
+    body: string;
+    reason?: string | null;
+    deliveredTo: string[];
+  }
 ) {
-  await ctx.db.insert(notifications).values({ id: newId("ntf"), automationId: null, reason: null, ...input, createdAt: ctx.now() });
+  await ctx.db.insert(notifications).values({
+    id: newId("ntf"),
+    automationId: null,
+    reason: null,
+    ...input,
+    createdAt: ctx.now(),
+  });
 }
 
-export async function pushBudget(ctx: AppContext, memberId: string, since: Date) {
-  const [stats] = (await ctx.db
+export async function pushBudget(
+  ctx: AppContext,
+  memberId: string,
+  since: Date
+) {
+  const [stats] = await ctx.db
     .select({ n: count() })
     .from(notifications)
-    .where(and(eq(notifications.memberId, memberId), eq(notifications.kind, "push"), gte(notifications.createdAt, since)))) as [{ n: number }];
+    .where(
+      and(
+        eq(notifications.memberId, memberId),
+        eq(notifications.kind, "push"),
+        gte(notifications.createdAt, since)
+      )
+    );
   const [latest] = await ctx.db
     .select({ at: notifications.createdAt })
     .from(notifications)
-    .where(and(eq(notifications.memberId, memberId), eq(notifications.kind, "push")))
+    .where(
+      and(eq(notifications.memberId, memberId), eq(notifications.kind, "push"))
+    )
     .orderBy(desc(notifications.createdAt))
     .limit(1);
-  return { pushesToday: Number(stats.n), lastPushAt: latest?.at ?? null };
+  return { pushesToday: stats?.n ?? 0, lastPushAt: latest?.at ?? null };
 }
 
 // ---------------------------------------------------------------------------
 // Feedback: the learning signal
 // ---------------------------------------------------------------------------
 
-export async function giveFeedback(ctx: AppContext, memberId: string, id: string, signal: FeedbackSignal) {
+export async function giveFeedback(
+  ctx: AppContext,
+  memberId: string,
+  id: string,
+  signal: FeedbackSignal
+) {
   const item = await getAttention(ctx, memberId, id);
   await ctx.db.insert(attentionFeedback).values({
     id: newId("fbk"),
@@ -274,55 +425,108 @@ export async function giveFeedback(ctx: AppContext, memberId: string, id: string
     signal,
     createdAt: ctx.now(),
   });
-  return { kind: item.kind, muted: (await mutedKinds(ctx, memberId)).has(item.kind) };
+  const muted = await mutedKinds(ctx, memberId);
+  return { kind: item.kind, muted: muted.has(item.kind) };
 }
 
 /**
  * Kinds this person keeps rejecting are held for digests instead of pushed: one explicit
  * "less like this", or 3+ "not useful" with no "useful" in the last 14 days.
  */
-export async function mutedKinds(ctx: AppContext, memberId: string): Promise<Set<string>> {
+export async function mutedKinds(
+  ctx: AppContext,
+  memberId: string
+): Promise<Set<string>> {
   const rows = await ctx.db
-    .select({ kind: attentionFeedback.kind, signal: attentionFeedback.signal, n: count() })
+    .select({
+      kind: attentionFeedback.kind,
+      signal: attentionFeedback.signal,
+      n: count(),
+    })
     .from(attentionFeedback)
-    .where(and(eq(attentionFeedback.memberId, memberId), gte(attentionFeedback.createdAt, new Date(ctx.now().getTime() - 14 * DAY_MS))))
+    .where(
+      and(
+        eq(attentionFeedback.memberId, memberId),
+        gte(
+          attentionFeedback.createdAt,
+          new Date(ctx.now().getTime() - 14 * DAY_MS)
+        )
+      )
+    )
     .groupBy(attentionFeedback.kind, attentionFeedback.signal);
   const byKind = new Map<string, Record<string, number>>();
-  for (const r of rows) byKind.set(r.kind, { ...byKind.get(r.kind), [r.signal]: Number(r.n) });
+  for (const r of rows) {
+    byKind.set(r.kind, { ...byKind.get(r.kind), [r.signal]: r.n });
+  }
   const muted = new Set<string>();
   for (const [kind, s] of byKind) {
-    if (s.useful) continue;
-    if ((s.less_like_this ?? 0) >= 1 || (s.not_useful ?? 0) >= 3) muted.add(kind);
+    if ((s.useful ?? 0) > 0) {
+      continue;
+    }
+    if ((s.less_like_this ?? 0) >= 1 || (s.not_useful ?? 0) >= 3) {
+      muted.add(kind);
+    }
   }
   return muted;
 }
 
 /** How well the proactive side is doing for this person — push precision and engagement. */
-export async function attentionMetrics(ctx: AppContext, memberId: string, days = 14) {
+export async function attentionMetrics(
+  ctx: AppContext,
+  memberId: string,
+  days = 14
+) {
   const since = new Date(ctx.now().getTime() - days * DAY_MS);
   const [pushes, pushedItems, feedback, muted] = await Promise.all([
     ctx.db
       .select({ n: count() })
       .from(notifications)
-      .where(and(eq(notifications.memberId, memberId), eq(notifications.kind, "push"), gte(notifications.createdAt, since))),
+      .where(
+        and(
+          eq(notifications.memberId, memberId),
+          eq(notifications.kind, "push"),
+          gte(notifications.createdAt, since)
+        )
+      ),
     ctx.db
-      .select({ state: attentionItems.state, acted: isNotNull(attentionItems.actedAt) })
+      .select({
+        state: attentionItems.state,
+        actedAt: attentionItems.actedAt,
+      })
       .from(attentionItems)
-      .where(and(eq(attentionItems.memberId, memberId), gte(attentionItems.pushedAt, since))),
+      .where(
+        and(
+          eq(attentionItems.memberId, memberId),
+          gte(attentionItems.pushedAt, since)
+        )
+      ),
     ctx.db
       .select({ signal: attentionFeedback.signal, n: count() })
       .from(attentionFeedback)
-      .where(and(eq(attentionFeedback.memberId, memberId), gte(attentionFeedback.createdAt, since)))
+      .where(
+        and(
+          eq(attentionFeedback.memberId, memberId),
+          gte(attentionFeedback.createdAt, since)
+        )
+      )
       .groupBy(attentionFeedback.signal),
     mutedKinds(ctx, memberId),
   ]);
-  const fb = Object.fromEntries(FEEDBACK_SIGNALS.map((s) => [s, Number(feedback.find((f) => f.signal === s)?.n ?? 0)])) as Record<FeedbackSignal, number>;
+  const countOf = (signal: FeedbackSignal) =>
+    feedback.find((f) => f.signal === signal)?.n ?? 0;
+  const fb: Record<FeedbackSignal, number> = {
+    useful: countOf("useful"),
+    not_useful: countOf("not_useful"),
+    less_like_this: countOf("less_like_this"),
+  };
   const rated = fb.useful + fb.not_useful + fb.less_like_this;
-  const acted = pushedItems.filter((p) => p.acted || p.state === "done").length;
+  const acted = pushedItems.filter(
+    (p) => p.actedAt !== null || p.state === "done"
+  ).length;
   const dismissed = pushedItems.filter((p) => p.state === "dismissed").length;
   return {
     days,
-    pushes: Number(pushes[0]?.n ?? 0),
+    pushes: pushes[0]?.n ?? 0,
     itemsPushed: pushedItems.length,
     actedOnRate: pushedItems.length ? acted / pushedItems.length : null,
     dismissalRate: pushedItems.length ? dismissed / pushedItems.length : null,
@@ -333,5 +537,8 @@ export async function attentionMetrics(ctx: AppContext, memberId: string, days =
 }
 
 export function assertAction(item: AttentionRow, actionId: string) {
-  if (!item.actions?.some((a) => a.id === actionId)) throw badRequest(`"${actionId}" isn't an action on this item`);
+  const offered = item.actions ?? [];
+  if (!offered.some((a) => a.id === actionId)) {
+    throw badRequest(`"${actionId}" isn't an action on this item`);
+  }
 }

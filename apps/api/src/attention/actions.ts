@@ -5,19 +5,29 @@ import type { Member } from "../members/service";
 import { assertAction, getAttention, updateAttention } from "./service";
 
 /** One-click answers to an agent's question (from the app, an email link, or a chat reply). */
-export async function performAttentionAction(ctx: AppContext, member: Member, id: string, actionId: string) {
+export async function performAttentionAction(
+  ctx: AppContext,
+  member: Member,
+  id: string,
+  actionId: string
+) {
   const item = await getAttention(ctx, member.id, id);
   assertAction(item, actionId);
   switch (item.kind) {
     case "card.drifting": {
       const number = Number(item.meta?.cardNumber);
-      if (actionId === "keep") await board.keepAlive(ctx, member, number);
-      else if (actionId === "not_now") await board.postpone(ctx, member, member.workspaceId, number);
-      else if (actionId === "done") await board.close(ctx, member, member.workspaceId, number);
+      if (actionId === "keep") {
+        await board.keepAlive(ctx, member, number);
+      } else if (actionId === "not_now") {
+        await board.postpone(ctx, member, member.workspaceId, number);
+      } else if (actionId === "done") {
+        await board.close(ctx, member, member.workspaceId, number);
+      }
       break;
     }
-    default:
+    default: {
       throw badRequest(`No actions are wired up for ${item.kind} items`);
+    }
   }
-  return updateAttention(ctx, member.id, id, { state: "done" });
+  return await updateAttention(ctx, member.id, id, { state: "done" });
 }

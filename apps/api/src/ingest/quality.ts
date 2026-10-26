@@ -26,7 +26,13 @@ const BASE_IMPORTANCE: Record<string, number> = {
 };
 
 /** Bots (dependabot, renovate, CI) are kept only for these, and at low importance. */
-const BOT_KINDS_KEPT = new Set(["pr.opened", "pr.merged", "release.published", "deploy.succeeded", "deploy.failed"]);
+const BOT_KINDS_KEPT = new Set([
+  "pr.opened",
+  "pr.merged",
+  "release.published",
+  "deploy.succeeded",
+  "deploy.failed",
+]);
 
 export type QualitySettings = {
   /** "quiet" (default): keep only a bot's PRs/releases/deploys, at low importance. "drop": ignore bots. "keep": treat bots like people. */
@@ -35,16 +41,37 @@ export type QualitySettings = {
   ignoreKinds?: string[];
 };
 
-export type Gate = { keep: true; importance: number } | { keep: false; reason: string };
+export type Gate =
+  | { keep: true; importance: number }
+  | { keep: false; reason: string };
 
-export function gate(event: WorklogEvent, isBot: boolean, settings: QualitySettings): Gate {
-  if (settings.ignoreKinds?.includes(event.kind)) return { keep: false, reason: `kind ${event.kind} is ignored for this connection` };
+export function gate(
+  event: WorklogEvent,
+  isBot: boolean,
+  settings: QualitySettings
+): Gate {
+  if ((settings.ignoreKinds ?? []).includes(event.kind)) {
+    return {
+      keep: false,
+      reason: `kind ${event.kind} is ignored for this connection`,
+    };
+  }
   let importance = event.importance ?? BASE_IMPORTANCE[event.kind] ?? 0.4;
   if (isBot) {
     const policy = settings.bots ?? "quiet";
-    if (policy === "drop") return { keep: false, reason: "bot activity is ignored for this connection" };
+    if (policy === "drop") {
+      return {
+        keep: false,
+        reason: "bot activity is ignored for this connection",
+      };
+    }
     if (policy === "quiet") {
-      if (!BOT_KINDS_KEPT.has(event.kind)) return { keep: false, reason: `bot ${event.kind} (only bot PRs, releases and deploys are kept)` };
+      if (!BOT_KINDS_KEPT.has(event.kind)) {
+        return {
+          keep: false,
+          reason: `bot ${event.kind} (only bot PRs, releases and deploys are kept)`,
+        };
+      }
       importance *= 0.3;
     }
   }
