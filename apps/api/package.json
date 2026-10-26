@@ -13,7 +13,7 @@
     "worker": "bun src/worker.ts",
     "auth:generate": "auth generate --config src/auth/cli.ts --output src/db/auth-schema.ts --adapter drizzle --dialect postgresql --yes && sed -i -E 's/timestamp\\(\"([a-z_]+)\"\\)/timestamp(\"\\1\", { withTimezone: true })/g' src/db/auth-schema.ts && bun --bun oxfmt src/db/auth-schema.ts",
     "db:generate": "drizzle-kit generate",
-    "openapi": "bun src/scripts/openapi.ts",
+    "openapi": "bun scripts/openapi.ts",
     "typecheck": "tsc --noEmit",
     "test": "bun test --timeout 60000"
   },

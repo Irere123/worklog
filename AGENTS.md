@@ -77,6 +77,7 @@ apps/api/              the API server (Bun + Hono)
     context.ts         AppContext: everything a handler needs, built once per process
     config.ts          the only place that reads environment variables
   test/                harness.ts plus one file per area
+  scripts/             one-off tools: openapi.ts prints the spec
   drizzle/             generated migrations
 docs/                  ARCHITECTURE.md, CONNECTORS.md, research notes
 ```
