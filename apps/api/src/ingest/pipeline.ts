@@ -75,19 +75,12 @@ export async function receive(
       body: await connector.interact(ctx, view, received.payload, req.channel),
     };
   }
-  const [stored] = await ctx.db
-    .insert(inboundEvents)
-    .values({
-      id: newId("inb"),
-      workspaceId: conn.workspaceId,
-      connectionId: conn.id,
-      deliveryId: received.deliveryId,
-      eventType: received.eventType,
-      payload: received.payload,
-      receivedAt: req.receivedAt,
-    })
-    .onConflictDoNothing()
-    .returning({ id: inboundEvents.id });
+  const stored = await store(ctx, conn, {
+    deliveryId: received.deliveryId,
+    eventType: received.eventType,
+    payload: received.payload,
+    receivedAt: req.receivedAt,
+  });
   if (!stored) {
     return { status: 200, body: { ok: true, duplicate: true } };
   }
@@ -95,13 +88,6 @@ export async function receive(
     .update(connections)
     .set({ lastEventAt: req.receivedAt })
     .where(eq(connections.id, conn.id));
-  // One connection's deliveries are processed in order (merging and thread state depend on it).
-  await enqueue(
-    ctx,
-    "ingest:process",
-    { inboundEventId: stored.id },
-    { queue: `ingest:${conn.id}` }
-  );
   return { status: 200, body: { ok: true } };
 }
 
@@ -111,29 +97,53 @@ export async function receivePushed(
   deliveryId: string,
   events: unknown[]
 ) {
-  const [stored] = await ctx.db
-    .insert(inboundEvents)
-    .values({
-      id: newId("inb"),
-      workspaceId: conn.workspaceId,
-      connectionId: conn.id,
-      deliveryId,
-      eventType: "worklog.events",
-      payload: { events },
-      receivedAt: ctx.now(),
-    })
-    .onConflictDoNothing()
-    .returning({ id: inboundEvents.id });
+  const stored = await store(ctx, conn, {
+    deliveryId,
+    eventType: "worklog.events",
+    payload: { events },
+    receivedAt: ctx.now(),
+  });
   if (!stored) {
     return { duplicate: true };
   }
-  await enqueue(
-    ctx,
-    "ingest:process",
-    { inboundEventId: stored.id },
-    { queue: `ingest:${conn.id}` }
-  );
-  return { duplicate: false, inboundEventId: stored.id };
+  return { duplicate: false, inboundEventId: stored };
+}
+
+/**
+ * The delivery and its job commit together. Stored without a job, a delivery would never be
+ * processed: the provider's retry is a duplicate and gets a 200.
+ */
+async function store(
+  ctx: AppContext,
+  conn: ConnectionRow,
+  delivery: Pick<
+    typeof inboundEvents.$inferInsert,
+    "deliveryId" | "eventType" | "payload" | "receivedAt"
+  >
+): Promise<string | null> {
+  return await ctx.db.transaction(async (tx) => {
+    const [row] = await tx
+      .insert(inboundEvents)
+      .values({
+        id: newId("inb"),
+        workspaceId: conn.workspaceId,
+        connectionId: conn.id,
+        ...delivery,
+      })
+      .onConflictDoNothing()
+      .returning({ id: inboundEvents.id });
+    if (!row) {
+      return null;
+    }
+    // One connection's deliveries are processed in order (merging and thread state depend on it).
+    await enqueue(
+      ctx,
+      "ingest:process",
+      { inboundEventId: row.id },
+      { queue: `ingest:${conn.id}`, db: tx }
+    );
+    return row.id;
+  });
 }
 
 export async function processInbound(

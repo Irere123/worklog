@@ -92,7 +92,7 @@ docs/                  ARCHITECTURE.md, CONNECTORS.md, research notes
   - `raiseAttention` for attention items;
   - `appendMessages` for conversation messages.
 - **Events after writes.** Publish to the event bus after the write it describes.
-- **Background work goes through `enqueue`,** and each task is listed in `jobs/worker.ts`.
+- **Background work goes through `enqueue`,** and each task is listed in `jobs/worker.ts`. When a job must follow a write, pass `db: tx` so the write and the job commit together.
 - **Inject the outside world.** Use `ctx.now()`, not `new Date()`, and `ctx.fetch` for outbound HTTP, so tests control time and the network.
 - **AI is optional.** `ctx.models` is null when no `OPENROUTER_API_KEY` is set, so every AI feature needs a deterministic fallback. Models are called through the Vercel AI SDK with OpenRouter.
 - **Config:** read environment variables only in `config.ts`, and add new ones to `apps/api/.env.example`.

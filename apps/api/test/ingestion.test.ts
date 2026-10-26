@@ -1,6 +1,8 @@
 import { beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { createHmac } from "node:crypto";
 
+import { sql } from "drizzle-orm";
+
 import { normalizeGithubLike } from "../src/connectors/github";
 import { normalizeSlackMessage } from "../src/connectors/slack";
 import { webhookConnector } from "../src/connectors/webhook";
@@ -622,6 +624,58 @@ describe("ingestion pipeline", () => {
         })
       ).body
     ).toHaveLength(0);
+  });
+
+  test("a delivery whose job can't be queued isn't kept, so the provider's retry goes through", async () => {
+    const { owner, conn } = await github();
+    const raw = JSON.stringify({
+      repository: repo,
+      ref: "refs/heads/feature",
+      after: "sha-retry",
+      sender: emma,
+      commits: [{ id: "r1", message: "Retry payments" }],
+    });
+    const deliver = async () =>
+      await env.app.request(new URL(conn.webhookUrls.webhook).pathname, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-github-event": "push",
+          "x-github-delivery": "retried-delivery",
+          "x-hub-signature-256": `sha256=${hmacHex("s", raw)}`,
+        },
+        body: raw,
+      });
+
+    await env.ctx.db.execute(
+      sql.raw(`
+        create function test_queue_down() returns trigger language plpgsql
+          as $$ begin raise exception 'queue down'; end $$;
+        create trigger test_queue_down before insert on graphile_worker._private_jobs
+          execute function test_queue_down();
+      `)
+    );
+    try {
+      expect((await deliver()).status).toBe(500);
+    } finally {
+      await env.ctx.db.execute(
+        sql.raw(`
+          drop trigger test_queue_down on graphile_worker._private_jobs;
+          drop function test_queue_down();
+        `)
+      );
+    }
+
+    const retried = await deliver();
+    expect(await retried.json()).toEqual({ ok: true });
+    await env.drain();
+    expect(
+      (
+        await env.call("GET", "/v1/activities?kind=code.pushed", {
+          token: owner.token,
+        })
+      ).body
+    ).toHaveLength(1);
   });
 });
 

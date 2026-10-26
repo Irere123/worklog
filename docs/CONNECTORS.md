@@ -20,7 +20,7 @@ Everything Worklog does depends on the activity stream: the board, briefs, "what
 
 ```
 tool ──webhook──▶ /hooks/{connectionId}[/{channel}]
-                    │ 1. receive   verify signature · store raw delivery (inbound_events) · ack fast
+                    │ 1. receive   verify signature · store raw delivery (inbound_events) and its job together · ack fast
                     ▼
                job queue (Graphile Worker on Postgres: in order per connection, retries with backoff)
                     │ 2. normalize connector turns one delivery into canonical events (pure function)

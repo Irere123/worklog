@@ -19,14 +19,17 @@ export async function installQueue(db: Db) {
   await runMigrations({ pgPool: db.$client, logger });
 }
 
-/** Jobs in the same `queue` run one at a time, oldest first, but a failed job retries after the ones behind it. */
+/**
+ * Pass `db` to add the job inside a transaction. Jobs in the same `queue` run one at a time, oldest
+ * first, but a failed job retries after the ones behind it.
+ */
 export async function enqueue(
   ctx: AppContext,
   task: string,
   payload: Record<string, unknown>,
-  opts: { queue?: string; maxAttempts?: number } = {}
+  opts: { queue?: string; maxAttempts?: number; db?: Pick<Db, "execute"> } = {}
 ) {
-  await ctx.db.execute(
+  await (opts.db ?? ctx.db).execute(
     sql`select graphile_worker.add_job(
       ${task}::text,
       ${JSON.stringify(payload)}::json,
