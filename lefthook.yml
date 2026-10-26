@@ -1,0 +1,24 @@
+# Git hooks, installed by `bun install`. Skip once with `git commit --no-verify`.
+# https://lefthook.dev/configuration/
+
+pre-commit:
+  # Lint fixes first, then format, so the commit is always formatted.
+  piped: true
+  jobs:
+    - name: lint
+      glob: "*.{ts,tsx,js,jsx,mjs,cjs,mts,cts}"
+      run: bun --bun oxlint --fix {staged_files}
+      stage_fixed: true
+    - name: format
+      run: bun --bun oxfmt --no-error-on-unmatched-pattern {staged_files}
+      stage_fixed: true
+
+commit-msg:
+  jobs:
+    - name: conventional commit message
+      run: bun --bun commitlint --edit {1}
+
+pre-push:
+  jobs:
+    - name: typecheck
+      run: bun run typecheck
