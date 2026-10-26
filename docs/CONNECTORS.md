@@ -2,6 +2,20 @@
 
 Everything Worklog does depends on the activity stream: the board, briefs, "what is X working on", the assistant's answers. Noise or wrong attribution makes the whole product useless, so ingestion is built around one rule: **only record work that moved, credited to the right person, and be able to explain every decision.**
 
+## Supported tools
+
+| Tool | What Worklog picks up | How |
+| --- | --- | --- |
+| **GitHub** | PRs, reviews, issues, comments, pushes, releases. Review requests reach the reviewer; issues can become cards. | Webhook + secret |
+| **Slack** | Work updates from the channels you choose, @mentions, edits and deletes; `/log`, `/worklog`, and `@worklog` in any thread. | Slack app |
+| **Discord** | `/log`, `/now`, `/ask`, `/brief`, and delivery of briefs to a channel. | Interactions URL |
+| **Gitea / Forgejo** | Same as GitHub, for self-hosted forges. | Webhook + secret |
+| **Anything with webhooks** | Map payloads to events with rules: GitLab, Sentry, CI, deploy bots. | `webhook` connector, no code |
+| **Your own code** | Push events from scripts and sync jobs. | `custom` connector + an `ingest` key |
+| **Agents** | Progress reports with _working / needs you / finished / failed_. | `POST /v1/activities` |
+
+`GET /v1/connectors` lists every connector and what it needs.
+
 ## The pipeline
 
 ```

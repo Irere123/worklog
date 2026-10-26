@@ -22,6 +22,7 @@ Formatting and linting use the [Oxc](https://oxc.rs) tools with [Ultracite](http
 - **[oxlint](https://oxc.rs/docs/guide/usage/linter)** runs Ultracite's rules, including type-aware ones such as unhandled promises. `bun run lint:fix` applies the safe fixes.
 - **Our departures from the preset** are in `oxlint.config.ts`, each with its reason. Add to that list only with a reason too.
 - **Fix rather than silence.** If a rule really doesn't fit one line, disable it for that line and say why: `// oxlint-disable-next-line <rule> -- <reason>`.
+- **Comments explain why, never what.** No narration: don't restate the code or describe your change. The full rules for humans and AI agents are in [AGENTS.md](AGENTS.md).
 
 ## How the code is organized
 
