@@ -1,5 +1,6 @@
 import { beforeAll, beforeEach, describe, expect, test } from "bun:test";
 
+import { CONSTITUTION } from "#agent/prompts";
 import { nextRun } from "#automations/schedule";
 import { briefWindow } from "#briefs/service";
 import type { ConsoleMailer } from "#delivery/mailer";
@@ -7,7 +8,7 @@ import { enqueue } from "#jobs/queue";
 import { startWorker } from "#jobs/worker";
 import { localParts } from "#lib/time";
 
-import { testEnv } from "./harness";
+import { scriptedModel, testEnv } from "./harness";
 import type { TestEnv } from "./harness";
 
 let env: TestEnv;
@@ -144,6 +145,41 @@ describe("automations", () => {
       await env.call("GET", `/v1/conversations/${inbox.id}`, { token })
     ).body;
     expect(thread.messages.at(-1).text).toContain("Call with finance");
+  });
+
+  test("briefs and custom automations start from the assistant's constitution", async () => {
+    const { token } = await env.workspace();
+    const { model, prompts } = scriptedModel([
+      { text: "## You\n- A quiet day." },
+      {
+        text: JSON.stringify({
+          decision: "notify",
+          message: "Nothing to rank; here is what moved.",
+          summary: "sent",
+        }),
+      },
+    ]);
+    env.ctx.models = { main: model, fast: model };
+    const autos = (await env.call("GET", "/v1/automations", { token })).body;
+    const morning = autos.find((a: any) => a.kind === "brief.daily");
+    await env.call("POST", `/v1/automations/${morning.id}/run`, { token });
+    const custom = (
+      await env.call("POST", "/v1/automations", {
+        token,
+        body: {
+          name: "Friday ranking",
+          schedule: { type: "weekly", weekday: 5, at: "15:00" },
+          instructions: "Rank my teammates by commits this week",
+        },
+      })
+    ).body;
+    await env.call("POST", `/v1/automations/${custom.id}/run`, { token });
+
+    const systems = prompts.map((p) => p.prompt[0].content as string);
+    expect(systems).toHaveLength(2);
+    expect(systems.every((s) => s.startsWith(CONSTITUTION))).toBe(true);
+    expect(systems[0]).toContain("# This brief");
+    expect(systems[1]).toContain("# This automation");
   });
 
   test("the attention check stays quiet for low-key items and pings for things blocked on you", async () => {

@@ -16,6 +16,7 @@ import { listOpenAttention } from "#db/queries/attention";
 import type { ConversationRow } from "#db/queries/conversations";
 import { findMemberById, getPersonalAgent } from "#db/queries/members";
 import type { Member } from "#db/queries/members";
+import { findVoice } from "#db/queries/voices";
 import { getWorkspaceById } from "#db/queries/workspaces";
 import { badRequest, notFound } from "#lib/errors";
 import { timezoneOf } from "#members/service";
@@ -77,6 +78,7 @@ async function prepareTurn(ctx: AppContext, asker: Member, input: TurnInput) {
   }
   const ws = await getWorkspaceById(ctx.db, { id: owner.workspaceId });
 
+  const voice = await findVoice(ctx.db, { memberId: owner.id });
   const history = await loadHistory(ctx, conversation);
   // A new conversation opens with what's in flight, the way a person would glance at their list.
   const loops =
@@ -91,6 +93,7 @@ async function prepareTurn(ctx: AppContext, asker: Member, input: TurnInput) {
       asker,
       mode: conversation.mode,
       workspaceName: ws.name,
+      voice: voice?.content ?? null,
       memory: await memoryPage(ctx, owner.id, conversation.mode === "owner"),
       recap: conversation.recap,
     }),

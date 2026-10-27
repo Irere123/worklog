@@ -1,5 +1,7 @@
 import { beforeAll, beforeEach, describe, expect, test } from "bun:test";
 
+import { CONSTITUTION } from "#agent/prompts";
+
 import { scriptedModel, testEnv } from "./harness";
 import type { TestEnv } from "./harness";
 
@@ -281,5 +283,58 @@ describe("assistant", () => {
       expect.stringContaining("Anything for me?"),
       "Nothing needs you right now.",
     ]);
+  });
+
+  test("every conversation starts from the constitution, then the owner's own instructions, which only the owner writes", async () => {
+    const owner = await env.workspace();
+    const sam = await env.teammate(owner.token, "Sam");
+    expect(
+      (await env.call("GET", "/v1/voice", { token: owner.token })).body
+    ).toEqual({ content: "", savedAt: null });
+    const first = "Sign off as Em.";
+    const second =
+      "Sign off as Emma. Send payments questions to #payments-oncall.";
+    for (const [i, content] of [first, second].entries()) {
+      env.ctx.now = () => new Date(Date.UTC(2026, 9, 26 + i));
+      await env.call("PUT", "/v1/voice", {
+        token: owner.token,
+        body: { content },
+      });
+    }
+
+    const { model, prompts } = scriptedModel([{ text: "ok" }]);
+    env.ctx.models = { main: model, fast: model };
+    await env.call("POST", "/v1/conversations", {
+      token: owner.token,
+      body: { message: "Morning" },
+    });
+    await env.call("POST", "/v1/conversations", {
+      token: sam.token,
+      body: { to: owner.member.handle, message: "Who handles payments?" },
+    });
+
+    expect(prompts).toHaveLength(2);
+    for (const prompt of prompts) {
+      const system: string = prompt.prompt[0].content;
+      expect(system.startsWith(CONSTITUTION)).toBe(true);
+      expect(system).toContain(second);
+      expect(system).not.toContain(first);
+      expect(toolNames(prompt).join(",")).not.toMatch(/voice|instruction/u);
+    }
+    const history = (
+      await env.call("GET", "/v1/voice/history", { token: owner.token })
+    ).body;
+    expect(history.map((v: any) => v.content)).toEqual([second, first]);
+    expect(
+      (await env.call("GET", "/v1/voice", { token: owner.token })).body
+    ).toEqual({ content: second, savedAt: "2026-10-27T00:00:00.000Z" });
+    expect(
+      (await env.call("GET", "/v1/voice", { token: sam.token })).body.content
+    ).toBe("");
+    const tooLong = await env.call("PUT", "/v1/voice", {
+      token: owner.token,
+      body: { content: "x".repeat(4001) },
+    });
+    expect(tooLong.status).toBe(400);
   });
 });

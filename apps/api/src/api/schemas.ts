@@ -12,6 +12,7 @@ import type { ConversationRow, MessageRow } from "#db/queries/conversations";
 import type { TargetRow } from "#db/queries/delivery-targets";
 import type { Member } from "#db/queries/members";
 import type { MemoryRow } from "#db/queries/memories";
+import type { VoiceRow } from "#db/queries/voices";
 import type { Workspace } from "#db/queries/workspaces";
 import type {
   ApiScope,
@@ -695,6 +696,22 @@ export const toMemory = (m: MemoryRow): z.infer<typeof MemorySchema> => ({
   expiresAt: isoOrNull(m.expiresAt),
   createdAt: iso(m.createdAt),
   updatedAt: iso(m.updatedAt),
+});
+
+export const VoiceSchema = z
+  .object({
+    content: z.string().openapi({ description: "Markdown; empty when unset" }),
+    savedAt: Timestamp.nullable().openapi({
+      description: "Null until you first save one",
+    }),
+  })
+  .openapi("Voice");
+
+export const toVoice = (
+  v: VoiceRow | undefined
+): z.infer<typeof VoiceSchema> => ({
+  content: v?.content ?? "",
+  savedAt: v ? iso(v.createdAt) : null,
 });
 
 export const ConversationSchema = z

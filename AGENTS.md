@@ -70,7 +70,7 @@ apps/api/              the API server (Bun + Hono)
     board/             cards, columns, entropy, drift nudges
     attention/         "needs you": raise, collapse, quotas, feedback, actions
     automations/       scheduled routines: service.ts (CRUD), run.ts (execution), runners.ts (the routines)
-    agent/             the assistant: prompts, tools, models, conversations
+    agent/             the assistant: constitution.md, prompts, voice, tools, models, conversations
     jobs/              Graphile Worker: queue.ts (enqueue), worker.ts (tasks and cron)
     briefs/ memory/ delivery/ members/ auth/ events/
     db/                schema.ts (ours), auth-schema.ts (generated), queries/ (one file per area), transact.ts
@@ -96,6 +96,7 @@ docs/                  ARCHITECTURE.md, CONNECTORS.md, research notes
 - **Events after writes.** Publish to the event bus after the write it describes. Inside `transact`, events wait for the commit.
 - **Background work goes through `enqueue`,** and each task is listed in `jobs/worker.ts`. When a job must follow a write, enqueue it inside the same `transact`, so the write and the job commit together.
 - **Inject the outside world.** Use `ctx.now()`, not `new Date()`, and `ctx.fetch` for outbound HTTP, so tests control time and the network.
+- **The assistant never writes its own instructions.** `agent/constitution.md` changes only by commit, and the owner's voice only through `voice.set`. Give no tool a way to write either, so text planted in ingested data can't persist itself into every later conversation.
 - **AI is optional.** `ctx.models` is null when no `OPENROUTER_API_KEY` is set, so every AI feature needs a deterministic fallback. Models are called through the Vercel AI SDK with OpenRouter.
 - **Config:** read environment variables only in `config.ts`, and add new ones to `apps/api/.env.example`.
 - **Errors:** throw the helpers in `lib/errors.ts` (`notFound`, `forbidden`, `badRequest`, `conflict`). Use `returned()` from `lib/assert.ts` for rows an insert or update must return.

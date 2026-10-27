@@ -40,6 +40,7 @@ export type IdPrefix =
   | "aut"
   | "run"
   | "mmr"
+  | "vce"
   | "cnv"
   | "msg"
   | "inb"

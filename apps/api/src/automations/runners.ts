@@ -4,7 +4,7 @@ import { z } from "zod";
 import { workSnapshot } from "#activity/snapshot";
 import { postToInbox } from "#agent/conversations";
 import { TIMEOUTS } from "#agent/models";
-import { UNTRUSTED_NOTE } from "#agent/prompts";
+import { CONSTITUTION, UNTRUSTED_NOTE } from "#agent/prompts";
 import {
   markConsidered,
   markDigested,
@@ -461,7 +461,11 @@ export async function runCustom(
   };
   const { output } = await generateText({
     model: ctx.models.main,
-    instructions: `You are ${member.name}'s Worklog assistant running a scheduled automation they wrote. Follow their instructions using only the data provided. If there is nothing worth telling them, decide "quiet". ${UNTRUSTED_NOTE}`,
+    instructions: `${CONSTITUTION}
+
+# This automation
+
+You are ${member.name}'s assistant, running a scheduled automation they wrote. Follow their instructions using only the data provided. If there is nothing worth telling them, decide "quiet".`,
     prompt: `Automation "${automation.name}" instructions:\n${automation.instructions}\n\nLast result: ${JSON.stringify(automation.state.lastResult ?? null)}\n\nWhat you know about them:\n${memory}\n\nData:\n${JSON.stringify(data)}`,
     output: Output.object({ schema: CustomResult }),
     timeout: TIMEOUTS.background,

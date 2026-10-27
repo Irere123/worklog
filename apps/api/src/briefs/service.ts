@@ -1,7 +1,7 @@
 import { generateText } from "ai";
 
 import { TIMEOUTS } from "#agent/models";
-import { UNTRUSTED_NOTE } from "#agent/prompts";
+import { CONSTITUTION } from "#agent/prompts";
 import { listCards } from "#board/service";
 import type { AppContext } from "#context";
 import { listActivities } from "#db/queries/activities";
@@ -193,7 +193,7 @@ export async function gatherBriefData(
   };
 }
 
-const BRIEF_INSTRUCTIONS = `You write Worklog briefs: short, skimmable updates a person reads before stand-up (daily) or at the end of the week (weekly).
+const BRIEF_INSTRUCTIONS = `Worklog briefs are short, skimmable updates a person reads before stand-up (daily) or at the end of the week (weekly).
 
 Write GitHub-flavoured markdown with these sections, omitting any that would be empty:
 ## Needs your attention — the few things that are blocked on this person, highest priority first, each with who/what and a link if there is one.
@@ -201,8 +201,7 @@ Write GitHub-flavoured markdown with these sections, omitting any that would be 
 ## Team — one bullet per person (humans and agents) with the gist of what they moved forward. Name people.
 ## Heads-up — cards about to drift to "Not now" from inactivity, and anything else worth a glance.
 
-Rules: be concrete (card numbers like #12, PR titles), never invent facts that are not in the data, no filler or greetings, at most ~250 words for daily and ~450 for weekly. If almost nothing happened, say so in one line.
-${UNTRUSTED_NOTE}`;
+Rules: be concrete (card numbers like #12, PR titles), never invent facts that are not in the data, no filler or greetings, at most ~250 words for daily and ~450 for weekly. If almost nothing happened, say so in one line.`;
 
 export async function composeBrief(
   ctx: AppContext,
@@ -217,11 +216,15 @@ export async function composeBrief(
   const memory = await renderMemory(ctx, member.id, true, 1);
   const result = await generateText({
     model: ctx.models.main,
-    instructions:
-      BRIEF_INSTRUCTIONS +
-      (extraInstructions
-        ? `\n\nThe reader's own preferences for this brief: ${extraInstructions}`
-        : ""),
+    instructions: [
+      CONSTITUTION,
+      `# This brief\n\nYou are ${member.name}'s assistant, writing their ${data.period} brief. ${BRIEF_INSTRUCTIONS}`,
+      extraInstructions
+        ? `The reader's own preferences for this brief: ${extraInstructions}`
+        : "",
+    ]
+      .filter(Boolean)
+      .join("\n\n"),
     prompt: `What you know about ${member.name}:\n${memory}\n\nBrief data (JSON):\n${JSON.stringify(data)}`,
     timeout: TIMEOUTS.background,
   });

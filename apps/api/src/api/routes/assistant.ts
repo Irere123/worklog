@@ -2,6 +2,7 @@ import { createRoute, z } from "@hono/zod-openapi";
 
 import { ask, askStream, resolveAgent } from "#agent/assistant";
 import { createConversation, getConversation } from "#agent/conversations";
+import { MAX_VOICE_CHARS, setVoice } from "#agent/voice";
 import { body, errors, json, Ok, router } from "#api/router";
 import {
   AutomationRunSchema,
@@ -17,6 +18,8 @@ import {
   toMessages,
   toRun,
   toTarget,
+  toVoice,
+  VoiceSchema,
 } from "#api/schemas";
 import { runAutomation } from "#automations/run";
 import * as automations from "#automations/service";
@@ -25,6 +28,7 @@ import { getAutomationById, listAutomations } from "#db/queries/automations";
 import { listConversations, listMessages } from "#db/queries/conversations";
 import { listDeliveryTargets } from "#db/queries/delivery-targets";
 import { listMemories } from "#db/queries/memories";
+import { findVoice, listVoices } from "#db/queries/voices";
 import {
   AUTOMATION_KINDS,
   MEMORY_KINDS,
@@ -302,6 +306,67 @@ export const assistantRoutes = router()
         c.req.valid("param").id
       );
       return c.json({ ok: true as const }, 200);
+    }
+  )
+  .openapi(
+    createRoute({
+      method: "get",
+      path: "/v1/voice",
+      operationId: "voice.get",
+      tags: ["Assistant"],
+      summary: "Your instructions for how your assistant speaks for you",
+      responses: { 200: json(VoiceSchema), ...errors },
+    }),
+    async (c) => {
+      const row = await findVoice(c.get("ctx").db, {
+        memberId: c.get("member").id,
+      });
+      return c.json(toVoice(row), 200);
+    }
+  )
+  .openapi(
+    createRoute({
+      method: "put",
+      path: "/v1/voice",
+      operationId: "voice.set",
+      tags: ["Assistant"],
+      summary: "Tell your assistant how to speak for you",
+      description:
+        "Every conversation with your assistant follows it, teammates' included, so treat it as visible to your team and keep anything private in private memory. Your assistant can't change it; each save is kept, and an empty one clears it.",
+      request: body(
+        z.object({
+          content: z.string().max(MAX_VOICE_CHARS).openapi({
+            example:
+              "Sign off as Em. Send anyone asking about payments to #payments-oncall first.",
+          }),
+        })
+      ),
+      responses: { 200: json(VoiceSchema), ...errors },
+    }),
+    async (c) => {
+      const row = await setVoice(
+        c.get("ctx"),
+        c.get("member"),
+        c.req.valid("json").content
+      );
+      return c.json(toVoice(row), 200);
+    }
+  )
+  .openapi(
+    createRoute({
+      method: "get",
+      path: "/v1/voice/history",
+      operationId: "voice.history",
+      tags: ["Assistant"],
+      summary: "Every version of your instructions, newest first",
+      responses: { 200: json(z.array(VoiceSchema)), ...errors },
+    }),
+    async (c) => {
+      const rows = await listVoices(c.get("ctx").db, {
+        memberId: c.get("member").id,
+        limit: 100,
+      });
+      return c.json(rows.map(toVoice), 200);
     }
   )
   .openapi(

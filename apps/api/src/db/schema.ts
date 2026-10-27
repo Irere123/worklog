@@ -681,6 +681,26 @@ export const memories = pgTable(
   (t) => [index("memories_member_idx").on(t.memberId, t.kind, t.status)]
 );
 
+/**
+ * How a member wants their assistant to speak for them, in their own words. Only the member writes
+ * it, never the assistant. Every save is a new row: the newest is current, the rest are history.
+ */
+export const voices = pgTable(
+  "voices",
+  {
+    id: text("id").primaryKey(),
+    workspaceId: text("workspace_id")
+      .notNull()
+      .references(() => workspaces.id),
+    memberId: text("member_id")
+      .notNull()
+      .references(() => members.id),
+    content: text("content").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [index("voices_member_idx").on(t.memberId, t.createdAt)]
+);
+
 export const conversations = pgTable(
   "conversations",
   {
