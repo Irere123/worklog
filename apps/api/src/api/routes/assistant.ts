@@ -235,11 +235,13 @@ export const assistantRoutes = router()
     }),
     async (c) => {
       const { kind, q } = c.req.valid("query");
-      const rows = await listMemories(c.get("ctx").db, {
+      const ctx = c.get("ctx");
+      const rows = await listMemories(ctx.db, {
         memberId: c.get("member").id,
         kinds: kind ? [kind] : undefined,
         q,
         includePrivate: true,
+        now: ctx.now(),
       });
       return c.json(rows.map(toMemory), 200);
     }
@@ -259,17 +261,27 @@ export const assistantRoutes = router()
           }),
           kind: z.enum(["profile", "fact"]).default("profile"),
           visibility: z.enum(VISIBILITY).default("team"),
+          aliases: z
+            .array(z.string())
+            .optional()
+            .openapi({ example: ["billing", "@emma"] }),
+          expiresAt: z.iso
+            .datetime()
+            .optional()
+            .openapi({ description: "Stop recalling it after this" }),
         })
       ),
       responses: { 201: json(MemorySchema, "Saved"), ...errors },
     }),
     async (c) => {
       const me = c.get("member");
+      const { expiresAt, ...input } = c.req.valid("json");
       const row = await addMemory(c.get("ctx"), {
         workspaceId: me.workspaceId,
         memberId: me.id,
         source: "self",
-        ...c.req.valid("json"),
+        ...input,
+        expiresAt: expiresAt ? new Date(expiresAt) : null,
       });
       return c.json(toMemory(row), 201);
     }

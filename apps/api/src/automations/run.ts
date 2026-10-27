@@ -12,13 +12,8 @@ import { transact } from "#db/transact";
 import { notFound } from "#lib/errors";
 import { newId } from "#lib/ids";
 
-import {
-  runBrief,
-  runCheck,
-  runConsolidate,
-  runCustom,
-  runDigest,
-} from "./runners";
+import { runConsolidate } from "./consolidate";
+import { runBrief, runCheck, runCustom, runDigest } from "./runners";
 import type { RunOutcome } from "./runners";
 import { jitterFor, nextRun } from "./schedule";
 import { memberTimezone } from "./service";

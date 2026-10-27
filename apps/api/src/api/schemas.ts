@@ -674,9 +674,11 @@ export const MemorySchema = z
     id: z.string(),
     kind: z.enum(MEMORY_KINDS),
     content: z.string(),
+    aliases: z.array(z.string()),
     visibility: z.enum(VISIBILITY),
     day: z.string().nullable(),
     source: z.enum(["self", "agent", "teammate"]),
+    expiresAt: Timestamp.nullable(),
     createdAt: Timestamp,
     updatedAt: Timestamp,
   })
@@ -686,9 +688,11 @@ export const toMemory = (m: MemoryRow): z.infer<typeof MemorySchema> => ({
   id: m.id,
   kind: m.kind,
   content: m.content,
+  aliases: m.aliases,
   visibility: m.visibility,
   day: m.day,
   source: m.source,
+  expiresAt: isoOrNull(m.expiresAt),
   createdAt: iso(m.createdAt),
   updatedAt: iso(m.updatedAt),
 });

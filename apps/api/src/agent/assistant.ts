@@ -10,13 +10,16 @@ import {
 import type { ModelMessage } from "ai";
 
 import { renderSnapshot, workSnapshot } from "#activity/snapshot";
+import { listCards } from "#board/service";
 import type { AppContext } from "#context";
+import { listOpenAttention } from "#db/queries/attention";
 import type { ConversationRow } from "#db/queries/conversations";
 import { findMemberById, getPersonalAgent } from "#db/queries/members";
 import type { Member } from "#db/queries/members";
 import { getWorkspaceById } from "#db/queries/workspaces";
 import { badRequest, notFound } from "#lib/errors";
 import { timezoneOf } from "#members/service";
+import { memoryPage } from "#memory/service";
 
 import {
   appendMessages,
@@ -74,17 +77,22 @@ async function prepareTurn(ctx: AppContext, asker: Member, input: TurnInput) {
   }
   const ws = await getWorkspaceById(ctx.db, { id: owner.workspaceId });
 
+  const history = await loadHistory(ctx, conversation);
+  // A new conversation opens with what's in flight, the way a person would glance at their list.
+  const loops =
+    history.length === 0 ? await openLoops(ctx, owner, conversation.mode) : "";
   const userMessage: ModelMessage = {
     role: "user",
-    content: `${turnPreamble(ctx.now(), timezoneOf(asker, ws), asker)}\n${input.message}`,
+    content: `${turnPreamble(ctx.now(), timezoneOf(asker, ws), asker)}${loops}\n${input.message}`,
   };
-  const history = await loadHistory(ctx, conversation.id);
   const params = {
     instructions: assistantInstructions({
       owner,
       asker,
       mode: conversation.mode,
       workspaceName: ws.name,
+      memory: await memoryPage(ctx, owner.id, conversation.mode === "owner"),
+      recap: conversation.recap,
     }),
     messages: [...history, userMessage],
     tools: assistantTools({
@@ -100,6 +108,40 @@ async function prepareTurn(ctx: AppContext, asker: Member, input: TurnInput) {
     providerOptions: CACHED,
   };
   return { conversation, owner, userMessage, params };
+}
+
+// Attention items are the owner's own queue, so a teammate's conversation only sees the cards.
+async function openLoops(
+  ctx: AppContext,
+  owner: Member,
+  mode: ConversationRow["mode"]
+) {
+  const parts: string[] = [];
+  if (mode === "owner") {
+    const items = await listOpenAttention(ctx.db, {
+      memberId: owner.id,
+      now: ctx.now(),
+      limit: 5,
+    });
+    if (items.length) {
+      parts.push(
+        `waiting on ${owner.name}: ${items.map((i) => i.title).join("; ")}`
+      );
+    }
+  }
+  const assigned = await listCards(ctx, owner.workspaceId, {
+    assigneeId: owner.id,
+    limit: 50,
+  });
+  const cards = assigned
+    .filter((c) => c.golden || c.stage === "active")
+    .slice(0, 5);
+  if (cards.length) {
+    parts.push(
+      `${owner.name}'s cards in play: ${cards.map((c) => `#${c.number} ${c.title}${c.golden ? " (golden)" : ""}`).join("; ")}`
+    );
+  }
+  return parts.length ? `\n[Open right now: ${parts.join(" · ")}]` : "";
 }
 
 async function offlineReply(

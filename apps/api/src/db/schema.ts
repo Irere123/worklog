@@ -640,7 +640,7 @@ export const notifications = pgTable(
   (t) => [index("notifications_member_idx").on(t.memberId, t.createdAt)]
 );
 
-export const MEMORY_KINDS = ["profile", "fact", "journal"] as const;
+export const MEMORY_KINDS = ["profile", "fact", "journal", "digest"] as const;
 export type MemoryKind = (typeof MEMORY_KINDS)[number];
 
 /** Visibility is enforced in queries, not in prompts. */
@@ -654,9 +654,17 @@ export const memories = pgTable(
     memberId: text("member_id")
       .notNull()
       .references(() => members.id),
-    /** profile = how they work / what they own; fact = durable knowledge; journal = one entry per day. */
+    /**
+     * profile = how they work / what they own; fact = durable knowledge; journal = one entry per day;
+     * digest = a model-written page of all of it, rebuilt nightly, that every conversation starts with.
+     */
     kind: text("kind", { enum: MEMORY_KINDS }).notNull(),
     content: text("content").notNull(),
+    /** Other words for what the memory is about (synonyms, @handles, #card numbers), so recall finds it. */
+    aliases: text("aliases")
+      .array()
+      .notNull()
+      .default(sql`'{}'::text[]`),
     visibility: text("visibility", { enum: VISIBILITY })
       .notNull()
       .default("team"),
@@ -665,6 +673,8 @@ export const memories = pgTable(
       .default("active"),
     day: date("day"),
     source: text("source", { enum: ["self", "agent", "teammate"] }).notNull(),
+    /** Time-bound knowledge ("on leave until Friday") stops being recalled after this. */
+    expiresAt: ts("expires_at"),
     createdAt: createdAt(),
     updatedAt: ts("updated_at").notNull().defaultNow(),
   },
@@ -688,6 +698,9 @@ export const conversations = pgTable(
     mode: text("mode", { enum: ["owner", "teammate"] }).notNull(),
     inbox: boolean("inbox").notNull().default(false),
     title: text("title"),
+    /** Summary of the messages up to `recapThroughSeq`, which are no longer replayed to the model. */
+    recap: text("recap"),
+    recapThroughSeq: integer("recap_through_seq").notNull().default(0),
     createdAt: createdAt(),
     updatedAt: ts("updated_at").notNull().defaultNow(),
   },

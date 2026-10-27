@@ -19,9 +19,10 @@ import { getCardByNumber } from "#db/queries/cards";
 import { listMembers } from "#db/queries/members";
 import type { Member } from "#db/queries/members";
 import { listMemories } from "#db/queries/memories";
+import { getWorkspaceById } from "#db/queries/workspaces";
 import { CARD_STAGES } from "#db/schema";
-import { DAY_MS } from "#lib/time";
-import { resolveMember } from "#members/service";
+import { DAY_MS, startOfLocalDate } from "#lib/time";
+import { resolveMember, timezoneOf } from "#members/service";
 import { addMemory, forgetMemory } from "#memory/service";
 
 type Scope = {
@@ -208,12 +209,21 @@ export function assistantTools(scope: Scope): ToolSet {
     }),
 
     recall: tool({
-      description: `What you have learned about ${owner.name}: profile (how they work, what they own), facts, and recent daily journal entries.`,
-      inputSchema: z.object({ query: z.string().optional() }),
+      description: `What you have learned about ${owner.name}: profile (how they work, what they own), facts, and daily journal entries. Your instructions hold a digest; use this for details, ids to supersede, and anything newer.`,
+      inputSchema: z.object({
+        query: z
+          .string()
+          .optional()
+          .describe(
+            "Words to look for; each word is matched on its own and misspellings are fine. Omit for the most recent."
+          ),
+      }),
       execute: safe(async ({ query }) => {
         const memories = await listMemories(ctx.db, {
           memberId: owner.id,
           includePrivate: mode === "owner",
+          kinds: ["profile", "fact", "journal"],
+          now: ctx.now(),
           q: query,
           limit: 60,
         });
@@ -222,6 +232,8 @@ export function assistantTools(scope: Scope): ToolSet {
           kind: m.kind,
           day: m.day,
           content: m.content,
+          aliases: m.aliases,
+          expiresAt: m.expiresAt?.toISOString() ?? null,
           visibility: m.visibility,
         }));
       }),
@@ -351,9 +363,32 @@ export function assistantTools(scope: Scope): ToolSet {
           .array(z.string())
           .optional()
           .describe("Ids of memories this replaces"),
+        aliases: z
+          .array(z.string())
+          .optional()
+          .describe(
+            "Other words someone might search for: synonyms, @handles, #card numbers"
+          ),
+        expiresOn: z
+          .string()
+          .optional()
+          .describe(
+            "YYYY-MM-DD after which it no longer holds, for time-bound things like leave or a deadline"
+          ),
       }),
       execute: safe(
-        async ({ content, kind, private: isPrivate, supersedes }) => {
+        async ({
+          content,
+          kind,
+          private: isPrivate,
+          supersedes,
+          aliases,
+          expiresOn,
+        }) => {
+          const tz = timezoneOf(
+            owner,
+            await getWorkspaceById(ctx.db, { id: ws })
+          );
           const row = await addMemory(ctx, {
             workspaceId: ws,
             memberId: owner.id,
@@ -362,6 +397,8 @@ export function assistantTools(scope: Scope): ToolSet {
             visibility: isPrivate ? "private" : "team",
             source: "agent",
             supersedes,
+            aliases,
+            expiresAt: expiresOn ? startOfLocalDate(expiresOn, tz, 1) : null,
           });
           return { ok: true, id: row.id };
         }

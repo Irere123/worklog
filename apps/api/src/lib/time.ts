@@ -114,6 +114,35 @@ export function startOfLocalDay(
   );
 }
 
+// The start of a local calendar date given as YYYY-MM-DD, or undefined if it isn't one.
+export function startOfLocalDate(
+  day: string,
+  timeZone: string,
+  offsetDays = 0
+): Date | undefined {
+  const m = /^(?<y>\d{4})-(?<m>\d{2})-(?<d>\d{2})$/u.exec(day);
+  if (!m?.groups) {
+    return undefined;
+  }
+  const base = new Date(
+    Date.UTC(
+      Number(m.groups.y),
+      Number(m.groups.m) - 1,
+      Number(m.groups.d) + offsetDays
+    )
+  );
+  return Number.isNaN(base.getTime())
+    ? undefined
+    : zonedToUtc(
+        base.getUTCFullYear(),
+        base.getUTCMonth() + 1,
+        base.getUTCDate(),
+        0,
+        0,
+        timeZone
+      );
+}
+
 // Formatted YYYY-MM-DD.
 export function localDate(date: Date, timeZone: string): string {
   const p = localParts(date, timeZone);

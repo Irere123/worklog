@@ -2,6 +2,7 @@ import { parseCrontab, run, runOnce } from "graphile-worker";
 import type { TaskList } from "graphile-worker";
 import { z } from "zod";
 
+import { compactConversation } from "#agent/compaction";
 import { runDueAutomations } from "#automations/run";
 import { nudgeDrifting, sweepEntropy } from "#board/service";
 import type { AppContext } from "#context";
@@ -26,6 +27,13 @@ const TASKS: Record<
       String(payload.workspaceId),
       String(payload.connectionId),
       typeof payload.since === "string" ? new Date(payload.since) : undefined
+    );
+  },
+  "conversation:compact": async (ctx, payload) => {
+    await compactConversation(
+      ctx,
+      String(payload.workspaceId),
+      String(payload.conversationId)
     );
   },
   "automations:run": async (ctx) => {

@@ -96,8 +96,10 @@ The fields that drive this live on `attention_items`: `consideredAt`, `dispositi
 
   The mode is decided by _who asks_. The toolset and the queries enforce it; it is not left to the prompt.
 
-- **Append-only history.** Model messages are stored verbatim and replayed in full. The instructions are built only from values that don't change within a conversation, and per-turn context (the time, who is asking) goes into the user message. That keeps Anthropic prompt caching effective (enabled through OpenRouter, with the provider pinned for cache locality) and satisfies the preserved-thinking checks.
-- **Inbox.** Briefs and pings are also written into the owner's inbox conversation, so replying "tell me more about #12" has context.
+- **Append-only history.** Model messages are stored verbatim and replayed verbatim. Per-turn context (the time, who is asking) goes into the user message. That keeps Anthropic prompt caching effective (enabled through OpenRouter, with the provider pinned for cache locality) and satisfies the preserved-thinking checks.
+- **What a conversation starts with:** the instructions hold the rules, then the owner's memory digest (owners get the one built from all their memory, teammates the team-only one), then the conversation's recap, if it has one. They change only when the digest is rebuilt overnight or the conversation is compacted, so the prefix stays cacheable. A conversation's first turn also lists what's in flight: the owner's open attention items, for owners only, and their golden and active cards.
+- **Compaction.** When the replayed messages pass about 64k tokens, a job (`conversation:compact`) folds the older ones into the recap and stops replaying them. The newest ~16k tokens stay verbatim, starting at a user turn, and every message stays stored. The recap keeps open loops, decisions and identifiers in separate fields and copies identifiers exactly, because summaries lose the details a conversation depends on. Without AI, the older messages are just dropped from the replay.
+- **Inbox.** Briefs and pings are also written into the owner's inbox conversation, so replying "tell me more about #12" has context. Compaction keeps it bounded.
 - **Untrusted content.** Every prompt marks ingested text as data, not instructions. Outbound text is sanitized against the URLs present in its source data.
 - **Two tiers of model calls, each with a timeout:**
   - **main:** chat, briefs, custom automations.
@@ -110,8 +112,12 @@ The fields that drive this live on `attention_items`: `consideredAt`, `dispositi
 | `profile` | `USER.md` | you (`POST /v1/memories`), the assistant (`remember`), nightly consolidation |
 | `fact` | `MEMORY.md` | the same three |
 | `journal` | `memory/YYYY-MM-DD.md` | nightly consolidation, one entry per day and visibility |
+| `digest` | — | nightly consolidation: a page of all of it, one per visibility, that conversations start with |
 
-Consolidation runs **twice**: once over team-visible activity (producing team memory, without ever seeing private memory) and once over private activity (producing private memory). Teammate-mode tools only query `visibility = 'team'`.
+- **Two passes:** consolidation runs once over team-visible activity, producing team memory without ever seeing private memory, and once over private activity plus what the owner said to their own assistant, producing private memory. Teammate-mode tools only query `visibility = 'team'`.
+- **Aliases and expiry:** every line can carry aliases (synonyms, @handles, #card numbers) and an `expiresAt` for time-bound knowledge ("on leave until Friday"). Expired lines stop being recalled.
+- **Weekly tidy:** Sunday's run also reconciles each visibility on its own. It merges duplicates, turns repeated examples into one trait, keeps the newest of contradicting lines and retires what stopped being true. A rewrite must replace lines that exist; superseded lines stay as history.
+- **Recall:** each word of a query is matched on its own against content and aliases with `pg_trgm`'s `word_similarity`, so misspellings still match, and results are ranked with `strict_word_similarity`, which respects word boundaries. A member's memories are few, so there's no index.
 
 ## Scheduling
 
@@ -130,4 +136,5 @@ See [`apps/api/.env.example`](../apps/api/.env.example). Production requires `WO
 - **Migrations run at startup.** The API and the worker take the same advisory lock, so only one of them migrates. An index on an existing table is built `CONCURRENTLY`, so ingest keeps writing while it builds.
 - **Connections:** each process keeps its own pool of 10. PgBouncer is optional; if you add it, use session pooling, because Graphile Worker `LISTEN`s for new jobs and migrations hold a session lock.
 - **Busy tables:** `identities`, `inbound_events` and `attention_items` are updated constantly. They leave free space on each page and vacuum early (migration `0002_tune_autovacuum`). Watch `n_dead_tup` and `last_autovacuum` in `pg_stat_user_tables`; an autovacuum running for hours needs tuning.
+- **Extensions:** memory recall needs `pg_trgm` (migration `0004_pg_trgm`). It ships with Postgres and is trusted, so the database owner can create it.
 - **Slow queries:** enable `pg_stat_statements` and set `log_min_duration_statement` (for example `500ms`) to see which queries to look at. Read plans with `EXPLAIN`; `EXPLAIN ANALYZE` runs the query.
