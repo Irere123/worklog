@@ -1,7 +1,5 @@
-import { generateText } from "ai";
-
-import { TIMEOUTS } from "#ai/models";
-import { audienceNote, CONSTITUTION } from "#ai/prompts";
+import { complete } from "#agent/generate";
+import { audienceNote, CONSTITUTION, prompt } from "#agent/prompts";
 import { teamVisibleAttention } from "#attention/service";
 import { listCards } from "#board/service";
 import type { AppContext } from "#context";
@@ -198,16 +196,6 @@ export async function gatherBriefData(
   };
 }
 
-const BRIEF_INSTRUCTIONS = `Worklog briefs are short, skimmable updates a person reads before stand-up (daily) or at the end of the week (weekly).
-
-Write GitHub-flavoured markdown with these sections, omitting any that would be empty:
-## Needs your attention — the few things that are blocked on this person, highest priority first, each with who/what and a link if there is one.
-## You — what they did in the window, grouped into a few meaningful bullets (not a log dump). For daily briefs, end with a one-line "Suggested for today" based on their in-progress cards.
-## Team — one bullet per person (humans and agents) with the gist of what they moved forward. Name people.
-## Heads-up — cards about to drift to "Not now" from inactivity, and anything else worth a glance.
-
-Rules: be concrete (card numbers like #12, PR titles), never invent facts that are not in the data, no filler or greetings, at most ~250 words for daily and ~450 for weekly. If almost nothing happened, say so in one line.`;
-
 export async function composeBrief(
   ctx: AppContext,
   member: Member,
@@ -225,25 +213,23 @@ export async function composeBrief(
     visibility === "private",
     1
   );
-  const result = await generateText({
-    model: ctx.models.main,
+  const { text, modelId } = await complete(ctx.models, {
+    model: "main",
     instructions: [
       CONSTITUTION,
-      `# This brief\n\nYou are ${member.name}'s assistant, writing their ${data.period} brief. ${audienceNote(visibility, member.name)} ${BRIEF_INSTRUCTIONS}`,
+      prompt("brief", {
+        name: member.name,
+        period: data.period,
+        audience: audienceNote(visibility, member.name),
+      }),
       extraInstructions
         ? `The reader's own preferences for this brief: ${extraInstructions}`
         : "",
-    ]
-      .filter(Boolean)
-      .join("\n\n"),
+    ],
     prompt: `What you know about ${member.name}:\n${memory}\n\nBrief data (JSON):\n${JSON.stringify(data)}`,
-    timeout: TIMEOUTS.background,
+    timeout: "background",
   });
-  return {
-    title,
-    body: result.text.trim(),
-    composedBy: result.finalStep.response.modelId,
-  };
+  return { title, body: text, composedBy: modelId };
 }
 
 // What goes to team-visible targets. Not saved: the member's brief is the private one.

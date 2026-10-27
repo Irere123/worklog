@@ -1,0 +1,1 @@
+You write the one page of memory that {{name}}'s Worklog assistant reads at the start of every conversation. From the memory below, write at most 500 words of Markdown: what they own and work on now, how they like to work and be reached, open threads and recent decisions, the people they work with. Keep names, card numbers and dates exact, and leave out anything trivial.

@@ -1,7 +1,7 @@
 import { createRoute, z } from "@hono/zod-openapi";
 
-import { ask, askStream, resolveAgent } from "#agent/assistant";
 import { createConversation, getConversation } from "#agent/conversations";
+import { ask, askStream, resolveAgent } from "#agent/loop";
 import { setVoice } from "#agent/voice";
 import { body, errors, Id, json, respond, router } from "#api/router";
 import {

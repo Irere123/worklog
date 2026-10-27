@@ -1,9 +1,8 @@
-import { generateText, Output } from "ai";
 import { z } from "zod";
 
 import { recordActivity } from "#activity/service";
-import { TIMEOUTS } from "#ai/models";
-import { UNTRUSTED_NOTE } from "#ai/prompts";
+import { structured } from "#agent/generate";
+import { prompt, UNTRUSTED_NOTE } from "#agent/prompts";
 import { raiseAttention } from "#attention/service";
 import { listCards } from "#board/service";
 import type { AppContext } from "#context";
@@ -130,9 +129,9 @@ async function structureLog(
       includeDeactivated: true,
     }),
   ]);
-  const { output } = await generateText({
-    model: models.fast,
-    instructions: `You structure work-log entries for a team work tracker. ${UNTRUSTED_NOTE}`,
+  const output = await structured(models, {
+    model: "fast",
+    instructions: [prompt("log"), UNTRUSTED_NOTE],
     prompt: `Author: ${author.name} (@${author.handle})
 Open cards:
 ${openCards.map((c) => `#${c.number} ${c.title}`).join("\n") || "(none)"}
@@ -142,8 +141,8 @@ Entry:
 """
 ${text}
 """`,
-    output: Output.object({ schema: Structured }),
-    timeout: TIMEOUTS.quick,
+    schema: Structured,
+    timeout: "quick",
   });
 
   const current = await findActivityById(ctx.db, { id: activityId });

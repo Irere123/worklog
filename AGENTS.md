@@ -71,8 +71,9 @@ apps/api/              the API server (Bun + Hono)
     attention/         "needs you": raise, collapse, quotas, feedback
     automations/       scheduled routines: service.ts (CRUD), run.ts (execution), runners.ts (the routines)
     work/              one person's work: manual logs in (log.ts, + AI structuring), snapshot out
-    ai/                models and tiers, constitution.md, prompt fragments every AI feature shares
-    agent/             the assistant: instructions, voice, tools, conversations, compaction
+    agent/             everything that talks to a model: loop.ts (a conversation turn), generate.ts (one-shot calls),
+                       models.ts, instructions.ts, conversations, compaction, voice; prompts.ts loads prompts/*.md
+                       (one file per prompt, plus constitution.md); tools.ts registers tools/*.ts (one file per tool)
     jobs/              Graphile Worker: queue.ts (enqueue), tasks.ts (the task table and cron)
     briefs/ memory/ delivery/ members/ auth/ events/   memory/consolidate.ts is the nightly upkeep
     db/                schema.ts (ours), auth-schema.ts (generated), queries/ (one file per area), transact.ts
@@ -99,8 +100,9 @@ docs/                  ARCHITECTURE.md, CONNECTORS.md, research notes
 - **Events after writes.** Publish to the event bus after the write it describes. Inside `transact`, events wait for the commit.
 - **Background work goes through `enqueue`,** and each task is listed in `jobs/tasks.ts`. When a job must follow a write, enqueue it inside the same `transact`, so the write and the job commit together.
 - **Inject the outside world.** Use `ctx.now()`, not `new Date()`, and `ctx.fetch` for outbound HTTP, so tests control time and the network.
-- **The assistant never writes its own instructions.** `ai/constitution.md` changes only by commit, and the owner's voice only through `voice.set`. Give no tool a way to write either, so text planted in ingested data can't persist itself into every later conversation.
+- **The assistant never writes its own instructions.** `agent/prompts/constitution.md` changes only by commit, and the owner's voice only through `voice.set`. Give no tool a way to write either, so text planted in ingested data can't persist itself into every later conversation.
 - **AI is optional.** `ctx.models` is null when no `OPENROUTER_API_KEY` is set, so every AI feature needs a deterministic fallback. Models are called through the Vercel AI SDK with OpenRouter.
+- **Prompts are files, calls go through `agent/`.** What the assistant is told lives in `agent/prompts/*.md`, rendered with `prompt(name, vars)`; a placeholder the caller doesn't supply throws. A one-shot call is `structured()` or `complete()` from `agent/generate.ts`, never `generateText` directly outside `agent/`. A tool is one file in `agent/tools/`, a function of the conversation's `Scope`, registered by name in `agent/tools.ts`.
 - **Config:** read environment variables only in `config.ts`, and add new ones to `apps/api/.env.example`.
 - **Errors:** throw the helpers in `lib/errors.ts` (`notFound`, `forbidden`, `badRequest`, `conflict`). Use `returned()` from `lib/assert.ts` for rows an insert or update must return.
 - **IDs:** use `newId(prefix)` from `lib/ids.ts`.

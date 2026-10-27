@@ -1,8 +1,5 @@
-import { generateText, Output } from "ai";
 import { z } from "zod";
 
-import { TIMEOUTS } from "#ai/models";
-import { UNTRUSTED_NOTE } from "#ai/prompts";
 import type { AppContext } from "#context";
 import {
   findConversationById,
@@ -10,6 +7,9 @@ import {
   setConversationRecap,
 } from "#db/queries/conversations";
 import type { ConversationRow, MessageRow } from "#db/queries/conversations";
+
+import { structured } from "./generate";
+import { prompt, UNTRUSTED_NOTE } from "./prompts";
 
 // Stored messages are JSON, which runs about four characters per token; close enough for a budget.
 const CHARS_PER_TOKEN = 4;
@@ -113,12 +113,12 @@ async function writeRecap(
     .filter((r) => r.text)
     .map((r) => `${r.role}: ${r.text?.slice(0, MAX_LINE_CHARS)}`)
     .join("\n\n");
-  const { output } = await generateText({
-    model: models.fast,
-    instructions: `You summarize the older part of a conversation with a Worklog assistant so the conversation can carry on without it. Keep every open loop, and copy every identifier exactly as written. Fold the previous summary in, if there is one, dropping only what is resolved and no longer matters. ${UNTRUSTED_NOTE}`,
+  const output = await structured(models, {
+    model: "fast",
+    instructions: [prompt("compaction"), UNTRUSTED_NOTE],
     prompt: `${conversation.recap ? `Previous summary:\n${conversation.recap}\n\n` : ""}Messages:\n${transcript}`,
-    output: Output.object({ schema: Recap }),
-    timeout: TIMEOUTS.background,
+    schema: Recap,
+    timeout: "background",
   });
   return renderRecap(output, ctx.now());
 }

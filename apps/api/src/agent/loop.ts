@@ -9,7 +9,6 @@ import {
 } from "ai";
 import type { ModelMessage } from "ai";
 
-import { CACHED, TIMEOUTS } from "#ai/models";
 import { listCards } from "#board/service";
 import type { AppContext } from "#context";
 import { listOpenAttention } from "#db/queries/attention";
@@ -29,7 +28,8 @@ import {
   getConversation,
   loadHistory,
 } from "./conversations";
-import { assistantInstructions, turnPreamble } from "./prompts";
+import { assistantInstructions, turnPreamble } from "./instructions";
+import { CACHED, TIMEOUTS } from "./models";
 import { assistantTools } from "./tools";
 
 const MAX_STEPS = 10;

@@ -1,4 +1,4 @@
-import { ask, resolveAgent } from "#agent/assistant";
+import { ask, resolveAgent } from "#agent/loop";
 import { generateBrief } from "#briefs/service";
 import type { AppContext } from "#context";
 import type { Member } from "#db/queries/members";

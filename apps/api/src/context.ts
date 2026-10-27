@@ -1,7 +1,7 @@
 import type { Pool } from "pg";
 
-import { createModels } from "./ai/models";
-import type { Models } from "./ai/models";
+import { createModels } from "./agent/models";
+import type { Models } from "./agent/models";
 import { createAuth } from "./auth/auth";
 import type { Auth } from "./auth/auth";
 import type { Config } from "./config";

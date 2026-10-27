@@ -1,6 +1,7 @@
 import { beforeAll, beforeEach, describe, expect, test } from "bun:test";
 
-import { CONSTITUTION } from "#ai/prompts";
+import { CONSTITUTION, prompt as renderPrompt } from "#agent/prompts";
+import type { PromptName } from "#agent/prompts";
 
 import { scriptedModel, testEnv } from "./harness";
 import type { TestEnv } from "./harness";
@@ -356,5 +357,38 @@ describe("assistant step limit", () => {
       })
     ).body;
     expect(thread.messages.at(-1).text).toContain("ran out of steps");
+  });
+});
+
+describe("prompts", () => {
+  test("every prompt renders its placeholders, and a missing one throws", () => {
+    const names: PromptName[] = [
+      "brief",
+      "check",
+      "compaction",
+      "consolidate",
+      "conversation",
+      "custom",
+      "log",
+      "memory-page",
+      "owner",
+      "reconcile",
+      "teammate",
+    ];
+    const vars = {
+      name: "Emma",
+      owner: "Emma",
+      asker: "Sam (Designer)",
+      askerName: "Sam",
+      workspace: "Acme",
+      period: "daily",
+      audience: "Only Emma reads this.",
+    };
+    for (const name of names) {
+      const text = renderPrompt(name, vars);
+      expect(text.length).toBeGreaterThan(20);
+      expect(text).not.toContain("{{");
+    }
+    expect(() => renderPrompt("brief", {})).toThrow("needs {{name}}");
   });
 });

@@ -1,10 +1,14 @@
-import { generateText, Output } from "ai";
 import { z } from "zod";
 
 import { postToInbox } from "#agent/conversations";
-import { TIMEOUTS } from "#ai/models";
-import type { Models } from "#ai/models";
-import { audienceNote, CONSTITUTION, UNTRUSTED_NOTE } from "#ai/prompts";
+import { structured } from "#agent/generate";
+import type { Models } from "#agent/models";
+import {
+  audienceNote,
+  CONSTITUTION,
+  prompt,
+  UNTRUSTED_NOTE,
+} from "#agent/prompts";
 import {
   markConsidered,
   markDigested,
@@ -369,10 +373,15 @@ async function classify(
     }));
   }
   const memory = await renderMemory(ctx, member.id, true, 0);
-  const { output } = await generateText({
-    model: ctx.models.fast,
-    instructions: `You decide whether ${member.name}'s Worklog assistant should interrupt them now. Every item has already passed the urgency and budget rules, so only drop the push for items that are clearly not blocked on ${member.name} or not time-sensitive given what you know about them. Respect their stated preferences.
-${automation.instructions ? `Their instructions for this check: ${automation.instructions}\n` : ""}${UNTRUSTED_NOTE}`,
+  const output = await structured(ctx.models, {
+    model: "fast",
+    instructions: [
+      prompt("check", { name: member.name }),
+      automation.instructions
+        ? `Their instructions for this check: ${automation.instructions}`
+        : "",
+      UNTRUSTED_NOTE,
+    ],
     prompt: `What you know about ${member.name}:\n${memory}\n\nLast result: ${JSON.stringify(automation.state.lastResult ?? null)}\n\nItems:\n${JSON.stringify(
       candidates.map((p) => ({
         id: p.id,
@@ -383,8 +392,8 @@ ${automation.instructions ? `Their instructions for this check: ${automation.ins
         since: p.createdAt.toISOString(),
       }))
     )}`,
-    output: Output.object({ schema: Classified }),
-    timeout: TIMEOUTS.quick,
+    schema: Classified,
+    timeout: "quick",
   });
   return candidates.map((c) => {
     const d = output.decisions.find((x) => x.id === c.id);
@@ -561,16 +570,18 @@ async function composeCustom(
   const last = everything
     ? `Last result: ${JSON.stringify(automation.state.lastResult ?? null)}\n\n`
     : "";
-  const { output } = await generateText({
-    model: models.main,
-    instructions: `${CONSTITUTION}
-
-# This automation
-
-You are ${member.name}'s assistant, running a scheduled automation they wrote. Follow their instructions using only the data provided. If there is nothing worth telling them, decide "quiet". ${audienceNote(visibility, member.name)}`,
+  const output = await structured(models, {
+    model: "main",
+    instructions: [
+      CONSTITUTION,
+      prompt("custom", {
+        name: member.name,
+        audience: audienceNote(visibility, member.name),
+      }),
+    ],
     prompt: `Automation "${automation.name}" instructions:\n${automation.instructions}\n\n${last}What you know about them:\n${memory}\n\nData:\n${JSON.stringify(data)}`,
-    output: Output.object({ schema: CustomResult }),
-    timeout: TIMEOUTS.background,
+    schema: CustomResult,
+    timeout: "background",
   });
   const quiet = output.decision === "quiet" || !output.message.trim();
   return {

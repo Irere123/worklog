@@ -91,7 +91,7 @@ Note: the codebase changed while this survey ran. `src/automations/service.ts` g
 
 - In `dist/index.js` `createOpenRouter`: `const compatibility = options.compatibility ?? "compatible"`. Only the default `openrouter` export is `"strict"`.
 - In `doStream`, `stream_options: { include_usage: true }` is sent **only when `compatibility === "strict"`**, even if `usage: { include: true }` is set.
-- `src/ai/models.ts:14` doesn't set it, so as soon as you switch to `streamText`/`agent.stream()`, token usage and cost may be missing from streamed responses. Set `compatibility: "strict"`.
+- `src/agent/models.ts:14` doesn't set it, so as soon as you switch to `streamText`/`agent.stream()`, token usage and cost may be missing from streamed responses. Set `compatibility: "strict"`.
 
 ### A8. `openrouter(id)` is typed as the completion model (P3, typing)
 
@@ -661,7 +661,7 @@ Keep the existing `Output.object` path as the fallback when the Decisions API er
 **Sketch**
 
 ```ts
-// src/ai/models.ts
+// src/agent/models.ts
 const openrouter = createOpenRouter({ apiKey, appName: "Worklog", appUrl: config.PUBLIC_URL, compatibility: "strict" });
 const shared = { usage: { include: true }, provider: { order: ["anthropic"], allow_fallbacks: true, data_collection: "deny" as const } };
 return {
