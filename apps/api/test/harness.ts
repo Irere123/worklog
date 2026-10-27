@@ -107,8 +107,8 @@ export async function testEnv() {
   return { ctx, app, call, workspace, teammate, reset, drain };
 }
 
-async function openTestContext() {
-  const name = new URL(TEST_DATABASE_URL).pathname.slice(1);
+// Drops and recreates a database next to the test database, and returns its URL.
+export async function freshDatabase(name: string) {
   const server = new URL(TEST_DATABASE_URL);
   server.pathname = "/postgres";
   const admin = new Client({ connectionString: server.href });
@@ -119,10 +119,18 @@ async function openTestContext() {
   } finally {
     await admin.end();
   }
+  const url = new URL(TEST_DATABASE_URL);
+  url.pathname = `/${name}`;
+  return url.href;
+}
+
+async function openTestContext() {
   return await createContext(
     loadConfig({
       NODE_ENV: "test",
-      DATABASE_URL: TEST_DATABASE_URL,
+      DATABASE_URL: await freshDatabase(
+        new URL(TEST_DATABASE_URL).pathname.slice(1)
+      ),
       SETUP_SECRET: "test-secret",
       PUBLIC_URL: "http://worklog.test",
     }),

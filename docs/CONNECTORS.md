@@ -40,7 +40,7 @@ Each stage is visible from the API:
 | What exactly arrived, and what happened to each delivery? | `GET /v1/connections/{id}/deliveries` |
 | Which accounts haven't been matched to anyone? | `GET /v1/identities?unlinked=true` |
 | Match an account to a person; their past activity is re-attributed | `PATCH /v1/identities/{id}` |
-| Rebuild activity after changing settings or fixing a connector | `POST /v1/connections/{id}/replay` |
+| Rebuild activity after changing settings or fixing a connector (from deliveries kept for `INBOUND_RETENTION_DAYS`) | `POST /v1/connections/{id}/replay` |
 
 ## The canonical event (schema v1)
 

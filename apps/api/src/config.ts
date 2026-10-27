@@ -35,6 +35,9 @@ const Env = z.object({
   SMTP_URL: z.string().optional(),
   MAIL_FROM: z.string().default("Worklog <worklog@localhost>"),
 
+  // Raw webhook deliveries are kept this long, and replay can't reach further back. 0 keeps them all.
+  INBOUND_RETENTION_DAYS: z.coerce.number().int().min(0).default(90),
+
   RUN_SCHEDULER: z
     .enum(["true", "false"])
     .default("true")

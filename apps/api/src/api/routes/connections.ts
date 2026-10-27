@@ -297,7 +297,7 @@ export const connectionRoutes = router()
       summary:
         "Rebuild this connection's activity from stored deliveries (after changing settings or fixing a connector)",
       description:
-        "Runs in the background. Attention items and board changes are not re-applied.",
+        "Runs in the background. Attention items and board changes are not re-applied. Deliveries are kept for `INBOUND_RETENTION_DAYS` (90 by default), so a replay starts no earlier than that, and older activity is left as it is.",
       request: {
         params: Id,
         ...body(z.object({ since: z.iso.datetime().optional() })),

@@ -22,6 +22,12 @@ export async function listConnections(
 }
 
 // `workspaceId` is optional for webhooks and jobs, which only know the connection id.
+// Every workspace's connections, for jobs that sweep them all.
+export async function listAllConnectionIds(db: DbOrTx) {
+  const rows = await db.select({ id: connections.id }).from(connections);
+  return rows.map((r) => r.id);
+}
+
 export async function findConnectionById(
   db: DbOrTx,
   params: { id: string; workspaceId?: string }

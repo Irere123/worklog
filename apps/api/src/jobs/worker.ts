@@ -6,6 +6,7 @@ import { runDueAutomations } from "#automations/run";
 import { nudgeDrifting, sweepEntropy } from "#board/service";
 import type { AppContext } from "#context";
 import { processInbound, replayConnection } from "#ingest/pipeline";
+import { pruneDeliveries } from "#ingest/retention";
 import { DAY_MS } from "#lib/time";
 
 import { logger } from "./queue";
@@ -43,6 +44,12 @@ const TASKS: Record<
   "events:prune": async (ctx) => {
     await ctx.bus.prune(new Date(ctx.now().getTime() - 7 * DAY_MS));
   },
+  "inbound:prune": async (ctx) => {
+    const pruned = await pruneDeliveries(ctx);
+    if (pruned) {
+      console.log(`[scheduler] pruned ${pruned} stored webhook(s)`);
+    }
+  },
 };
 
 // One queue, so scheduled tasks never overlap. No retries: the next run catches up on whatever is due.
@@ -50,6 +57,7 @@ const CRONTAB = `
 * * * * * automations:run ?queue=scheduler&max=1
 0 * * * * board:entropy ?queue=scheduler&max=1
 0 3 * * * events:prune ?queue=scheduler&max=1
+30 3 * * * inbound:prune ?queue=scheduler&max=1
 `;
 
 export async function startWorker(ctx: AppContext) {
