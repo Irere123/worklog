@@ -1,8 +1,8 @@
-import { sql } from "drizzle-orm";
 import { Logger, runMigrations } from "graphile-worker";
 
 import type { AppContext } from "#context";
 import type { Db } from "#db";
+import { addJob } from "#db/queries/jobs";
 
 export type JobHandler = (
   ctx: AppContext,
@@ -20,21 +20,19 @@ export async function installQueue(db: Db) {
 }
 
 /**
- * Pass `db` to add the job inside a transaction. Jobs in the same `queue` run one at a time, oldest
- * first, but a failed job retries after the ones behind it.
+ * Inside `transact`, the job commits with the transaction. Jobs in the same `queue` run one at a
+ * time, oldest first, but a failed job retries after the ones behind it.
  */
 export async function enqueue(
   ctx: AppContext,
   task: string,
   payload: Record<string, unknown>,
-  opts: { queue?: string; maxAttempts?: number; db?: Pick<Db, "execute"> } = {}
+  opts: { queue?: string; maxAttempts?: number } = {}
 ) {
-  await (opts.db ?? ctx.db).execute(
-    sql`select graphile_worker.add_job(
-      ${task}::text,
-      ${JSON.stringify(payload)}::json,
-      queue_name => ${opts.queue ?? null}::text,
-      max_attempts => ${opts.maxAttempts ?? 5}::int
-    )`
-  );
+  await addJob(ctx.db, {
+    task,
+    payload,
+    queue: opts.queue ?? null,
+    maxAttempts: opts.maxAttempts ?? 5,
+  });
 }

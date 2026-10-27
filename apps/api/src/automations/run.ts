@@ -1,8 +1,14 @@
-import { and, asc, eq, lte } from "drizzle-orm";
-
 import { raiseAttention } from "#attention/service";
 import type { AppContext } from "#context";
-import { automationRuns, automations, members } from "#db/schema";
+import {
+  insertAutomationRun,
+  listDueAutomations,
+  updateAutomationById,
+} from "#db/queries/automations";
+import type { Automation } from "#db/queries/automations";
+import { findMemberById } from "#db/queries/members";
+import type { Member } from "#db/queries/members";
+import { transact } from "#db/transact";
 import { notFound } from "#lib/errors";
 import { newId } from "#lib/ids";
 
@@ -16,9 +22,6 @@ import {
 import type { RunOutcome } from "./runners";
 import { jitterFor, nextRun } from "./schedule";
 import { memberTimezone } from "./service";
-import type { AutomationRow } from "./service";
-
-type Member = typeof members.$inferSelect;
 
 const FAILURE_ALERT_AT = 3;
 const FAILURE_DISABLE_AT = 10;
@@ -31,17 +34,10 @@ export async function runDueAutomations(
   const deadline = Date.now() + (opts.budgetMs ?? 45_000);
   const results = [];
   while (Date.now() < deadline) {
-    const due = await ctx.db
-      .select()
-      .from(automations)
-      .where(
-        and(
-          eq(automations.enabled, true),
-          lte(automations.nextRunAt, ctx.now())
-        )
-      )
-      .orderBy(asc(automations.nextRunAt))
-      .limit(batch);
+    const due = await listDueAutomations(ctx.db, {
+      now: ctx.now(),
+      limit: batch,
+    });
     for (const automation of due) {
       results.push(await runAutomation(ctx, automation));
     }
@@ -54,14 +50,11 @@ export async function runDueAutomations(
 
 export async function runAutomation(
   ctx: AppContext,
-  automation: AutomationRow,
+  automation: Automation,
   opts: { manual?: boolean } = {}
 ) {
   const startedAt = ctx.now();
-  const [member] = await ctx.db
-    .select()
-    .from(members)
-    .where(eq(members.id, automation.memberId));
+  const member = await findMemberById(ctx.db, { id: automation.memberId });
   if (!member) {
     throw notFound("Member");
   }
@@ -89,33 +82,36 @@ export async function runAutomation(
           },
         }
       : automation.state;
-  await ctx.db
-    .update(automations)
-    .set({
-      lastRunAt: startedAt,
-      lastStatus: outcome.status,
-      failureCount,
-      state,
-      enabled: failureCount >= FAILURE_DISABLE_AT ? false : automation.enabled,
-      nextRunAt:
-        opts.manual === true
-          ? automation.nextRunAt
-          : nextRun(
-              automation.schedule,
-              tz,
-              ctx.now(),
-              member.settings,
-              jitterFor(automation.id)
-            ),
-    })
-    .where(eq(automations.id, automation.id));
-  await ctx.db.insert(automationRuns).values({
-    id: newId("run"),
-    automationId: automation.id,
-    status: outcome.status,
-    summary: outcome.summary.slice(0, 2000),
-    error,
-    startedAt,
+  await transact(ctx, async (tx) => {
+    await updateAutomationById(tx.db, {
+      id: automation.id,
+      set: {
+        lastRunAt: startedAt,
+        lastStatus: outcome.status,
+        failureCount,
+        state,
+        enabled:
+          failureCount >= FAILURE_DISABLE_AT ? false : automation.enabled,
+        nextRunAt:
+          opts.manual === true
+            ? automation.nextRunAt
+            : nextRun(
+                automation.schedule,
+                tz,
+                tx.now(),
+                member.settings,
+                jitterFor(automation.id)
+              ),
+      },
+    });
+    await insertAutomationRun(tx.db, {
+      id: newId("run"),
+      automationId: automation.id,
+      status: outcome.status,
+      summary: outcome.summary.slice(0, 2000),
+      error,
+      startedAt,
+    });
   });
   if (
     failureCount === FAILURE_ALERT_AT ||
@@ -150,7 +146,7 @@ export async function runAutomation(
 
 async function execute(
   ctx: AppContext,
-  automation: AutomationRow,
+  automation: Automation,
   member: Member,
   tz: string,
   manual: boolean

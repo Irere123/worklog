@@ -2,9 +2,11 @@ import type { Context, Next } from "hono";
 import { createMiddleware } from "hono/factory";
 
 import type { AppContext } from "#context";
+import { listMemberships } from "#db/queries/members";
+import type { Member } from "#db/queries/members";
 import type { ApiScope } from "#db/schema";
-import { authenticate, membershipsOf } from "#members/service";
-import type { Member, SignedInUser } from "#members/service";
+import { authenticate } from "#members/service";
+import type { SignedInUser } from "#members/service";
 
 import type { Env } from "./router";
 
@@ -56,7 +58,7 @@ async function identify(
     return deny(c, 401, "unauthorized", "Sign in, or send an API key");
   }
   const user: SignedInUser = session.user;
-  const memberships = await membershipsOf(ctx, user.id);
+  const memberships = await listMemberships(ctx.db, { userId: user.id });
   const wanted =
     c.req.header("x-worklog-workspace") ?? c.req.query("workspace");
   const chosen = wanted

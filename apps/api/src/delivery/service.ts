@@ -1,28 +1,25 @@
-import { and, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 
 import type { AppContext } from "#context";
-import { connections, deliveryTargets } from "#db/schema";
+import { findConnectionById } from "#db/queries/connections";
+import {
+  deleteDeliveryTarget,
+  insertDeliveryTarget,
+  listEnabledTargets,
+} from "#db/queries/delivery-targets";
+import type { TargetRow } from "#db/queries/delivery-targets";
 import type { TargetKind } from "#db/schema";
 import { badRequest, notFound } from "#lib/errors";
 import { newId } from "#lib/ids";
 
 import { toEmailHtml } from "./sanitize";
 
-export type TargetRow = typeof deliveryTargets.$inferSelect;
 export type Outgoing = {
   subject: string;
   markdown: string;
   type: string;
   url?: string;
 };
-
-export async function listTargets(ctx: AppContext, memberId: string) {
-  return await ctx.db
-    .select()
-    .from(deliveryTargets)
-    .where(eq(deliveryTargets.memberId, memberId));
-}
 
 export async function createTarget(
   ctx: AppContext,
@@ -45,15 +42,10 @@ export async function createTarget(
     );
   }
   if (input.connectionId) {
-    const [conn] = await ctx.db
-      .select()
-      .from(connections)
-      .where(
-        and(
-          eq(connections.id, input.connectionId),
-          eq(connections.workspaceId, workspaceId)
-        )
-      );
+    const conn = await findConnectionById(ctx.db, {
+      id: input.connectionId,
+      workspaceId,
+    });
     if (!conn || conn.provider !== input.kind) {
       throw badRequest(`connectionId must be a ${input.kind} connection`);
     }
@@ -72,7 +64,7 @@ export async function createTarget(
     enabled: true,
     createdAt: ctx.now(),
   };
-  await ctx.db.insert(deliveryTargets).values(row);
+  await insertDeliveryTarget(ctx.db, row);
   return row;
 }
 
@@ -81,12 +73,7 @@ export async function deleteTarget(
   memberId: string,
   id: string
 ) {
-  const deleted = await ctx.db
-    .delete(deliveryTargets)
-    .where(
-      and(eq(deliveryTargets.id, id), eq(deliveryTargets.memberId, memberId))
-    )
-    .returning();
+  const deleted = await deleteDeliveryTarget(ctx.db, { id, memberId });
   if (!deleted.length) {
     throw notFound("Delivery target");
   }
@@ -105,16 +92,10 @@ export async function deliver(
       failed: [] as { id: string; error: string }[],
     };
   }
-  const targets = await ctx.db
-    .select()
-    .from(deliveryTargets)
-    .where(
-      and(
-        eq(deliveryTargets.memberId, memberId),
-        inArray(deliveryTargets.id, targetIds),
-        eq(deliveryTargets.enabled, true)
-      )
-    );
+  const targets = await listEnabledTargets(ctx.db, {
+    memberId,
+    ids: targetIds,
+  });
   const delivered: string[] = [];
   const failed: { id: string; error: string }[] = [];
   for (const target of targets) {
@@ -138,10 +119,7 @@ async function botToken(
   if (!connectionId) {
     throw new Error("No connection configured for this target");
   }
-  const [conn] = await ctx.db
-    .select()
-    .from(connections)
-    .where(eq(connections.id, connectionId));
+  const conn = await findConnectionById(ctx.db, { id: connectionId });
   if (!conn) {
     throw new Error("Connection no longer exists");
   }

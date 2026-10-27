@@ -27,12 +27,16 @@ import {
 } from "#api/schemas";
 import { enabledSocialProviders } from "#auth/auth";
 import type { AppContext } from "#context";
-import { API_SCOPES, workspaces, MEMBER_KINDS, ROLES } from "#db/schema";
+import { listActiveTokens } from "#db/queries/api-tokens";
+import { listIdentities } from "#db/queries/identities";
 import {
-  linkByHandle,
-  linkIdentityToMember,
-  listIdentities,
-} from "#ingest/identity";
+  getPersonalAgent,
+  listMembers,
+  listMemberships,
+} from "#db/queries/members";
+import { countWorkspaces, getWorkspaceById } from "#db/queries/workspaces";
+import { API_SCOPES, MEMBER_KINDS, ROLES } from "#db/schema";
+import { linkByHandle, linkIdentityToMember } from "#ingest/identity";
 import { safeEqual } from "#lib/crypto";
 import { forbidden, notFound } from "#lib/errors";
 import * as people from "#members/service";
@@ -81,7 +85,7 @@ export const setupRoutes = router().openapi(
   }),
   async (c) => {
     const ctx = c.get("ctx");
-    const n = await ctx.db.$count(workspaces);
+    const n = await countWorkspaces(ctx.db);
     const secret = c.req.valid("header")["x-setup-secret"];
     if (
       n > 0 &&
@@ -181,7 +185,7 @@ export const sessionRoutes = router()
             memberships: [
               {
                 workspace: toWorkspace(
-                  await people.getWorkspace(ctx, me.workspaceId)
+                  await getWorkspaceById(ctx.db, { id: me.workspaceId })
                 ),
                 member: toMember(me),
               },
@@ -191,7 +195,7 @@ export const sessionRoutes = router()
           200
         );
       }
-      const memberships = await people.membershipsOf(ctx, user.id);
+      const memberships = await listMemberships(ctx.db, { userId: user.id });
       return c.json(
         {
           user: {
@@ -252,7 +256,9 @@ export const sessionRoutes = router()
         {
           workspace: toWorkspace(workspace),
           member: toMember(member),
-          assistant: toMember(await people.personalAgentOf(ctx, member.id)),
+          assistant: toMember(
+            await getPersonalAgent(ctx.db, { ownerId: member.id })
+          ),
         },
         201
       );
@@ -282,12 +288,14 @@ export const peopleRoutes = router()
       const ctx = c.get("ctx");
       const me = c.get("member");
       const assistant =
-        me.kind === "human" ? await people.personalAgentOf(ctx, me.id) : null;
+        me.kind === "human"
+          ? await getPersonalAgent(ctx.db, { ownerId: me.id })
+          : null;
       return c.json(
         {
           member: toMember(me),
           workspace: toWorkspace(
-            await people.getWorkspace(ctx, me.workspaceId)
+            await getWorkspaceById(ctx.db, { id: me.workspaceId })
           ),
           assistant: assistant ? toMember(assistant) : null,
         },
@@ -334,11 +342,10 @@ export const peopleRoutes = router()
     }),
     async (c) => {
       const me = c.get("member");
-      const rows = await people.listMembers(
-        c.get("ctx"),
-        me.workspaceId,
-        c.req.valid("query").kind
-      );
+      const rows = await listMembers(c.get("ctx").db, {
+        workspaceId: me.workspaceId,
+        kind: c.req.valid("query").kind,
+      });
       return c.json(rows.map(toMember), 200);
     }
   )
@@ -402,7 +409,7 @@ export const peopleRoutes = router()
       const inviteTo = member.kind === "human" ? member.email : null;
       const invited = Boolean(inviteTo);
       if (inviteTo) {
-        const ws = await people.getWorkspace(ctx, me.workspaceId);
+        const ws = await getWorkspaceById(ctx.db, { id: me.workspaceId });
         void sendInvite(ctx, inviteTo, me.name, ws.name);
       }
       return c.json({ member: toMember(member), token, invited }, 201);
@@ -473,7 +480,8 @@ export const peopleRoutes = router()
         c.get("member"),
         c.req.valid("param").ref
       );
-      const found = await listIdentities(ctx, m.workspaceId, {
+      const found = await listIdentities(ctx.db, {
+        workspaceId: m.workspaceId,
         memberId: m.id,
       });
       return c.json(found.map(toIdentity), 200);
@@ -546,7 +554,10 @@ export const peopleRoutes = router()
       const { ref, id } = c.req.valid("param");
       const m = await people.resolveMember(ctx, me, ref);
       requireSelfOrAdmin(me, m);
-      const mine = await listIdentities(ctx, m.workspaceId, { memberId: m.id });
+      const mine = await listIdentities(ctx.db, {
+        workspaceId: m.workspaceId,
+        memberId: m.id,
+      });
       if (!mine.some((i) => i.id === id)) {
         throw notFound("Identity");
       }
@@ -612,7 +623,7 @@ export const peopleRoutes = router()
       const me = c.get("member");
       const m = await people.resolveMember(ctx, me, c.req.valid("param").ref);
       requireSelfOrAdmin(me, m);
-      const tokens = await people.listTokens(ctx, m.id);
+      const tokens = await listActiveTokens(ctx.db, { memberId: m.id });
       return c.json(tokens.map(toTokenInfo), 200);
     }
   )

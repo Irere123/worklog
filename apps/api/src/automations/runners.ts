@@ -1,31 +1,30 @@
 import { generateText, Output } from "ai";
 import { z } from "zod";
 
-import { listActivities } from "#activity/service";
-import type { ActivityRow } from "#activity/service";
 import { workSnapshot } from "#activity/snapshot";
 import { postToInbox } from "#agent/conversations";
 import { TIMEOUTS } from "#agent/models";
 import { UNTRUSTED_NOTE } from "#agent/prompts";
 import {
-  digestableAttention,
-  listOpenAttention,
   markConsidered,
   markDigested,
   mutedKinds,
   pushBudget,
   recordNotification,
-  unconsideredAttention,
 } from "#attention/service";
-import type { AttentionRow } from "#attention/service";
 import { generateBrief } from "#briefs/service";
 import type { AppContext } from "#context";
-import type {
-  automationRuns,
-  automations,
-  members,
-  Visibility,
-} from "#db/schema";
+import { listActivities } from "#db/queries/activities";
+import type { ActivityRow } from "#db/queries/activities";
+import {
+  listDigestableAttention,
+  listOpenAttention,
+  listUnconsideredAttention,
+} from "#db/queries/attention";
+import type { AttentionItem } from "#db/queries/attention";
+import type { Automation, AutomationRun } from "#db/queries/automations";
+import type { Member } from "#db/queries/members";
+import type { Visibility } from "#db/schema";
 import { sanitizeMarkdown, urlsIn } from "#delivery/sanitize";
 import { deliver } from "#delivery/service";
 import { DAY_MS, localDate, startOfLocalDay } from "#lib/time";
@@ -33,17 +32,15 @@ import { addMemory, renderMemory, writeJournal } from "#memory/service";
 
 import { isActiveNow } from "./schedule";
 
-type Member = typeof members.$inferSelect;
-type AutomationRow = typeof automations.$inferSelect;
 export type RunOutcome = {
-  status: (typeof automationRuns.$inferSelect)["status"];
+  status: AutomationRun["status"];
   summary: string;
 };
 
 // Every outbound body is sanitized against the URLs in its source data, so injected content can't smuggle links out.
 async function send(
   ctx: AppContext,
-  automation: AutomationRow,
+  automation: Automation,
   member: Member,
   message: {
     subject: string;
@@ -92,7 +89,7 @@ async function send(
 
 export async function runBrief(
   ctx: AppContext,
-  automation: AutomationRow,
+  automation: Automation,
   member: Member
 ): Promise<RunOutcome> {
   const period = automation.kind === "brief.weekly" ? "weekly" : "daily";
@@ -109,7 +106,11 @@ export async function runBrief(
     kind: "brief",
   });
   // The brief's "Needs your attention" section counts as having shown these.
-  const shown = await listOpenAttention(ctx, member.id, 30);
+  const shown = await listOpenAttention(ctx.db, {
+    memberId: member.id,
+    now: ctx.now(),
+    limit: 30,
+  });
   await markDigested(
     ctx,
     shown.map((a) => a.id)
@@ -122,10 +123,13 @@ export async function runBrief(
 
 export async function runDigest(
   ctx: AppContext,
-  automation: AutomationRow,
+  automation: Automation,
   member: Member
 ): Promise<RunOutcome> {
-  const items = await digestableAttention(ctx, member.id);
+  const items = await listDigestableAttention(ctx.db, {
+    memberId: member.id,
+    now: ctx.now(),
+  });
   if (!items.length) {
     return { status: "skipped", summary: "Nothing new since the last batch" };
   }
@@ -150,7 +154,7 @@ export async function runDigest(
   return { status: "delivered", summary: `${items.length} item(s)` };
 }
 
-function digestLine(a: AttentionRow) {
+function digestLine(a: AttentionItem) {
   const bold = a.priority === "high" ? "**" : "";
   return `- ${bold}${a.title}${bold}${a.count > 1 ? ` (×${a.count})` : ""}${a.url ? ` — ${a.url}` : ""}`;
 }
@@ -187,7 +191,7 @@ type Decision = {
 
 export async function runCheck(
   ctx: AppContext,
-  automation: AutomationRow,
+  automation: Automation,
   member: Member,
   tz: string,
   manual: boolean
@@ -195,7 +199,10 @@ export async function runCheck(
   if (!manual && !isActiveNow(ctx.now(), tz, member.settings)) {
     return { status: "skipped", summary: "Outside active hours" };
   }
-  const pending = await unconsideredAttention(ctx, member.id);
+  const pending = await listUnconsideredAttention(ctx.db, {
+    memberId: member.id,
+    now: ctx.now(),
+  });
   if (!pending.length) {
     return { status: "skipped", summary: "Nothing new" };
   }
@@ -204,7 +211,7 @@ export async function runCheck(
   const now = ctx.now().getTime();
   const muted = await mutedKinds(ctx, member.id);
   const decisions: Decision[] = [];
-  let candidates: AttentionRow[] = [];
+  let candidates: AttentionItem[] = [];
   for (const item of pending) {
     const reason = digestReason(item, muted, limits, now);
     if (reason === null) {
@@ -244,7 +251,7 @@ export async function runCheck(
 type Limits = typeof DEFAULT_LIMITS;
 
 function digestReason(
-  item: AttentionRow,
+  item: AttentionItem,
   muted: Set<string>,
   limits: Limits,
   now: number
@@ -291,9 +298,9 @@ async function pingBudget(
 // The model may only demote a push to the digest; without one, everything that got this far is pushed.
 async function classify(
   ctx: AppContext,
-  automation: AutomationRow,
+  automation: Automation,
   member: Member,
-  candidates: AttentionRow[]
+  candidates: AttentionItem[]
 ): Promise<Decision[]> {
   if (!candidates.length || !ctx.models) {
     return candidates.map((c) => ({
@@ -332,9 +339,9 @@ ${automation.instructions ? `Their instructions for this check: ${automation.ins
 
 async function pushDecided(
   ctx: AppContext,
-  automation: AutomationRow,
+  automation: Automation,
   member: Member,
-  pending: AttentionRow[],
+  pending: AttentionItem[],
   decisions: Decision[]
 ): Promise<RunOutcome> {
   const rows = decisions
@@ -383,7 +390,7 @@ function plainReason(reason?: string) {
   return clean === undefined || clean === "" ? null : clean;
 }
 
-function defaultReason(item: AttentionRow) {
+function defaultReason(item: AttentionItem) {
   switch (item.kind) {
     case "review.requested": {
       return "Someone is waiting on your review";
@@ -434,7 +441,9 @@ export async function runConsolidate(
   const until = startOfLocalDay(ctx.now(), tz);
   const since = startOfLocalDay(ctx.now(), tz, -1);
   const day = localDate(new Date(since.getTime() + DAY_MS / 2), tz);
-  const yesterday = await listActivities(ctx, member.workspaceId, [member.id], {
+  const yesterday = await listActivities(ctx.db, {
+    workspaceId: member.workspaceId,
+    privateFor: [member.id],
     actorIds: [member.id],
     since,
     until,
@@ -537,7 +546,7 @@ const CustomResult = z.object({
 
 export async function runCustom(
   ctx: AppContext,
-  automation: AutomationRow,
+  automation: Automation,
   member: Member
 ): Promise<RunOutcome> {
   if (!ctx.models) {
@@ -548,8 +557,14 @@ export async function runCustom(
   }
   const [snapshot, attention, team, memory] = await Promise.all([
     workSnapshot(ctx, member, { includePrivate: true, days: 7 }),
-    listOpenAttention(ctx, member.id, 30),
-    listActivities(ctx, member.workspaceId, [], {
+    listOpenAttention(ctx.db, {
+      memberId: member.id,
+      now: ctx.now(),
+      limit: 30,
+    }),
+    listActivities(ctx.db, {
+      workspaceId: member.workspaceId,
+      privateFor: [],
       since: new Date(ctx.now().getTime() - 7 * DAY_MS),
       limit: 200,
     }),

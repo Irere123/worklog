@@ -15,6 +15,8 @@ import {
   CommentSchema,
 } from "#api/schemas";
 import * as board from "#board/service";
+import { getBoardWithColumns, listBoardsWithColumns } from "#db/queries/boards";
+import { getCardByNumber } from "#db/queries/cards";
 import { CARD_STAGES } from "#db/schema";
 import { resolveMember } from "#members/service";
 
@@ -60,14 +62,10 @@ export const boardRoutes = router()
       responses: { 200: json(z.array(BoardSchema)), ...errors },
     }),
     async (c) => {
-      const ctx = c.get("ctx");
-      const rows = await board.listBoards(ctx, ws(c));
-      return c.json(
-        await Promise.all(
-          rows.map(async (b) => toBoard(await board.getBoard(ctx, ws(c), b.id)))
-        ),
-        200
-      );
+      const rows = await listBoardsWithColumns(c.get("ctx").db, {
+        workspaceId: ws(c),
+      });
+      return c.json(rows.map(toBoard), 200);
     }
   )
   .openapi(
@@ -115,7 +113,10 @@ export const boardRoutes = router()
     async (c) =>
       c.json(
         toBoard(
-          await board.getBoard(c.get("ctx"), ws(c), c.req.valid("param").id)
+          await getBoardWithColumns(c.get("ctx").db, {
+            workspaceId: ws(c),
+            id: c.req.valid("param").id,
+          })
         ),
         200
       )
@@ -633,11 +634,10 @@ export const boardRoutes = router()
     }),
     async (c) => {
       const ctx = c.get("ctx");
-      const card = await board.findCard(
-        ctx,
-        ws(c),
-        c.req.valid("param").number
-      );
+      const card = await getCardByNumber(ctx.db, {
+        workspaceId: ws(c),
+        number: c.req.valid("param").number,
+      });
       await board.watch(ctx, card.id, c.get("member").id);
       return c.json({ ok: true as const }, 200);
     }
@@ -653,11 +653,10 @@ export const boardRoutes = router()
     }),
     async (c) => {
       const ctx = c.get("ctx");
-      const card = await board.findCard(
-        ctx,
-        ws(c),
-        c.req.valid("param").number
-      );
+      const card = await getCardByNumber(ctx.db, {
+        workspaceId: ws(c),
+        number: c.req.valid("param").number,
+      });
       await board.unwatch(ctx, card.id, c.get("member").id);
       return c.json({ ok: true as const }, 200);
     }

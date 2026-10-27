@@ -1,17 +1,17 @@
-import { and, eq, inArray } from "drizzle-orm";
-
 import { raiseAttention } from "#attention/service";
 import type { AttentionInput } from "#attention/service";
 import * as board from "#board/service";
 import type { AppContext } from "#context";
-import { attentionItems, cards, members } from "#db/schema";
+import { setOpenAttentionDone } from "#db/queries/attention";
+import { findCardByExternalKey, listCardIdsByRefs } from "#db/queries/cards";
+import type { CardRow } from "#db/queries/cards";
+import { findMemberById } from "#db/queries/members";
+import type { Member } from "#db/queries/members";
 import type { Priority } from "#db/schema";
 
 import { resolveActor } from "./identity";
 import type { BoardEffect, ExternalActor, Signal, WorklogEvent } from "./types";
 
-type Member = typeof members.$inferSelect;
-type CardRow = typeof cards.$inferSelect;
 type Scope = {
   workspaceId: string;
   namespace: string;
@@ -27,26 +27,11 @@ export async function findCardIds(
   if (!refs) {
     return [];
   }
-  const { externalKeys = [], numbers = [] } = refs;
-  const conds = [];
-  if (externalKeys.length > 0) {
-    conds.push(inArray(cards.externalKey, externalKeys));
-  }
-  if (numbers.length > 0) {
-    conds.push(inArray(cards.number, numbers));
-  }
-  if (conds.length === 0) {
-    return [];
-  }
-  const rows = await Promise.all(
-    conds.map((c) =>
-      ctx.db
-        .select({ id: cards.id })
-        .from(cards)
-        .where(and(eq(cards.workspaceId, workspaceId), c))
-    )
-  );
-  return [...new Set(rows.flat().map((r) => r.id))];
+  return await listCardIdsByRefs(ctx.db, {
+    workspaceId,
+    externalKeys: refs.externalKeys ?? [],
+    numbers: refs.numbers ?? [],
+  });
 }
 
 async function memberFor(
@@ -65,11 +50,7 @@ async function memberFor(
   if (!memberId) {
     return null;
   }
-  const [m] = await ctx.db
-    .select()
-    .from(members)
-    .where(eq(members.id, memberId));
-  return m ?? null;
+  return (await findMemberById(ctx.db, { id: memberId })) ?? null;
 }
 
 // Run before the activity is written so it can link to the card. Silent: the source event's own activity is the record.
@@ -82,15 +63,10 @@ export async function applyBoardEffects(
 ) {
   const touched: string[] = [];
   for (const effect of effects) {
-    const [card] = await ctx.db
-      .select()
-      .from(cards)
-      .where(
-        and(
-          eq(cards.workspaceId, scope.workspaceId),
-          eq(cards.externalKey, effect.externalKey)
-        )
-      );
+    const card = await findCardByExternalKey(ctx.db, {
+      workspaceId: scope.workspaceId,
+      externalKey: effect.externalKey,
+    });
     const cardId = await applyBoardEffect(ctx, scope, effect, card, {
       actor,
       at,
@@ -306,17 +282,12 @@ async function resolveItems(
   if (signal.who && !who) {
     return;
   }
-  await ctx.db
-    .update(attentionItems)
-    .set({ state: "done", resolvedAt: ctx.now(), updatedAt: ctx.now() })
-    .where(
-      and(
-        eq(attentionItems.workspaceId, scope.workspaceId),
-        eq(attentionItems.dedupeKey, key),
-        eq(attentionItems.state, "open"),
-        who ? eq(attentionItems.memberId, who.id) : undefined
-      )
-    );
+  await setOpenAttentionDone(ctx.db, {
+    workspaceId: scope.workspaceId,
+    dedupeKey: key,
+    memberId: who?.id,
+    at: ctx.now(),
+  });
 }
 
 // Loud only when the agent is waiting on the human; never notify while it's working.

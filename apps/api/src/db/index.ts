@@ -10,6 +10,9 @@ import * as appSchema from "./schema";
 
 export const schema = { ...appSchema, ...authSchema };
 export type Db = NodePgDatabase<typeof schema> & { $client: Pool };
+export type Tx = Parameters<Parameters<Db["transaction"]>[0]>[0];
+// What query functions take, so the same query runs alone or inside `transact`.
+export type DbOrTx = Db | Tx;
 
 const migrationsFolder = fileURLToPath(
   new URL("../../drizzle", import.meta.url)

@@ -54,7 +54,7 @@ const CRONTAB = `
 
 export async function startWorker(ctx: AppContext) {
   const runner = await run({
-    pgPool: ctx.db.$client,
+    pgPool: ctx.pool,
     taskList: taskList(ctx),
     parsedCronItems: parseCrontab(CRONTAB),
     concurrency: 4,
@@ -68,7 +68,7 @@ export async function startWorker(ctx: AppContext) {
 
 export async function runJobsOnce(ctx: AppContext) {
   await runOnce({
-    pgPool: ctx.db.$client,
+    pgPool: ctx.pool,
     taskList: taskList(ctx),
     noHandleSignals: true,
     logger,

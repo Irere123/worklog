@@ -22,7 +22,7 @@
  │ events/bus.ts durable, sequenced event log + live fan-out                     │
  │ jobs/         Graphile Worker: queues per connection · cron schedule          │
  └───────────────────────────────────────────────────────────────────────────────┘
-        │ Drizzle ORM (one schema, one migration set)
+        │ db/queries/* (one file per area) → Drizzle ORM (one schema, one migration set)
         ▼
   Postgres (node-postgres), which also holds the Graphile Worker job queue
         │
@@ -39,6 +39,7 @@
   - **Invites:** a member with an email but no user is a pending invite, claimed on sign-in with that verified address.
 - **Humans and agents are both members.** Every human gets a personal assistant (`agentProvider: "worklog"`, `ownerId` = the human). External agents are members with their own tokens. Board changes made by an assistant are attributed to the assistant, so the team can see which moves an agent made.
 - **One write path per concept.** `recordActivity` (which also resets the card's entropy clock), `raiseAttention` (which collapses, applies quotas and triggers checks), `appendMessages` (append-only, row-locked).
+- **Queries in one place, transactions that compose.** Every query lives in `db/queries/` and takes the pool or a transaction as its first argument, so any of them can run inside a transaction (Midday's layout). Domain code wraps related writes in `transact`, which gives callees a context bound to the transaction (Ecto's `Repo.transact`). Jobs commit with it, and events publish only after the commit.
 - **Events after writes.** Changes publish to `events` (with a `seq`), then to live SSE subscribers. Private items carry an `audienceId`. Clients resume with `Last-Event-ID`; events are pruned after 7 days.
 
 ## The activity stream

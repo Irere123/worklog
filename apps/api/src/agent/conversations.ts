@@ -1,15 +1,22 @@
 import type { ModelMessage } from "ai";
-import { and, asc, desc, eq, sql } from "drizzle-orm";
 
 import type { AppContext } from "#context";
-import { conversations, messages } from "#db/schema";
+import {
+  findConversationById,
+  findInboxConversation,
+  insertConversation,
+  insertMessages,
+  listMessages,
+  lockConversation,
+  nextMessageSeq,
+  updateConversationById,
+} from "#db/queries/conversations";
+import type { ConversationRow, MessageRow } from "#db/queries/conversations";
+import { getPersonalAgent } from "#db/queries/members";
+import type { Member } from "#db/queries/members";
+import { transact } from "#db/transact";
 import { forbidden, notFound } from "#lib/errors";
 import { newId } from "#lib/ids";
-import { personalAgentOf } from "#members/service";
-import type { Member } from "#members/service";
-
-export type ConversationRow = typeof conversations.$inferSelect;
-export type MessageRow = typeof messages.$inferSelect;
 
 export async function createConversation(
   ctx: AppContext,
@@ -28,7 +35,7 @@ export async function createConversation(
     createdAt: ctx.now(),
     updatedAt: ctx.now(),
   };
-  await ctx.db.insert(conversations).values(row);
+  await insertConversation(ctx.db, row);
   return row;
 }
 
@@ -38,15 +45,10 @@ export async function getConversation(
   viewer: Member,
   id: string
 ) {
-  const [row] = await ctx.db
-    .select()
-    .from(conversations)
-    .where(
-      and(
-        eq(conversations.id, id),
-        eq(conversations.workspaceId, viewer.workspaceId)
-      )
-    );
+  const row = await findConversationById(ctx.db, {
+    id,
+    workspaceId: viewer.workspaceId,
+  });
   if (!row) {
     throw notFound("Conversation");
   }
@@ -56,28 +58,11 @@ export async function getConversation(
   return row;
 }
 
-export async function listConversations(ctx: AppContext, viewer: Member) {
-  return await ctx.db
-    .select()
-    .from(conversations)
-    .where(eq(conversations.askerId, viewer.id))
-    .orderBy(desc(conversations.updatedAt))
-    .limit(50);
-}
-
-export async function loadMessages(ctx: AppContext, conversationId: string) {
-  return await ctx.db
-    .select()
-    .from(messages)
-    .where(eq(messages.conversationId, conversationId))
-    .orderBy(asc(messages.seq));
-}
-
 export async function loadHistory(
   ctx: AppContext,
   conversationId: string
 ): Promise<ModelMessage[]> {
-  const rows = await loadMessages(ctx, conversationId);
+  const rows = await listMessages(ctx.db, { conversationId });
   return rows.map((row) => row.content).filter(isModelMessage);
 }
 
@@ -101,21 +86,11 @@ export async function appendMessages(
   if (!items.length) {
     return [];
   }
-  const rows = await ctx.db.transaction(async (tx) => {
-    await tx
-      .select({ id: conversations.id })
-      .from(conversations)
-      .where(eq(conversations.id, conversation.id))
-      .for("update");
-    const [last] = await tx
-      .select({
-        next: sql<number>`coalesce(max(${messages.seq}), 0) + 1`.mapWith(
-          Number
-        ),
-      })
-      .from(messages)
-      .where(eq(messages.conversationId, conversation.id));
-    const next = last?.next ?? 1;
+  const rows = await transact(ctx, async (tx) => {
+    await lockConversation(tx.db, { id: conversation.id });
+    const next = await nextMessageSeq(tx.db, {
+      conversationId: conversation.id,
+    });
     const inserted: MessageRow[] = items.map((m, i) => {
       if (m.role === "system") {
         throw new Error(
@@ -129,14 +104,14 @@ export async function appendMessages(
         role: m.role,
         content: m,
         text: displayText(m),
-        createdAt: ctx.now(),
+        createdAt: tx.now(),
       };
     });
-    await tx.insert(messages).values(inserted);
-    await tx
-      .update(conversations)
-      .set({ updatedAt: ctx.now() })
-      .where(eq(conversations.id, conversation.id));
+    await insertMessages(tx.db, inserted);
+    await updateConversationById(tx.db, {
+      id: conversation.id,
+      set: { updatedAt: tx.now() },
+    });
     return inserted;
   });
   for (const row of rows.filter((r) => r.text)) {
@@ -176,17 +151,11 @@ export async function postToInbox(
   label: string,
   markdown: string
 ) {
-  const agent = await personalAgentOf(ctx, owner.id);
-  let [inbox] = await ctx.db
-    .select()
-    .from(conversations)
-    .where(
-      and(
-        eq(conversations.agentId, agent.id),
-        eq(conversations.askerId, owner.id),
-        eq(conversations.inbox, true)
-      )
-    );
+  const agent = await getPersonalAgent(ctx.db, { ownerId: owner.id });
+  let inbox = await findInboxConversation(ctx.db, {
+    agentId: agent.id,
+    askerId: owner.id,
+  });
   inbox ??= await createConversation(ctx, agent, owner, {
     inbox: true,
     title: "Inbox",

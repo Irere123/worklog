@@ -1,15 +1,30 @@
-import { and, asc, count, desc, eq, gte, isNull, sql } from "drizzle-orm";
-
 import { recordActivity } from "#activity/service";
 import { getConnector } from "#connectors/registry";
 import type { AppContext } from "#context";
 import {
-  activities,
-  connections,
-  identities,
-  inboundEvents,
-  members,
-} from "#db/schema";
+  deleteActivityByExternalId,
+  deleteConnectionActivities,
+  updateUnmergedActivity,
+} from "#db/queries/activities";
+import {
+  findConnectionById,
+  setConnectionLastEventAt,
+} from "#db/queries/connections";
+import type { ConnectionRow } from "#db/queries/connections";
+import { countUnlinkedIdentities } from "#db/queries/identities";
+import {
+  countInboundEventsByStatus,
+  findInboundEventById,
+  insertInboundEvent,
+  listInboundEventIds,
+  listInboundFailures,
+  listInboundOutcomes,
+  updateInboundAttempt,
+} from "#db/queries/inbound-events";
+import type { InboundEvent } from "#db/queries/inbound-events";
+import { findMemberById } from "#db/queries/members";
+import type { Member } from "#db/queries/members";
+import { transact } from "#db/transact";
 import { enqueue } from "#jobs/queue";
 import { newId } from "#lib/ids";
 
@@ -23,8 +38,6 @@ import { resolveActor } from "./identity";
 import { gate } from "./quality";
 import type { ConnectionView, InboundRequest, WorklogEvent } from "./types";
 
-type ConnectionRow = typeof connections.$inferSelect;
-type Member = typeof members.$inferSelect;
 type Outcome = {
   kept: number;
   merged: number;
@@ -48,10 +61,7 @@ export async function receive(
   connectionId: string,
   req: InboundRequest
 ): Promise<{ status: number; body: unknown }> {
-  const [conn] = await ctx.db
-    .select()
-    .from(connections)
-    .where(eq(connections.id, connectionId));
+  const conn = await findConnectionById(ctx.db, { id: connectionId });
   const connector = conn ? getConnector(conn.provider) : undefined;
   if (!conn || !connector || conn.status !== "active") {
     return { status: 404, body: { error: "unknown connection" } };
@@ -85,10 +95,10 @@ export async function receive(
   if (!stored) {
     return { status: 200, body: { ok: true, duplicate: true } };
   }
-  await ctx.db
-    .update(connections)
-    .set({ lastEventAt: req.receivedAt })
-    .where(eq(connections.id, conn.id));
+  await setConnectionLastEventAt(ctx.db, {
+    id: conn.id,
+    at: req.receivedAt,
+  });
   return { status: 200, body: { ok: true } };
 }
 
@@ -118,30 +128,26 @@ async function store(
   ctx: AppContext,
   conn: ConnectionRow,
   delivery: Pick<
-    typeof inboundEvents.$inferInsert,
+    InboundEvent,
     "deliveryId" | "eventType" | "payload" | "receivedAt"
   >
 ): Promise<string | null> {
-  return await ctx.db.transaction(async (tx) => {
-    const [row] = await tx
-      .insert(inboundEvents)
-      .values({
-        id: newId("inb"),
-        workspaceId: conn.workspaceId,
-        connectionId: conn.id,
-        ...delivery,
-      })
-      .onConflictDoNothing()
-      .returning({ id: inboundEvents.id });
+  return await transact(ctx, async (tx) => {
+    const row = await insertInboundEvent(tx.db, {
+      id: newId("inb"),
+      workspaceId: conn.workspaceId,
+      connectionId: conn.id,
+      ...delivery,
+    });
     if (!row) {
       return null;
     }
     // One connection's deliveries are processed in order (merging and thread state depend on it).
     await enqueue(
-      ctx,
+      tx,
       "ingest:process",
       { inboundEventId: row.id },
-      { queue: `ingest:${conn.id}`, db: tx }
+      { queue: `ingest:${conn.id}` }
     );
     return row.id;
   });
@@ -152,17 +158,11 @@ export async function processInbound(
   inboundEventId: string,
   { replay = false }: { replay?: boolean } = {}
 ) {
-  const [inbound] = await ctx.db
-    .select()
-    .from(inboundEvents)
-    .where(eq(inboundEvents.id, inboundEventId));
+  const inbound = await findInboundEventById(ctx.db, { id: inboundEventId });
   if (!inbound) {
     return;
   }
-  const [conn] = await ctx.db
-    .select()
-    .from(connections)
-    .where(eq(connections.id, inbound.connectionId));
+  const conn = await findConnectionById(ctx.db, { id: inbound.connectionId });
   const connector = conn ? getConnector(conn.provider) : undefined;
   if (!conn || !connector) {
     return;
@@ -198,25 +198,18 @@ export async function processInbound(
       outcome.kept + outcome.merged > 0 || normalized.events.some(actsOnPeople)
         ? "processed"
         : "ignored";
-    await ctx.db
-      .update(inboundEvents)
-      .set({
-        status,
-        outcome,
-        error: null,
-        attempts: sql`${inboundEvents.attempts} + 1`,
-        processedAt: ctx.now(),
-      })
-      .where(eq(inboundEvents.id, inbound.id));
+    await updateInboundAttempt(ctx.db, {
+      id: inbound.id,
+      set: { status, outcome, error: null, processedAt: ctx.now() },
+    });
   } catch (error) {
-    await ctx.db
-      .update(inboundEvents)
-      .set({
+    await updateInboundAttempt(ctx.db, {
+      id: inbound.id,
+      set: {
         status: "failed",
         error: error instanceof Error ? error.message : String(error),
-        attempts: sql`${inboundEvents.attempts} + 1`,
-      })
-      .where(eq(inboundEvents.id, inbound.id));
+      },
+    });
     // The queue retries with backoff.
     throw error;
   }
@@ -303,12 +296,9 @@ async function identify(
     actor,
     at
   );
-  const [member] = resolved.memberId
-    ? await ctx.db
-        .select()
-        .from(members)
-        .where(eq(members.id, resolved.memberId))
-    : [];
+  const member = resolved.memberId
+    ? await findMemberById(ctx.db, { id: resolved.memberId })
+    : undefined;
   return {
     resolved,
     member: member ?? null,
@@ -450,35 +440,31 @@ async function applyRevision(
   event: WorklogEvent,
   outcome: Outcome
 ) {
-  const where = and(
-    eq(activities.workspaceId, conn.workspaceId),
-    eq(activities.source, conn.provider),
-    eq(activities.externalId, event.id)
-  );
+  const key = {
+    workspaceId: conn.workspaceId,
+    source: conn.provider,
+    externalId: event.id,
+  };
   if (event.op === "delete") {
-    const removed = await ctx.db
-      .delete(activities)
-      .where(where)
-      .returning({ id: activities.id });
+    const removed = await deleteActivityByExternalId(ctx.db, key);
     outcome.dropped.push({
       id: event.id,
       reason:
-        removed.length > 0
+        removed > 0
           ? "deleted at the source"
           : "deleted at the source (nothing recorded)",
     });
     return;
   }
-  const updated = await ctx.db
-    .update(activities)
-    .set({
+  const updated = await updateUnmergedActivity(ctx.db, {
+    ...key,
+    set: {
       title: event.title,
       body: event.body?.slice(0, 4000) ?? null,
       updatedAt: event.occurredAt,
-    })
-    .where(and(where, eq(activities.count, 1)))
-    .returning({ id: activities.id });
-  if (updated.length > 0) {
+    },
+  });
+  if (updated > 0) {
     outcome.merged += 1;
   } else {
     outcome.dropped.push({
@@ -494,29 +480,19 @@ export async function replayConnection(
   connectionId: string,
   since?: Date
 ) {
-  const where = and(
-    eq(inboundEvents.connectionId, connectionId),
-    eq(inboundEvents.workspaceId, workspaceId),
-    since ? gte(inboundEvents.receivedAt, since) : undefined
-  );
-  const raw = await ctx.db
-    .select({ id: inboundEvents.id })
-    .from(inboundEvents)
-    .where(where)
-    .orderBy(asc(inboundEvents.receivedAt));
-  const removed = await ctx.db
-    .delete(activities)
-    .where(
-      and(
-        eq(activities.connectionId, connectionId),
-        since ? gte(activities.occurredAt, since) : undefined
-      )
-    )
-    .returning({ id: activities.id });
-  for (const r of raw) {
-    await processInbound(ctx, r.id, { replay: true });
+  const ids = await listInboundEventIds(ctx.db, {
+    workspaceId,
+    connectionId,
+    since,
+  });
+  const removed = await deleteConnectionActivities(ctx.db, {
+    connectionId,
+    since,
+  });
+  for (const id of ids) {
+    await processInbound(ctx, id, { replay: true });
   }
-  return { reprocessed: raw.length, rebuiltFrom: removed.length };
+  return { reprocessed: ids.length, rebuiltFrom: removed };
 }
 
 export async function connectionHealth(
@@ -527,61 +503,20 @@ export async function connectionHealth(
   const since = new Date(ctx.now().getTime() - days * 86_400_000);
   const connector = getConnector(conn.provider);
   const [byStatus, recent, unlinked, failures] = await Promise.all([
-    ctx.db
-      .select({ status: inboundEvents.status, n: count() })
-      .from(inboundEvents)
-      .where(
-        and(
-          eq(inboundEvents.connectionId, conn.id),
-          gte(inboundEvents.receivedAt, since)
-        )
-      )
-      .groupBy(inboundEvents.status),
-    ctx.db
-      .select({ outcome: inboundEvents.outcome })
-      .from(inboundEvents)
-      .where(
-        and(
-          eq(inboundEvents.connectionId, conn.id),
-          gte(inboundEvents.receivedAt, since)
-        )
-      )
-      .limit(2000),
+    countInboundEventsByStatus(ctx.db, { connectionId: conn.id, since }),
+    listInboundOutcomes(ctx.db, { connectionId: conn.id, since, limit: 2000 }),
     connector
-      ? ctx.db
-          .select({ n: count() })
-          .from(identities)
-          .where(
-            and(
-              eq(identities.workspaceId, conn.workspaceId),
-              eq(
-                identities.provider,
-                connector.identityNamespace(viewOf(ctx, conn))
-              ),
-              isNull(identities.memberId)
-            )
-          )
-      : Promise.resolve([{ n: 0 }]),
-    ctx.db
-      .select({
-        at: inboundEvents.receivedAt,
-        error: inboundEvents.error,
-        eventType: inboundEvents.eventType,
-      })
-      .from(inboundEvents)
-      .where(
-        and(
-          eq(inboundEvents.connectionId, conn.id),
-          eq(inboundEvents.status, "failed")
-        )
-      )
-      .orderBy(desc(inboundEvents.receivedAt))
-      .limit(5),
+      ? countUnlinkedIdentities(ctx.db, {
+          workspaceId: conn.workspaceId,
+          provider: connector.identityNamespace(viewOf(ctx, conn)),
+        })
+      : 0,
+    listInboundFailures(ctx.db, { connectionId: conn.id, limit: 5 }),
   ]);
   const reasons = new Map<string, number>();
   let kept = 0;
   let merged = 0;
-  for (const { outcome } of recent) {
+  for (const outcome of recent) {
     const o = (outcome ?? {}) as Partial<Outcome>;
     kept += o.kept ?? 0;
     merged += o.merged ?? 0;
@@ -606,7 +541,7 @@ export async function connectionHealth(
       .toSorted((a, b) => b[1] - a[1])
       .slice(0, 10)
       .map(([reason, n]) => ({ reason, count: n })),
-    unlinkedIdentities: unlinked[0]?.n ?? 0,
+    unlinkedIdentities: unlinked,
     recentFailures: failures.map((f) => ({
       at: f.at.toISOString(),
       eventType: f.eventType,

@@ -2,9 +2,9 @@ import { createRoute, z } from "@hono/zod-openapi";
 import { streamSSE } from "hono/streaming";
 
 import { errors, router } from "#api/router";
+import type { StoredEvent } from "#db/queries/events";
 import { EVENT_TYPES } from "#db/schema";
 import { canSee } from "#events/bus";
-import type { StoredEvent } from "#events/bus";
 
 const HEARTBEAT_MS = 10_000;
 

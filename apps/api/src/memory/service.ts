@@ -1,49 +1,15 @@
-import { and, desc, eq, gte, ilike, inArray } from "drizzle-orm";
-import type { SQL } from "drizzle-orm";
-
 import type { AppContext } from "#context";
-import { memories } from "#db/schema";
+import {
+  insertMemory,
+  listJournalIds,
+  listMemories,
+  setMemoriesSuperseded,
+} from "#db/queries/memories";
+import type { MemoryRow } from "#db/queries/memories";
 import type { MemoryKind, Visibility } from "#db/schema";
+import { transact } from "#db/transact";
 import { notFound } from "#lib/errors";
 import { newId } from "#lib/ids";
-
-export type MemoryRow = typeof memories.$inferSelect;
-
-// Visibility is enforced here, in the query, never by prompt: teammates only ever get `team` rows.
-export async function listMemories(
-  ctx: AppContext,
-  memberId: string,
-  opts: {
-    kinds?: MemoryKind[];
-    includePrivate: boolean;
-    since?: string;
-    q?: string;
-    limit?: number;
-  }
-) {
-  const where: SQL[] = [
-    eq(memories.memberId, memberId),
-    eq(memories.status, "active"),
-  ];
-  if (!opts.includePrivate) {
-    where.push(eq(memories.visibility, "team"));
-  }
-  if (opts.kinds && opts.kinds.length > 0) {
-    where.push(inArray(memories.kind, opts.kinds));
-  }
-  if (opts.since) {
-    where.push(gte(memories.day, opts.since));
-  }
-  if (opts.q) {
-    where.push(ilike(memories.content, `%${opts.q}%`));
-  }
-  return await ctx.db
-    .select()
-    .from(memories)
-    .where(and(...where))
-    .orderBy(desc(memories.updatedAt))
-    .limit(opts.limit ?? 100);
-}
 
 export async function addMemory(
   ctx: AppContext,
@@ -72,18 +38,14 @@ export async function addMemory(
     createdAt: now,
     updatedAt: now,
   };
-  await ctx.db.insert(memories).values(row);
-  if (input.supersedes && input.supersedes.length > 0) {
-    await ctx.db
-      .update(memories)
-      .set({ status: "superseded", updatedAt: now })
-      .where(
-        and(
-          eq(memories.memberId, input.memberId),
-          inArray(memories.id, input.supersedes)
-        )
-      );
-  }
+  await transact(ctx, async (tx) => {
+    await insertMemory(tx.db, row);
+    await setMemoriesSuperseded(tx.db, {
+      memberId: input.memberId,
+      ids: input.supersedes ?? [],
+      now,
+    });
+  });
   return row;
 }
 
@@ -95,18 +57,11 @@ export async function writeJournal(
   content: string,
   visibility: Visibility
 ) {
-  const existing = await ctx.db
-    .select({ id: memories.id })
-    .from(memories)
-    .where(
-      and(
-        eq(memories.memberId, memberId),
-        eq(memories.kind, "journal"),
-        eq(memories.day, day),
-        eq(memories.visibility, visibility),
-        eq(memories.status, "active")
-      )
-    );
+  const existing = await listJournalIds(ctx.db, {
+    memberId,
+    day,
+    visibility,
+  });
   return await addMemory(ctx, {
     workspaceId,
     memberId,
@@ -115,7 +70,7 @@ export async function writeJournal(
     day,
     visibility,
     source: "agent",
-    supersedes: existing.map((e) => e.id),
+    supersedes: existing,
   });
 }
 
@@ -124,11 +79,11 @@ export async function forgetMemory(
   memberId: string,
   id: string
 ) {
-  const [row] = await ctx.db
-    .update(memories)
-    .set({ status: "superseded", updatedAt: ctx.now() })
-    .where(and(eq(memories.id, id), eq(memories.memberId, memberId)))
-    .returning();
+  const [row] = await setMemoriesSuperseded(ctx.db, {
+    memberId,
+    ids: [id],
+    now: ctx.now(),
+  });
   if (!row) {
     throw notFound("Memory");
   }
@@ -142,13 +97,20 @@ export async function renderMemory(
   journalDays = 3
 ) {
   const [profile, facts, journal] = await Promise.all([
-    listMemories(ctx, memberId, {
+    listMemories(ctx.db, {
+      memberId,
       kinds: ["profile"],
       includePrivate,
       limit: 40,
     }),
-    listMemories(ctx, memberId, { kinds: ["fact"], includePrivate, limit: 60 }),
-    listMemories(ctx, memberId, {
+    listMemories(ctx.db, {
+      memberId,
+      kinds: ["fact"],
+      includePrivate,
+      limit: 60,
+    }),
+    listMemories(ctx.db, {
+      memberId,
       kinds: ["journal"],
       includePrivate,
       limit: journalDays,

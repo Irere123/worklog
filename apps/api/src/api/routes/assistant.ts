@@ -1,12 +1,7 @@
 import { createRoute, z } from "@hono/zod-openapi";
 
 import { ask, askStream, resolveAgent } from "#agent/assistant";
-import {
-  createConversation,
-  getConversation,
-  listConversations,
-  loadMessages,
-} from "#agent/conversations";
+import { createConversation, getConversation } from "#agent/conversations";
 import { body, errors, json, Ok, router } from "#api/router";
 import {
   AutomationRunSchema,
@@ -25,21 +20,21 @@ import {
 } from "#api/schemas";
 import { runAutomation } from "#automations/run";
 import * as automations from "#automations/service";
+import type { AppContext } from "#context";
+import { getAutomationById, listAutomations } from "#db/queries/automations";
+import { listConversations, listMessages } from "#db/queries/conversations";
+import { listDeliveryTargets } from "#db/queries/delivery-targets";
+import { listMemories } from "#db/queries/memories";
 import {
   AUTOMATION_KINDS,
   MEMORY_KINDS,
   TARGET_KINDS,
   VISIBILITY,
 } from "#db/schema";
-import {
-  createTarget,
-  deleteTarget,
-  deliver,
-  listTargets,
-} from "#delivery/service";
+import { createTarget, deleteTarget, deliver } from "#delivery/service";
 import { badRequest } from "#lib/errors";
 import { resolveMember } from "#members/service";
-import { addMemory, forgetMemory, listMemories } from "#memory/service";
+import { addMemory, forgetMemory } from "#memory/service";
 
 const Id = z.object({ id: z.string() });
 const Reply = z
@@ -185,7 +180,9 @@ export const assistantRoutes = router()
       responses: { 200: json(z.array(ConversationSchema)), ...errors },
     }),
     async (c) => {
-      const rows = await listConversations(c.get("ctx"), c.get("member"));
+      const rows = await listConversations(c.get("ctx").db, {
+        askerId: c.get("member").id,
+      });
       return c.json(rows.map(toConversation), 200);
     }
   )
@@ -213,7 +210,9 @@ export const assistantRoutes = router()
       return c.json(
         {
           ...toConversation(conversation),
-          messages: toMessages(await loadMessages(ctx, conversation.id)),
+          messages: toMessages(
+            await listMessages(ctx.db, { conversationId: conversation.id })
+          ),
         },
         200
       );
@@ -236,7 +235,8 @@ export const assistantRoutes = router()
     }),
     async (c) => {
       const { kind, q } = c.req.valid("query");
-      const rows = await listMemories(c.get("ctx"), c.get("member").id, {
+      const rows = await listMemories(c.get("ctx").db, {
+        memberId: c.get("member").id,
         kinds: kind ? [kind] : undefined,
         q,
         includePrivate: true,
@@ -301,7 +301,9 @@ export const assistantRoutes = router()
       responses: { 200: json(z.array(TargetSchema)), ...errors },
     }),
     async (c) => {
-      const rows = await listTargets(c.get("ctx"), c.get("member").id);
+      const rows = await listDeliveryTargets(c.get("ctx").db, {
+        memberId: c.get("member").id,
+      });
       return c.json(rows.map(toTarget), 200);
     }
   )
@@ -402,10 +404,9 @@ export const assistantRoutes = router()
       responses: { 200: json(z.array(AutomationSchema)), ...errors },
     }),
     async (c) => {
-      const rows = await automations.listAutomations(
-        c.get("ctx"),
-        c.get("member").id
-      );
+      const rows = await listAutomations(c.get("ctx").db, {
+        memberId: c.get("member").id,
+      });
       return c.json(rows.map(toAutomation), 200);
     }
   )
@@ -514,11 +515,10 @@ export const assistantRoutes = router()
     }),
     async (c) => {
       const ctx = c.get("ctx");
-      const row = await automations.getAutomation(
-        ctx,
-        c.get("member").id,
-        c.req.valid("param").id
-      );
+      const row = await getAutomationById(ctx.db, {
+        id: c.req.valid("param").id,
+        memberId: c.get("member").id,
+      });
       const { status, summary } = await runAutomation(ctx, row, {
         manual: true,
       });
@@ -545,14 +545,14 @@ export const assistantRoutes = router()
   );
 
 async function assertOwnTargets(
-  ctx: Parameters<typeof listTargets>[0],
+  ctx: AppContext,
   memberId: string,
   ids?: string[]
 ) {
   if (ids === undefined || ids.length === 0) {
     return;
   }
-  const targets = await listTargets(ctx, memberId);
+  const targets = await listDeliveryTargets(ctx.db, { memberId });
   const mine = new Set(targets.map((t) => t.id));
   const foreign = ids.filter((id) => !mine.has(id));
   if (foreign.length) {

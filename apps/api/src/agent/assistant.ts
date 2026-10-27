@@ -8,14 +8,15 @@ import {
   toUIMessageStream,
 } from "ai";
 import type { ModelMessage } from "ai";
-import { eq } from "drizzle-orm";
 
 import { renderSnapshot, workSnapshot } from "#activity/snapshot";
 import type { AppContext } from "#context";
-import { members } from "#db/schema";
+import type { ConversationRow } from "#db/queries/conversations";
+import { findMemberById, getPersonalAgent } from "#db/queries/members";
+import type { Member } from "#db/queries/members";
+import { getWorkspaceById } from "#db/queries/workspaces";
 import { badRequest, notFound } from "#lib/errors";
-import { getWorkspace, personalAgentOf, timezoneOf } from "#members/service";
-import type { Member } from "#members/service";
+import { timezoneOf } from "#members/service";
 
 import {
   appendMessages,
@@ -23,7 +24,6 @@ import {
   getConversation,
   loadHistory,
 } from "./conversations";
-import type { ConversationRow } from "./conversations";
 import { CACHED, TIMEOUTS } from "./models";
 import { assistantInstructions, turnPreamble } from "./prompts";
 import { assistantTools } from "./tools";
@@ -42,7 +42,7 @@ export async function resolveAgent(
     }
     return target;
   }
-  return await personalAgentOf(ctx, target.id);
+  return await getPersonalAgent(ctx.db, { ownerId: target.id });
 }
 
 type TurnInput = { conversationId?: string; agent?: Member; message: string };
@@ -59,17 +59,20 @@ async function prepareTurn(ctx: AppContext, asker: Member, input: TurnInput) {
     throw badRequest("Say which conversation or agent this is for");
   }
 
-  const [agent] = await ctx.db
-    .select()
-    .from(members)
-    .where(eq(members.id, conversation.agentId));
-  const [owner] = agent?.ownerId
-    ? await ctx.db.select().from(members).where(eq(members.id, agent.ownerId))
-    : [];
+  const agent = await findMemberById(ctx.db, {
+    id: conversation.agentId,
+    workspaceId: conversation.workspaceId,
+  });
+  const owner = agent?.ownerId
+    ? await findMemberById(ctx.db, {
+        id: agent.ownerId,
+        workspaceId: conversation.workspaceId,
+      })
+    : undefined;
   if (!agent || !owner) {
     throw notFound("Agent");
   }
-  const ws = await getWorkspace(ctx, owner.workspaceId);
+  const ws = await getWorkspaceById(ctx.db, { id: owner.workspaceId });
 
   const userMessage: ModelMessage = {
     role: "user",

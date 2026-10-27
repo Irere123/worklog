@@ -72,7 +72,7 @@ apps/api/              the API server (Bun + Hono)
     agent/             the assistant: prompts, tools, models, conversations
     jobs/              Graphile Worker: queue.ts (enqueue), worker.ts (tasks and cron)
     briefs/ memory/ delivery/ members/ auth/ events/
-    db/                schema.ts (ours), auth-schema.ts (generated)
+    db/                schema.ts (ours), auth-schema.ts (generated), queries/ (one file per area), transact.ts
     lib/               small shared helpers: errors, ids, crypto, time, assert
     context.ts         AppContext: everything a handler needs, built once per process
     config.ts          the only place that reads environment variables
@@ -85,21 +85,38 @@ docs/                  ARCHITECTURE.md, CONNECTORS.md, research notes
 ## Architecture rules
 
 - **One domain per folder.** Each folder exports plain functions that take `ctx: AppContext` first.
-- **Routes are thin.** A route validates with zod (`@hono/zod-openapi`), then calls a domain function. Every route has a stable dotted `operationId` such as `card.close`. It becomes the SDK method name, so never rename one.
+- **Routes are thin.** A route validates with zod (`@hono/zod-openapi`), then calls a domain function, or a query for a plain read. Every route has a stable dotted `operationId` such as `card.close`. It becomes the SDK method name, so never rename one.
 - **Tenancy comes from the caller.** The workspace is the authenticated member's `workspaceId`. Never take a workspace id from the request.
 - **Privacy is enforced in queries.** Teammate-facing reads filter `visibility = 'team'`. Never rely on a prompt to hide private data.
 - **One write path per concept.** Write through these functions, never into their tables directly:
   - `recordActivity` for activity;
   - `raiseAttention` for attention items;
   - `appendMessages` for conversation messages.
-- **Events after writes.** Publish to the event bus after the write it describes.
-- **Background work goes through `enqueue`,** and each task is listed in `jobs/worker.ts`. When a job must follow a write, pass `db: tx` so the write and the job commit together.
+- **Events after writes.** Publish to the event bus after the write it describes. Inside `transact`, events wait for the commit.
+- **Background work goes through `enqueue`,** and each task is listed in `jobs/worker.ts`. When a job must follow a write, enqueue it inside the same `transact`, so the write and the job commit together.
 - **Inject the outside world.** Use `ctx.now()`, not `new Date()`, and `ctx.fetch` for outbound HTTP, so tests control time and the network.
 - **AI is optional.** `ctx.models` is null when no `OPENROUTER_API_KEY` is set, so every AI feature needs a deterministic fallback. Models are called through the Vercel AI SDK with OpenRouter.
 - **Config:** read environment variables only in `config.ts`, and add new ones to `apps/api/.env.example`.
 - **Errors:** throw the helpers in `lib/errors.ts` (`notFound`, `forbidden`, `badRequest`, `conflict`). Use `returned()` from `lib/assert.ts` for rows an insert or update must return.
 - **IDs:** use `newId(prefix)` from `lib/ids.ts`.
 - **Generated files:** never hand-edit `apps/api/drizzle/**` or `src/db/auth-schema.ts`. Regenerate them with the commands above.
+
+## Database
+
+The layout follows [Midday](https://github.com/midday-ai/midday)'s `packages/db/src/queries`; the transaction and constraint rules follow Elixir's Ecto.
+
+- **Queries live in `src/db/queries/`,** one file per area (`members.ts`, `api-tokens.ts`), together with their row types (`Member`, `Workspace`). There is no barrel file: import each one directly (`#db/queries/members`).
+- **A query takes `db: DbOrTx` first and one params object.** Every id is a string, so named params stop a swapped `workspaceId` and `memberId`. Tenant queries take `workspaceId`.
+- **Queries hold SQL and nothing else:** no events, jobs, models or clock. Pass `now` in.
+- **Names say what comes back.** `find*` returns `undefined` when nothing matches, `get*` throws `notFound`, and `list*` and `count*` read many. `insert*`, `upsert*`, `update*`, `delete*` and `set*` write, with `ById` when the primary key is the only key.
+- **Reads may be called straight from a route or another domain** with `ctx.db`. Writes go through the domain function, which owns validation, permissions and side effects.
+- **Writes that belong together run in `transact(ctx, async (tx) => …)`** from `db/transact.ts`. Inside it, pass `tx`, never the outer `ctx`. Jobs commit with the transaction and events publish after it. A nested `transact` joins the outer one. Never call `ctx.db.transaction` directly, and keep model calls and outbound HTTP out of a transaction. Inside one, run queries one after another, never with `Promise.all`: they share one connection, and pg 9 rejects a second query on a busy one.
+- **Turn known constraint violations into domain errors** with `violates(error, "<constraint>")` from `db/errors.ts`, so a race returns a 409, not a 500.
+- **Lint keeps SQL in `db/`:** importing `drizzle-orm` anywhere else in `src/` fails. A few things talk to Postgres without our queries, by design:
+  - Better Auth runs its own queries through `drizzleAdapter` (`auth/auth.ts`, `auth/cli.ts`).
+  - Graphile Worker takes the pg pool (`ctx.pool`) for its migrations and runner.
+  - `db/index.ts` runs the Drizzle migrations.
+  - Tests may query directly to set up or inspect rows.
 
 ## Connectors
 

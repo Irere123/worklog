@@ -1,22 +1,23 @@
 import { generateText } from "ai";
-import { and, desc, eq, gte, ne } from "drizzle-orm";
 
-import { listActivities } from "#activity/service";
 import { TIMEOUTS } from "#agent/models";
 import { UNTRUSTED_NOTE } from "#agent/prompts";
-import { listOpenAttention } from "#attention/service";
 import { listCards } from "#board/service";
 import type { AppContext } from "#context";
-import { briefs, cards, members } from "#db/schema";
-import { returned } from "#lib/assert";
+import { listActivities } from "#db/queries/activities";
+import { listOpenAttention } from "#db/queries/attention";
+import { upsertBrief } from "#db/queries/briefs";
+import type { BriefRow } from "#db/queries/briefs";
+import { countCards } from "#db/queries/cards";
+import { listMembers } from "#db/queries/members";
+import type { Member } from "#db/queries/members";
+import { getWorkspaceById } from "#db/queries/workspaces";
 import { newId } from "#lib/ids";
 import { localParts, startOfLocalDay } from "#lib/time";
-import { getWorkspace, timezoneOf } from "#members/service";
-import type { Member } from "#members/service";
+import { timezoneOf } from "#members/service";
 import { renderMemory } from "#memory/service";
 
 export type Period = "daily" | "weekly";
-export type BriefRow = typeof briefs.$inferSelect;
 
 export type BriefData = {
   period: Period;
@@ -76,7 +77,7 @@ export async function gatherBriefData(
   member: Member,
   period: Period
 ): Promise<BriefData & { _key: Date }> {
-  const ws = await getWorkspace(ctx, member.workspaceId);
+  const ws = await getWorkspaceById(ctx.db, { id: member.workspaceId });
   const tz = timezoneOf(member, ws);
   const { start, end, key } = briefWindow(
     ctx.now(),
@@ -87,48 +88,41 @@ export async function gatherBriefData(
 
   const [mine, everyone, attention, myCards, people, triageCount, closedCount] =
     await Promise.all([
-      listActivities(ctx, member.workspaceId, [member.id], {
+      listActivities(ctx.db, {
+        workspaceId: member.workspaceId,
+        privateFor: [member.id],
         actorIds: [member.id],
         since: start,
         until: end,
         limit: 100,
       }),
-      listActivities(ctx, member.workspaceId, [], {
+      listActivities(ctx.db, {
+        workspaceId: member.workspaceId,
+        privateFor: [],
         since: start,
         until: end,
         limit: 400,
       }),
-      listOpenAttention(ctx, member.id, 30),
+      listOpenAttention(ctx.db, {
+        memberId: member.id,
+        now: ctx.now(),
+        limit: 30,
+      }),
       listCards(ctx, member.workspaceId, { assigneeId: member.id, limit: 100 }),
-      ctx.db
-        .select()
-        .from(members)
-        .where(
-          and(
-            eq(members.workspaceId, member.workspaceId),
-            ne(members.id, member.id)
-          )
-        ),
-      ctx.db
-        .select({ id: cards.id })
-        .from(cards)
-        .where(
-          and(
-            eq(cards.workspaceId, member.workspaceId),
-            eq(cards.stage, "triage"),
-            gte(cards.createdAt, start)
-          )
-        ),
-      ctx.db
-        .select({ id: cards.id })
-        .from(cards)
-        .where(
-          and(
-            eq(cards.workspaceId, member.workspaceId),
-            eq(cards.stage, "done"),
-            gte(cards.closedAt, start)
-          )
-        ),
+      listMembers(ctx.db, {
+        workspaceId: member.workspaceId,
+        includeDeactivated: true,
+      }).then((all) => all.filter((m) => m.id !== member.id)),
+      countCards(ctx.db, {
+        workspaceId: member.workspaceId,
+        stage: "triage",
+        createdSince: start,
+      }),
+      countCards(ctx.db, {
+        workspaceId: member.workspaceId,
+        stage: "done",
+        closedSince: start,
+      }),
     ]);
 
   const item = (a: (typeof mine)[number]): Item => ({
@@ -195,7 +189,7 @@ export async function gatherBriefData(
         : []
     ),
     team,
-    board: { newInMaybe: triageCount.length, closed: closedCount.length },
+    board: { newInMaybe: triageCount, closed: closedCount },
   };
 }
 
@@ -319,24 +313,7 @@ export async function generateBrief(
     composedBy,
     createdAt: ctx.now(),
   };
-  const saved = returned(
-    await ctx.db
-      .insert(briefs)
-      .values(row)
-      .onConflictDoUpdate({
-        target: [briefs.memberId, briefs.period, briefs.periodStart],
-        set: {
-          title,
-          body,
-          data: row.data,
-          composedBy,
-          periodEnd: row.periodEnd,
-          createdAt: row.createdAt,
-        },
-      })
-      .returning(),
-    "brief"
-  );
+  const saved = await upsertBrief(ctx.db, row);
   await ctx.bus.publish({
     workspaceId: member.workspaceId,
     audienceId: member.id,
@@ -344,31 +321,4 @@ export async function generateBrief(
     data: { id: saved.id, period, title },
   });
   return saved;
-}
-
-export async function listBriefs(
-  ctx: AppContext,
-  memberId: string,
-  period?: Period,
-  limit = 20
-) {
-  return await ctx.db
-    .select()
-    .from(briefs)
-    .where(
-      and(
-        eq(briefs.memberId, memberId),
-        period ? eq(briefs.period, period) : undefined
-      )
-    )
-    .orderBy(desc(briefs.periodStart))
-    .limit(limit);
-}
-
-export async function getBrief(ctx: AppContext, memberId: string, id: string) {
-  const [row] = await ctx.db
-    .select()
-    .from(briefs)
-    .where(and(eq(briefs.id, id), eq(briefs.memberId, memberId)));
-  return row ?? null;
 }
