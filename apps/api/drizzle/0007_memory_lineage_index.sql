@@ -1,0 +1,1 @@
+CREATE INDEX CONCURRENTLY "memories_superseded_by_idx" ON "memories" USING btree ("superseded_by") WHERE "memories"."superseded_by" is not null;

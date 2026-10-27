@@ -215,10 +215,25 @@ test("Sunday's run tidies memory: duplicates merge and stale lines retire, keepi
   const run = await consolidate(env, token, MONDAY);
   expect(run.summary).toContain("2 line(s) merged, 1 retired");
 
-  const facts = (await memories(env, token, "?kind=fact")).map(
-    (m: any) => m.content
-  );
-  expect(facts).toEqual(["Prefers written, async updates over calls"]);
+  const facts = await memories(env, token, "?kind=fact");
+  expect(facts.map((m: any) => m.content)).toEqual([
+    "Prefers written, async updates over calls",
+  ]);
+  const merged = facts[0].id;
+  const history = async (id: string, as = token) =>
+    await env.call("GET", `/v1/memories/${id}/history`, { token: as });
+  const lineage = (await history(merged)).body.map((m: any) => m.id);
+  expect(lineage).toHaveLength(3);
+  expect(lineage).toEqual(expect.arrayContaining([a, b, merged]));
+  expect((await history(a)).body).toMatchObject([
+    { id: a, status: "superseded", supersededBy: merged },
+    { id: merged, status: "active", supersededBy: null },
+  ]);
+  expect((await history(c)).body).toMatchObject([
+    { id: c, status: "superseded", supersededBy: null },
+  ]);
+  const sam = await env.teammate(token, "Sam");
+  expect((await history(a, sam.token)).status).toBe(404);
 });
 
 test("recall matches word by word and forgives typos", async () => {
@@ -286,5 +301,57 @@ test("a new conversation opens with what's in flight; later turns don't repeat i
   expect(opening).toContain("waiting on Sam");
   expect(JSON.stringify(prompts[1]!.prompt.at(-1))).not.toContain(
     "Open right now"
+  );
+});
+
+test("memory exports as Markdown files split by visibility, unchanged until memory changes", async () => {
+  const env = await testEnv();
+  const { token } = await env.workspace();
+  env.ctx.now = () => TUESDAY;
+  for (const body of [
+    { content: "Owns the payments\nservice", aliases: ["billing"] },
+    { content: "Interviewing elsewhere", kind: "fact", visibility: "private" },
+    {
+      content: "On leave until 30 Oct",
+      kind: "fact",
+      expiresAt: "2026-10-30T22:00:00.000Z",
+    },
+  ]) {
+    await env.call("POST", "/v1/memories", { token, body });
+  }
+  await env.call("POST", "/v1/logs", {
+    token,
+    body: { text: "Shipped the retry queue" },
+  });
+  await consolidate(env, token, WEDNESDAY);
+  const exported = async (at: Date) => {
+    env.ctx.now = () => at;
+    return (await env.call("GET", "/v1/memories/export", { token })).body
+      .files as { path: string; content: string }[];
+  };
+
+  const files = await exported(WEDNESDAY);
+  expect(files.map((f) => f.path)).toEqual([
+    "private/facts.md",
+    "team/facts.md",
+    "team/journal/2026-10-27.md",
+    "team/profile.md",
+  ]);
+  const file = (path: string) => files.find((f) => f.path === path)?.content;
+  expect(file("team/profile.md")).toMatch(
+    /^# Profile\n\n- Owns the payments service \(also: billing\) \[mmr_\w+\]\n$/u
+  );
+  expect(file("team/facts.md")).toContain(
+    "- On leave until 30 Oct (until 2026-10-30)"
+  );
+  expect(file("team/facts.md")).not.toContain("Interviewing");
+  expect(file("private/facts.md")).toContain("Interviewing elsewhere");
+  expect(file("team/journal/2026-10-27.md")).toContain(
+    "Shipped the retry queue"
+  );
+
+  expect(await exported(new Date("2026-10-29T10:00:00Z"))).toEqual(files);
+  expect((await exported(SUNDAY)).map((f) => f.path)).not.toContain(
+    "team/facts.md"
   );
 });

@@ -677,6 +677,11 @@ export const MemorySchema = z
     content: z.string(),
     aliases: z.array(z.string()),
     visibility: z.enum(VISIBILITY),
+    status: z.enum(["active", "superseded"]),
+    supersededBy: z.string().nullable().openapi({
+      description:
+        "The memory that replaced this one; null while active, or if it was forgotten",
+    }),
     day: z.string().nullable(),
     source: z.enum(["self", "agent", "teammate"]),
     expiresAt: Timestamp.nullable(),
@@ -691,12 +696,25 @@ export const toMemory = (m: MemoryRow): z.infer<typeof MemorySchema> => ({
   content: m.content,
   aliases: m.aliases,
   visibility: m.visibility,
+  status: m.status,
+  supersededBy: m.supersededBy,
   day: m.day,
   source: m.source,
   expiresAt: isoOrNull(m.expiresAt),
   createdAt: iso(m.createdAt),
   updatedAt: iso(m.updatedAt),
 });
+
+export const MemoryExportSchema = z
+  .object({
+    files: z.array(
+      z.object({
+        path: z.string().openapi({ example: "team/profile.md" }),
+        content: z.string().openapi({ description: "Markdown" }),
+      })
+    ),
+  })
+  .openapi("MemoryExport");
 
 export const VoiceSchema = z
   .object({

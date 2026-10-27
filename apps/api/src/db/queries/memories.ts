@@ -23,6 +23,8 @@ export type MemoryRow = typeof memories.$inferSelect;
 // which respects word boundaries, ranks, so "pazta" puts pasta above payment though both match.
 const TYPO_TOLERANCE = 0.3;
 const MAX_TERMS = 8;
+// A nightly digest replaces the one before, so a digest's history grows by a line a day.
+const MAX_LINEAGE = 200;
 
 const searchable = sql`${memories.content} || ' ' || array_to_string(${memories.aliases}, ' ')`;
 
@@ -146,24 +148,64 @@ export async function insertMemory(db: DbOrTx, row: MemoryRow) {
   await db.insert(memories).values(row);
 }
 
-// Scoped to the member, so ids from another member's memory match nothing.
+// Scoped to the member, so ids from another member's memory match nothing. Only active lines
+// change, so a line keeps pointing at whatever replaced it first.
 export async function setMemoriesSuperseded(
   db: DbOrTx,
-  params: { memberId: string; ids: string[]; now: Date }
+  params: { memberId: string; ids: string[]; supersededBy?: string; now: Date }
 ) {
   if (!params.ids.length) {
     return [];
   }
   return await db
     .update(memories)
-    .set({ status: "superseded", updatedAt: params.now })
+    .set({
+      status: "superseded",
+      supersededBy: params.supersededBy ?? null,
+      updatedAt: params.now,
+    })
     .where(
       and(
         eq(memories.memberId, params.memberId),
-        inArray(memories.id, params.ids)
+        inArray(memories.id, params.ids),
+        eq(memories.status, "active")
       )
     )
     .returning();
+}
+
+// A line's history both ways: the lines it replaced, transitively, and the lines that replaced it,
+// up to the one in use now. `union` rather than `union all` stops at a line already seen.
+export async function listMemoryLineage(
+  db: DbOrTx,
+  params: { memberId: string; id: string }
+) {
+  const lineage = sql`
+    with recursive
+      earlier(id) as (
+        select ${params.id}::text
+        union
+        select m.id from memories m join earlier e on m.superseded_by = e.id
+        where m.member_id = ${params.memberId}
+      ),
+      later(id) as (
+        select ${params.id}::text
+        union
+        select m.superseded_by from memories m join later l on m.id = l.id
+        where m.member_id = ${params.memberId} and m.superseded_by is not null
+      )
+    select id from earlier union select id from later`;
+  return await db
+    .select()
+    .from(memories)
+    .where(
+      and(
+        eq(memories.memberId, params.memberId),
+        sql`${memories.id} in (${lineage})`
+      )
+    )
+    .orderBy(asc(memories.createdAt), asc(memories.id))
+    .limit(MAX_LINEAGE);
 }
 
 function current(now: Date) {

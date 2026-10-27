@@ -8,6 +8,7 @@ import {
   AutomationRunSchema,
   AutomationSchema,
   ConversationSchema,
+  MemoryExportSchema,
   MemorySchema,
   MessageSchema,
   ScheduleSchema,
@@ -27,7 +28,7 @@ import type { AppContext } from "#context";
 import { getAutomationById, listAutomations } from "#db/queries/automations";
 import { listConversations, listMessages } from "#db/queries/conversations";
 import { listDeliveryTargets } from "#db/queries/delivery-targets";
-import { listMemories } from "#db/queries/memories";
+import { listMemories, listMemoryLineage } from "#db/queries/memories";
 import { findVoice, listVoices } from "#db/queries/voices";
 import {
   AUTOMATION_KINDS,
@@ -36,8 +37,9 @@ import {
   VISIBILITY,
 } from "#db/schema";
 import { createTarget, deleteTarget, deliver } from "#delivery/service";
-import { badRequest } from "#lib/errors";
+import { badRequest, notFound } from "#lib/errors";
 import { resolveMember } from "#members/service";
+import { exportMemory } from "#memory/export";
 import { addMemory, forgetMemory } from "#memory/service";
 
 const Id = z.object({ id: z.string() });
@@ -306,6 +308,44 @@ export const assistantRoutes = router()
         c.req.valid("param").id
       );
       return c.json({ ok: true as const }, 200);
+    }
+  )
+  .openapi(
+    createRoute({
+      method: "get",
+      path: "/v1/memories/export",
+      operationId: "memory.export",
+      tags: ["Assistant"],
+      summary: "Everything your assistant knows about you, as Markdown files",
+      description:
+        "Split by visibility, so you can share `team/` and keep `private/` to yourself. The files only change when your memory does, so committing each export to a git repo keeps a history of what your assistant learned.",
+      responses: { 200: json(MemoryExportSchema), ...errors },
+    }),
+    async (c) =>
+      c.json({ files: await exportMemory(c.get("ctx"), c.get("member")) }, 200)
+  )
+  .openapi(
+    createRoute({
+      method: "get",
+      path: "/v1/memories/{id}/history",
+      operationId: "memory.history",
+      tags: ["Assistant"],
+      summary:
+        "Where a memory came from: the lines it replaced and what replaced it",
+      description:
+        "Oldest first, including the memory itself. Follow `supersededBy` to see which line replaced which.",
+      request: { params: Id },
+      responses: { 200: json(z.array(MemorySchema)), ...errors },
+    }),
+    async (c) => {
+      const rows = await listMemoryLineage(c.get("ctx").db, {
+        memberId: c.get("member").id,
+        id: c.req.valid("param").id,
+      });
+      if (!rows.length) {
+        throw notFound("Memory");
+      }
+      return c.json(rows.map(toMemory), 200);
     }
   )
   .openapi(

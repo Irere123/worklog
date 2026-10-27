@@ -43,6 +43,20 @@
       "when": 1793072917086,
       "tag": "0005_voices",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1793073054723,
+      "tag": "0006_memory_lineage",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1793073056740,
+      "tag": "0007_memory_lineage_index",
+      "breakpoints": true
     }
   ]
 }

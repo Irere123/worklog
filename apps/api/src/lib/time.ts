@@ -149,6 +149,12 @@ export function localDate(date: Date, timeZone: string): string {
   return `${p.year}-${String(p.month).padStart(2, "0")}-${String(p.day).padStart(2, "0")}`;
 }
 
+// The last local day an expiry covers: it is stored as the next day's midnight, which belongs to
+// the day after.
+export function lastLocalDate(expiresAt: Date, timeZone: string): string {
+  return localDate(new Date(expiresAt.getTime() - 1), timeZone);
+}
+
 export function isWithinHours(
   date: Date,
   timeZone: string,

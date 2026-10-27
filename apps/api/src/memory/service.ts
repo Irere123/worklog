@@ -37,6 +37,7 @@ export async function addMemory(
     aliases: cleanAliases(input.aliases ?? []),
     visibility: input.visibility ?? "team",
     status: "active",
+    supersededBy: null,
     day: input.day ?? null,
     source: input.source,
     expiresAt: input.expiresAt ?? null,
@@ -48,6 +49,7 @@ export async function addMemory(
     await setMemoriesSuperseded(tx.db, {
       memberId: input.memberId,
       ids: input.supersedes ?? [],
+      supersededBy: row.id,
       now,
     });
   });

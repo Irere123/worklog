@@ -14,6 +14,7 @@ import type { Visibility } from "#db/schema";
 import { transact } from "#db/transact";
 import {
   DAY_MS,
+  lastLocalDate,
   localDate,
   startOfLocalDate,
   startOfLocalDay,
@@ -335,9 +336,7 @@ async function rebuildDigests(ctx: AppContext, member: Member, day: string) {
 }
 
 function line(r: MemoryRow, tz: string) {
-  const until = r.expiresAt
-    ? ` (until ${localDate(new Date(r.expiresAt.getTime() - 1), tz)})`
-    : "";
+  const until = r.expiresAt ? ` (until ${lastLocalDate(r.expiresAt, tz)})` : "";
   const aliases = r.aliases.length ? ` {${r.aliases.join(", ")}}` : "";
   return `- [${r.id}] ${r.kind}${until}: ${r.content}${aliases}`;
 }

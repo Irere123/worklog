@@ -671,6 +671,8 @@ export const memories = pgTable(
     status: text("status", { enum: ["active", "superseded"] })
       .notNull()
       .default("active"),
+    /** The line that replaced this one; null while active, and when it was forgotten rather than replaced. */
+    supersededBy: text("superseded_by"),
     day: date("day"),
     source: text("source", { enum: ["self", "agent", "teammate"] }).notNull(),
     /** Time-bound knowledge ("on leave until Friday") stops being recalled after this. */
@@ -678,7 +680,14 @@ export const memories = pgTable(
     createdAt: createdAt(),
     updatedAt: ts("updated_at").notNull().defaultNow(),
   },
-  (t) => [index("memories_member_idx").on(t.memberId, t.kind, t.status)]
+  (t) => [
+    index("memories_member_idx").on(t.memberId, t.kind, t.status),
+    // Walking a line's history backwards looks up the lines each one replaced.
+    index("memories_superseded_by_idx")
+      .on(t.supersededBy)
+      .concurrently()
+      .where(sql`${t.supersededBy} is not null`),
+  ]
 );
 
 /**
