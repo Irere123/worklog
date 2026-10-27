@@ -1,5 +1,6 @@
 import { createRoute, z } from "@hono/zod-openapi";
 
+import { listIdentities } from "#db/queries/identities";
 import {
   body,
   errors,
@@ -10,7 +11,7 @@ import {
   requireSelfOrAdmin,
   respond,
   router,
-} from "#api/router";
+} from "#http/router";
 import {
   AssignIdentityRequest,
   Identity,
@@ -19,8 +20,7 @@ import {
   LinkIdentityRequest,
   ListIdentitiesQuery,
   MemberRef,
-} from "#api/schemas/members";
-import { listIdentities } from "#db/queries/identities";
+} from "#http/schemas/members";
 import { linkByHandle, linkIdentityToMember } from "#ingest/identity";
 import { notFound } from "#lib/errors";
 import { resolveMember } from "#work/members";

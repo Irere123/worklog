@@ -63,7 +63,7 @@ Work is done when `format:check`, `lint`, `typecheck` and `test` all pass. CI ru
 ```
 apps/api/              the API server (Bun + Hono)
   src/
-    api/               routes/ and schemas/ (one file per API resource), auth middleware, webhook entry (hooks.ts)
+    http/              routes/ and schemas/ (one file per API resource), auth middleware, webhook entry (hooks.ts)
     ingest/            events in: pipeline.ts (normalize → identity → gates → card linking → persist → effects),
                        connections.ts, commands.ts (chat commands); connectors.ts registers connectors/*.ts
                        (github + gitea, slack, discord, webhook (no-code), custom)
@@ -93,7 +93,7 @@ docs/                  ARCHITECTURE.md, CONNECTORS.md, research notes
 
 - **One domain per folder.** Each folder exports plain functions that take `ctx: AppContext` first.
 - **Routes are thin.** A route validates with zod (`@hono/zod-openapi`), then calls a domain function, or a query for a plain read. Route and schema files are named after the API resource they serve (`routes/attention.ts`, `schemas/attention.ts`), so one feature touches one file in each place.
-- **Three kinds of schema per area, in `api/schemas/`.** The base schema is the entity as the API presents it (`Card`, registered under that name in the spec). Request schemas (`CreateCardRequest`, `ListCardsQuery`) reuse its fields where the constraints are the same. Response schemas are the base, or `derived(Base, row => …)` when the row lacks a field the contract has (`signedUp` from `userId`). A route returns with `respond(c, Schema, row, status)`, never `c.json` directly: the parse turns dates into ISO strings, drops every field the schema doesn't list, and fails loudly on a shape the contract doesn't describe. Don't write `toX()` mappers; put what a response needs into the schema. Every route has a stable dotted `operationId` such as `card.close`. It becomes the SDK method name, so never rename one.
+- **Three kinds of schema per area, in `http/schemas/`.** The base schema is the entity as the API presents it (`Card`, registered under that name in the spec). Request schemas (`CreateCardRequest`, `ListCardsQuery`) reuse its fields where the constraints are the same. Response schemas are the base, or `derived(Base, row => …)` when the row lacks a field the contract has (`signedUp` from `userId`). A route returns with `respond(c, Schema, row, status)`, never `c.json` directly: the parse turns dates into ISO strings, drops every field the schema doesn't list, and fails loudly on a shape the contract doesn't describe. Don't write `toX()` mappers; put what a response needs into the schema. Every route has a stable dotted `operationId` such as `card.close`. It becomes the SDK method name, so never rename one.
 - **Tenancy comes from the caller.** The workspace is the authenticated member's `workspaceId`. Never take a workspace id from the request.
 - **Privacy is enforced in queries.** Teammate-facing reads filter `visibility = 'team'`. Never rely on a prompt to hide private data. Delivery follows the same rule: a delivery target has a visibility too, and an automation sends team targets a version built from team-visible data only (`send` in `automations/runners.ts`).
 - **One write path per concept.** Write through these functions, never into their tables directly:

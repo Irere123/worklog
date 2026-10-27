@@ -1,9 +1,9 @@
 import { createRoute } from "@hono/zod-openapi";
 
-import { body, errors, json, respond, router } from "#api/router";
-import { Activity } from "#api/schemas/activity";
-import { MemberRef } from "#api/schemas/members";
-import { LogRequest, Snapshot, SnapshotQuery } from "#api/schemas/work";
+import { body, errors, json, respond, router } from "#http/router";
+import { Activity } from "#http/schemas/activity";
+import { MemberRef } from "#http/schemas/members";
+import { LogRequest, Snapshot, SnapshotQuery } from "#http/schemas/work";
 import { logWork } from "#work/log";
 import { resolveMember } from "#work/members";
 import { workSnapshot } from "#work/snapshot";

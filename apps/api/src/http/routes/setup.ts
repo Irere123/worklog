@@ -1,6 +1,8 @@
 import { createRoute, z } from "@hono/zod-openapi";
 
-import { body, errors, json, respond, router } from "#api/router";
+import { getPersonalAgent, listMemberships } from "#db/queries/members";
+import { countWorkspaces, getWorkspaceById } from "#db/queries/workspaces";
+import { body, errors, json, respond, router } from "#http/router";
 import {
   AuthConfigResponse,
   CreateWorkspaceRequest,
@@ -8,9 +10,7 @@ import {
   SetupRequest,
   SetupResponse,
   WorkspaceCreatedResponse,
-} from "#api/schemas/members";
-import { getPersonalAgent, listMemberships } from "#db/queries/members";
-import { countWorkspaces, getWorkspaceById } from "#db/queries/workspaces";
+} from "#http/schemas/members";
 import { enabledSocialProviders } from "#lib/auth";
 import { safeEqual } from "#lib/crypto";
 import { forbidden } from "#lib/errors";

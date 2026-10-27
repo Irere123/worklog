@@ -1,5 +1,9 @@
 import { createRoute, z } from "@hono/zod-openapi";
 
+import type { AppContext } from "#context";
+import { getConnectionById, listConnections } from "#db/queries/connections";
+import type { ConnectionRow } from "#db/queries/connections";
+import { listInboundEvents } from "#db/queries/inbound-events";
 import {
   body,
   errors,
@@ -9,7 +13,7 @@ import {
   requireAdmin,
   respond,
   router,
-} from "#api/router";
+} from "#http/router";
 import {
   Connection,
   ConnectionHealth,
@@ -26,11 +30,7 @@ import {
   ReplayQueuedResponse,
   ReplayRequest,
   UpdateConnectionRequest,
-} from "#api/schemas/connections";
-import type { AppContext } from "#context";
-import { getConnectionById, listConnections } from "#db/queries/connections";
-import type { ConnectionRow } from "#db/queries/connections";
-import { listInboundEvents } from "#db/queries/inbound-events";
+} from "#http/schemas/connections";
 import * as conns from "#ingest/connections";
 import { listConnectors } from "#ingest/connectors";
 import { registerDiscordCommands } from "#ingest/connectors/discord";

@@ -1,6 +1,11 @@
 import { createRoute, z } from "@hono/zod-openapi";
 
-import { body, errors, Id, json, Ok, respond, router } from "#api/router";
+import { runAutomation } from "#automations/run";
+import * as automations from "#automations/service";
+import type { AppContext } from "#context";
+import { getAutomationById, listAutomations } from "#db/queries/automations";
+import { listDeliveryTargets } from "#db/queries/delivery-targets";
+import { body, errors, Id, json, Ok, respond, router } from "#http/router";
 import {
   Automation,
   AutomationResponse,
@@ -8,12 +13,7 @@ import {
   CreateAutomationRequest,
   RunResultResponse,
   UpdateAutomationRequest,
-} from "#api/schemas/automations";
-import { runAutomation } from "#automations/run";
-import * as automations from "#automations/service";
-import type { AppContext } from "#context";
-import { getAutomationById, listAutomations } from "#db/queries/automations";
-import { listDeliveryTargets } from "#db/queries/delivery-targets";
+} from "#http/schemas/automations";
 import { badRequest } from "#lib/errors";
 
 export const automationRoutes = router()

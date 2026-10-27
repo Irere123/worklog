@@ -3,7 +3,9 @@ import { createRoute, z } from "@hono/zod-openapi";
 import { createConversation, getConversation } from "#agent/conversations";
 import { ask, askStream, resolveAgent } from "#agent/loop";
 import { setVoice } from "#agent/voice";
-import { body, errors, Id, json, respond, router } from "#api/router";
+import { listConversations, listMessages } from "#db/queries/conversations";
+import { findVoice, listVoices } from "#db/queries/voices";
+import { body, errors, Id, json, respond, router } from "#http/router";
 import {
   AgentReply,
   ChatRequest,
@@ -15,10 +17,8 @@ import {
   SetVoiceRequest,
   Voice,
   VoiceResponse,
-} from "#api/schemas/agent";
-import { ErrorSchema } from "#api/schemas/common";
-import { listConversations, listMessages } from "#db/queries/conversations";
-import { findVoice, listVoices } from "#db/queries/voices";
+} from "#http/schemas/agent";
+import { ErrorSchema } from "#http/schemas/common";
 import { resolveMember } from "#work/members";
 
 export const agentRoutes = router()

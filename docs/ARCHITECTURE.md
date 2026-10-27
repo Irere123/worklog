@@ -5,9 +5,9 @@
         │  REST (OpenAPI 3.1)      │ SSE /v1/events         │ signed webhooks /hooks/*
         ▼                          ▼                        ▼
  ┌──────────────────────────── apps/api (Bun + Hono) ────────────────────────────┐
- │ api/routes/*  zod-openapi routes, one file per domain → docs + typed SDKs     │
- │ api/hooks.ts  /hooks/{connection}: verify → store raw → queue (any connector) │
- │ api/auth.ts   API keys (agents) or better-auth sessions (people) → member     │
+ │ http/routes/* zod-openapi routes, one file per resource → docs + typed SDKs   │
+ │ http/hooks.ts /hooks/{connection}: verify → store raw → queue (any connector) │
+ │ http/auth.ts  API keys (agents) or better-auth sessions (people) → member     │
  │                                                                               │
  │ ingest/       pipeline: normalize · identity · gates · merge · effects        │
  │   connectors/ GitHub · Gitea · Slack · Discord · webhook (no-code) · custom   │

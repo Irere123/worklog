@@ -2,14 +2,14 @@ import { createRoute, z } from "@hono/zod-openapi";
 
 import { addMemory, forgetMemory } from "#agent/memory";
 import { exportMemory } from "#agent/memory/export";
-import { body, errors, Id, json, Ok, respond, router } from "#api/router";
+import { listMemories, listMemoryLineage } from "#db/queries/memories";
+import { body, errors, Id, json, Ok, respond, router } from "#http/router";
 import {
   CreateMemoryRequest,
   ListMemoriesQuery,
   Memory,
   MemoryExport,
-} from "#api/schemas/memory";
-import { listMemories, listMemoryLineage } from "#db/queries/memories";
+} from "#http/schemas/memory";
 import { notFound } from "#lib/errors";
 
 export const memoryRoutes = router()

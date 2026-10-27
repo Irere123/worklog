@@ -1,6 +1,6 @@
 import { createRoute, z } from "@hono/zod-openapi";
 
-import { body, errors, Id, json, respond, router } from "#api/router";
+import { body, errors, Id, json, respond, router } from "#http/router";
 import {
   ActionParams,
   Attention,
@@ -10,7 +10,7 @@ import {
   ListAttentionQuery,
   MetricsQuery,
   UpdateAttentionRequest,
-} from "#api/schemas/attention";
+} from "#http/schemas/attention";
 import {
   attentionMetrics,
   giveFeedback,

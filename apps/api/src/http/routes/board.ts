@@ -1,8 +1,10 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import type { Context } from "hono";
 
-import { body, errors, Id, json, Ok, respond, router } from "#api/router";
-import type { Env } from "#api/router";
+import { getBoardWithColumns, listBoardsWithColumns } from "#db/queries/boards";
+import { getCardByNumber } from "#db/queries/cards";
+import { body, errors, Id, json, Ok, respond, router } from "#http/router";
+import type { Env } from "#http/router";
 import {
   AssignCardRequest,
   Board,
@@ -21,9 +23,7 @@ import {
   UpdateBoardRequest,
   UpdateCardRequest,
   UpdateColumnRequest,
-} from "#api/schemas/board";
-import { getBoardWithColumns, listBoardsWithColumns } from "#db/queries/boards";
-import { getCardByNumber } from "#db/queries/cards";
+} from "#http/schemas/board";
 import * as board from "#work/board";
 import { resolveMember } from "#work/members";
 

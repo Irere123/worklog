@@ -1,14 +1,14 @@
 import { createRoute, z } from "@hono/zod-openapi";
 
-import { body, errors, Id, json, respond, router } from "#api/router";
+import { generateBrief } from "#automations/briefs";
+import { deliver } from "#automations/delivery";
+import { getBriefById, listBriefs } from "#db/queries/briefs";
+import { body, errors, Id, json, respond, router } from "#http/router";
 import {
   Brief,
   CreateBriefRequest,
   ListBriefsQuery,
-} from "#api/schemas/briefs";
-import { generateBrief } from "#automations/briefs";
-import { deliver } from "#automations/delivery";
-import { getBriefById, listBriefs } from "#db/queries/briefs";
+} from "#http/schemas/briefs";
 
 export const briefRoutes = router()
   .openapi(

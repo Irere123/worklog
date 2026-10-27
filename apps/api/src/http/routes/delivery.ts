@@ -1,12 +1,5 @@
 import { createRoute, z } from "@hono/zod-openapi";
 
-import { body, errors, Id, json, Ok, respond, router } from "#api/router";
-import {
-  CreateTargetRequest,
-  Target,
-  TargetTestResponse,
-  UpdateTargetRequest,
-} from "#api/schemas/delivery";
 import {
   createTarget,
   deleteTarget,
@@ -14,6 +7,13 @@ import {
   updateTarget,
 } from "#automations/delivery";
 import { listDeliveryTargets } from "#db/queries/delivery-targets";
+import { body, errors, Id, json, Ok, respond, router } from "#http/router";
+import {
+  CreateTargetRequest,
+  Target,
+  TargetTestResponse,
+  UpdateTargetRequest,
+} from "#http/schemas/delivery";
 
 export const deliveryRoutes = router()
   .openapi(

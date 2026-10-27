@@ -3,28 +3,28 @@ import type { ErrorHandler } from "hono";
 import { cors } from "hono/cors";
 import { HTTPException } from "hono/http-exception";
 
-import { authMiddleware } from "./api/auth";
-import { hookRoutes } from "./api/hooks";
-import { router } from "./api/router";
-import { activityRoutes } from "./api/routes/activity";
-import { agentRoutes } from "./api/routes/agent";
-import { attentionRoutes } from "./api/routes/attention";
-import { automationRoutes } from "./api/routes/automations";
-import { boardRoutes } from "./api/routes/board";
-import { briefRoutes } from "./api/routes/briefs";
-import { connectionRoutes } from "./api/routes/connections";
-import { deliveryRoutes } from "./api/routes/delivery";
-import { eventRoutes } from "./api/routes/events";
-import { identityRoutes } from "./api/routes/identities";
-import { memberRoutes } from "./api/routes/members";
-import { memoryRoutes } from "./api/routes/memory";
+import type { AppContext } from "./context";
+import { authMiddleware } from "./http/auth";
+import { hookRoutes } from "./http/hooks";
+import { router } from "./http/router";
+import { activityRoutes } from "./http/routes/activity";
+import { agentRoutes } from "./http/routes/agent";
+import { attentionRoutes } from "./http/routes/attention";
+import { automationRoutes } from "./http/routes/automations";
+import { boardRoutes } from "./http/routes/board";
+import { briefRoutes } from "./http/routes/briefs";
+import { connectionRoutes } from "./http/routes/connections";
+import { deliveryRoutes } from "./http/routes/delivery";
+import { eventRoutes } from "./http/routes/events";
+import { identityRoutes } from "./http/routes/identities";
+import { memberRoutes } from "./http/routes/members";
+import { memoryRoutes } from "./http/routes/memory";
 import {
   authConfigRoutes,
   sessionRoutes,
   setupRoutes,
-} from "./api/routes/setup";
-import { workRoutes } from "./api/routes/work";
-import type { AppContext } from "./context";
+} from "./http/routes/setup";
+import { workRoutes } from "./http/routes/work";
 import { webOrigins } from "./lib/auth";
 import { ApiError } from "./lib/errors";
 

@@ -1,15 +1,15 @@
 import { createRoute, z } from "@hono/zod-openapi";
 
-import { body, errors, Id, json, Ok, respond, router } from "#api/router";
-import {
-  Activity,
-  CreateActivityRequest,
-  ListActivitiesQuery,
-} from "#api/schemas/activity";
 import type { AppContext } from "#context";
 import { deleteOwnActivity, listActivities } from "#db/queries/activities";
 import { getCardByNumber } from "#db/queries/cards";
 import type { Member } from "#db/queries/members";
+import { body, errors, Id, json, Ok, respond, router } from "#http/router";
+import {
+  Activity,
+  CreateActivityRequest,
+  ListActivitiesQuery,
+} from "#http/schemas/activity";
 import { applyAgentState } from "#ingest/effects";
 import { notFound } from "#lib/errors";
 import { recordActivity } from "#work/activity";

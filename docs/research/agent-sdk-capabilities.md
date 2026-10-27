@@ -21,7 +21,7 @@ Sources used:
 
 Throughout, "doc:" means `apps/api/node_modules/ai/docs/...` and "d.ts:" means `apps/api/node_modules/ai/dist/index.d.ts`.
 
-Note: the codebase changed while this survey ran. `src/automations/service.ts` gained a batched, time-budgeted `runDueAutomations`. `src/api/routes/*`, `src/index.ts`, `src/app.ts` and `test/*` were added. Line numbers below reflect the files as of the end of the survey.
+Note: the codebase changed while this survey ran. `src/automations/service.ts` gained a batched, time-budgeted `runDueAutomations`. `src/http/routes/*`, `src/index.ts`, `src/app.ts` and `test/*` were added. Line numbers below reflect the files as of the end of the survey.
 
 ---
 
@@ -140,7 +140,7 @@ Note: the codebase changed while this survey ran. `src/automations/service.ts` g
 
 ### 1. Streaming chat for web and mobile (`useChat`-compatible) — P1
 
-**What:** a POST endpoint that streams the v7 UI message stream (SSE, header `x-vercel-ai-ui-message-stream: v1`) so `@ai-sdk/react` `useChat` (web, and Expo with `expo/fetch`) renders tokens, tool calls, approvals and reasoning live. Today `POST /v1/conversations[/{id}/messages]` (`src/api/routes/agent.ts:32-75`) returns the finished reply only.
+**What:** a POST endpoint that streams the v7 UI message stream (SSE, header `x-vercel-ai-ui-message-stream: v1`) so `@ai-sdk/react` `useChat` (web, and Expo with `expo/fetch`) renders tokens, tool calls, approvals and reasoning live. Today `POST /v1/conversations[/{id}/messages]` (`src/http/routes/agent.ts:32-75`) returns the finished reply only.
 
 **Verified APIs**
 
@@ -161,7 +161,7 @@ Note: the codebase changed while this survey ran. `src/automations/service.ts` g
 - Rows written by Slack, Discord or `postToInbox` have no UI JSON. Synthesize `{ id, role, parts: [{ type: 'text', text }] }` from the existing `text` column.
 - Persist the incoming message and the response **together** in the agent's `onEnd`, as `ask()` does today. That avoids an inbox post landing between a tool call and its result.
 
-**Where it plugs in:** a new route next to `src/api/routes/agent.ts`. Reuse `getConversation`, `loadMessages`, `appendMessages`, `turnPreamble`, and the agent factory from section 2.
+**Where it plugs in:** a new route next to `src/http/routes/agent.ts`. Reuse `getConversation`, `loadMessages`, `appendMessages`, `turnPreamble`, and the agent factory from section 2.
 
 **Server sketch (Hono)**
 

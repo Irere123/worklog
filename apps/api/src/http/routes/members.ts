@@ -1,5 +1,9 @@
 import { createRoute, z } from "@hono/zod-openapi";
 
+import type { AppContext } from "#context";
+import { listActiveTokens } from "#db/queries/api-tokens";
+import { getPersonalAgent, listMembers } from "#db/queries/members";
+import { getWorkspaceById } from "#db/queries/workspaces";
 import {
   body,
   errors,
@@ -9,7 +13,7 @@ import {
   requireSelfOrAdmin,
   respond,
   router,
-} from "#api/router";
+} from "#http/router";
 import {
   CreateMemberRequest,
   CreateTokenRequest,
@@ -21,11 +25,7 @@ import {
   Token,
   TokenInfo,
   UpdateMeRequest,
-} from "#api/schemas/members";
-import type { AppContext } from "#context";
-import { listActiveTokens } from "#db/queries/api-tokens";
-import { getPersonalAgent, listMembers } from "#db/queries/members";
-import { getWorkspaceById } from "#db/queries/workspaces";
+} from "#http/schemas/members";
 import * as people from "#work/members";
 
 export const memberRoutes = router()
