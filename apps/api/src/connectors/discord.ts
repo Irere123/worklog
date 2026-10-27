@@ -3,9 +3,9 @@ import { createPublicKey, verify } from "node:crypto";
 import { z } from "zod";
 
 import type { AppContext } from "#context";
+import { findMemberByIdentity } from "#db/queries/members";
+import type { Member } from "#db/queries/members";
 import type { ConnectionView, Connector } from "#ingest/types";
-import { memberByIdentity } from "#members/service";
-import type { Member } from "#members/service";
 
 import { needsDeferral, runCommand } from "./commands";
 
@@ -120,18 +120,21 @@ async function handleInteraction(
     return UNSUPPORTED;
   }
   const userId = i.member?.user.id ?? i.user?.id ?? "";
-  const author = await memberByIdentity(
-    ctx,
-    conn.workspaceId,
-    "discord",
-    userId
-  );
+  const author = await findMemberByIdentity(ctx.db, {
+    workspaceId: conn.workspaceId,
+    provider: "discord",
+    externalIds: userId,
+  });
   const options = i.data.options ?? [];
   const opt = (name: string) => options.find((o) => o.name === name)?.value;
   const personId = opt("person");
-  let target: Member | null = null;
+  let target: Member | undefined;
   if (personId) {
-    target = await memberByIdentity(ctx, conn.workspaceId, "discord", personId);
+    target = await findMemberByIdentity(ctx.db, {
+      workspaceId: conn.workspaceId,
+      provider: "discord",
+      externalIds: personId,
+    });
     if (!target) {
       return {
         type: 4,

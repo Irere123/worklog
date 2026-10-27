@@ -1,41 +1,44 @@
-import {
-  and,
-  asc,
-  desc,
-  eq,
-  ilike,
-  inArray,
-  isNull,
-  or,
-  sql,
-} from "drizzle-orm";
-import type { SQL } from "drizzle-orm";
-
 import { recordActivity } from "#activity/service";
 import { raiseAttention } from "#attention/service";
 import type { AppContext } from "#context";
 import {
-  boards,
-  cardAssignees,
-  cards,
-  cardTags,
-  cardWatchers,
-  columns,
-  comments,
-  members,
-  tags,
-  workspaces,
-} from "#db/schema";
+  getBoardWithColumns,
+  getColumnById,
+  insertBoard,
+  insertColumns,
+  deleteColumnById,
+  updateBoardById,
+  updateColumnById,
+  updateColumnPositions,
+} from "#db/queries/boards";
+import type { Board } from "#db/queries/boards";
+import {
+  deleteAssignee,
+  deleteWatcher,
+  getCardByNumber,
+  insertAssignee,
+  insertCard,
+  insertComment,
+  insertWatcher,
+  listCardRelations,
+  listCardRows,
+  listComments,
+  listDriftingAssignments,
+  listStaleCards,
+  listWatchers,
+  nextCardNumber,
+  setCardTags,
+  updateCardById,
+  updateCardsByColumn,
+} from "#db/queries/cards";
+import type { CardFilters, CardRow } from "#db/queries/cards";
+import { findMemberById, listMembersByHandles } from "#db/queries/members";
+import type { Member } from "#db/queries/members";
 import type { CardStage } from "#db/schema";
-import { returned } from "#lib/assert";
+import { transact } from "#db/transact";
 import { badRequest, notFound } from "#lib/errors";
 import { newId } from "#lib/ids";
 import { DAY_MS } from "#lib/time";
-
-export type Member = typeof members.$inferSelect;
-export type Board = typeof boards.$inferSelect;
-export type Column = typeof columns.$inferSelect;
-export type CardRow = typeof cards.$inferSelect;
 
 export type CardView = CardRow & {
   columnName: string | null;
@@ -70,47 +73,24 @@ export async function createBoard(
     createdAt: ctx.now(),
     archivedAt: null,
   };
-  await ctx.db.insert(boards).values(board);
   const names = input.columns ?? ["Doing", "Review"];
-  const cols = names.map((name, position) => ({
-    id: newId("col"),
-    boardId: board.id,
-    name,
-    position,
-    color: "gray",
-  }));
-  if (cols.length) {
-    await ctx.db.insert(columns).values(cols);
-  }
-  return await getBoard(ctx, actor.workspaceId, board.id);
-}
-
-export async function listBoards(ctx: AppContext, workspaceId: string) {
-  return await ctx.db
-    .select()
-    .from(boards)
-    .where(and(eq(boards.workspaceId, workspaceId), isNull(boards.archivedAt)))
-    .orderBy(asc(boards.createdAt));
-}
-
-export async function getBoard(
-  ctx: AppContext,
-  workspaceId: string,
-  boardId: string
-) {
-  const [board] = await ctx.db
-    .select()
-    .from(boards)
-    .where(and(eq(boards.id, boardId), eq(boards.workspaceId, workspaceId)));
-  if (!board) {
-    throw notFound("Board");
-  }
-  const cols = await ctx.db
-    .select()
-    .from(columns)
-    .where(eq(columns.boardId, boardId))
-    .orderBy(asc(columns.position));
-  return { ...board, columns: cols };
+  return await transact(ctx, async (tx) => {
+    await insertBoard(tx.db, board);
+    await insertColumns(
+      tx.db,
+      names.map((name, position) => ({
+        id: newId("col"),
+        boardId: board.id,
+        name,
+        position,
+        color: "gray",
+      }))
+    );
+    return await getBoardWithColumns(tx.db, {
+      workspaceId: actor.workspaceId,
+      id: board.id,
+    });
+  });
 }
 
 export async function updateBoard(
@@ -124,18 +104,18 @@ export async function updateBoard(
     archived?: boolean;
   }
 ) {
-  await getBoard(ctx, workspaceId, boardId);
+  await getBoardWithColumns(ctx.db, { workspaceId, id: boardId });
   const { archived, ...rest } = patch;
-  await ctx.db
-    .update(boards)
-    .set({
+  await updateBoardById(ctx.db, {
+    id: boardId,
+    set: {
       ...rest,
       ...(archived === undefined
         ? {}
         : { archivedAt: archived ? ctx.now() : null }),
-    })
-    .where(eq(boards.id, boardId));
-  return await getBoard(ctx, workspaceId, boardId);
+    },
+  });
+  return await getBoardWithColumns(ctx.db, { workspaceId, id: boardId });
 }
 
 export async function addColumn(
@@ -144,40 +124,24 @@ export async function addColumn(
   boardId: string,
   input: { name: string; color?: string; position?: number }
 ) {
-  const board = await getBoard(ctx, workspaceId, boardId);
-  const position = input.position ?? board.columns.length;
-  await ctx.db
-    .update(columns)
-    .set({ position: sql`${columns.position} + 1` })
-    .where(
-      and(eq(columns.boardId, boardId), sql`${columns.position} >= ${position}`)
-    );
-  const col = {
-    id: newId("col"),
-    boardId,
-    name: input.name,
-    color: input.color ?? "gray",
-    position,
-    createdAt: ctx.now(),
-  };
-  await ctx.db.insert(columns).values(col);
-  return col;
-}
-
-async function getColumn(
-  ctx: AppContext,
-  workspaceId: string,
-  columnId: string
-) {
-  const [row] = await ctx.db
-    .select({ column: columns })
-    .from(columns)
-    .innerJoin(boards, eq(boards.id, columns.boardId))
-    .where(and(eq(columns.id, columnId), eq(boards.workspaceId, workspaceId)));
-  if (!row) {
-    throw notFound("Column");
-  }
-  return row.column;
+  return await transact(ctx, async (tx) => {
+    const board = await getBoardWithColumns(tx.db, {
+      workspaceId,
+      id: boardId,
+    });
+    const position = input.position ?? board.columns.length;
+    await updateColumnPositions(tx.db, { boardId, from: position, by: 1 });
+    const col = {
+      id: newId("col"),
+      boardId,
+      name: input.name,
+      color: input.color ?? "gray",
+      position,
+      createdAt: tx.now(),
+    };
+    await insertColumns(tx.db, [col]);
+    return col;
+  });
 }
 
 export async function updateColumn(
@@ -186,13 +150,8 @@ export async function updateColumn(
   columnId: string,
   patch: { name?: string; color?: string }
 ) {
-  await getColumn(ctx, workspaceId, columnId);
-  const rows = await ctx.db
-    .update(columns)
-    .set(patch)
-    .where(eq(columns.id, columnId))
-    .returning();
-  return returned(rows, "column");
+  await getColumnById(ctx.db, { workspaceId, id: columnId });
+  return await updateColumnById(ctx.db, { id: columnId, set: patch });
 }
 
 export async function deleteColumn(
@@ -200,21 +159,19 @@ export async function deleteColumn(
   workspaceId: string,
   columnId: string
 ) {
-  const col = await getColumn(ctx, workspaceId, columnId);
-  await ctx.db
-    .update(cards)
-    .set({ stage: "triage", columnId: null })
-    .where(eq(cards.columnId, columnId));
-  await ctx.db.delete(columns).where(eq(columns.id, columnId));
-  await ctx.db
-    .update(columns)
-    .set({ position: sql`${columns.position} - 1` })
-    .where(
-      and(
-        eq(columns.boardId, col.boardId),
-        sql`${columns.position} > ${col.position}`
-      )
-    );
+  await transact(ctx, async (tx) => {
+    const col = await getColumnById(tx.db, { workspaceId, id: columnId });
+    await updateCardsByColumn(tx.db, {
+      columnId,
+      set: { stage: "triage", columnId: null },
+    });
+    await deleteColumnById(tx.db, { id: columnId });
+    await updateColumnPositions(tx.db, {
+      boardId: col.boardId,
+      from: col.position + 1,
+      by: -1,
+    });
+  });
 }
 
 export type CardInput = {
@@ -241,45 +198,40 @@ export async function createCard(
   input: CardInput,
   opts: EffectOpts = {}
 ) {
-  const board = await getBoard(ctx, workspaceId, input.boardId);
+  const board = await getBoardWithColumns(ctx.db, {
+    workspaceId,
+    id: input.boardId,
+  });
   if (input.columnId && !board.columns.some((c) => c.id === input.columnId)) {
     throw badRequest("columnId is not on this board");
   }
+  const number = await nextCardNumber(ctx.db, { workspaceId });
+  return await transact(ctx, async (tx) => {
+    const card = newCardRow(tx, workspaceId, number, actor, input);
+    await insertCard(tx.db, card);
+    if (actor) {
+      await watch(tx, card.id, actor.id);
+    }
+    if (input.tags && input.tags.length > 0) {
+      await setTags(tx, workspaceId, card.id, input.tags);
+    }
 
-  const number = await nextCardNumber(ctx, workspaceId);
-  const card = newCardRow(ctx, workspaceId, number, actor, input);
-  await ctx.db.insert(cards).values(card);
-  if (actor) {
-    await watch(ctx, card.id, actor.id);
-  }
-  if (input.tags && input.tags.length > 0) {
-    await setTags(ctx, workspaceId, card.id, input.tags);
-  }
-
-  if (opts.silent !== true) {
-    await recordActivity(ctx, {
-      workspaceId,
-      actorId: actor?.id ?? null,
-      source: card.source,
-      kind: "card.created",
-      title: `#${card.number} ${card.title}`,
-      cardId: card.id,
-      data: { boardId: board.id, stage: card.stage },
-    });
-  }
-  for (const memberId of input.assigneeIds ?? []) {
-    await assign(ctx, actor, workspaceId, card.number, memberId, opts);
-  }
-  return await getCard(ctx, workspaceId, card.number);
-}
-
-async function nextCardNumber(ctx: AppContext, workspaceId: string) {
-  const rows = await ctx.db
-    .update(workspaces)
-    .set({ cardSeq: sql`${workspaces.cardSeq} + 1` })
-    .where(eq(workspaces.id, workspaceId))
-    .returning({ number: workspaces.cardSeq });
-  return returned(rows, "card number").number;
+    if (opts.silent !== true) {
+      await recordActivity(tx, {
+        workspaceId,
+        actorId: actor?.id ?? null,
+        source: card.source,
+        kind: "card.created",
+        title: `#${card.number} ${card.title}`,
+        cardId: card.id,
+        data: { boardId: board.id, stage: card.stage },
+      });
+    }
+    for (const memberId of input.assigneeIds ?? []) {
+      await assign(tx, actor, workspaceId, card.number, memberId, opts);
+    }
+    return await getCard(tx, workspaceId, card.number);
+  });
 }
 
 function newCardRow(
@@ -315,73 +267,12 @@ function newCardRow(
   };
 }
 
-export type CardFilters = {
-  boardId?: string;
-  stage?: CardStage;
-  assigneeId?: string;
-  golden?: boolean;
-  tag?: string;
-  q?: string;
-  limit?: number;
-};
-
 export async function listCards(
   ctx: AppContext,
   workspaceId: string,
   filters: CardFilters = {}
 ): Promise<CardView[]> {
-  const where: (SQL | undefined)[] = [eq(cards.workspaceId, workspaceId)];
-  if (filters.boardId) {
-    where.push(eq(cards.boardId, filters.boardId));
-  }
-  if (filters.stage) {
-    where.push(eq(cards.stage, filters.stage));
-  }
-  if (filters.golden !== undefined) {
-    where.push(eq(cards.golden, filters.golden));
-  }
-  if (filters.q) {
-    where.push(
-      or(
-        ilike(cards.title, `%${filters.q}%`),
-        ilike(cards.body, `%${filters.q}%`)
-      )
-    );
-  }
-  if (filters.assigneeId) {
-    where.push(
-      inArray(
-        cards.id,
-        ctx.db
-          .select({ id: cardAssignees.cardId })
-          .from(cardAssignees)
-          .where(eq(cardAssignees.memberId, filters.assigneeId))
-      )
-    );
-  }
-  if (filters.tag) {
-    where.push(
-      inArray(
-        cards.id,
-        ctx.db
-          .select({ id: cardTags.cardId })
-          .from(cardTags)
-          .innerJoin(tags, eq(tags.id, cardTags.tagId))
-          .where(
-            and(
-              eq(tags.workspaceId, workspaceId),
-              eq(tags.name, filters.tag.toLowerCase())
-            )
-          )
-      )
-    );
-  }
-  const rows = await ctx.db
-    .select()
-    .from(cards)
-    .where(and(...where))
-    .orderBy(desc(cards.golden), desc(cards.lastActiveAt))
-    .limit(filters.limit ?? 200);
+  const rows = await listCardRows(ctx.db, { ...filters, workspaceId });
   return await hydrate(ctx, workspaceId, rows);
 }
 
@@ -393,44 +284,25 @@ async function hydrate(
   if (!rows.length) {
     return [];
   }
-  const ids = rows.map((r) => r.id);
-  const [assigneeRows, tagRows, columnRows, boardRows, [ws]] =
-    await Promise.all([
-      ctx.db
-        .select()
-        .from(cardAssignees)
-        .where(inArray(cardAssignees.cardId, ids)),
-      ctx.db
-        .select({ cardId: cardTags.cardId, name: tags.name })
-        .from(cardTags)
-        .innerJoin(tags, eq(tags.id, cardTags.tagId))
-        .where(inArray(cardTags.cardId, ids)),
-      ctx.db
-        .select()
-        .from(columns)
-        .where(
-          inArray(columns.boardId, [...new Set(rows.map((r) => r.boardId))])
-        ),
-      ctx.db
-        .select()
-        .from(boards)
-        .where(inArray(boards.id, [...new Set(rows.map((r) => r.boardId))])),
-      ctx.db.select().from(workspaces).where(eq(workspaces.id, workspaceId)),
-    ]);
+  const related = await listCardRelations(ctx.db, {
+    workspaceId,
+    cards: rows,
+  });
   const now = ctx.now().getTime();
   return rows.map((card) => {
-    const board = boardRows.find((b) => b.id === card.boardId);
-    const days = board?.entropyDays ?? ws?.entropyDays ?? 30;
+    const board = related.boards.find((b) => b.id === card.boardId);
+    const days = board?.entropyDays ?? related.workspace?.entropyDays ?? 30;
     const autoPostponeAt = new Date(
       card.lastActiveAt.getTime() + days * DAY_MS
     );
     return {
       ...card,
-      columnName: columnRows.find((c) => c.id === card.columnId)?.name ?? null,
-      assigneeIds: assigneeRows
+      columnName:
+        related.columns.find((c) => c.id === card.columnId)?.name ?? null,
+      assigneeIds: related.assignees
         .filter((a) => a.cardId === card.id)
         .map((a) => a.memberId),
-      tags: tagRows.filter((t) => t.cardId === card.id).map((t) => t.name),
+      tags: related.tags.filter((t) => t.cardId === card.id).map((t) => t.name),
       entropy:
         card.stage === "active"
           ? {
@@ -444,27 +316,12 @@ async function hydrate(
   });
 }
 
-export async function findCard(
-  ctx: AppContext,
-  workspaceId: string,
-  number: number
-) {
-  const [card] = await ctx.db
-    .select()
-    .from(cards)
-    .where(and(eq(cards.workspaceId, workspaceId), eq(cards.number, number)));
-  if (!card) {
-    throw notFound(`Card #${number}`);
-  }
-  return card;
-}
-
 export async function getCard(
   ctx: AppContext,
   workspaceId: string,
   number: number
 ) {
-  const card = await findCard(ctx, workspaceId, number);
+  const card = await getCardByNumber(ctx.db, { workspaceId, number });
   const [view] = await hydrate(ctx, workspaceId, [card]);
   if (!view) {
     throw notFound(`Card #${number}`);
@@ -479,12 +336,8 @@ export async function getCardDetail(
 ) {
   const card = await getCard(ctx, workspaceId, number);
   const [commentRows, watcherRows] = await Promise.all([
-    ctx.db
-      .select()
-      .from(comments)
-      .where(eq(comments.cardId, card.id))
-      .orderBy(asc(comments.createdAt)),
-    ctx.db.select().from(cardWatchers).where(eq(cardWatchers.cardId, card.id)),
+    listComments(ctx.db, { cardId: card.id }),
+    listWatchers(ctx.db, { cardId: card.id }),
   ]);
   return {
     ...card,
@@ -505,33 +358,41 @@ export async function updateCard(
     tags?: string[];
   }
 ) {
-  const card = await findCard(ctx, actor.workspaceId, number);
-  const { tags: tagNames, boardId, ...fields } = patch;
-  const set: Partial<CardRow> = { ...fields, updatedAt: ctx.now() };
-  if (boardId && boardId !== card.boardId) {
-    await getBoard(ctx, actor.workspaceId, boardId);
-    // Columns are per board: moving boards sends the card back to triage there.
-    Object.assign(set, {
-      boardId,
-      columnId: null,
-      stage: card.stage === "active" ? "triage" : card.stage,
+  return await transact(ctx, async (tx) => {
+    const card = await getCardByNumber(tx.db, {
+      workspaceId: actor.workspaceId,
+      number,
     });
-  }
-  await ctx.db.update(cards).set(set).where(eq(cards.id, card.id));
-  if (tagNames) {
-    await setTags(ctx, actor.workspaceId, card.id, tagNames);
-  }
-  const changed = Object.keys(patch).join(", ");
-  await recordActivity(ctx, {
-    workspaceId: actor.workspaceId,
-    actorId: actor.id,
-    source: "worklog",
-    kind: "card.updated",
-    title: `#${card.number} ${patch.title ?? card.title}`,
-    body: `Changed ${changed}`,
-    cardId: card.id,
+    const { tags: tagNames, boardId, ...fields } = patch;
+    const set: Partial<CardRow> = { ...fields, updatedAt: tx.now() };
+    if (boardId && boardId !== card.boardId) {
+      await getBoardWithColumns(tx.db, {
+        workspaceId: actor.workspaceId,
+        id: boardId,
+      });
+      // Columns are per board: moving boards sends the card back to triage there.
+      Object.assign(set, {
+        boardId,
+        columnId: null,
+        stage: card.stage === "active" ? "triage" : card.stage,
+      });
+    }
+    await updateCardById(tx.db, { id: card.id, set });
+    if (tagNames) {
+      await setTags(tx, actor.workspaceId, card.id, tagNames);
+    }
+    const changed = Object.keys(patch).join(", ");
+    await recordActivity(tx, {
+      workspaceId: actor.workspaceId,
+      actorId: actor.id,
+      source: "worklog",
+      kind: "card.updated",
+      title: `#${card.number} ${patch.title ?? card.title}`,
+      body: `Changed ${changed}`,
+      cardId: card.id,
+    });
+    return await getCard(tx, actor.workspaceId, number);
   });
-  return await getCard(ctx, actor.workspaceId, number);
 }
 
 type Transition = {
@@ -549,40 +410,42 @@ async function transition(
   t: Transition,
   opts: EffectOpts = {}
 ) {
-  const card = await findCard(ctx, workspaceId, number);
-  const now = ctx.now();
-  await ctx.db
-    .update(cards)
-    .set({
-      stage: t.stage,
-      columnId: t.stage === "active" ? (t.columnId ?? null) : null,
-      postponedAt: t.stage === "not_now" ? now : null,
-      autoPostponed: t.kind === "card.auto_postponed",
-      closedAt: t.stage === "done" ? now : null,
-      closedById: t.stage === "done" ? (actor?.id ?? null) : null,
-      updatedAt: now,
-      ...(opts.silent === true ? { lastActiveAt: now } : {}),
-    })
-    .where(eq(cards.id, card.id));
-  if (opts.silent !== true) {
-    await recordActivity(ctx, {
-      workspaceId,
-      actorId: actor?.id ?? null,
-      source: "worklog",
-      kind: t.kind,
-      title: `#${card.number} ${card.title}`,
-      body: t.verb,
-      cardId: card.id,
-      data: { from: card.stage, to: t.stage, columnId: t.columnId ?? null },
+  return await transact(ctx, async (tx) => {
+    const card = await getCardByNumber(tx.db, { workspaceId, number });
+    const now = tx.now();
+    await updateCardById(tx.db, {
+      id: card.id,
+      set: {
+        stage: t.stage,
+        columnId: t.stage === "active" ? (t.columnId ?? null) : null,
+        postponedAt: t.stage === "not_now" ? now : null,
+        autoPostponed: t.kind === "card.auto_postponed",
+        closedAt: t.stage === "done" ? now : null,
+        closedById: t.stage === "done" ? (actor?.id ?? null) : null,
+        updatedAt: now,
+        ...(opts.silent === true ? { lastActiveAt: now } : {}),
+      },
     });
-  }
-  const view = await getCard(ctx, workspaceId, number);
-  await ctx.bus.publish({
-    workspaceId,
-    type: "card.updated",
-    data: { number, stage: view.stage, columnId: view.columnId },
+    if (opts.silent !== true) {
+      await recordActivity(tx, {
+        workspaceId,
+        actorId: actor?.id ?? null,
+        source: "worklog",
+        kind: t.kind,
+        title: `#${card.number} ${card.title}`,
+        body: t.verb,
+        cardId: card.id,
+        data: { from: card.stage, to: t.stage, columnId: t.columnId ?? null },
+      });
+    }
+    const view = await getCard(tx, workspaceId, number);
+    await tx.bus.publish({
+      workspaceId,
+      type: "card.updated",
+      data: { number, stage: view.stage, columnId: view.columnId },
+    });
+    return view;
   });
-  return view;
 }
 
 export async function triage(
@@ -592,8 +455,11 @@ export async function triage(
   number: number,
   columnId: string
 ) {
-  const card = await findCard(ctx, workspaceId, number);
-  const board = await getBoard(ctx, workspaceId, card.boardId);
+  const card = await getCardByNumber(ctx.db, { workspaceId, number });
+  const board = await getBoardWithColumns(ctx.db, {
+    workspaceId,
+    id: card.boardId,
+  });
   const col = board.columns.find((c) => c.id === columnId);
   if (!col) {
     throw badRequest("columnId is not on this card's board");
@@ -680,21 +546,26 @@ export async function setGolden(
   number: number,
   golden: boolean
 ) {
-  const card = await findCard(ctx, actor.workspaceId, number);
-  await ctx.db
-    .update(cards)
-    .set({ golden, updatedAt: ctx.now() })
-    .where(eq(cards.id, card.id));
-  await recordActivity(ctx, {
-    workspaceId: actor.workspaceId,
-    actorId: actor.id,
-    source: "worklog",
-    kind: golden ? "card.golden" : "card.ungolden",
-    title: `#${card.number} ${card.title}`,
-    body: golden ? "Made it a golden ticket" : "Removed golden ticket",
-    cardId: card.id,
+  return await transact(ctx, async (tx) => {
+    const card = await getCardByNumber(tx.db, {
+      workspaceId: actor.workspaceId,
+      number,
+    });
+    await updateCardById(tx.db, {
+      id: card.id,
+      set: { golden, updatedAt: tx.now() },
+    });
+    await recordActivity(tx, {
+      workspaceId: actor.workspaceId,
+      actorId: actor.id,
+      source: "worklog",
+      kind: golden ? "card.golden" : "card.ungolden",
+      title: `#${card.number} ${card.title}`,
+      body: golden ? "Made it a golden ticket" : "Removed golden ticket",
+      cardId: card.id,
+    });
+    return await getCard(tx, actor.workspaceId, number);
   });
-  return await getCard(ctx, actor.workspaceId, number);
 }
 
 export async function assign(
@@ -705,50 +576,44 @@ export async function assign(
   memberId: string,
   opts: EffectOpts = {}
 ) {
-  const card = await findCard(ctx, workspaceId, number);
-  const [assignee] = await ctx.db
-    .select()
-    .from(members)
-    .where(and(eq(members.id, memberId), eq(members.workspaceId, workspaceId)));
-  if (!assignee) {
-    throw notFound("Member");
-  }
-  const inserted = await ctx.db
-    .insert(cardAssignees)
-    .values({ cardId: card.id, memberId })
-    .onConflictDoNothing()
-    .returning();
-  if (!inserted.length) {
-    return await getCard(ctx, workspaceId, number);
-  }
-  await watch(ctx, card.id, memberId);
-  if (opts.silent === true) {
-    return await getCard(ctx, workspaceId, number);
-  }
-  const activity = await recordActivity(ctx, {
-    workspaceId,
-    actorId: actor?.id ?? null,
-    source: "worklog",
-    kind: "card.assigned",
-    title: `#${card.number} ${card.title}`,
-    body: `Assigned to ${assignee.name}`,
-    cardId: card.id,
-    data: { assigneeId: memberId },
-  });
-  if (actor?.id !== memberId) {
-    await raiseAttention(ctx, {
+  return await transact(ctx, async (tx) => {
+    const card = await getCardByNumber(tx.db, { workspaceId, number });
+    const assignee = await findMemberById(tx.db, { id: memberId, workspaceId });
+    if (!assignee) {
+      throw notFound("Member");
+    }
+    if (!(await insertAssignee(tx.db, { cardId: card.id, memberId }))) {
+      return await getCard(tx, workspaceId, number);
+    }
+    await watch(tx, card.id, memberId);
+    if (opts.silent === true) {
+      return await getCard(tx, workspaceId, number);
+    }
+    const activity = await recordActivity(tx, {
       workspaceId,
-      memberId,
+      actorId: actor?.id ?? null,
+      source: "worklog",
       kind: "card.assigned",
-      title: `${actor?.name ?? "Worklog"} assigned you #${card.number} ${card.title}`,
+      title: `#${card.number} ${card.title}`,
+      body: `Assigned to ${assignee.name}`,
       cardId: card.id,
-      activityId: activity?.id ?? null,
-      fromId: actor?.id ?? null,
-      priority: "normal",
-      dedupeKey: `assigned:${card.id}`,
+      data: { assigneeId: memberId },
     });
-  }
-  return await getCard(ctx, workspaceId, number);
+    if (actor?.id !== memberId) {
+      await raiseAttention(tx, {
+        workspaceId,
+        memberId,
+        kind: "card.assigned",
+        title: `${actor?.name ?? "Worklog"} assigned you #${card.number} ${card.title}`,
+        cardId: card.id,
+        activityId: activity?.id ?? null,
+        fromId: actor?.id ?? null,
+        priority: "normal",
+        dedupeKey: `assigned:${card.id}`,
+      });
+    }
+    return await getCard(tx, workspaceId, number);
+  });
 }
 
 export async function unassign(
@@ -757,32 +622,27 @@ export async function unassign(
   number: number,
   memberId: string
 ) {
-  const card = await findCard(ctx, actor.workspaceId, number);
-  await ctx.db
-    .delete(cardAssignees)
-    .where(
-      and(
-        eq(cardAssignees.cardId, card.id),
-        eq(cardAssignees.memberId, memberId)
-      )
-    );
-  await recordActivity(ctx, {
-    workspaceId: actor.workspaceId,
-    actorId: actor.id,
-    source: "worklog",
-    kind: "card.unassigned",
-    title: `#${card.number} ${card.title}`,
-    cardId: card.id,
-    data: { assigneeId: memberId },
+  return await transact(ctx, async (tx) => {
+    const card = await getCardByNumber(tx.db, {
+      workspaceId: actor.workspaceId,
+      number,
+    });
+    await deleteAssignee(tx.db, { cardId: card.id, memberId });
+    await recordActivity(tx, {
+      workspaceId: actor.workspaceId,
+      actorId: actor.id,
+      source: "worklog",
+      kind: "card.unassigned",
+      title: `#${card.number} ${card.title}`,
+      cardId: card.id,
+      data: { assigneeId: memberId },
+    });
+    return await getCard(tx, actor.workspaceId, number);
   });
-  return await getCard(ctx, actor.workspaceId, number);
 }
 
 export async function watch(ctx: AppContext, cardId: string, memberId: string) {
-  await ctx.db
-    .insert(cardWatchers)
-    .values({ cardId, memberId })
-    .onConflictDoNothing();
+  await insertWatcher(ctx.db, { cardId, memberId });
 }
 
 export async function unwatch(
@@ -790,11 +650,7 @@ export async function unwatch(
   cardId: string,
   memberId: string
 ) {
-  await ctx.db
-    .delete(cardWatchers)
-    .where(
-      and(eq(cardWatchers.cardId, cardId), eq(cardWatchers.memberId, memberId))
-    );
+  await deleteWatcher(ctx.db, { cardId, memberId });
 }
 
 const MENTION = /(?:^|\s)@(?<handle>[a-z0-9][a-z0-9._-]*)/giu;
@@ -805,80 +661,78 @@ export async function addComment(
   number: number,
   body: string
 ) {
-  const card = await findCard(ctx, actor.workspaceId, number);
-  const comment = {
-    id: newId("cmt"),
-    cardId: card.id,
-    authorId: actor.id,
-    body,
-    createdAt: ctx.now(),
-  };
-  await ctx.db.insert(comments).values(comment);
-  await watch(ctx, card.id, actor.id);
-  const activity = await recordActivity(ctx, {
-    workspaceId: actor.workspaceId,
-    actorId: actor.id,
-    source: "worklog",
-    kind: "comment.created",
-    title: `#${card.number} ${card.title}`,
-    body: body.slice(0, 500),
-    cardId: card.id,
+  return await transact(ctx, async (tx) => {
+    const card = await getCardByNumber(tx.db, {
+      workspaceId: actor.workspaceId,
+      number,
+    });
+    const comment = {
+      id: newId("cmt"),
+      cardId: card.id,
+      authorId: actor.id,
+      body,
+      createdAt: tx.now(),
+    };
+    await insertComment(tx.db, comment);
+    await watch(tx, card.id, actor.id);
+    const activity = await recordActivity(tx, {
+      workspaceId: actor.workspaceId,
+      actorId: actor.id,
+      source: "worklog",
+      kind: "comment.created",
+      title: `#${card.number} ${card.title}`,
+      body: body.slice(0, 500),
+      cardId: card.id,
+    });
+
+    const handles = [...body.matchAll(MENTION)]
+      .map((m) => m.groups?.handle?.toLowerCase())
+      .filter((handle) => handle !== undefined);
+    const mentioned = await listMembersByHandles(tx.db, {
+      workspaceId: actor.workspaceId,
+      handles,
+    });
+    for (const m of mentioned) {
+      if (m.id === actor.id) {
+        continue;
+      }
+      await raiseAttention(tx, {
+        workspaceId: actor.workspaceId,
+        memberId: m.id,
+        kind: "mention",
+        title: `${actor.name} mentioned you on #${card.number} ${card.title}`,
+        body: body.slice(0, 280),
+        cardId: card.id,
+        activityId: activity?.id ?? null,
+        fromId: actor.id,
+        priority: "high",
+        dedupeKey: `mention:${comment.id}`,
+      });
+    }
+
+    const watchers = await listWatchers(tx.db, { cardId: card.id });
+    for (const w of watchers) {
+      if (
+        w.memberId === actor.id ||
+        mentioned.some((m) => m.id === w.memberId)
+      ) {
+        continue;
+      }
+      await raiseAttention(tx, {
+        workspaceId: actor.workspaceId,
+        memberId: w.memberId,
+        kind: "card.activity",
+        title: `New comments on #${card.number} ${card.title}`,
+        body: `${actor.name}: ${body.slice(0, 200)}`,
+        cardId: card.id,
+        activityId: activity?.id ?? null,
+        fromId: actor.id,
+        priority: "low",
+        dedupeKey: `card:${card.id}`,
+      });
+    }
+    return comment;
   });
-
-  const handles = [...body.matchAll(MENTION)]
-    .map((m) => m.groups?.handle?.toLowerCase())
-    .filter((handle) => handle !== undefined);
-  const mentioned = handles.length
-    ? await ctx.db
-        .select()
-        .from(members)
-        .where(
-          and(
-            eq(members.workspaceId, actor.workspaceId),
-            inArray(members.handle, handles)
-          )
-        )
-    : [];
-  for (const m of mentioned) {
-    if (m.id === actor.id) {
-      continue;
-    }
-    await raiseAttention(ctx, {
-      workspaceId: actor.workspaceId,
-      memberId: m.id,
-      kind: "mention",
-      title: `${actor.name} mentioned you on #${card.number} ${card.title}`,
-      body: body.slice(0, 280),
-      cardId: card.id,
-      activityId: activity?.id ?? null,
-      fromId: actor.id,
-      priority: "high",
-      dedupeKey: `mention:${comment.id}`,
-    });
-  }
-
-  const watchers = await ctx.db
-    .select()
-    .from(cardWatchers)
-    .where(eq(cardWatchers.cardId, card.id));
-  for (const w of watchers) {
-    if (w.memberId === actor.id || mentioned.some((m) => m.id === w.memberId)) {
-      continue;
-    }
-    await raiseAttention(ctx, {
-      workspaceId: actor.workspaceId,
-      memberId: w.memberId,
-      kind: "card.activity",
-      title: `New comments on #${card.number} ${card.title}`,
-      body: `${actor.name}: ${body.slice(0, 200)}`,
-      cardId: card.id,
-      activityId: activity?.id ?? null,
-      fromId: actor.id,
-      priority: "low",
-      dedupeKey: `card:${card.id}`,
-    });
-  }
-  return comment;
 }
 
 async function setTags(
@@ -890,21 +744,9 @@ async function setTags(
   const clean = [
     ...new Set(names.map((n) => n.trim().toLowerCase()).filter(Boolean)),
   ];
-  await ctx.db.delete(cardTags).where(eq(cardTags.cardId, cardId));
-  if (!clean.length) {
-    return;
-  }
-  await ctx.db
-    .insert(tags)
-    .values(clean.map((name) => ({ id: newId("tag"), workspaceId, name })))
-    .onConflictDoNothing();
-  const rows = await ctx.db
-    .select()
-    .from(tags)
-    .where(and(eq(tags.workspaceId, workspaceId), inArray(tags.name, clean)));
-  await ctx.db
-    .insert(cardTags)
-    .values(rows.map((t) => ({ cardId, tagId: t.id })));
+  await transact(ctx, async (tx) => {
+    await setCardTags(tx.db, { workspaceId, cardId, names: clean });
+  });
 }
 
 export async function keepAlive(
@@ -912,7 +754,10 @@ export async function keepAlive(
   actor: Member,
   number: number
 ) {
-  const card = await findCard(ctx, actor.workspaceId, number);
+  const card = await getCardByNumber(ctx.db, {
+    workspaceId: actor.workspaceId,
+    number,
+  });
   await recordActivity(ctx, {
     workspaceId: actor.workspaceId,
     actorId: actor.id,
@@ -933,29 +778,7 @@ const DRIFT_ACTIONS = [
 
 // Asks once per quiet spell.
 export async function nudgeDrifting(ctx: AppContext): Promise<number> {
-  const now = ctx.now();
-  const rows = await ctx.db
-    .select({
-      card: cards,
-      days: sql<number>`coalesce(${boards.entropyDays}, ${workspaces.entropyDays})`.mapWith(
-        Number
-      ),
-      memberId: members.id,
-    })
-    .from(cards)
-    .innerJoin(boards, eq(boards.id, cards.boardId))
-    .innerJoin(workspaces, eq(workspaces.id, cards.workspaceId))
-    .innerJoin(cardAssignees, eq(cardAssignees.cardId, cards.id))
-    .innerJoin(
-      members,
-      and(eq(members.id, cardAssignees.memberId), eq(members.kind, "human"))
-    )
-    .where(
-      and(
-        eq(cards.stage, "active"),
-        sql`${cards.lastActiveAt} <= ${now.toISOString()}::timestamptz - make_interval(days => coalesce(${boards.entropyDays}, ${workspaces.entropyDays})) * 0.75`
-      )
-    );
+  const rows = await listDriftingAssignments(ctx.db, { now: ctx.now() });
   let raised = 0;
   for (const { card, days, memberId } of rows) {
     const driftsOn = new Date(card.lastActiveAt.getTime() + days * DAY_MS);
@@ -979,18 +802,7 @@ export async function nudgeDrifting(ctx: AppContext): Promise<number> {
 }
 
 export async function sweepEntropy(ctx: AppContext): Promise<number> {
-  const now = ctx.now();
-  const stale = await ctx.db
-    .select({ workspaceId: cards.workspaceId, number: cards.number })
-    .from(cards)
-    .innerJoin(boards, eq(boards.id, cards.boardId))
-    .innerJoin(workspaces, eq(workspaces.id, cards.workspaceId))
-    .where(
-      and(
-        eq(cards.stage, "active"),
-        sql`${cards.lastActiveAt} <= ${now.toISOString()}::timestamptz - make_interval(days => coalesce(${boards.entropyDays}, ${workspaces.entropyDays}))`
-      )
-    );
+  const stale = await listStaleCards(ctx.db, { now: ctx.now() });
   for (const card of stale) {
     await transition(ctx, null, card.workspaceId, card.number, {
       stage: "not_now",

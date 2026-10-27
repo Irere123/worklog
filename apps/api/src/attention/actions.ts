@@ -1,9 +1,10 @@
 import * as board from "#board/service";
 import type { AppContext } from "#context";
+import { getAttentionById } from "#db/queries/attention";
+import type { Member } from "#db/queries/members";
 import { badRequest } from "#lib/errors";
-import type { Member } from "#members/service";
 
-import { assertAction, getAttention, updateAttention } from "./service";
+import { assertAction, updateAttention } from "./service";
 
 export async function performAttentionAction(
   ctx: AppContext,
@@ -11,7 +12,7 @@ export async function performAttentionAction(
   id: string,
   actionId: string
 ) {
-  const item = await getAttention(ctx, member.id, id);
+  const item = await getAttentionById(ctx.db, { id, memberId: member.id });
   assertAction(item, actionId);
   switch (item.kind) {
     case "card.drifting": {

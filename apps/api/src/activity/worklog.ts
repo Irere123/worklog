@@ -1,15 +1,17 @@
 import { generateText, Output } from "ai";
-import { and, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 
 import { TIMEOUTS } from "#agent/models";
 import { UNTRUSTED_NOTE } from "#agent/prompts";
 import { raiseAttention } from "#attention/service";
-import { findCard, listCards } from "#board/service";
+import { listCards } from "#board/service";
 import type { AppContext } from "#context";
-import { activities, cards, members } from "#db/schema";
+import { findActivityById, updateActivityById } from "#db/queries/activities";
+import { getCardByNumber, updateCardById } from "#db/queries/cards";
+import { listMembers, listMembersByHandles } from "#db/queries/members";
+import type { Member } from "#db/queries/members";
 import type { Visibility } from "#db/schema";
-import type { Member } from "#members/service";
+import { transact } from "#db/transact";
 
 import { recordActivity } from "./service";
 
@@ -35,7 +37,10 @@ export async function logWork(
   const card =
     cardNumber === 0
       ? null
-      : await findCard(ctx, author.workspaceId, cardNumber);
+      : await getCardByNumber(ctx.db, {
+          workspaceId: author.workspaceId,
+          number: cardNumber,
+        });
   const kind = input.kind ?? "entry";
   const activity = await recordActivity(ctx, {
     workspaceId: author.workspaceId,
@@ -121,10 +126,10 @@ async function structureLog(
     listCards(ctx, author.workspaceId, { limit: 60 }).then((cs) =>
       cs.filter((c) => c.stage === "active" || c.stage === "triage")
     ),
-    ctx.db
-      .select({ handle: members.handle, name: members.name })
-      .from(members)
-      .where(eq(members.workspaceId, author.workspaceId)),
+    listMembers(ctx.db, {
+      workspaceId: author.workspaceId,
+      includeDeactivated: true,
+    }),
   ]);
   const { output } = await generateText({
     model: models.fast,
@@ -142,10 +147,7 @@ ${text}
     timeout: TIMEOUTS.quick,
   });
 
-  const [current] = await ctx.db
-    .select()
-    .from(activities)
-    .where(eq(activities.id, activityId));
+  const current = await findActivityById(ctx.db, { id: activityId });
   if (!current) {
     return;
   }
@@ -154,35 +156,29 @@ ${text}
     : openCards.find((c) => c.number === output.cardNumber);
   const cardId = suggested?.id ?? current.cardId;
   const kind = given.kindGiven ? current.kind : `log.${output.kind}`;
-  await ctx.db
-    .update(activities)
-    .set({
-      title: output.title || current.title,
-      kind,
-      cardId,
-      data: { ...current.data, structured: true },
-    })
-    .where(eq(activities.id, activityId));
-  if (cardId) {
-    await ctx.db
-      .update(cards)
-      .set({ lastActiveAt: ctx.now() })
-      .where(eq(cards.id, cardId));
-  }
+  await transact(ctx, async (tx) => {
+    await updateActivityById(tx.db, {
+      id: activityId,
+      set: {
+        title: output.title || current.title,
+        kind,
+        cardId,
+        data: { ...current.data, structured: true },
+      },
+    });
+    if (cardId) {
+      await updateCardById(tx.db, {
+        id: cardId,
+        set: { lastActiveAt: tx.now() },
+      });
+    }
+  });
 
   if (kind === "log.blocker" && output.blockedOn.length > 0) {
-    const blockers = await ctx.db
-      .select()
-      .from(members)
-      .where(
-        and(
-          eq(members.workspaceId, author.workspaceId),
-          inArray(
-            members.handle,
-            output.blockedOn.map((h) => h.replace(/^@/u, "").toLowerCase())
-          )
-        )
-      );
+    const blockers = await listMembersByHandles(ctx.db, {
+      workspaceId: author.workspaceId,
+      handles: output.blockedOn.map((h) => h.replace(/^@/u, "").toLowerCase()),
+    });
     for (const m of blockers) {
       if (m.id === author.id) {
         continue;

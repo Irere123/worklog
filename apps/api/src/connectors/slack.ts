@@ -1,6 +1,8 @@
 import { z } from "zod";
 
 import type { AppContext } from "#context";
+import { findMemberByIdentity } from "#db/queries/members";
+import type { Member } from "#db/queries/members";
 import { toSlack } from "#delivery/service";
 import type {
   ConnectionView,
@@ -10,8 +12,6 @@ import type {
   WorklogEvent,
 } from "#ingest/types";
 import { hmacHex, safeEqual } from "#lib/crypto";
-import { memberByIdentity } from "#members/service";
-import type { Member } from "#members/service";
 
 import {
   HELP,
@@ -296,7 +296,7 @@ const ApiResult = z.object({ ok: z.boolean(), error: z.string().optional() });
 async function runSlackCommand(
   ctx: AppContext,
   conn: ConnectionView,
-  author: Member | null,
+  author: Member | undefined,
   userId: string,
   input: string
 ) {
@@ -304,11 +304,15 @@ async function runSlackCommand(
   if (name === "help") {
     return HELP;
   }
-  let target: Member | null = null;
+  let target: Member | undefined;
   let text = rest;
   const person = MENTIONED_PERSON.exec(rest)?.groups;
   if (person?.id) {
-    target = await memberByIdentity(ctx, conn.workspaceId, "slack", person.id);
+    target = await findMemberByIdentity(ctx.db, {
+      workspaceId: conn.workspaceId,
+      provider: "slack",
+      externalIds: person.id,
+    });
     text = person.text ?? "";
     if (!target) {
       return "I don't know that person in Worklog yet — they need to sign in with Slack or link their account.";
@@ -350,7 +354,7 @@ async function postMessage(
 async function replyInThread(
   ctx: AppContext,
   conn: ConnectionView,
-  author: Member | null,
+  author: Member | undefined,
   e: SlackEvent,
   text: string
 ) {
@@ -370,7 +374,7 @@ async function replyInThread(
 async function answerLater(
   ctx: AppContext,
   conn: ConnectionView,
-  author: Member | null,
+  author: Member | undefined,
   userId: string,
   input: string,
   responseUrl: string | undefined
@@ -518,24 +522,22 @@ export const slackConnector: Connector = {
     const interaction = Interaction.parse(payload);
     if (interaction.kind === "mention") {
       const e = interaction.event;
-      const author = await memberByIdentity(
-        ctx,
-        conn.workspaceId,
-        "slack",
-        e.user ?? ""
-      );
+      const author = await findMemberByIdentity(ctx.db, {
+        workspaceId: conn.workspaceId,
+        provider: "slack",
+        externalIds: e.user ?? "",
+      });
       const text = (e.text ?? "").replace(LEADING_MENTION, "");
       void replyInThread(ctx, conn, author, e, text);
       return { ok: true };
     }
     const { form } = interaction;
     const userId = form.user_id ?? "";
-    const author = await memberByIdentity(
-      ctx,
-      conn.workspaceId,
-      "slack",
-      userId
-    );
+    const author = await findMemberByIdentity(ctx.db, {
+      workspaceId: conn.workspaceId,
+      provider: "slack",
+      externalIds: userId,
+    });
     const input =
       form.command === "/log" ? `log ${form.text ?? ""}` : (form.text ?? "");
     const { name } = parseCommand(input);

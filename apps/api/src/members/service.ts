@@ -1,27 +1,33 @@
-import { and, asc, desc, eq, gt, inArray, isNull, or, sql } from "drizzle-orm";
-
 import { createDefaultAutomations } from "#automations/service";
 import type { AppContext } from "#context";
-import { account } from "#db/auth-schema";
 import {
-  API_SCOPES,
-  apiTokens,
-  deliveryTargets,
-  identities,
-  members,
-  workspaces,
-} from "#db/schema";
+  findTokenByHash,
+  findTokenById,
+  insertToken,
+  updateTokenById,
+} from "#db/queries/api-tokens";
+import { insertDeliveryTarget } from "#db/queries/delivery-targets";
+import {
+  findMemberByIdOrHandle,
+  getPersonalAgent,
+  insertMembers,
+  listHandlesLike,
+  listMemberships,
+  listPendingInvites,
+  setMembersUser,
+  updateMemberById,
+  WORKLOG_AGENT,
+} from "#db/queries/members";
+import type { Member } from "#db/queries/members";
+import { insertWorkspace } from "#db/queries/workspaces";
+import type { Workspace } from "#db/queries/workspaces";
+import { API_SCOPES } from "#db/schema";
 import type { ApiScope, MemberSettings } from "#db/schema";
-import { returned } from "#lib/assert";
+import { transact } from "#db/transact";
 import { generateToken, hashToken } from "#lib/crypto";
 import { badRequest, conflict, forbidden, notFound } from "#lib/errors";
 import { newId } from "#lib/ids";
 import { isValidTimeZone } from "#lib/time";
-
-export type Member = typeof members.$inferSelect;
-export type Workspace = typeof workspaces.$inferSelect;
-
-export const WORKLOG_AGENT = "worklog";
 
 function slugify(value: string) {
   return (
@@ -45,15 +51,10 @@ async function uniqueHandle(
   base: string
 ) {
   const root = slugify(base);
+  const taken = new Set(await listHandlesLike(ctx.db, { workspaceId, root }));
   for (let i = 0; i < 50; i += 1) {
     const handle = i === 0 ? root : `${root}-${i + 1}`;
-    const [taken] = await ctx.db
-      .select({ id: members.id })
-      .from(members)
-      .where(
-        and(eq(members.workspaceId, workspaceId), eq(members.handle, handle))
-      );
-    if (!taken) {
+    if (!taken.has(handle)) {
       return handle;
     }
   }
@@ -77,7 +78,7 @@ async function createWorkspace(
     cardSeq: 0,
     createdAt: ctx.now(),
   };
-  await ctx.db.insert(workspaces).values(workspace);
+  await insertWorkspace(ctx.db, workspace);
   return workspace;
 }
 
@@ -91,25 +92,27 @@ export async function setupWorkspace(
     timezone?: string;
   }
 ) {
-  const workspace = await createWorkspace(ctx, {
-    name: input.workspaceName,
-    timezone: input.timezone,
+  return await transact(ctx, async (tx) => {
+    const workspace = await createWorkspace(tx, {
+      name: input.workspaceName,
+      timezone: input.timezone,
+    });
+    const owner = await createMember(tx, workspace.id, {
+      kind: "human",
+      role: "owner",
+      name: input.name,
+      handle: input.handle,
+      email: input.email ?? null,
+      timezone: workspace.timezone,
+    });
+    const token = await createToken(tx, owner, "setup");
+    return {
+      workspace,
+      member: owner,
+      assistant: await getPersonalAgent(tx.db, { ownerId: owner.id }),
+      token,
+    };
   });
-  const owner = await createMember(ctx, workspace.id, {
-    kind: "human",
-    role: "owner",
-    name: input.name,
-    handle: input.handle,
-    email: input.email ?? null,
-    timezone: workspace.timezone,
-  });
-  const token = await createToken(ctx, owner, "setup");
-  return {
-    workspace,
-    member: owner,
-    assistant: await personalAgentOf(ctx, owner.id),
-    token,
-  };
 }
 
 export type SignedInUser = {
@@ -124,17 +127,19 @@ export async function createWorkspaceForUser(
   user: SignedInUser,
   input: { name: string; timezone?: string; handle?: string }
 ) {
-  const workspace = await createWorkspace(ctx, input);
-  const owner = await createMember(ctx, workspace.id, {
-    kind: "human",
-    role: "owner",
-    name: user.name || localPart(user.email),
-    handle: input.handle ?? localPart(user.email),
-    email: user.email,
-    timezone: workspace.timezone,
-    userId: user.id,
+  return await transact(ctx, async (tx) => {
+    const workspace = await createWorkspace(tx, input);
+    const owner = await createMember(tx, workspace.id, {
+      kind: "human",
+      role: "owner",
+      name: user.name || localPart(user.email),
+      handle: input.handle ?? localPart(user.email),
+      email: user.email,
+      timezone: workspace.timezone,
+      userId: user.id,
+    });
+    return { workspace, member: owner };
   });
-  return { workspace, member: owner };
 }
 
 // Claimed on sign-in with the same verified email (magic link, or a provider reporting a verified address).
@@ -142,41 +147,19 @@ export async function claimMemberships(ctx: AppContext, user: SignedInUser) {
   if (!user.emailVerified) {
     return 0;
   }
-  const pending = await ctx.db
-    .select()
-    .from(members)
-    .where(
-      and(
-        isNull(members.userId),
-        eq(members.kind, "human"),
-        isNull(members.deactivatedAt),
-        sql`lower(${members.email}) = ${user.email.toLowerCase()}`
-      )
-    );
-  const memberships = await membershipsOf(ctx, user.id);
-  const already = new Set(memberships.map((m) => m.member.workspaceId));
-  let claimed = 0;
+  const pending = await listPendingInvites(ctx.db, { email: user.email });
+  const memberships = await listMemberships(ctx.db, { userId: user.id });
+  // One member per user and workspace: of several invites to one workspace, the first wins.
+  const joined = new Set(memberships.map((m) => m.member.workspaceId));
+  const ids: string[] = [];
   for (const m of pending) {
-    if (already.has(m.workspaceId)) {
-      continue;
+    if (!joined.has(m.workspaceId)) {
+      joined.add(m.workspaceId);
+      ids.push(m.id);
     }
-    await ctx.db
-      .update(members)
-      .set({ userId: user.id })
-      .where(eq(members.id, m.id));
-    already.add(m.workspaceId);
-    claimed += 1;
   }
-  return claimed;
-}
-
-export async function membershipsOf(ctx: AppContext, userId: string) {
-  return await ctx.db
-    .select({ member: members, workspace: workspaces })
-    .from(members)
-    .innerJoin(workspaces, eq(workspaces.id, members.workspaceId))
-    .where(and(eq(members.userId, userId), isNull(members.deactivatedAt)))
-    .orderBy(asc(members.createdAt));
+  await setMembersUser(ctx.db, { ids, userId: user.id });
+  return ids.length;
 }
 
 export type NewMember = {
@@ -201,105 +184,61 @@ export async function createMember(
   if (input.timezone && !isValidTimeZone(input.timezone)) {
     throw badRequest(`Unknown time zone ${input.timezone}`);
   }
-  const member: Member = {
-    id: newId("mem"),
-    workspaceId,
-    kind: input.kind,
-    role: input.role ?? "member",
-    name: input.name,
-    handle: await uniqueHandle(ctx, workspaceId, input.handle ?? input.name),
-    email: input.email ?? null,
-    title: input.title ?? null,
-    timezone: input.timezone ?? null,
-    ownerId: input.ownerId ?? null,
-    agentProvider:
-      input.kind === "agent" ? (input.agentProvider ?? "custom") : null,
-    userId: input.kind === "human" ? (input.userId ?? null) : null,
-    settings: input.settings ?? {
-      activeHours: { start: "08:00", end: "19:00" },
-      workdays: [1, 2, 3, 4, 5],
-    },
-    createdAt: ctx.now(),
-    deactivatedAt: null,
-  };
-  await ctx.db.insert(members).values(member);
-
-  if (member.kind === "human") {
-    await ctx.db.insert(members).values({
+  return await transact(ctx, async (tx) => {
+    const member: Member = {
       id: newId("mem"),
       workspaceId,
-      kind: "agent",
-      role: "member",
-      name: `${member.name}'s assistant`,
-      handle: await uniqueHandle(ctx, workspaceId, `${member.handle}-agent`),
-      ownerId: member.id,
-      agentProvider: WORKLOG_AGENT,
-      settings: {},
-      createdAt: ctx.now(),
-    });
-    let emailTargetId: string | null = null;
-    if (member.email) {
-      emailTargetId = newId("tgt");
-      await ctx.db.insert(deliveryTargets).values({
-        id: emailTargetId,
-        workspaceId,
-        memberId: member.id,
-        kind: "email",
-        label: `Email (${member.email})`,
-        address: member.email,
-      });
+      kind: input.kind,
+      role: input.role ?? "member",
+      name: input.name,
+      handle: await uniqueHandle(tx, workspaceId, input.handle ?? input.name),
+      email: input.email ?? null,
+      title: input.title ?? null,
+      timezone: input.timezone ?? null,
+      ownerId: input.ownerId ?? null,
+      agentProvider:
+        input.kind === "agent" ? (input.agentProvider ?? "custom") : null,
+      userId: input.kind === "human" ? (input.userId ?? null) : null,
+      settings: input.settings ?? {
+        activeHours: { start: "08:00", end: "19:00" },
+        workdays: [1, 2, 3, 4, 5],
+      },
+      createdAt: tx.now(),
+      deactivatedAt: null,
+    };
+    await insertMembers(tx.db, [member]);
+
+    if (member.kind === "human") {
+      await insertMembers(tx.db, [
+        {
+          id: newId("mem"),
+          workspaceId,
+          kind: "agent",
+          role: "member",
+          name: `${member.name}'s assistant`,
+          handle: await uniqueHandle(tx, workspaceId, `${member.handle}-agent`),
+          ownerId: member.id,
+          agentProvider: WORKLOG_AGENT,
+          settings: {},
+          createdAt: tx.now(),
+        },
+      ]);
+      let emailTargetId: string | null = null;
+      if (member.email) {
+        emailTargetId = newId("tgt");
+        await insertDeliveryTarget(tx.db, {
+          id: emailTargetId,
+          workspaceId,
+          memberId: member.id,
+          kind: "email",
+          label: `Email (${member.email})`,
+          address: member.email,
+        });
+      }
+      await createDefaultAutomations(tx, member, emailTargetId);
     }
-    await createDefaultAutomations(ctx, member, emailTargetId);
-  }
-  return member;
-}
-
-export async function personalAgentOf(
-  ctx: AppContext,
-  humanId: string
-): Promise<Member> {
-  const [agent] = await ctx.db
-    .select()
-    .from(members)
-    .where(
-      and(
-        eq(members.ownerId, humanId),
-        eq(members.agentProvider, WORKLOG_AGENT)
-      )
-    );
-  if (!agent) {
-    throw notFound("Assistant");
-  }
-  return agent;
-}
-
-export async function getWorkspace(ctx: AppContext, workspaceId: string) {
-  const [ws] = await ctx.db
-    .select()
-    .from(workspaces)
-    .where(eq(workspaces.id, workspaceId));
-  if (!ws) {
-    throw notFound("Workspace");
-  }
-  return ws;
-}
-
-export async function listMembers(
-  ctx: AppContext,
-  workspaceId: string,
-  kind?: Member["kind"]
-) {
-  return await ctx.db
-    .select()
-    .from(members)
-    .where(
-      and(
-        eq(members.workspaceId, workspaceId),
-        isNull(members.deactivatedAt),
-        kind ? eq(members.kind, kind) : undefined
-      )
-    )
-    .orderBy(members.createdAt);
+    return member;
+  });
 }
 
 export async function resolveMember(
@@ -310,16 +249,11 @@ export async function resolveMember(
   if (ref === "me") {
     return viewer;
   }
-  const handle = ref.replace(/^@/u, "").toLowerCase();
-  const [m] = await ctx.db
-    .select()
-    .from(members)
-    .where(
-      and(
-        eq(members.workspaceId, viewer.workspaceId),
-        or(eq(members.id, ref), eq(members.handle, handle))
-      )
-    );
+  const m = await findMemberByIdOrHandle(ctx.db, {
+    workspaceId: viewer.workspaceId,
+    id: ref,
+    handle: ref.replace(/^@/u, "").toLowerCase(),
+  });
   if (!m) {
     throw notFound(`Member ${ref}`);
   }
@@ -339,12 +273,10 @@ export async function updateMember(
   const settings = patch.settings
     ? { ...member.settings, ...patch.settings }
     : undefined;
-  const rows = await ctx.db
-    .update(members)
-    .set({ ...patch, ...(settings ? { settings } : {}) })
-    .where(eq(members.id, member.id))
-    .returning();
-  return returned(rows, "member");
+  return await updateMemberById(ctx.db, {
+    id: member.id,
+    set: { ...patch, ...(settings ? { settings } : {}) },
+  });
 }
 
 export function timezoneOf(member: Member, workspace: Workspace) {
@@ -369,7 +301,7 @@ export async function createToken(
     expiresAt: opts.expiresAt ?? null,
     createdAt: ctx.now(),
   };
-  await ctx.db.insert(apiTokens).values(row);
+  await insertToken(ctx.db, row);
   return {
     id: row.id,
     name,
@@ -380,42 +312,21 @@ export async function createToken(
   };
 }
 
-export async function listTokens(ctx: AppContext, memberId: string) {
-  return await ctx.db
-    .select()
-    .from(apiTokens)
-    .where(and(eq(apiTokens.memberId, memberId), isNull(apiTokens.revokedAt)))
-    .orderBy(desc(apiTokens.createdAt));
-}
-
 export async function authenticate(ctx: AppContext, token: string) {
-  const [row] = await ctx.db
-    .select({
-      member: members,
-      tokenId: apiTokens.id,
-      scopes: apiTokens.scopes,
-    })
-    .from(apiTokens)
-    .innerJoin(members, eq(members.id, apiTokens.memberId))
-    .where(
-      and(
-        eq(apiTokens.tokenHash, hashToken(token)),
-        isNull(apiTokens.revokedAt),
-        isNull(members.deactivatedAt),
-        or(isNull(apiTokens.expiresAt), gt(apiTokens.expiresAt, ctx.now()))
-      )
-    );
+  const row = await findTokenByHash(ctx.db, {
+    tokenHash: hashToken(token),
+    now: ctx.now(),
+  });
   if (!row) {
     return null;
   }
   // Fire-and-forget bookkeeping; never block a request on it.
-  void ctx.db
-    .update(apiTokens)
-    .set({ lastUsedAt: ctx.now() })
-    .where(eq(apiTokens.id, row.tokenId))
-    .catch(() => {
-      // Best effort: a missed lastUsedAt update is harmless.
-    });
+  void updateTokenById(ctx.db, {
+    id: row.tokenId,
+    set: { lastUsedAt: ctx.now() },
+  }).catch(() => {
+    // Best effort: a missed lastUsedAt update is harmless.
+  });
   return { member: row.member, scopes: row.scopes.filter(isApiScope) };
 }
 
@@ -437,72 +348,18 @@ export async function revokeToken(
   viewer: Member,
   tokenId: string
 ) {
-  const [row] = await ctx.db
-    .select({ token: apiTokens, member: members })
-    .from(apiTokens)
-    .innerJoin(members, eq(members.id, apiTokens.memberId))
-    .where(
-      and(
-        eq(apiTokens.id, tokenId),
-        eq(apiTokens.workspaceId, viewer.workspaceId)
-      )
-    );
+  const row = await findTokenById(ctx.db, {
+    id: tokenId,
+    workspaceId: viewer.workspaceId,
+  });
   if (!row) {
     throw notFound("Token");
   }
   if (!canActFor(viewer, row.member)) {
     throw forbidden("You can't revoke that token");
   }
-  await ctx.db
-    .update(apiTokens)
-    .set({ revokedAt: ctx.now() })
-    .where(eq(apiTokens.id, tokenId));
-}
-
-// Explicit links first, then sign-in accounts, so signing in with GitHub is enough to be attributed.
-// Pass every id the event carries (e.g. GitHub's numeric id and login).
-export async function memberByIdentity(
-  ctx: AppContext,
-  workspaceId: string,
-  provider: string,
-  externalIds: string | string[]
-) {
-  const ids = [
-    ...new Set(
-      (Array.isArray(externalIds) ? externalIds : [externalIds]).filter(Boolean)
-    ),
-  ];
-  if (!ids.length) {
-    return null;
-  }
-  const normalized =
-    provider === "github" ? ids.map((i) => i.toLowerCase()) : ids;
-  const [linked] = await ctx.db
-    .select({ member: members })
-    .from(identities)
-    .innerJoin(members, eq(members.id, identities.memberId))
-    .where(
-      and(
-        eq(identities.workspaceId, workspaceId),
-        eq(identities.provider, provider),
-        inArray(identities.externalId, normalized)
-      )
-    );
-  if (linked) {
-    return linked.member;
-  }
-  const [signedIn] = await ctx.db
-    .select({ member: members })
-    .from(account)
-    .innerJoin(
-      members,
-      and(
-        eq(members.userId, account.userId),
-        eq(members.workspaceId, workspaceId)
-      )
-    )
-    .where(
-      and(eq(account.providerId, provider), inArray(account.accountId, ids))
-    );
-  return signedIn?.member ?? null;
+  await updateTokenById(ctx.db, {
+    id: tokenId,
+    set: { revokedAt: ctx.now() },
+  });
 }

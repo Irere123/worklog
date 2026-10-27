@@ -2,23 +2,27 @@ import { tool } from "ai";
 import type { ToolSet } from "ai";
 import { z } from "zod";
 
-import { listActivities } from "#activity/service";
 import { workSnapshot } from "#activity/snapshot";
 import { logWork, LOG_KINDS } from "#activity/worklog";
 import { performAttentionAction } from "#attention/actions";
 import {
   giveFeedback,
-  listOpenAttention,
   raiseAttention,
   updateAttention,
 } from "#attention/service";
 import * as board from "#board/service";
 import type { AppContext } from "#context";
+import { listActivities } from "#db/queries/activities";
+import { listOpenAttention } from "#db/queries/attention";
+import { getBoardWithColumns, listBoards } from "#db/queries/boards";
+import { getCardByNumber } from "#db/queries/cards";
+import { listMembers } from "#db/queries/members";
+import type { Member } from "#db/queries/members";
+import { listMemories } from "#db/queries/memories";
 import { CARD_STAGES } from "#db/schema";
 import { DAY_MS } from "#lib/time";
-import { listMembers, resolveMember } from "#members/service";
-import type { Member } from "#members/service";
-import { addMemory, forgetMemory, listMemories } from "#memory/service";
+import { resolveMember } from "#members/service";
+import { addMemory, forgetMemory } from "#memory/service";
 
 type Scope = {
   ctx: AppContext;
@@ -59,7 +63,7 @@ export function assistantTools(scope: Scope): ToolSet {
         "List the people and agents in the workspace with their handles and roles.",
       inputSchema: z.object({}),
       execute: safe(async () => {
-        const people = await listMembers(ctx, ws);
+        const people = await listMembers(ctx.db, { workspaceId: ws });
         return people.map((m) => ({
           handle: m.handle,
           name: m.name,
@@ -119,19 +123,16 @@ export function assistantTools(scope: Scope): ToolSet {
       }),
       execute: safe(async ({ query, person, source, kind, days, limit }) => {
         const who = person ? await resolveMember(ctx, owner, person) : null;
-        const rows = await listActivities(
-          ctx,
-          ws,
-          mode === "owner" ? [owner.id] : [],
-          {
-            q: query,
-            actorIds: who ? [who.id] : undefined,
-            source,
-            kinds: kind ? [kind] : undefined,
-            since: new Date(ctx.now().getTime() - (days ?? 14) * DAY_MS),
-            limit: limit ?? 30,
-          }
-        );
+        const rows = await listActivities(ctx.db, {
+          workspaceId: ws,
+          privateFor: mode === "owner" ? [owner.id] : [],
+          q: query,
+          actorIds: who ? [who.id] : undefined,
+          source,
+          kinds: kind ? [kind] : undefined,
+          since: new Date(ctx.now().getTime() - (days ?? 14) * DAY_MS),
+          limit: limit ?? 30,
+        });
         return rows.map((a) => ({
           at: a.occurredAt.toISOString(),
           actorId: a.actorId,
@@ -183,12 +184,12 @@ export function assistantTools(scope: Scope): ToolSet {
       inputSchema: z.object({ number: z.number().int() }),
       execute: safe(async ({ number }) => {
         const card = await board.getCardDetail(ctx, ws, number);
-        const history = await listActivities(
-          ctx,
-          ws,
-          mode === "owner" ? [owner.id] : [],
-          { cardId: card.id, limit: 20 }
-        );
+        const history = await listActivities(ctx.db, {
+          workspaceId: ws,
+          privateFor: mode === "owner" ? [owner.id] : [],
+          cardId: card.id,
+          limit: 20,
+        });
         return {
           ...card,
           comments: card.comments.map((c) => ({
@@ -210,7 +211,8 @@ export function assistantTools(scope: Scope): ToolSet {
       description: `What you have learned about ${owner.name}: profile (how they work, what they own), facts, and recent daily journal entries.`,
       inputSchema: z.object({ query: z.string().optional() }),
       execute: safe(async ({ query }) => {
-        const memories = await listMemories(ctx, owner.id, {
+        const memories = await listMemories(ctx.db, {
+          memberId: owner.id,
           includePrivate: mode === "owner",
           q: query,
           limit: 60,
@@ -244,7 +246,10 @@ export function assistantTools(scope: Scope): ToolSet {
           const card =
             cardNumber === undefined
               ? null
-              : await board.findCard(ctx, ws, cardNumber);
+              : await getCardByNumber(ctx.db, {
+                  workspaceId: ws,
+                  number: cardNumber,
+                });
           await raiseAttention(ctx, {
             workspaceId: ws,
             memberId: owner.id,
@@ -268,7 +273,11 @@ export function assistantTools(scope: Scope): ToolSet {
       description: `${owner.name}'s open attention items (review requests, mentions, assignments, blockers, notes from teammates).`,
       inputSchema: z.object({}),
       execute: safe(async () => {
-        const items = await listOpenAttention(ctx, owner.id, 50);
+        const items = await listOpenAttention(ctx.db, {
+          memberId: owner.id,
+          now: ctx.now(),
+          limit: 50,
+        });
         return items.map((a) => ({
           id: a.id,
           kind: a.kind,
@@ -406,7 +415,7 @@ export function assistantTools(scope: Scope): ToolSet {
       }),
       execute: safe(
         async ({ title, body, board: boardRef, column, assignToOwner }) => {
-          const boards = await board.listBoards(ctx, ws);
+          const boards = await listBoards(ctx.db, { workspaceId: ws });
           const target =
             boards.find(
               (b) =>
@@ -416,7 +425,10 @@ export function assistantTools(scope: Scope): ToolSet {
           if (!target) {
             return { error: "There are no boards yet" };
           }
-          const detail = await board.getBoard(ctx, ws, target.id);
+          const detail = await getBoardWithColumns(ctx.db, {
+            workspaceId: ws,
+            id: target.id,
+          });
           const col = column
             ? detail.columns.find(
                 (c) => c.name.toLowerCase() === column.toLowerCase()
@@ -478,8 +490,11 @@ async function moveCard(
   if (dest === "done") {
     return await board.close(ctx, agent, ws, number);
   }
-  const c = await board.findCard(ctx, ws, number);
-  const b = await board.getBoard(ctx, ws, c.boardId);
+  const c = await getCardByNumber(ctx.db, { workspaceId: ws, number });
+  const b = await getBoardWithColumns(ctx.db, {
+    workspaceId: ws,
+    id: c.boardId,
+  });
   const col = b.columns.find((x) => x.name.toLowerCase() === to.toLowerCase());
   if (!col) {
     throw new Error(

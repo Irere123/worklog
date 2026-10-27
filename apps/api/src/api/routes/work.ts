@@ -1,10 +1,6 @@
 import { createRoute, z } from "@hono/zod-openapi";
 
-import {
-  deleteOwnActivity,
-  listActivities,
-  recordActivity,
-} from "#activity/service";
+import { recordActivity } from "#activity/service";
 import { LOG_KINDS, logWork } from "#activity/worklog";
 import { body, errors, json, Ok, router } from "#api/router";
 import {
@@ -23,15 +19,17 @@ import {
   listAttention,
   updateAttention,
 } from "#attention/service";
-import { findCard } from "#board/service";
-import { generateBrief, getBrief, listBriefs } from "#briefs/service";
+import { generateBrief } from "#briefs/service";
 import type { AppContext } from "#context";
+import { deleteOwnActivity, listActivities } from "#db/queries/activities";
+import { getBriefById, listBriefs } from "#db/queries/briefs";
+import { getCardByNumber } from "#db/queries/cards";
+import type { Member } from "#db/queries/members";
 import { ATTENTION_STATES, FEEDBACK_SIGNALS, VISIBILITY } from "#db/schema";
 import { deliver } from "#delivery/service";
 import { applyAgentState } from "#ingest/effects";
 import { notFound } from "#lib/errors";
 import { resolveMember } from "#members/service";
-import type { Member } from "#members/service";
 
 export const workRoutes = router()
   .openapi(
@@ -74,8 +72,13 @@ export const workRoutes = router()
       const card =
         q.card === undefined || q.card === 0
           ? null
-          : await findCard(ctx, me.workspaceId, q.card);
-      const rows = await listActivities(ctx, me.workspaceId, [me.id], {
+          : await getCardByNumber(ctx.db, {
+              workspaceId: me.workspaceId,
+              number: q.card,
+            });
+      const rows = await listActivities(ctx.db, {
+        workspaceId: me.workspaceId,
+        privateFor: [me.id],
         actorIds: actor ? [actor.id] : undefined,
         source: q.source,
         kinds: q.kind ? [q.kind] : undefined,
@@ -139,7 +142,10 @@ export const workRoutes = router()
       const card =
         input.cardNumber === undefined || input.cardNumber === 0
           ? null
-          : await findCard(ctx, me.workspaceId, input.cardNumber);
+          : await getCardByNumber(ctx.db, {
+              workspaceId: me.workspaceId,
+              number: input.cardNumber,
+            });
       const onBehalfOf = await workingFor(ctx, me, input.onBehalfOf);
       const thread = input.thread ?? input.externalId ?? null;
       const row = await recordActivity(ctx, {
@@ -190,12 +196,11 @@ export const workRoutes = router()
     async (c) => {
       const me = c.get("member");
       if (
-        !(await deleteOwnActivity(
-          c.get("ctx"),
-          me.workspaceId,
-          me.id,
-          c.req.valid("param").id
-        ))
+        !(await deleteOwnActivity(c.get("ctx").db, {
+          id: c.req.valid("param").id,
+          workspaceId: me.workspaceId,
+          actorId: me.id,
+        }))
       ) {
         throw notFound("Activity");
       }
@@ -377,11 +382,10 @@ export const workRoutes = router()
       responses: { 200: json(z.array(BriefSchema)), ...errors },
     }),
     async (c) => {
-      const rows = await listBriefs(
-        c.get("ctx"),
-        c.get("member").id,
-        c.req.valid("query").period
-      );
+      const rows = await listBriefs(c.get("ctx").db, {
+        memberId: c.get("member").id,
+        period: c.req.valid("query").period,
+      });
       return c.json(rows.map(toBrief), 200);
     }
   )
@@ -395,14 +399,10 @@ export const workRoutes = router()
       responses: { 200: json(BriefSchema), ...errors },
     }),
     async (c) => {
-      const row = await getBrief(
-        c.get("ctx"),
-        c.get("member").id,
-        c.req.valid("param").id
-      );
-      if (!row) {
-        throw notFound("Brief");
-      }
+      const row = await getBriefById(c.get("ctx").db, {
+        id: c.req.valid("param").id,
+        memberId: c.get("member").id,
+      });
       return c.json(toBrief(row), 200);
     }
   )

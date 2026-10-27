@@ -1,15 +1,20 @@
-import { and, asc, desc, eq } from "drizzle-orm";
-
 import type { AppContext } from "#context";
-import { automationRuns, automations, workspaces } from "#db/schema";
-import type { AutomationKind, members, Schedule } from "#db/schema";
+import {
+  deleteAutomationById,
+  getAutomationById,
+  insertAutomation,
+  listAutomationRuns,
+  updateAutomationById,
+} from "#db/queries/automations";
+import type { Automation } from "#db/queries/automations";
+import type { Member } from "#db/queries/members";
+import { getWorkspaceById } from "#db/queries/workspaces";
+import type { AutomationKind, Schedule } from "#db/schema";
+import { transact } from "#db/transact";
 import { badRequest, notFound } from "#lib/errors";
 import { newId } from "#lib/ids";
 
 import { jitterFor, nextRun } from "./schedule";
-
-type Member = typeof members.$inferSelect;
-export type AutomationRow = typeof automations.$inferSelect;
 
 export async function createDefaultAutomations(
   ctx: AppContext,
@@ -63,9 +68,11 @@ export async function createDefaultAutomations(
       targetIds: [],
     },
   ];
-  for (const d of defaults) {
-    await createAutomation(ctx, member, d);
-  }
+  await transact(ctx, async (tx) => {
+    for (const d of defaults) {
+      await createAutomation(tx, member, d);
+    }
+  });
 }
 
 export async function createAutomation(
@@ -104,31 +111,7 @@ export async function createAutomation(
     ),
     createdAt: ctx.now(),
   };
-  await ctx.db.insert(automations).values(row);
-  return await getAutomation(ctx, member.id, id);
-}
-
-export async function listAutomations(ctx: AppContext, memberId: string) {
-  return await ctx.db
-    .select()
-    .from(automations)
-    .where(eq(automations.memberId, memberId))
-    .orderBy(asc(automations.createdAt));
-}
-
-export async function getAutomation(
-  ctx: AppContext,
-  memberId: string,
-  id: string
-) {
-  const [row] = await ctx.db
-    .select()
-    .from(automations)
-    .where(and(eq(automations.id, id), eq(automations.memberId, memberId)));
-  if (!row) {
-    throw notFound("Automation");
-  }
-  return row;
+  return await insertAutomation(ctx.db, row);
 }
 
 export async function updateAutomation(
@@ -137,17 +120,17 @@ export async function updateAutomation(
   id: string,
   patch: Partial<
     Pick<
-      AutomationRow,
+      Automation,
       "name" | "schedule" | "targetIds" | "instructions" | "enabled"
     >
   >
 ) {
-  const current = await getAutomation(ctx, member.id, id);
+  const current = await getAutomationById(ctx.db, { id, memberId: member.id });
   const schedule = patch.schedule ?? current.schedule;
   const tz = await memberTimezone(ctx, member);
-  await ctx.db
-    .update(automations)
-    .set({
+  const row = await updateAutomationById(ctx.db, {
+    id,
+    set: {
       ...patch,
       ...(patch.enabled === true ? { failureCount: 0 } : {}),
       nextRunAt: nextRun(
@@ -157,9 +140,12 @@ export async function updateAutomation(
         member.settings,
         jitterFor(id)
       ),
-    })
-    .where(eq(automations.id, id));
-  return await getAutomation(ctx, member.id, id);
+    },
+  });
+  if (!row) {
+    throw notFound("Automation");
+  }
+  return row;
 }
 
 export async function deleteAutomation(
@@ -167,27 +153,20 @@ export async function deleteAutomation(
   memberId: string,
   id: string
 ) {
-  await getAutomation(ctx, memberId, id);
-  await ctx.db.delete(automations).where(eq(automations.id, id));
+  if (!(await deleteAutomationById(ctx.db, { id, memberId }))) {
+    throw notFound("Automation");
+  }
 }
 
 export async function listRuns(ctx: AppContext, memberId: string, id: string) {
-  await getAutomation(ctx, memberId, id);
-  return await ctx.db
-    .select()
-    .from(automationRuns)
-    .where(eq(automationRuns.automationId, id))
-    .orderBy(desc(automationRuns.startedAt))
-    .limit(50);
+  await getAutomationById(ctx.db, { id, memberId });
+  return await listAutomationRuns(ctx.db, { automationId: id });
 }
 
 export async function memberTimezone(ctx: AppContext, member: Member) {
   if (member.timezone) {
     return member.timezone;
   }
-  const [ws] = await ctx.db
-    .select({ tz: workspaces.timezone })
-    .from(workspaces)
-    .where(eq(workspaces.id, member.workspaceId));
-  return ws?.tz ?? "UTC";
+  const ws = await getWorkspaceById(ctx.db, { id: member.workspaceId });
+  return ws.timezone;
 }

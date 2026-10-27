@@ -29,6 +29,29 @@ export default defineConfig({
         "unicorn/no-await-expression-member": "off",
       },
     },
+    {
+      // Queries live in src/db/queries (AGENTS.md, Database), so domain code
+      // can't build SQL. Drivers like drizzle-orm/node-postgres stay allowed:
+      // the Better Auth CLI needs one.
+      files: ["apps/api/src/**"],
+      rules: {
+        "no-restricted-imports": [
+          "error",
+          {
+            paths: [
+              {
+                name: "drizzle-orm",
+                message: "Write the query in src/db/queries and call it.",
+              },
+            ],
+          },
+        ],
+      },
+    },
+    {
+      files: ["apps/api/src/db/**"],
+      rules: { "no-restricted-imports": "off" },
+    },
   ],
   rules: {
     // Key order carries meaning: schemas, table columns, API responses and

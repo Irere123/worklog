@@ -1,9 +1,8 @@
 import { listCards } from "#board/service";
 import type { AppContext } from "#context";
+import { listActivities } from "#db/queries/activities";
+import type { Member } from "#db/queries/members";
 import { DAY_MS } from "#lib/time";
-import type { Member } from "#members/service";
-
-import { listActivities } from "./service";
 
 export async function workSnapshot(
   ctx: AppContext,
@@ -13,16 +12,13 @@ export async function workSnapshot(
   const days = opts.days ?? 7;
   const [assigned, recent] = await Promise.all([
     listCards(ctx, person.workspaceId, { assigneeId: person.id, limit: 100 }),
-    listActivities(
-      ctx,
-      person.workspaceId,
-      opts.includePrivate ? [person.id] : [],
-      {
-        actorIds: [person.id],
-        since: new Date(ctx.now().getTime() - days * DAY_MS),
-        limit: 40,
-      }
-    ),
+    listActivities(ctx.db, {
+      workspaceId: person.workspaceId,
+      privateFor: opts.includePrivate ? [person.id] : [],
+      actorIds: [person.id],
+      since: new Date(ctx.now().getTime() - days * DAY_MS),
+      limit: 40,
+    }),
   ]);
   return {
     person: {

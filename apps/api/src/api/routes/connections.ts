@@ -1,5 +1,4 @@
 import { createRoute, z } from "@hono/zod-openapi";
-import { and, desc, eq } from "drizzle-orm";
 
 import { body, errors, json, Ok, requireAdmin, router } from "#api/router";
 import {
@@ -12,8 +11,10 @@ import * as conns from "#connectors/connections";
 import { PushedEvent } from "#connectors/custom";
 import { registerDiscordCommands } from "#connectors/discord";
 import { listConnectors } from "#connectors/registry";
-import { inboundEvents } from "#db/schema";
-import { linkIdentityToMember, listIdentities } from "#ingest/identity";
+import { getConnectionById, listConnections } from "#db/queries/connections";
+import { listIdentities } from "#db/queries/identities";
+import { listInboundEvents } from "#db/queries/inbound-events";
+import { linkIdentityToMember } from "#ingest/identity";
 import { connectionHealth, receivePushed, viewOf } from "#ingest/pipeline";
 import { enqueue } from "#jobs/queue";
 import { badRequest, forbidden } from "#lib/errors";
@@ -107,10 +108,9 @@ export const connectionRoutes = router()
     }),
     async (c) => {
       const ctx = c.get("ctx");
-      const rows = await conns.listConnections(
-        ctx,
-        c.get("member").workspaceId
-      );
+      const rows = await listConnections(ctx.db, {
+        workspaceId: c.get("member").workspaceId,
+      });
       return c.json(
         rows.map((r) => toConnection(r, conns.webhookUrls(ctx, r))),
         200
@@ -228,11 +228,10 @@ export const connectionRoutes = router()
     }),
     async (c) => {
       const ctx = c.get("ctx");
-      const conn = await conns.getConnection(
-        ctx,
-        c.get("member").workspaceId,
-        c.req.valid("param").id
-      );
+      const conn = await getConnectionById(ctx.db, {
+        id: c.req.valid("param").id,
+        workspaceId: c.get("member").workspaceId,
+      });
       return c.json(
         await connectionHealth(ctx, conn, c.req.valid("query").days),
         200
@@ -263,23 +262,16 @@ export const connectionRoutes = router()
       const ctx = c.get("ctx");
       const me = c.get("member");
       requireAdmin(me);
-      const conn = await conns.getConnection(
-        ctx,
-        me.workspaceId,
-        c.req.valid("param").id
-      );
+      const conn = await getConnectionById(ctx.db, {
+        id: c.req.valid("param").id,
+        workspaceId: me.workspaceId,
+      });
       const q = c.req.valid("query");
-      const rows = await ctx.db
-        .select()
-        .from(inboundEvents)
-        .where(
-          and(
-            eq(inboundEvents.connectionId, conn.id),
-            q.status ? eq(inboundEvents.status, q.status) : undefined
-          )
-        )
-        .orderBy(desc(inboundEvents.receivedAt))
-        .limit(q.limit ?? 50);
+      const rows = await listInboundEvents(ctx.db, {
+        connectionId: conn.id,
+        status: q.status,
+        limit: q.limit ?? 50,
+      });
       return c.json(
         rows.map((r) => ({
           id: r.id,
@@ -319,11 +311,10 @@ export const connectionRoutes = router()
       const ctx = c.get("ctx");
       const me = c.get("member");
       requireAdmin(me);
-      const conn = await conns.getConnection(
-        ctx,
-        me.workspaceId,
-        c.req.valid("param").id
-      );
+      const conn = await getConnectionById(ctx.db, {
+        id: c.req.valid("param").id,
+        workspaceId: me.workspaceId,
+      });
       await enqueue(
         ctx,
         "ingest:replay",
@@ -364,11 +355,10 @@ export const connectionRoutes = router()
     async (c) => {
       const ctx = c.get("ctx");
       const me = c.get("member");
-      const conn = await conns.getConnection(
-        ctx,
-        me.workspaceId,
-        c.req.valid("param").id
-      );
+      const conn = await getConnectionById(ctx.db, {
+        id: c.req.valid("param").id,
+        workspaceId: me.workspaceId,
+      });
       if (conn.provider !== "custom") {
         throw badRequest("Push events only to a custom connection");
       }
@@ -404,11 +394,10 @@ export const connectionRoutes = router()
       const ctx = c.get("ctx");
       const me = c.get("member");
       requireAdmin(me);
-      const conn = await conns.getConnection(
-        ctx,
-        me.workspaceId,
-        c.req.valid("param").id
-      );
+      const conn = await getConnectionById(ctx.db, {
+        id: c.req.valid("param").id,
+        workspaceId: me.workspaceId,
+      });
       if (conn.provider !== "discord") {
         throw badRequest("Not a Discord connection");
       }
@@ -432,11 +421,10 @@ export const connectionRoutes = router()
       responses: { 200: json(z.array(IdentitySchema)), ...errors },
     }),
     async (c) => {
-      const rows = await listIdentities(
-        c.get("ctx"),
-        c.get("member").workspaceId,
-        { unlinked: c.req.valid("query").unlinked === "true" }
-      );
+      const rows = await listIdentities(c.get("ctx").db, {
+        workspaceId: c.get("member").workspaceId,
+        unlinked: c.req.valid("query").unlinked === "true",
+      });
       return c.json(rows.map(toIdentity), 200);
     }
   )

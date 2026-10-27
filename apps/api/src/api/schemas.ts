@@ -1,13 +1,18 @@
 import { z } from "@hono/zod-openapi";
 
-import type { ActivityRow } from "#activity/service";
 import type { WorkSnapshot } from "#activity/snapshot";
-import type { ConversationRow, MessageRow } from "#agent/conversations";
-import type { AttentionRow } from "#attention/service";
-import type { AutomationRow } from "#automations/service";
-import type { CardView, Column } from "#board/service";
-import type { BriefRow } from "#briefs/service";
-import type { ConnectionRow } from "#connectors/connections";
+import type { CardView } from "#board/service";
+import type { ActivityRow } from "#db/queries/activities";
+import type { AttentionItem } from "#db/queries/attention";
+import type { Automation } from "#db/queries/automations";
+import type { Column } from "#db/queries/boards";
+import type { BriefRow } from "#db/queries/briefs";
+import type { ConnectionRow } from "#db/queries/connections";
+import type { ConversationRow, MessageRow } from "#db/queries/conversations";
+import type { TargetRow } from "#db/queries/delivery-targets";
+import type { Member } from "#db/queries/members";
+import type { MemoryRow } from "#db/queries/memories";
+import type { Workspace } from "#db/queries/workspaces";
 import type {
   ApiScope,
   apiTokens,
@@ -28,9 +33,6 @@ import {
   TARGET_KINDS,
   VISIBILITY,
 } from "#db/schema";
-import type { TargetRow } from "#delivery/service";
-import type { Member, Workspace } from "#members/service";
-import type { MemoryRow } from "#memory/service";
 
 const iso = (d: Date) => d.toISOString();
 const isoOrNull = (d: Date | null) => (d ? d.toISOString() : null);
@@ -457,7 +459,7 @@ export const AttentionSchema = z
   .openapi("AttentionItem");
 
 export const toAttention = (
-  a: AttentionRow
+  a: AttentionItem
 ): z.infer<typeof AttentionSchema> => ({
   id: a.id,
   kind: a.kind,
@@ -629,7 +631,7 @@ export const AutomationSchema = z
   .openapi("Automation");
 
 export const toAutomation = (
-  a: AutomationRow
+  a: Automation
 ): z.infer<typeof AutomationSchema> => ({
   id: a.id,
   kind: a.kind,

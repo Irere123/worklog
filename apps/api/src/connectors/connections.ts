@@ -1,16 +1,18 @@
-import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 
 import type { AppContext } from "#context";
-import { connections } from "#db/schema";
-import { returned } from "#lib/assert";
-import { badRequest, notFound } from "#lib/errors";
+import {
+  deleteConnectionById,
+  getConnectionById,
+  insertConnection,
+  updateConnectionById,
+} from "#db/queries/connections";
+import type { ConnectionRow } from "#db/queries/connections";
+import { badRequest } from "#lib/errors";
 import { newId } from "#lib/ids";
 
 import { getConnector } from "./registry";
 import { WebhookSettings } from "./webhook";
-
-export type ConnectionRow = typeof connections.$inferSelect;
 
 function validate(
   provider: string,
@@ -81,31 +83,7 @@ export async function createConnection(
     lastEventAt: null,
     createdAt: ctx.now(),
   };
-  await ctx.db.insert(connections).values(row);
-  return row;
-}
-
-export async function listConnections(ctx: AppContext, workspaceId: string) {
-  return await ctx.db
-    .select()
-    .from(connections)
-    .where(eq(connections.workspaceId, workspaceId));
-}
-
-export async function getConnection(
-  ctx: AppContext,
-  workspaceId: string,
-  id: string
-) {
-  const [row] = await ctx.db
-    .select()
-    .from(connections)
-    .where(
-      and(eq(connections.id, id), eq(connections.workspaceId, workspaceId))
-    );
-  if (!row) {
-    throw notFound("Connection");
-  }
+  await insertConnection(ctx.db, row);
   return row;
 }
 
@@ -120,23 +98,21 @@ export async function updateConnection(
     secrets?: Record<string, string>;
   }
 ) {
-  const current = await getConnection(ctx, workspaceId, id);
+  const current = await getConnectionById(ctx.db, { id, workspaceId });
   const secrets = {
     ...ctx.secrets.open(current.secrets),
     ...patch.secrets,
   };
   validate(current.provider, secrets, patch.settings ?? current.settings);
-  const rows = await ctx.db
-    .update(connections)
-    .set({
+  return await updateConnectionById(ctx.db, {
+    id,
+    set: {
       name: patch.name,
       status: patch.status,
       settings: patch.settings,
       secrets: ctx.secrets.seal(secrets),
-    })
-    .where(eq(connections.id, id))
-    .returning();
-  return returned(rows, "connection");
+    },
+  });
 }
 
 export async function deleteConnection(
@@ -144,8 +120,8 @@ export async function deleteConnection(
   workspaceId: string,
   id: string
 ) {
-  await getConnection(ctx, workspaceId, id);
-  await ctx.db.delete(connections).where(eq(connections.id, id));
+  await getConnectionById(ctx.db, { id, workspaceId });
+  await deleteConnectionById(ctx.db, { id });
 }
 
 export function webhookUrls(

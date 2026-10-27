@@ -3,10 +3,10 @@ import { logWork } from "#activity/worklog";
 import { ask, resolveAgent } from "#agent/assistant";
 import { generateBrief } from "#briefs/service";
 import type { AppContext } from "#context";
+import type { Member } from "#db/queries/members";
 import { resolveMember } from "#members/service";
-import type { Member } from "#members/service";
 
-export type Command = { name: string; text: string; target?: Member | null };
+export type Command = { name: string; text: string; target?: Member };
 
 export const HELP = [
   "*Worklog commands*",
@@ -32,7 +32,7 @@ export function parseCommand(input: string): { name: string; rest: string } {
 
 export async function runCommand(
   ctx: AppContext,
-  author: Member | null,
+  author: Member | undefined,
   platform: "slack" | "discord",
   platformUserId: string,
   cmd: Command
@@ -81,7 +81,7 @@ export async function runCommand(
 
 export async function leadingHandle(
   ctx: AppContext,
-  author: Member | null,
+  author: Member | undefined,
   text: string
 ) {
   const groups = /^@(?<handle>[a-z0-9][a-z0-9._-]*)\s*(?<rest>.*)$/isu.exec(
@@ -89,7 +89,7 @@ export async function leadingHandle(
   )?.groups;
   const handle = groups?.handle;
   if (!handle || !author) {
-    return { target: null, text };
+    return { target: undefined, text };
   }
   try {
     return {
@@ -97,6 +97,6 @@ export async function leadingHandle(
       text: (groups?.rest ?? "").trim(),
     };
   } catch {
-    return { target: null, text };
+    return { target: undefined, text };
   }
 }
