@@ -13,6 +13,7 @@ import type { AutomationKind, Schedule } from "#db/schema";
 import { transact } from "#db/transact";
 import { badRequest, notFound } from "#lib/errors";
 import { newId } from "#lib/ids";
+import { timezoneOf } from "#lib/time";
 
 import { jitterFor, nextRun } from "./schedule";
 
@@ -90,7 +91,10 @@ export async function createAutomation(
   if (input.kind === "custom" && !input.instructions) {
     throw badRequest("Custom automations need instructions");
   }
-  const tz = await memberTimezone(ctx, member);
+  const tz = timezoneOf(
+    member,
+    await getWorkspaceById(ctx.db, { id: member.workspaceId })
+  );
   const id = newId("aut");
   const row = {
     id,
@@ -127,7 +131,10 @@ export async function updateAutomation(
 ) {
   const current = await getAutomationById(ctx.db, { id, memberId: member.id });
   const schedule = patch.schedule ?? current.schedule;
-  const tz = await memberTimezone(ctx, member);
+  const tz = timezoneOf(
+    member,
+    await getWorkspaceById(ctx.db, { id: member.workspaceId })
+  );
   const row = await updateAutomationById(ctx.db, {
     id,
     set: {
@@ -161,12 +168,4 @@ export async function deleteAutomation(
 export async function listRuns(ctx: AppContext, memberId: string, id: string) {
   await getAutomationById(ctx.db, { id, memberId });
   return await listAutomationRuns(ctx.db, { automationId: id });
-}
-
-export async function memberTimezone(ctx: AppContext, member: Member) {
-  if (member.timezone) {
-    return member.timezone;
-  }
-  const ws = await getWorkspaceById(ctx.db, { id: member.workspaceId });
-  return ws.timezone;
 }

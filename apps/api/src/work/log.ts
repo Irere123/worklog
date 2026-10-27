@@ -1,8 +1,9 @@
 import { generateText, Output } from "ai";
 import { z } from "zod";
 
-import { TIMEOUTS } from "#agent/models";
-import { UNTRUSTED_NOTE } from "#agent/prompts";
+import { recordActivity } from "#activity/service";
+import { TIMEOUTS } from "#ai/models";
+import { UNTRUSTED_NOTE } from "#ai/prompts";
 import { raiseAttention } from "#attention/service";
 import { listCards } from "#board/service";
 import type { AppContext } from "#context";
@@ -12,8 +13,6 @@ import { listMembers, listMembersByHandles } from "#db/queries/members";
 import type { Member } from "#db/queries/members";
 import type { Visibility } from "#db/schema";
 import { transact } from "#db/transact";
-
-import { recordActivity } from "./service";
 
 export const LOG_KINDS = ["entry", "decision", "blocker", "win"] as const;
 export type LogKind = (typeof LOG_KINDS)[number];

@@ -1,6 +1,6 @@
 import { loadConfig } from "./config";
 import { createContext } from "./context";
-import { startWorker } from "./jobs/worker";
+import { startWorker } from "./jobs/tasks";
 
 // Jobs-only process, for deployments that run API replicas with RUN_SCHEDULER=false.
 const ctx = await createContext(loadConfig());

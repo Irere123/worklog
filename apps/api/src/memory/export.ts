@@ -4,8 +4,7 @@ import { listMemories } from "#db/queries/memories";
 import type { MemoryRow } from "#db/queries/memories";
 import { getWorkspaceById } from "#db/queries/workspaces";
 import { VISIBILITY } from "#db/schema";
-import { lastLocalDate, localDate } from "#lib/time";
-import { timezoneOf } from "#members/service";
+import { lastLocalDate, localDate, timezoneOf } from "#lib/time";
 
 // Years of nightly journals and digests fit well inside this.
 const MAX_EXPORTED = 10_000;

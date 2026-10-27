@@ -1,6 +1,8 @@
 import { generateText, Output } from "ai";
 import { z } from "zod";
 
+import { TIMEOUTS } from "#ai/models";
+import { UNTRUSTED_NOTE } from "#ai/prompts";
 import type { AppContext } from "#context";
 import {
   findConversationById,
@@ -8,9 +10,6 @@ import {
   setConversationRecap,
 } from "#db/queries/conversations";
 import type { ConversationRow, MessageRow } from "#db/queries/conversations";
-
-import { TIMEOUTS } from "./models";
-import { UNTRUSTED_NOTE } from "./prompts";
 
 // Stored messages are JSON, which runs about four characters per token; close enough for a budget.
 const CHARS_PER_TOKEN = 4;

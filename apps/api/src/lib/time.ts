@@ -170,3 +170,11 @@ export function isWithinHours(
 }
 
 export const DAY_MS = 24 * 60 * 60 * 1000;
+
+// A member's clock is their own, or the workspace's until they set one.
+export function timezoneOf(
+  member: { timezone: string | null },
+  workspace: { timezone: string }
+) {
+  return member.timezone ?? workspace.timezone;
+}

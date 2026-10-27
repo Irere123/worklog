@@ -9,7 +9,7 @@ import {
 } from "ai";
 import type { ModelMessage } from "ai";
 
-import { renderSnapshot, workSnapshot } from "#activity/snapshot";
+import { CACHED, TIMEOUTS } from "#ai/models";
 import { listCards } from "#board/service";
 import type { AppContext } from "#context";
 import { listOpenAttention } from "#db/queries/attention";
@@ -19,8 +19,9 @@ import type { Member } from "#db/queries/members";
 import { findVoice } from "#db/queries/voices";
 import { getWorkspaceById } from "#db/queries/workspaces";
 import { badRequest, notFound } from "#lib/errors";
-import { timezoneOf } from "#members/service";
+import { timezoneOf } from "#lib/time";
 import { memoryPage } from "#memory/service";
+import { renderSnapshot, workSnapshot } from "#work/snapshot";
 
 import {
   appendMessages,
@@ -28,7 +29,6 @@ import {
   getConversation,
   loadHistory,
 } from "./conversations";
-import { CACHED, TIMEOUTS } from "./models";
 import { assistantInstructions, turnPreamble } from "./prompts";
 import { assistantTools } from "./tools";
 

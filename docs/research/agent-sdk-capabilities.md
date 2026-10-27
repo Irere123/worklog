@@ -1,6 +1,6 @@
 # Worklog agent: AI SDK v7 and OpenRouter capability survey
 
-Date: 2026-10-26. Scope: `apps/api` agent code (`src/agent/*`, `src/automations/service.ts`, `src/briefs/service.ts`, `src/activity/worklog.ts`, `src/memory/service.ts`) checked against the installed SDKs. No source files were modified.
+Date: 2026-10-26. Scope: `apps/api` agent code (`src/agent/*`, `src/automations/service.ts`, `src/briefs/service.ts`, `src/work/log.ts`, `src/memory/service.ts`) checked against the installed SDKs. No source files were modified.
 
 ## How this was verified
 
@@ -91,7 +91,7 @@ Note: the codebase changed while this survey ran. `src/automations/service.ts` g
 
 - In `dist/index.js` `createOpenRouter`: `const compatibility = options.compatibility ?? "compatible"`. Only the default `openrouter` export is `"strict"`.
 - In `doStream`, `stream_options: { include_usage: true }` is sent **only when `compatibility === "strict"`**, even if `usage: { include: true }` is set.
-- `src/agent/models.ts:14` doesn't set it, so as soon as you switch to `streamText`/`agent.stream()`, token usage and cost may be missing from streamed responses. Set `compatibility: "strict"`.
+- `src/ai/models.ts:14` doesn't set it, so as soon as you switch to `streamText`/`agent.stream()`, token usage and cost may be missing from streamed responses. Set `compatibility: "strict"`.
 
 ### A8. `openrouter(id)` is typed as the completion model (P3, typing)
 
@@ -140,7 +140,7 @@ Note: the codebase changed while this survey ran. `src/automations/service.ts` g
 
 ### 1. Streaming chat for web and mobile (`useChat`-compatible) — P1
 
-**What:** a POST endpoint that streams the v7 UI message stream (SSE, header `x-vercel-ai-ui-message-stream: v1`) so `@ai-sdk/react` `useChat` (web, and Expo with `expo/fetch`) renders tokens, tool calls, approvals and reasoning live. Today `POST /v1/conversations[/{id}/messages]` (`src/api/routes/assistant.ts:32-75`) returns the finished reply only.
+**What:** a POST endpoint that streams the v7 UI message stream (SSE, header `x-vercel-ai-ui-message-stream: v1`) so `@ai-sdk/react` `useChat` (web, and Expo with `expo/fetch`) renders tokens, tool calls, approvals and reasoning live. Today `POST /v1/conversations[/{id}/messages]` (`src/api/routes/agent.ts:32-75`) returns the finished reply only.
 
 **Verified APIs**
 
@@ -161,7 +161,7 @@ Note: the codebase changed while this survey ran. `src/automations/service.ts` g
 - Rows written by Slack, Discord or `postToInbox` have no UI JSON. Synthesize `{ id, role, parts: [{ type: 'text', text }] }` from the existing `text` column.
 - Persist the incoming message and the response **together** in the agent's `onEnd`, as `ask()` does today. That avoids an inbox post landing between a tool call and its result.
 
-**Where it plugs in:** a new route next to `src/api/routes/assistant.ts`. Reuse `getConversation`, `loadMessages`, `appendMessages`, `turnPreamble`, and the agent factory from section 2.
+**Where it plugs in:** a new route next to `src/api/routes/agent.ts`. Reuse `getConversation`, `loadMessages`, `appendMessages`, `turnPreamble`, and the agent factory from section 2.
 
 **Server sketch (Hono)**
 
@@ -477,7 +477,7 @@ return fused.slice(0, 20);
 
 **Two options**
 
-- **(A) OpenRouter-only, one call: transcribe and structure together.** Reuse `Structured` from `src/activity/worklog.ts` plus a `transcript` field:
+- **(A) OpenRouter-only, one call: transcribe and structure together.** Reuse `Structured` from `src/work/log.ts` plus a `transcript` field:
   ```ts
   const { output } = await generateText({
     model: ctx.models.audio, // openrouter.chat(config.WORKLOG_AUDIO_MODEL)
@@ -661,7 +661,7 @@ Keep the existing `Output.object` path as the fallback when the Decisions API er
 **Sketch**
 
 ```ts
-// src/agent/models.ts
+// src/ai/models.ts
 const openrouter = createOpenRouter({ apiKey, appName: "Worklog", appUrl: config.PUBLIC_URL, compatibility: "strict" });
 const shared = { usage: { include: true }, provider: { order: ["anthropic"], allow_fallbacks: true, data_collection: "deny" as const } };
 return {
@@ -713,7 +713,7 @@ telemetry: { functionId: "brief.compose", includeRuntimeContext: { workspaceId: 
 
 ### 9. Testing with `MockLanguageModelV4` — P1
 
-**Current state:** `test/harness.ts` already wraps `MockLanguageModelV4` in `scriptedModel()` and injects it via `ctx.models`. `test/assistant.test.ts` covers owner tools, `remember`, teammate read-only access and log structuring. `test/proactive.test.ts` covers schedules, briefs, the check and consolidation. Build on that.
+**Current state:** `test/harness.ts` already wraps `MockLanguageModelV4` in `scriptedModel()` and injects it via `ctx.models`. `test/assistant.test.ts` covers owner tools, `remember`, teammate read-only access and log structuring. `test/automations.test.ts` covers schedules, briefs, the check and consolidation. Build on that.
 
 **Verified test doubles** (`node_modules/ai/dist/test/index.d.ts`; doc `03-ai-sdk-core/55-testing.mdx`)
 

@@ -1,5 +1,7 @@
 import { expect, test } from "bun:test";
 
+import { DAY_MS } from "#lib/time";
+
 import { scriptedModel, testEnv } from "./harness";
 import type { TestEnv } from "./harness";
 
@@ -354,4 +356,81 @@ test("memory exports as Markdown files split by visibility, unchanged until memo
   expect((await exported(SUNDAY)).map((f) => f.path)).not.toContain(
     "team/facts.md"
   );
+});
+
+test("private work never reaches team-visible memory or teammates", async () => {
+  const env = await testEnv();
+  const owner = await env.workspace();
+  const sam = await env.teammate(owner.token, "Sam");
+  await env.call("POST", "/v1/logs", {
+    token: owner.token,
+    body: { text: "Shipped the retry queue" },
+  });
+  await env.call("POST", "/v1/logs", {
+    token: owner.token,
+    body: { text: "Salary negotiation call", visibility: "private" },
+  });
+
+  await consolidate(env, owner.token, new Date(Date.now() + DAY_MS));
+
+  const journals = (
+    await env.call("GET", "/v1/memories?kind=journal", { token: owner.token })
+  ).body;
+  const shared = journals.find((j: any) => j.visibility === "team");
+  const mine = journals.find((j: any) => j.visibility === "private");
+  expect(shared.content).toContain("Shipped the retry queue");
+  expect(shared.content).not.toContain("Salary");
+  expect(mine.content).toContain("Salary negotiation call");
+
+  // A teammate asking the assistant only ever sees the team journal.
+  const { model, prompts } = scriptedModel([
+    { tool: "recall", input: {} },
+    { text: "ok" },
+  ]);
+  env.ctx.models = { main: model, fast: model };
+  await env.call("POST", "/v1/conversations", {
+    token: sam.token,
+    body: { to: owner.member.handle, message: "What did Emma do yesterday?" },
+  });
+  expect(JSON.stringify(prompts[1].prompt)).not.toContain("Salary");
+});
+
+test("the model pass over team activity is never shown private activity or private memory", async () => {
+  const env = await testEnv();
+  const owner = await env.workspace();
+  await env.call("POST", "/v1/memories", {
+    token: owner.token,
+    body: {
+      content: "Secret: planning to leave",
+      kind: "fact",
+      visibility: "private",
+    },
+  });
+  await env.call("POST", "/v1/logs", {
+    token: owner.token,
+    body: { text: "Reviewed onboarding copy" },
+  });
+  await env.call("POST", "/v1/logs", {
+    token: owner.token,
+    body: { text: "Doctor appointment", visibility: "private" },
+  });
+  const { model, prompts } = scriptedModel([
+    {
+      text: JSON.stringify({
+        journal: "- did things",
+        facts: [],
+        profile: [],
+      }),
+    },
+  ]);
+  env.ctx.models = { main: model, fast: model };
+  await consolidate(env, owner.token, new Date(Date.now() + DAY_MS));
+
+  const teamPass = JSON.stringify(
+    prompts.find((p) =>
+      JSON.stringify(p.prompt).includes("Reviewed onboarding copy")
+    )!.prompt
+  );
+  expect(teamPass).not.toContain("Doctor appointment");
+  expect(teamPass).not.toContain("planning to leave");
 });

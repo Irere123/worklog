@@ -1,21 +1,12 @@
-import { createRoute, z } from "@hono/zod-openapi";
+import { createRoute } from "@hono/zod-openapi";
 import { streamSSE } from "hono/streaming";
 
 import { errors, router } from "#api/router";
+import { Event, EventsQuery } from "#api/schemas/events";
 import type { StoredEvent } from "#db/queries/events";
-import { EVENT_TYPES } from "#db/schema";
 import { canSee } from "#events/bus";
 
 const HEARTBEAT_MS = 10_000;
-
-export const EventSchema = z
-  .object({
-    seq: z.number().int(),
-    type: z.enum(EVENT_TYPES),
-    data: z.record(z.string(), z.unknown()),
-    createdAt: z.string(),
-  })
-  .openapi("Event");
 
 function createWaiter() {
   let wake: (() => void) | null = null;
@@ -37,12 +28,7 @@ function createWaiter() {
 const frame = (e: StoredEvent) => ({
   id: String(e.seq),
   event: e.type,
-  data: JSON.stringify({
-    seq: e.seq,
-    type: e.type,
-    data: e.data,
-    createdAt: e.createdAt.toISOString(),
-  }),
+  data: JSON.stringify(Event.parse(e)),
 });
 
 export const eventRoutes = router().openapi(
@@ -53,21 +39,10 @@ export const eventRoutes = router().openapi(
     tags: ["Realtime"],
     summary:
       "Server-sent events: activity, cards, attention, briefs, messages, automation runs",
-    request: {
-      query: z.object({
-        after: z.coerce
-          .number()
-          .int()
-          .optional()
-          .openapi({ description: "Replay events after this seq" }),
-        token: z.string().optional().openapi({
-          description: "API token, for clients that can't send headers",
-        }),
-      }),
-    },
+    request: { query: EventsQuery },
     responses: {
       200: {
-        content: { "text/event-stream": { schema: EventSchema } },
+        content: { "text/event-stream": { schema: Event } },
         description: "Event stream",
       },
       ...errors,

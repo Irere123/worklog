@@ -14,8 +14,7 @@
     "lint": "bun --bun oxlint",
     "lint:fix": "bun --bun oxlint --fix",
     "format": "bun --bun oxfmt",
-    "format:check": "bun --bun oxfmt --check",
-    "sdk": "bun run --filter @worklog/sdk generate"
+    "format:check": "bun --bun oxfmt --check"
   },
   "devDependencies": {
     "@commitlint/cli": "21.2.4",

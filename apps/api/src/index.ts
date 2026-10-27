@@ -1,7 +1,7 @@
 import { createApp } from "./app";
 import { loadConfig } from "./config";
 import { createContext } from "./context";
-import { startWorker } from "./jobs/worker";
+import { startWorker } from "./jobs/tasks";
 
 const config = loadConfig();
 const ctx = await createContext(config);

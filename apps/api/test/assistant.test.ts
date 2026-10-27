@@ -1,6 +1,6 @@
 import { beforeAll, beforeEach, describe, expect, test } from "bun:test";
 
-import { CONSTITUTION } from "#agent/prompts";
+import { CONSTITUTION } from "#ai/prompts";
 
 import { scriptedModel, testEnv } from "./harness";
 import type { TestEnv } from "./harness";
@@ -199,7 +199,7 @@ describe("assistant", () => {
     ]);
     env.ctx.models = { main: model, fast: model };
 
-    const { logWork } = await import("#activity/worklog");
+    const { logWork } = await import("#work/log");
     const { resolveMember } = await import("#members/service");
     const { getPersonalAgent } = await import("#db/queries/members");
     const emma = await resolveMember(
@@ -336,5 +336,25 @@ describe("assistant", () => {
       body: { content: "x".repeat(4001) },
     });
     expect(tooLong.status).toBe(400);
+  });
+});
+
+describe("assistant step limit", () => {
+  test("a turn cut off mid-tool-call says so, and the transcript records it", async () => {
+    const owner = await env.workspace();
+    // Never stops calling tools
+    const { model } = scriptedModel([{ tool: "team_directory", input: {} }]);
+    env.ctx.models = { main: model, fast: model };
+    const res = await env.call("POST", "/v1/conversations", {
+      token: owner.token,
+      body: { message: "Loop forever" },
+    });
+    expect(res.body.reply).toContain("ran out of steps");
+    const thread = (
+      await env.call("GET", `/v1/conversations/${res.body.conversation.id}`, {
+        token: owner.token,
+      })
+    ).body;
+    expect(thread.messages.at(-1).text).toContain("ran out of steps");
   });
 });

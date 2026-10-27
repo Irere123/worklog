@@ -513,7 +513,7 @@ Worklog's scheduled runs already have **no tools**, which is good. The residual 
 5. **Fixed polling latency.** A blocked-on-you item can wait up to 30 minutes, while non-urgent items are considered every 30 minutes. Both ends are suboptimal.
 6. **Priority inflation surface.**
    - Any member, **including external agents**, can create `high` items via `@mention` (`board/service.ts` `addComment`; GitHub mention handler).
-   - The work-log blocker classifier (`activity/worklog.ts`) sets `priority: "high"` for any handle the LLM extracts.
+   - The work-log blocker classifier (`work/log.ts`) sets `priority: "high"` for any handle the LLM extracts.
    - Teammate-mode `leave_note_for_owner({urgent: true})` is decided by the model under the asker's influence.
    - None of these are rate-limited per sender.
 7. **Drift warnings are informational only.** `briefs/service.ts` lists `driftingSoon` cards, but nothing lets the owner act from the nudge.

@@ -5,17 +5,19 @@
         │  REST (OpenAPI 3.1)      │ SSE /v1/events         │ signed webhooks /hooks/*
         ▼                          ▼                        ▼
  ┌──────────────────────────── apps/api (Bun + Hono) ────────────────────────────┐
- │ api/routes/*  zod-openapi routes → one contract → docs + typed SDKs           │
+ │ api/routes/*  zod-openapi routes, one file per domain → docs + typed SDKs    │
  │ api/hooks.ts  /hooks/{connection}: verify → store raw → queue (any connector) │
  │ api/auth.ts   API keys (agents) or better-auth sessions (people) → member    │
  │                                                                               │
- │ board/        Fizzy rules: stages, golden tickets, entropy, drift nudges      │
- │ activity/     the work stream · manual logs (+ AI structuring) · snapshots    │
- │ attention/    "needs you": collapse, quotas, feedback, actions, metrics       │
+ │ board/        Fizzy rules: stages, golden tickets, entropy, drift + answers   │
+ │ activity/     the work stream: one write path, which resets entropy          │
+ │ work/         one person's work: manual logs (+ AI structuring) · snapshots   │
+ │ attention/    "needs you": collapse, quotas, feedback, metrics                │
  │ briefs/       data gathering → model prose (or template)                      │
  │ automations/  scheduled jobs: brief · digest · check · consolidate · custom   │
- │ agent/        assistant (owner / teammate modes), tools, models, streaming    │
- │ memory/       profile · facts · journal, visibility enforced in queries       │
+ │ agent/        assistant (owner / teammate modes), tools, streaming            │
+ │ ai/           model tiers · constitution.md · prompt fragments shared by all │
+ │ memory/       profile · facts · journal · nightly consolidation               │
  │ delivery/     email (Resend/SMTP/console) · Slack · Discord · webhook, sanitize│
  │ connectors/   GitHub · Gitea · Slack · Discord · webhook (no-code) · custom   │
  │ ingest/       pipeline: normalize · identity · gates · merge · effects        │
@@ -31,7 +33,7 @@
 
 ## Principles
 
-- **One contract, many clients.** Routes are declared with zod schemas. Those same schemas validate requests, serialize responses, and produce `/openapi.json`. Operation ids are stable and dotted (`card.close`), so a generated SDK reads naturally (OpenCode's pattern).
+- **One contract, many clients.** Routes are declared with zod schemas. Those same schemas validate requests, parse responses on the way out (`respond()`: dates to ISO strings, unlisted fields such as secrets dropped, a wrong shape fails before it leaves), and produce `/openapi.json`. Operation ids are stable and dotted (`card.close`), so a generated SDK reads naturally (OpenCode's pattern).
 - **Everything is tenant-scoped.** Every request resolves to a member, and the member carries `workspaceId`. Services never take a workspace id from the client.
   - **People:** they sign in through better-auth (users, sessions, linked accounts). Their member row has a `userId`, and they pick a workspace with `x-worklog-workspace`.
   - **Agents and integrations:** they use API keys scoped `read`, `write` or `ingest`.
@@ -98,7 +100,7 @@ The fields that drive this live on `attention_items`: `consideredAt`, `dispositi
 
 - **Append-only history.** Model messages are stored verbatim and replayed verbatim. Per-turn context (the time, who is asking) goes into the user message. That keeps Anthropic prompt caching effective (enabled through OpenRouter, with the provider pinned for cache locality) and satisfies the preserved-thinking checks.
 - **What a conversation starts with:** the instructions hold the constitution, then the rules for this owner and mode, then the owner's voice, then their memory digest (owners get the one built from all their memory, teammates the team-only one), then the conversation's recap, if it has one. Most stable comes first. They change only when the owner edits their voice, the digest is rebuilt overnight or the conversation is compacted, so the prefix stays cacheable. A conversation's first turn also lists what's in flight: the owner's open attention items, for owners only, and their golden and active cards.
-- **Constitution and voice.** [`constitution.md`](../apps/api/src/agent/constitution.md) is who every assistant is: what it's for, the order it weighs things in when they conflict (privacy and permission, then honesty, then the owner's wishes, then helpfulness), the lines it never crosses, and why. It reasons rather than lists rules, so the model can handle cases nobody wrote down. Briefs and custom automations start from it too, since they also speak for the owner. The attention check and memory upkeep don't: they write nothing in the assistant's voice. The voice is the owner's own instructions (`PUT /v1/voice`); the constitution wins where they conflict. Every save is kept (`GET /v1/voice/history`). Teammate conversations follow the voice too, so it counts as team-visible. Neither is ever written by the assistant: no tool touches them, so text planted in a Slack message or a comment can't persist itself into the instructions. The constitution shapes judgment only; privacy is still enforced by the queries.
+- **Constitution and voice.** [`constitution.md`](../apps/api/src/ai/constitution.md) is who every assistant is: what it's for, the order it weighs things in when they conflict (privacy and permission, then honesty, then the owner's wishes, then helpfulness), the lines it never crosses, and why. It reasons rather than lists rules, so the model can handle cases nobody wrote down. Briefs and custom automations start from it too, since they also speak for the owner. The attention check and memory upkeep don't: they write nothing in the assistant's voice. The voice is the owner's own instructions (`PUT /v1/voice`); the constitution wins where they conflict. Every save is kept (`GET /v1/voice/history`). Teammate conversations follow the voice too, so it counts as team-visible. Neither is ever written by the assistant: no tool touches them, so text planted in a Slack message or a comment can't persist itself into the instructions. The constitution shapes judgment only; privacy is still enforced by the queries.
 - **Compaction.** When the replayed messages pass about 64k tokens, a job (`conversation:compact`) folds the older ones into the recap and stops replaying them. The newest ~16k tokens stay verbatim, starting at a user turn, and every message stays stored. The recap keeps open loops, decisions and identifiers in separate fields and copies identifiers exactly, because summaries lose the details a conversation depends on. Without AI, the older messages are just dropped from the replay.
 - **Inbox.** Briefs and pings are also written into the owner's inbox conversation, so replying "tell me more about #12" has context. Compaction keeps it bounded.
 - **Untrusted content.** Every prompt marks ingested text as data, not instructions. Outbound text is sanitized against the URLs present in its source data.
@@ -143,7 +145,7 @@ The team version is only composed when there are team targets, and nothing is se
 
 - **Automations are rows** with a schedule (`daily` / `weekly` / `interval` with `activeHoursOnly`), evaluated on the member's local clock with DST handled.
 - **Spreading load:** a deterministic per-automation jitter keeps jobs from all firing on the same minute.
-- **Cron:** Graphile Worker's crontab (`jobs/worker.ts`) runs due automations every minute, the entropy sweep hourly, and event and delivery pruning daily. Each run fires once across all workers, and the scheduled tasks share one queue, so they never overlap.
+- **Cron:** Graphile Worker's crontab (`jobs/tasks.ts`) runs due automations every minute, the entropy sweep hourly, and event and delivery pruning daily. Each run fires once across all workers, and the scheduled tasks share one queue, so they never overlap.
 - **Failure handling:** an attention item after 3 consecutive failures; the automation is disabled after 10.
 - **Deployment:** run it in the API process (`RUN_SCHEDULER=true`) or as a separate worker (`bun run worker`).
 

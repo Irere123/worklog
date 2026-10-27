@@ -8,15 +8,16 @@ import {
 import type { Automation } from "#db/queries/automations";
 import { findMemberById } from "#db/queries/members";
 import type { Member } from "#db/queries/members";
+import { getWorkspaceById } from "#db/queries/workspaces";
 import { transact } from "#db/transact";
 import { notFound } from "#lib/errors";
 import { newId } from "#lib/ids";
+import { timezoneOf } from "#lib/time";
+import { runConsolidate } from "#memory/consolidate";
 
-import { runConsolidate } from "./consolidate";
 import { runBrief, runCheck, runCustom, runDigest } from "./runners";
 import type { RunOutcome } from "./runners";
 import { jitterFor, nextRun } from "./schedule";
-import { memberTimezone } from "./service";
 
 const FAILURE_ALERT_AT = 3;
 const FAILURE_DISABLE_AT = 10;
@@ -53,7 +54,10 @@ export async function runAutomation(
   if (!member) {
     throw notFound("Member");
   }
-  const tz = await memberTimezone(ctx, member);
+  const tz = timezoneOf(
+    member,
+    await getWorkspaceById(ctx.db, { id: member.workspaceId })
+  );
 
   let outcome: RunOutcome;
   let error: string | null = null;

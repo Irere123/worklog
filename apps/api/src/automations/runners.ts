@@ -1,11 +1,10 @@
 import { generateText, Output } from "ai";
 import { z } from "zod";
 
-import { workSnapshot } from "#activity/snapshot";
 import { postToInbox } from "#agent/conversations";
-import { TIMEOUTS } from "#agent/models";
-import type { Models } from "#agent/models";
-import { audienceNote, CONSTITUTION, UNTRUSTED_NOTE } from "#agent/prompts";
+import { TIMEOUTS } from "#ai/models";
+import type { Models } from "#ai/models";
+import { audienceNote, CONSTITUTION, UNTRUSTED_NOTE } from "#ai/prompts";
 import {
   markConsidered,
   markDigested,
@@ -30,6 +29,7 @@ import { sanitizeMarkdown, urlsIn } from "#delivery/sanitize";
 import { deliver, splitTargets } from "#delivery/service";
 import { DAY_MS, startOfLocalDay } from "#lib/time";
 import { renderMemory } from "#memory/service";
+import { workSnapshot } from "#work/snapshot";
 
 import { isActiveNow } from "./schedule";
 

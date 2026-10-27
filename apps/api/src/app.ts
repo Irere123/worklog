@@ -6,16 +6,23 @@ import { HTTPException } from "hono/http-exception";
 import { authMiddleware } from "./api/auth";
 import { hookRoutes } from "./api/hooks";
 import { router } from "./api/router";
-import { assistantRoutes } from "./api/routes/assistant";
+import { activityRoutes } from "./api/routes/activity";
+import { agentRoutes } from "./api/routes/agent";
+import { attentionRoutes } from "./api/routes/attention";
+import { automationRoutes } from "./api/routes/automations";
 import { boardRoutes } from "./api/routes/board";
+import { briefRoutes } from "./api/routes/briefs";
 import { connectionRoutes } from "./api/routes/connections";
+import { deliveryRoutes } from "./api/routes/delivery";
 import { eventRoutes } from "./api/routes/events";
+import { identityRoutes } from "./api/routes/identities";
+import { memberRoutes } from "./api/routes/members";
+import { memoryRoutes } from "./api/routes/memory";
 import {
   authConfigRoutes,
-  peopleRoutes,
   sessionRoutes,
   setupRoutes,
-} from "./api/routes/people";
+} from "./api/routes/setup";
 import { workRoutes } from "./api/routes/work";
 import { webOrigins } from "./auth/auth";
 import type { AppContext } from "./context";
@@ -107,10 +114,17 @@ export function createApp(ctx: AppContext) {
     .route("/", setupRoutes)
     .route("/", authConfigRoutes)
     .route("/", sessionRoutes)
-    .route("/", peopleRoutes)
+    .route("/", memberRoutes)
+    .route("/", identityRoutes)
     .route("/", boardRoutes)
+    .route("/", activityRoutes)
     .route("/", workRoutes)
-    .route("/", assistantRoutes)
+    .route("/", attentionRoutes)
+    .route("/", briefRoutes)
+    .route("/", agentRoutes)
+    .route("/", memoryRoutes)
+    .route("/", deliveryRoutes)
+    .route("/", automationRoutes)
     .route("/", connectionRoutes)
     .route("/", eventRoutes)
     .route("/", hookRoutes());

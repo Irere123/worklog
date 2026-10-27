@@ -1,8 +1,8 @@
 import { beforeAll, beforeEach, describe, expect, test } from "bun:test";
 
 import { account } from "#db/auth-schema";
-import type { ConsoleMailer } from "#delivery/mailer";
 import { hmacHex } from "#lib/crypto";
+import type { ConsoleMailer } from "#lib/mailer";
 
 import { testEnv } from "./harness";
 import type { TestEnv } from "./harness";

@@ -63,18 +63,20 @@ Work is done when `format:check`, `lint`, `typecheck` and `test` all pass. CI ru
 ```
 apps/api/              the API server (Bun + Hono)
   src/
-    api/               routes/ (one file per area), auth middleware, webhook entry (hooks.ts), shared schemas
+    api/               routes/ and schemas/ (one file per domain folder), auth middleware, webhook entry (hooks.ts)
     ingest/            the pipeline: normalize → identity → gates → card linking → persist → effects
     connectors/        github (+ gitea), slack, discord, webhook (no-code), custom; registry.ts lists them
-    activity/          the activity stream, manual logs, snapshots
-    board/             cards, columns, entropy, drift nudges
-    attention/         "needs you": raise, collapse, quotas, feedback, actions
+    activity/          the activity stream: recordActivity, the one write path
+    board/             cards, columns, entropy; drift.ts holds the nudges and their one-click answers
+    attention/         "needs you": raise, collapse, quotas, feedback
     automations/       scheduled routines: service.ts (CRUD), run.ts (execution), runners.ts (the routines)
-    agent/             the assistant: constitution.md, prompts, voice, tools, models, conversations
-    jobs/              Graphile Worker: queue.ts (enqueue), worker.ts (tasks and cron)
-    briefs/ memory/ delivery/ members/ auth/ events/
+    work/              one person's work: manual logs in (log.ts, + AI structuring), snapshot out
+    ai/                models and tiers, constitution.md, prompt fragments every AI feature shares
+    agent/             the assistant: instructions, voice, tools, conversations, compaction
+    jobs/              Graphile Worker: queue.ts (enqueue), tasks.ts (the task table and cron)
+    briefs/ memory/ delivery/ members/ auth/ events/   memory/consolidate.ts is the nightly upkeep
     db/                schema.ts (ours), auth-schema.ts (generated), queries/ (one file per area), transact.ts
-    lib/               small shared helpers: errors, ids, crypto, time, assert
+    lib/               small shared helpers: errors, ids, crypto, time, assert, mailer
     context.ts         AppContext: everything a handler needs, built once per process
     config.ts          the only place that reads environment variables
   test/                harness.ts plus one file per area
@@ -86,7 +88,8 @@ docs/                  ARCHITECTURE.md, CONNECTORS.md, research notes
 ## Architecture rules
 
 - **One domain per folder.** Each folder exports plain functions that take `ctx: AppContext` first.
-- **Routes are thin.** A route validates with zod (`@hono/zod-openapi`), then calls a domain function, or a query for a plain read. Every route has a stable dotted `operationId` such as `card.close`. It becomes the SDK method name, so never rename one.
+- **Routes are thin.** A route validates with zod (`@hono/zod-openapi`), then calls a domain function, or a query for a plain read. Route and schema files are named after the domain folder they serve (`routes/attention.ts`, `schemas/attention.ts`), so one feature touches one file in each place.
+- **Three kinds of schema per area, in `api/schemas/`.** The base schema is the entity as the API presents it (`Card`, registered under that name in the spec). Request schemas (`CreateCardRequest`, `ListCardsQuery`) reuse its fields where the constraints are the same. Response schemas are the base, or `derived(Base, row => …)` when the row lacks a field the contract has (`signedUp` from `userId`). A route returns with `respond(c, Schema, row, status)`, never `c.json` directly: the parse turns dates into ISO strings, drops every field the schema doesn't list, and fails loudly on a shape the contract doesn't describe. Don't write `toX()` mappers; put what a response needs into the schema. Every route has a stable dotted `operationId` such as `card.close`. It becomes the SDK method name, so never rename one.
 - **Tenancy comes from the caller.** The workspace is the authenticated member's `workspaceId`. Never take a workspace id from the request.
 - **Privacy is enforced in queries.** Teammate-facing reads filter `visibility = 'team'`. Never rely on a prompt to hide private data. Delivery follows the same rule: a delivery target has a visibility too, and an automation sends team targets a version built from team-visible data only (`send` in `automations/runners.ts`).
 - **One write path per concept.** Write through these functions, never into their tables directly:
@@ -94,9 +97,9 @@ docs/                  ARCHITECTURE.md, CONNECTORS.md, research notes
   - `raiseAttention` for attention items;
   - `appendMessages` for conversation messages.
 - **Events after writes.** Publish to the event bus after the write it describes. Inside `transact`, events wait for the commit.
-- **Background work goes through `enqueue`,** and each task is listed in `jobs/worker.ts`. When a job must follow a write, enqueue it inside the same `transact`, so the write and the job commit together.
+- **Background work goes through `enqueue`,** and each task is listed in `jobs/tasks.ts`. When a job must follow a write, enqueue it inside the same `transact`, so the write and the job commit together.
 - **Inject the outside world.** Use `ctx.now()`, not `new Date()`, and `ctx.fetch` for outbound HTTP, so tests control time and the network.
-- **The assistant never writes its own instructions.** `agent/constitution.md` changes only by commit, and the owner's voice only through `voice.set`. Give no tool a way to write either, so text planted in ingested data can't persist itself into every later conversation.
+- **The assistant never writes its own instructions.** `ai/constitution.md` changes only by commit, and the owner's voice only through `voice.set`. Give no tool a way to write either, so text planted in ingested data can't persist itself into every later conversation.
 - **AI is optional.** `ctx.models` is null when no `OPENROUTER_API_KEY` is set, so every AI feature needs a deterministic fallback. Models are called through the Vercel AI SDK with OpenRouter.
 - **Config:** read environment variables only in `config.ts`, and add new ones to `apps/api/.env.example`.
 - **Errors:** throw the helpers in `lib/errors.ts` (`notFound`, `forbidden`, `badRequest`, `conflict`). Use `returned()` from `lib/assert.ts` for rows an insert or update must return.

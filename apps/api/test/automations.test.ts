@@ -1,11 +1,11 @@
 import { beforeAll, beforeEach, describe, expect, test } from "bun:test";
 
-import { CONSTITUTION } from "#agent/prompts";
+import { CONSTITUTION } from "#ai/prompts";
 import { nextRun } from "#automations/schedule";
 import { briefWindow } from "#briefs/service";
-import type { ConsoleMailer } from "#delivery/mailer";
 import { enqueue } from "#jobs/queue";
-import { startWorker } from "#jobs/worker";
+import { startWorker } from "#jobs/tasks";
+import type { ConsoleMailer } from "#lib/mailer";
 import { localParts } from "#lib/time";
 
 import { scriptedModel, testEnv } from "./harness";

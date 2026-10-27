@@ -1,7 +1,7 @@
 import { generateText } from "ai";
 
-import { TIMEOUTS } from "#agent/models";
-import { audienceNote, CONSTITUTION } from "#agent/prompts";
+import { TIMEOUTS } from "#ai/models";
+import { audienceNote, CONSTITUTION } from "#ai/prompts";
 import { teamVisibleAttention } from "#attention/service";
 import { listCards } from "#board/service";
 import type { AppContext } from "#context";
@@ -15,8 +15,7 @@ import type { Member } from "#db/queries/members";
 import { getWorkspaceById } from "#db/queries/workspaces";
 import type { Visibility } from "#db/schema";
 import { newId } from "#lib/ids";
-import { localParts, startOfLocalDay } from "#lib/time";
-import { timezoneOf } from "#members/service";
+import { localParts, startOfLocalDay, timezoneOf } from "#lib/time";
 import { renderMemory } from "#memory/service";
 
 export type Period = "daily" | "weekly";

@@ -6,8 +6,8 @@ import { createApp } from "#app";
 import { loadConfig } from "#config";
 import { createContext } from "#context";
 import type { AppContext } from "#context";
-import { ConsoleMailer } from "#delivery/mailer";
-import { runJobsOnce } from "#jobs/worker";
+import { runJobsOnce } from "#jobs/tasks";
+import { ConsoleMailer } from "#lib/mailer";
 
 // One database for the whole run (bun runs every test file in one process), recreated at the start
 // so rows from an earlier run can't make a test pass. Isolation comes from each test creating its

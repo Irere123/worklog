@@ -1,18 +1,18 @@
 import type { Pool } from "pg";
 
-import { createModels } from "./agent/models";
-import type { Models } from "./agent/models";
+import { createModels } from "./ai/models";
+import type { Models } from "./ai/models";
 import { createAuth } from "./auth/auth";
 import type { Auth } from "./auth/auth";
 import type { Config } from "./config";
 import { openDb } from "./db";
 import type { DbOrTx } from "./db";
 import { findUserById } from "./db/queries/users";
-import { createMailer } from "./delivery/mailer";
-import type { Mailer } from "./delivery/mailer";
 import { EventBus } from "./events/bus";
 import { installQueue } from "./jobs/queue";
 import { SecretBox } from "./lib/crypto";
+import { createMailer } from "./lib/mailer";
+import type { Mailer } from "./lib/mailer";
 import { claimMemberships } from "./members/service";
 
 export type AppContext = {

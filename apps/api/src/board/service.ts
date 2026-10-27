@@ -23,8 +23,6 @@ import {
   listCardRelations,
   listCardRows,
   listComments,
-  listDriftingAssignments,
-  listStaleCards,
   listWatchers,
   nextCardNumber,
   setCardTags,
@@ -402,7 +400,7 @@ type Transition = {
   verb: string;
 };
 
-async function transition(
+export async function transition(
   ctx: AppContext,
   actor: Member | null,
   workspaceId: string,
@@ -747,68 +745,4 @@ async function setTags(
   await transact(ctx, async (tx) => {
     await setCardTags(tx.db, { workspaceId, cardId, names: clean });
   });
-}
-
-export async function keepAlive(
-  ctx: AppContext,
-  actor: Member,
-  number: number
-) {
-  const card = await getCardByNumber(ctx.db, {
-    workspaceId: actor.workspaceId,
-    number,
-  });
-  await recordActivity(ctx, {
-    workspaceId: actor.workspaceId,
-    actorId: actor.id,
-    source: "worklog",
-    kind: "card.kept",
-    title: `#${card.number} ${card.title}`,
-    body: "Still on it",
-    cardId: card.id,
-  });
-  return await getCard(ctx, actor.workspaceId, number);
-}
-
-const DRIFT_ACTIONS = [
-  { id: "keep", label: "Still on it" },
-  { id: "not_now", label: "Not now" },
-  { id: "done", label: "It's done" },
-];
-
-// Asks once per quiet spell.
-export async function nudgeDrifting(ctx: AppContext): Promise<number> {
-  const rows = await listDriftingAssignments(ctx.db, { now: ctx.now() });
-  let raised = 0;
-  for (const { card, days, memberId } of rows) {
-    const driftsOn = new Date(card.lastActiveAt.getTime() + days * DAY_MS);
-    const item = await raiseAttention(ctx, {
-      workspaceId: card.workspaceId,
-      memberId,
-      kind: "card.drifting",
-      title: `#${card.number} ${card.title} drifts to Not now on ${driftsOn.toISOString().slice(0, 10)} — still on it?`,
-      cardId: card.id,
-      priority: "normal",
-      dedupeKey: `drift:${card.id}:${card.lastActiveAt.getTime()}`,
-      actions: DRIFT_ACTIONS,
-      meta: { cardNumber: card.number },
-      onlyIfNew: true,
-    });
-    if (item) {
-      raised += 1;
-    }
-  }
-  return raised;
-}
-
-export async function sweepEntropy(ctx: AppContext): Promise<number> {
-  const stale = await listStaleCards(ctx.db, { now: ctx.now() });
-  for (const card of stale) {
-    await transition(ctx, null, card.workspaceId, card.number, {
-      stage: "not_now",
-      kind: "card.auto_postponed",
-      verb: "Drifted to Not now after no activity",
-    });
-  }
-  return stale.length;
 }

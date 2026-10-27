@@ -1,8 +1,8 @@
 import { generateText, Output } from "ai";
 import { z } from "zod";
 
-import { TIMEOUTS } from "#agent/models";
-import { UNTRUSTED_NOTE } from "#agent/prompts";
+import { TIMEOUTS } from "#ai/models";
+import { UNTRUSTED_NOTE } from "#ai/prompts";
 import type { AppContext } from "#context";
 import { listActivities } from "#db/queries/activities";
 import type { ActivityRow } from "#db/queries/activities";
@@ -19,15 +19,14 @@ import {
   startOfLocalDate,
   startOfLocalDay,
 } from "#lib/time";
+
 import {
   addMemory,
   renderMemory,
   retireMemories,
   writeDigest,
   writeJournal,
-} from "#memory/service";
-
-import type { RunOutcome } from "./runners";
+} from "./service";
 
 const VISIBILITIES = ["team", "private"] as const;
 const SUNDAY = 0;
@@ -95,7 +94,7 @@ export async function runConsolidate(
   ctx: AppContext,
   member: Member,
   tz: string
-): Promise<RunOutcome> {
+): Promise<{ status: "quiet" | "skipped"; summary: string }> {
   const until = startOfLocalDay(ctx.now(), tz);
   const since = startOfLocalDay(ctx.now(), tz, -1);
   const day = localDate(new Date(since.getTime() + DAY_MS / 2), tz);

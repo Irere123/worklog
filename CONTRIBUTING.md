@@ -27,7 +27,7 @@ Formatting and linting use the [Oxc](https://oxc.rs) tools with [Ultracite](http
 ## How the code is organized
 
 - **One domain per folder** under `apps/api/src` (`board/`, `ingest/`, `attention/`…). Each exposes plain functions that take an `AppContext` first.
-- **Routes are thin.** They live in `src/api/routes/`, validate with zod (which also generates the OpenAPI spec), and call domain functions. Give each a stable dotted `operationId` (`card.close`): it becomes the SDK method name.
+- **Routes are thin.** They live in `src/api/routes/`, one file per domain folder with its schemas in `src/api/schemas/` (a base schema per entity, plus request and response schemas), validate with zod (which also generates the OpenAPI spec), and call domain functions. Every response goes out through `respond()`, which parses it with its schema. Give each a stable dotted `operationId` (`card.close`): it becomes the SDK method name.
 - **One write path per concept:** `recordActivity`, `raiseAttention`, `appendMessages`. Don't insert into those tables directly.
 - **Privacy is enforced in queries.** Teammate-facing code reads `visibility = 'team'` only. Never rely on a prompt to hide data.
 

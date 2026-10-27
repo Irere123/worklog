@@ -6,7 +6,6 @@ import {
   insertToken,
   updateTokenById,
 } from "#db/queries/api-tokens";
-import { insertDeliveryTarget } from "#db/queries/delivery-targets";
 import {
   findMemberByIdOrHandle,
   getPersonalAgent,
@@ -24,6 +23,7 @@ import type { Workspace } from "#db/queries/workspaces";
 import { API_SCOPES } from "#db/schema";
 import type { ApiScope, MemberSettings } from "#db/schema";
 import { transact } from "#db/transact";
+import { createTarget } from "#delivery/service";
 import { generateToken, hashToken } from "#lib/crypto";
 import { badRequest, conflict, forbidden, notFound } from "#lib/errors";
 import { newId } from "#lib/ids";
@@ -223,20 +223,15 @@ export async function createMember(
           createdAt: tx.now(),
         },
       ]);
-      let emailTargetId: string | null = null;
-      if (member.email) {
-        emailTargetId = newId("tgt");
-        await insertDeliveryTarget(tx.db, {
-          id: emailTargetId,
-          workspaceId,
-          memberId: member.id,
-          kind: "email",
-          label: `Email (${member.email})`,
-          address: member.email,
-          visibility: "private",
-        });
-      }
-      await createDefaultAutomations(tx, member, emailTargetId);
+      const emailTarget = member.email
+        ? await createTarget(tx, member, {
+            kind: "email",
+            label: `Email (${member.email})`,
+            address: member.email,
+            visibility: "private",
+          })
+        : null;
+      await createDefaultAutomations(tx, member, emailTarget?.id ?? null);
     }
     return member;
   });
@@ -278,10 +273,6 @@ export async function updateMember(
     id: member.id,
     set: { ...patch, ...(settings ? { settings } : {}) },
   });
-}
-
-export function timezoneOf(member: Member, workspace: Workspace) {
-  return member.timezone ?? workspace.timezone;
 }
 
 export async function createToken(

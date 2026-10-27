@@ -1,6 +1,6 @@
 import { beforeAll, beforeEach, describe, expect, test } from "bun:test";
 
-import { sweepEntropy } from "#board/service";
+import { nudgeDrifting, sweepEntropy } from "#board/drift";
 import { DAY_MS } from "#lib/time";
 
 import { testEnv } from "./harness";
@@ -12,53 +12,6 @@ beforeAll(async () => {
 });
 beforeEach(() => {
   env.reset();
-});
-
-describe("API basics", () => {
-  test("setup is closed once a workspace exists, unless the setup secret is sent", async () => {
-    await env.workspace();
-    const res = await env.call("POST", "/v1/setup", {
-      body: { workspaceName: "X", name: "Y" },
-    });
-    expect(res.status).toBe(403);
-  });
-
-  test("requests without a valid token are rejected", async () => {
-    expect((await env.call("GET", "/v1/me")).status).toBe(401);
-    expect((await env.call("GET", "/v1/me", { token: "wl_nope" })).status).toBe(
-      401
-    );
-  });
-
-  test("me returns the member, workspace and personal assistant", async () => {
-    const { token } = await env.workspace("Me Co");
-    const res = await env.call("GET", "/v1/me", { token });
-    expect(res.status).toBe(200);
-    expect(res.body.member.name).toBe("Emma");
-    expect(res.body.assistant.kind).toBe("agent");
-    expect(res.body.assistant.ownerId).toBe(res.body.member.id);
-  });
-
-  test("the OpenAPI document describes the API with stable operation ids", async () => {
-    const res = await env.call("GET", "/openapi.json");
-    expect(res.status).toBe(200);
-    const ops = Object.values(
-      res.body.paths as Record<string, Record<string, { operationId: string }>>
-    ).flatMap((p) => Object.values(p).map((o) => o.operationId));
-    expect(ops).toContain("card.close");
-    expect(ops).toContain("conversation.create");
-    expect(new Set(ops).size).toBe(ops.length);
-  });
-
-  test("validation errors come back as 400 with details", async () => {
-    const { token } = await env.workspace();
-    const res = await env.call("POST", "/v1/cards", {
-      token,
-      body: { title: "" },
-    });
-    expect(res.status).toBe(400);
-    expect(res.body.error.code).toBe("invalid_request");
-  });
 });
 
 async function boardSetup() {
@@ -218,5 +171,51 @@ describe("board (Fizzy rules)", () => {
     const after = (await env.call("GET", `/v1/cards/${card.number}`, { token }))
       .body;
     expect(after).toMatchObject({ stage: "not_now", autoPostponed: true });
+  });
+});
+
+describe("drift nudges", () => {
+  test("asks the assignee before a card drifts, once, and acts on the one-click answer", async () => {
+    const owner = await env.workspace();
+    const board = (
+      await env.call("POST", "/v1/boards", {
+        token: owner.token,
+        body: { name: "B", entropyDays: 7 },
+      })
+    ).body;
+    const { body: card } = await env.call("POST", "/v1/cards", {
+      token: owner.token,
+      body: {
+        boardId: board.id,
+        title: "Migrate billing",
+        columnId: board.columns[0].id,
+        assigneeIds: [owner.member.id],
+      },
+    });
+    // Assigning yourself is activity too; wait out 6 of the 7 days.
+    env.ctx.now = () => new Date(Date.now() + 6 * DAY_MS);
+    expect(await nudgeDrifting(env.ctx)).toBe(1);
+    // Once per quiet spell
+    expect(await nudgeDrifting(env.ctx)).toBe(0);
+
+    const item = (
+      await env.call("GET", "/v1/attention", { token: owner.token })
+    ).body.find((a: any) => a.kind === "card.drifting");
+    expect(item.actions.map((a: any) => a.id)).toEqual([
+      "keep",
+      "not_now",
+      "done",
+    ]);
+    const answered = await env.call(
+      "POST",
+      `/v1/attention/${item.id}/actions/keep`,
+      { token: owner.token }
+    );
+    expect(answered.body.state).toBe("done");
+
+    const after = (
+      await env.call("GET", `/v1/cards/${card.number}`, { token: owner.token })
+    ).body;
+    expect(after.entropy.postponingSoon).toBe(false);
   });
 });

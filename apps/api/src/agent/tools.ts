@@ -2,14 +2,12 @@ import { tool } from "ai";
 import type { ToolSet } from "ai";
 import { z } from "zod";
 
-import { workSnapshot } from "#activity/snapshot";
-import { logWork, LOG_KINDS } from "#activity/worklog";
-import { performAttentionAction } from "#attention/actions";
 import {
   giveFeedback,
   raiseAttention,
   updateAttention,
 } from "#attention/service";
+import { performAttentionAction } from "#board/drift";
 import * as board from "#board/service";
 import type { AppContext } from "#context";
 import { listActivities } from "#db/queries/activities";
@@ -21,9 +19,11 @@ import type { Member } from "#db/queries/members";
 import { listMemories } from "#db/queries/memories";
 import { getWorkspaceById } from "#db/queries/workspaces";
 import { CARD_STAGES } from "#db/schema";
-import { DAY_MS, startOfLocalDate } from "#lib/time";
-import { resolveMember, timezoneOf } from "#members/service";
+import { DAY_MS, startOfLocalDate, timezoneOf } from "#lib/time";
+import { resolveMember } from "#members/service";
 import { addMemory, forgetMemory } from "#memory/service";
+import { logWork, LOG_KINDS } from "#work/log";
+import { workSnapshot } from "#work/snapshot";
 
 type Scope = {
   ctx: AppContext;
