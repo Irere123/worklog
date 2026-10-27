@@ -1,9 +1,3 @@
-import { recordActivity } from "#activity/service";
-import {
-  assertAction,
-  raiseAttention,
-  updateAttention,
-} from "#attention/service";
 import type { AppContext } from "#context";
 import { getAttentionById } from "#db/queries/attention";
 import {
@@ -15,7 +9,9 @@ import type { Member } from "#db/queries/members";
 import { badRequest } from "#lib/errors";
 import { DAY_MS } from "#lib/time";
 
-import { close, getCard, postpone, transition } from "./service";
+import { recordActivity } from "./activity";
+import { assertAction, raiseAttention, updateAttention } from "./attention";
+import { close, getCard, postpone, transition } from "./board";
 
 export async function keepAlive(
   ctx: AppContext,

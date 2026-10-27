@@ -19,7 +19,7 @@ import {
 import { ErrorSchema } from "#api/schemas/common";
 import { listConversations, listMessages } from "#db/queries/conversations";
 import { findVoice, listVoices } from "#db/queries/voices";
-import { resolveMember } from "#members/service";
+import { resolveMember } from "#work/members";
 
 export const agentRoutes = router()
   .openapi(

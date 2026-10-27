@@ -27,13 +27,13 @@ import {
   ReplayRequest,
   UpdateConnectionRequest,
 } from "#api/schemas/connections";
-import * as conns from "#connectors/connections";
-import { registerDiscordCommands } from "#connectors/discord";
-import { listConnectors } from "#connectors/registry";
 import type { AppContext } from "#context";
 import { getConnectionById, listConnections } from "#db/queries/connections";
 import type { ConnectionRow } from "#db/queries/connections";
 import { listInboundEvents } from "#db/queries/inbound-events";
+import * as conns from "#ingest/connections";
+import { listConnectors } from "#ingest/connectors";
+import { registerDiscordCommands } from "#ingest/connectors/discord";
 import { connectionHealth, receivePushed, viewOf } from "#ingest/pipeline";
 import { enqueue } from "#jobs/queue";
 import { badRequest, forbidden } from "#lib/errors";

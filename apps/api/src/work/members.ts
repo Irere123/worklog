@@ -1,3 +1,4 @@
+import { createTarget } from "#automations/delivery";
 import { createDefaultAutomations } from "#automations/service";
 import type { AppContext } from "#context";
 import {
@@ -23,7 +24,6 @@ import type { Workspace } from "#db/queries/workspaces";
 import { API_SCOPES } from "#db/schema";
 import type { ApiScope, MemberSettings } from "#db/schema";
 import { transact } from "#db/transact";
-import { createTarget } from "#delivery/service";
 import { generateToken, hashToken } from "#lib/crypto";
 import { badRequest, conflict, forbidden, notFound } from "#lib/errors";
 import { newId } from "#lib/ids";

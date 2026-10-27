@@ -1,8 +1,8 @@
 import { z } from "@hono/zod-openapi";
 
-import { ENTROPY_DAYS } from "#board/service";
 import type { BoardWithColumns } from "#db/queries/boards";
 import { CARD_STAGES } from "#db/schema";
+import { ENTROPY_DAYS } from "#work/board";
 
 import { derived, Timestamp } from "./common";
 

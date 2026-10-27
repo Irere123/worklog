@@ -11,8 +11,8 @@ import type { ConnectionRow } from "#db/queries/connections";
 import { badRequest } from "#lib/errors";
 import { newId } from "#lib/ids";
 
-import { getConnector } from "./registry";
-import { WebhookSettings } from "./webhook";
+import { getConnector } from "./connectors";
+import { WebhookSettings } from "./connectors/webhook";
 
 function validate(
   provider: string,

@@ -181,7 +181,7 @@ Coding agents (Cursor, Grok Bot, Claude Code, OpenCode, your own) are members wi
 
 ### 4. A code connector
 
-Implement `Connector` (`apps/api/src/ingest/types.ts`) and register it in `apps/api/src/connectors/registry.ts`:
+Implement `Connector` (`apps/api/src/ingest/types.ts`) and register it in `apps/api/src/ingest/connectors.ts`:
 
 ```ts
 export const linearConnector: Connector = {

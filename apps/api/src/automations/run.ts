@@ -1,4 +1,4 @@
-import { raiseAttention } from "#attention/service";
+import { runConsolidate } from "#agent/memory/consolidate";
 import type { AppContext } from "#context";
 import {
   insertAutomationRun,
@@ -13,7 +13,7 @@ import { transact } from "#db/transact";
 import { notFound } from "#lib/errors";
 import { newId } from "#lib/ids";
 import { timezoneOf } from "#lib/time";
-import { runConsolidate } from "#memory/consolidate";
+import { raiseAttention } from "#work/attention";
 
 import { runBrief, runCheck, runCustom, runDigest } from "./runners";
 import type { RunOutcome } from "./runners";

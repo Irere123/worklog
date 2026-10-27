@@ -1,6 +1,6 @@
 # Worklog agent: AI SDK v7 and OpenRouter capability survey
 
-Date: 2026-10-26. Scope: `apps/api` agent code (`src/agent/*`, `src/automations/service.ts`, `src/briefs/service.ts`, `src/work/log.ts`, `src/memory/service.ts`) checked against the installed SDKs. No source files were modified.
+Date: 2026-10-26. Scope: `apps/api` agent code (`src/agent/*`, `src/automations/service.ts`, `src/automations/briefs.ts`, `src/work/log.ts`, `src/agent/memory.ts`) checked against the installed SDKs. No source files were modified.
 
 ## How this was verified
 
@@ -47,8 +47,8 @@ Note: the codebase changed while this survey ran. `src/automations/service.ts` g
 
 ### A1. Private activity leaks into team-visible memory (P0, privacy)
 
-- `src/automations/service.ts:304` loads yesterday's activity with `listActivities(ctx, ws, [member.id], …)`. The third argument (`privateFor`) includes the member's **private** activities (`src/activity/service.ts:79-83`).
-- `:326` `writeJournal(...)` and `:331` (profile lines) call `addMemory` **without** `visibility`. `addMemory` defaults to `"team"` (`src/memory/service.ts:54`). The no-AI fallback (`:313`) does the same with raw private titles.
+- `src/automations/service.ts:304` loads yesterday's activity with `listActivities(ctx, ws, [member.id], …)`. The third argument (`privateFor`) includes the member's **private** activities (`src/work/activity.ts:79-83`).
+- `:326` `writeJournal(...)` and `:331` (profile lines) call `addMemory` **without** `visibility`. `addMemory` defaults to `"team"` (`src/agent/memory.ts:54`). The no-AI fallback (`:313`) does the same with raw private titles.
 - Teammate-mode `recall` returns `visibility = "team"` rows (`src/agent/tools.ts:141`), so a teammate's question can surface the owner's private work logs, summarized into the journal.
 - This contradicts the stated design ("Privacy is enforced by what these functions query, not by the prompt").
 - Fix options:
@@ -124,7 +124,7 @@ Note: the codebase changed while this survey ran. `src/automations/service.ts` g
 
 - `appendMessages` (`conversations.ts:53-58`) computes `max(seq)+1` then inserts. Two concurrent turns on one conversation, or a brief landing in the inbox mid-turn, hit `messages_seq_uq` **after** the model call was paid for. Use a transaction with a row lock on the conversation, or retry.
 - `runCheck` (`:284`) sends whatever `output.message` holds when `decision === "notify"`, even an empty string. Guard it.
-- `composeBrief` records `composedBy` from the configured id (`briefs/service.ts:129`). With OpenRouter fallbacks (section 8) the served model can differ. Use `result.finalStep.response.modelId`.
+- `composeBrief` records `composedBy` from the configured id (`automations/briefs.ts:129`). With OpenRouter fallbacks (section 8) the served model can differ. Use `result.finalStep.response.modelId`.
 - `ask()` dereferences `input.agent!` (`assistant.ts:33`) when no `conversationId` is passed.
 
 ### What the current code already gets right for v7
@@ -396,7 +396,7 @@ export const ownerApprovalPolicy: GenericToolApprovalFunction<
 
 Add to the owner instructions: "When a tool execution is not approved, do not retry it" (recommended in the docs).
 
-**Slack/Discord path (`ask()` via `connectors/commands.ts`):** there is no approval UI. Two options:
+**Slack/Discord path (`ask()` via `ingest/commands.ts`):** there is no approval UI. Two options:
 
 - (a) Reply "Reply `yes` to confirm moving #12 to Done" and convert a following "yes" into the approval response.
 - (b) Auto-deny with a reason (`{ type: 'denied', reason: 'Confirm this in the Worklog app' }`) for the gated cases.
@@ -405,7 +405,7 @@ Add to the owner instructions: "When a tool execution is not approved, do not re
 
 ### 4. Memory retrieval: embeddings and reranking vs ILIKE — P2
 
-**Current state:** `recall` passes the model's whole query to `ilike(memories.content, '%…%')` (`src/memory/service.ts:25`), ordered by recency, limit 60. Multi-word queries ("payments retry decision") match only exact substrings, so recall often returns nothing relevant.
+**Current state:** `recall` passes the model's whole query to `ilike(memories.content, '%…%')` (`src/agent/memory.ts:25`), ordered by recency, limit 60. Multi-word queries ("payments retry decision") match only exact substrings, so recall often returns nothing relevant.
 
 **Step 1 (cheap, no new provider): full-text and trigram.** Postgres FTS (`to_tsvector` / `websearch_to_tsquery`) works on both Postgres and PGlite. PGlite 0.5.11 ships `pg_trgm` in `dist/contrib`. Rank by `ts_rank` with a trigram fallback. This fixes most misses with zero AI cost.
 

@@ -1,8 +1,8 @@
 import { beforeAll, beforeEach, describe, expect, test } from "bun:test";
 
 import { CONSTITUTION } from "#agent/prompts";
+import { briefWindow } from "#automations/briefs";
 import { nextRun } from "#automations/schedule";
-import { briefWindow } from "#briefs/service";
 import { enqueue } from "#jobs/queue";
 import { startWorker } from "#jobs/tasks";
 import type { ConsoleMailer } from "#lib/mailer";

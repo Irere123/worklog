@@ -3,9 +3,9 @@ import { createHmac } from "node:crypto";
 
 import { sql } from "drizzle-orm";
 
-import { normalizeGithubLike } from "#connectors/github";
-import { normalizeSlackMessage } from "#connectors/slack";
-import { webhookConnector } from "#connectors/webhook";
+import { normalizeGithubLike } from "#ingest/connectors/github";
+import { normalizeSlackMessage } from "#ingest/connectors/slack";
+import { webhookConnector } from "#ingest/connectors/webhook";
 import { pruneDeliveries } from "#ingest/retention";
 import { hmacHex } from "#lib/crypto";
 import { DAY_MS } from "#lib/time";

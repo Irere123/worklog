@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { sanitizeMarkdown, urlsIn } from "#delivery/sanitize";
+import { sanitizeMarkdown, urlsIn } from "#automations/sanitize";
 
 describe("outbound sanitizing", () => {
   test("drops images and links that weren't in the source data", () => {

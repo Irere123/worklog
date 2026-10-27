@@ -1,9 +1,16 @@
 import { z } from "zod";
 
+import { toSlack } from "#automations/delivery";
 import type { AppContext } from "#context";
 import { findMemberByIdentity } from "#db/queries/members";
 import type { Member } from "#db/queries/members";
-import { toSlack } from "#delivery/service";
+import {
+  HELP,
+  leadingHandle,
+  needsDeferral,
+  parseCommand,
+  runCommand,
+} from "#ingest/commands";
 import type {
   ConnectionView,
   Connector,
@@ -12,14 +19,6 @@ import type {
   WorklogEvent,
 } from "#ingest/types";
 import { hmacHex, safeEqual } from "#lib/crypto";
-
-import {
-  HELP,
-  leadingHandle,
-  needsDeferral,
-  parseCommand,
-  runCommand,
-} from "./commands";
 
 const MAX_SKEW_SECONDS = 60 * 5;
 

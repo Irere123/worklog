@@ -1,6 +1,6 @@
 import { z } from "@hono/zod-openapi";
 
-import { PushedEvent } from "#connectors/custom";
+import { PushedEvent } from "#ingest/connectors/custom";
 import type { Connector as ConnectorDef } from "#ingest/types";
 
 import { derived, Timestamp } from "./common";

@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { postToInbox } from "#agent/conversations";
 import { structured } from "#agent/generate";
+import { renderMemory } from "#agent/memory";
 import type { Models } from "#agent/models";
 import {
   audienceNote,
@@ -9,15 +10,6 @@ import {
   prompt,
   UNTRUSTED_NOTE,
 } from "#agent/prompts";
-import {
-  markConsidered,
-  markDigested,
-  mutedKinds,
-  pushBudget,
-  recordNotification,
-  teamVisibleAttention,
-} from "#attention/service";
-import { composeTeamBrief, generateBrief } from "#briefs/service";
 import type { AppContext } from "#context";
 import { listActivities } from "#db/queries/activities";
 import {
@@ -29,12 +21,20 @@ import type { AttentionItem } from "#db/queries/attention";
 import type { Automation, AutomationRun } from "#db/queries/automations";
 import type { Member } from "#db/queries/members";
 import type { Visibility } from "#db/schema";
-import { sanitizeMarkdown, urlsIn } from "#delivery/sanitize";
-import { deliver, splitTargets } from "#delivery/service";
 import { DAY_MS, startOfLocalDay } from "#lib/time";
-import { renderMemory } from "#memory/service";
+import {
+  markConsidered,
+  markDigested,
+  mutedKinds,
+  pushBudget,
+  recordNotification,
+  teamVisibleAttention,
+} from "#work/attention";
 import { workSnapshot } from "#work/snapshot";
 
+import { composeTeamBrief, generateBrief } from "./briefs";
+import { deliver, splitTargets } from "./delivery";
+import { sanitizeMarkdown, urlsIn } from "./sanitize";
 import { isActiveNow } from "./schedule";
 
 export type RunOutcome = {

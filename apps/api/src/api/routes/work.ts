@@ -4,8 +4,8 @@ import { body, errors, json, respond, router } from "#api/router";
 import { Activity } from "#api/schemas/activity";
 import { MemberRef } from "#api/schemas/members";
 import { LogRequest, Snapshot, SnapshotQuery } from "#api/schemas/work";
-import { resolveMember } from "#members/service";
 import { logWork } from "#work/log";
+import { resolveMember } from "#work/members";
 import { workSnapshot } from "#work/snapshot";
 
 export const workRoutes = router()

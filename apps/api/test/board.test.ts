@@ -1,7 +1,7 @@
 import { beforeAll, beforeEach, describe, expect, test } from "bun:test";
 
-import { nudgeDrifting, sweepEntropy } from "#board/drift";
 import { DAY_MS } from "#lib/time";
+import { nudgeDrifting, sweepEntropy } from "#work/drift";
 
 import { testEnv } from "./harness";
 import type { TestEnv } from "./harness";

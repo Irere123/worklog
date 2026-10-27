@@ -5,9 +5,8 @@ import { z } from "zod";
 import type { AppContext } from "#context";
 import { findMemberByIdentity } from "#db/queries/members";
 import type { Member } from "#db/queries/members";
+import { needsDeferral, runCommand } from "#ingest/commands";
 import type { ConnectionView, Connector } from "#ingest/types";
-
-import { needsDeferral, runCommand } from "./commands";
 
 const API = "https://discord.com/api/v10";
 

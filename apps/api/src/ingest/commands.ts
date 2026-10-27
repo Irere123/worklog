@@ -1,9 +1,9 @@
 import { ask, resolveAgent } from "#agent/loop";
-import { generateBrief } from "#briefs/service";
+import { generateBrief } from "#automations/briefs";
 import type { AppContext } from "#context";
 import type { Member } from "#db/queries/members";
-import { resolveMember } from "#members/service";
 import { logWork } from "#work/log";
+import { resolveMember } from "#work/members";
 import { renderSnapshot, workSnapshot } from "#work/snapshot";
 
 export type Command = { name: string; text: string; target?: Member };

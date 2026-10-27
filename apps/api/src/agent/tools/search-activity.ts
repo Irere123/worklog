@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import { listActivities } from "#db/queries/activities";
 import { DAY_MS } from "#lib/time";
-import { resolveMember } from "#members/service";
+import { resolveMember } from "#work/members";
 
 import { privateFor, safe } from "./scope";
 import type { Scope } from "./scope";

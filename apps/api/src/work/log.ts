@@ -1,10 +1,7 @@
 import { z } from "zod";
 
-import { recordActivity } from "#activity/service";
 import { structured } from "#agent/generate";
 import { prompt, UNTRUSTED_NOTE } from "#agent/prompts";
-import { raiseAttention } from "#attention/service";
-import { listCards } from "#board/service";
 import type { AppContext } from "#context";
 import { findActivityById, updateActivityById } from "#db/queries/activities";
 import { getCardByNumber, updateCardById } from "#db/queries/cards";
@@ -12,6 +9,10 @@ import { listMembers, listMembersByHandles } from "#db/queries/members";
 import type { Member } from "#db/queries/members";
 import type { Visibility } from "#db/schema";
 import { transact } from "#db/transact";
+
+import { recordActivity } from "./activity";
+import { raiseAttention } from "./attention";
+import { listCards } from "./board";
 
 export const LOG_KINDS = ["entry", "decision", "blocker", "win"] as const;
 export type LogKind = (typeof LOG_KINDS)[number];

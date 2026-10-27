@@ -1,8 +1,9 @@
-import { listCards } from "#board/service";
 import type { AppContext } from "#context";
 import { listActivities } from "#db/queries/activities";
 import type { Member } from "#db/queries/members";
 import { DAY_MS } from "#lib/time";
+
+import { listCards } from "./board";
 
 export async function workSnapshot(
   ctx: AppContext,

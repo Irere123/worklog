@@ -1,6 +1,5 @@
 import { createRoute, z } from "@hono/zod-openapi";
 
-import { recordActivity } from "#activity/service";
 import { body, errors, Id, json, Ok, respond, router } from "#api/router";
 import {
   Activity,
@@ -13,7 +12,8 @@ import { getCardByNumber } from "#db/queries/cards";
 import type { Member } from "#db/queries/members";
 import { applyAgentState } from "#ingest/effects";
 import { notFound } from "#lib/errors";
-import { resolveMember } from "#members/service";
+import { recordActivity } from "#work/activity";
+import { resolveMember } from "#work/members";
 
 export const activityRoutes = router()
   .openapi(

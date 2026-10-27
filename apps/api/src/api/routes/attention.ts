@@ -16,8 +16,8 @@ import {
   giveFeedback,
   listAttention,
   updateAttention,
-} from "#attention/service";
-import { performAttentionAction } from "#board/drift";
+} from "#work/attention";
+import { performAttentionAction } from "#work/drift";
 
 export const attentionRoutes = router()
   .openapi(

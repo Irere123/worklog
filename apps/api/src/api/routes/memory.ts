@@ -1,5 +1,7 @@
 import { createRoute, z } from "@hono/zod-openapi";
 
+import { addMemory, forgetMemory } from "#agent/memory";
+import { exportMemory } from "#agent/memory/export";
 import { body, errors, Id, json, Ok, respond, router } from "#api/router";
 import {
   CreateMemoryRequest,
@@ -9,8 +11,6 @@ import {
 } from "#api/schemas/memory";
 import { listMemories, listMemoryLineage } from "#db/queries/memories";
 import { notFound } from "#lib/errors";
-import { exportMemory } from "#memory/export";
-import { addMemory, forgetMemory } from "#memory/service";
 
 export const memoryRoutes = router()
   .openapi(

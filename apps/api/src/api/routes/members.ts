@@ -26,7 +26,7 @@ import type { AppContext } from "#context";
 import { listActiveTokens } from "#db/queries/api-tokens";
 import { getPersonalAgent, listMembers } from "#db/queries/members";
 import { getWorkspaceById } from "#db/queries/workspaces";
-import * as people from "#members/service";
+import * as people from "#work/members";
 
 export const memberRoutes = router()
   .openapi(

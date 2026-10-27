@@ -1,7 +1,7 @@
 import { tool } from "ai";
 import { z } from "zod";
 
-import { forgetMemory } from "#memory/service";
+import { forgetMemory } from "#agent/memory";
 
 import { safe } from "./scope";
 import type { Scope } from "./scope";

@@ -1,9 +1,9 @@
 import { tool } from "ai";
 import { z } from "zod";
 
-import { listCards } from "#board/service";
 import { CARD_STAGES } from "#db/schema";
-import { resolveMember } from "#members/service";
+import { listCards } from "#work/board";
+import { resolveMember } from "#work/members";
 
 import { safe } from "./scope";
 import type { Scope } from "./scope";

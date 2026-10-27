@@ -4,7 +4,7 @@ import { streamSSE } from "hono/streaming";
 import { errors, router } from "#api/router";
 import { Event, EventsQuery } from "#api/schemas/events";
 import type { StoredEvent } from "#db/queries/events";
-import { canSee } from "#events/bus";
+import { canSee } from "#events";
 
 const HEARTBEAT_MS = 10_000;
 

@@ -23,7 +23,7 @@ import {
 import { listIdentities } from "#db/queries/identities";
 import { linkByHandle, linkIdentityToMember } from "#ingest/identity";
 import { notFound } from "#lib/errors";
-import { resolveMember } from "#members/service";
+import { resolveMember } from "#work/members";
 
 export const identityRoutes = router()
   .openapi(

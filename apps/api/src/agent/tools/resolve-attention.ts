@@ -1,7 +1,7 @@
 import { tool } from "ai";
 import { z } from "zod";
 
-import { updateAttention } from "#attention/service";
+import { updateAttention } from "#work/attention";
 
 import { safe } from "./scope";
 import type { Scope } from "./scope";

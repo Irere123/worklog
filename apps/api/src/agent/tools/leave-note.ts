@@ -1,8 +1,8 @@
 import { tool } from "ai";
 import { z } from "zod";
 
-import { raiseAttention } from "#attention/service";
 import { getCardByNumber } from "#db/queries/cards";
+import { raiseAttention } from "#work/attention";
 
 import { safe } from "./scope";
 import type { Scope } from "./scope";

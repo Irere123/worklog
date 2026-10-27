@@ -52,7 +52,7 @@ cd apps/api
 bun run test test/board.test.ts   # one test file
 bun run db:generate               # migration after editing src/db/schema.ts
 bun run db:generate --custom --name=<name>   # empty migration, for SQL drizzle-kit can't generate
-bun run auth:generate             # regenerates src/db/auth-schema.ts after editing src/auth/auth.ts
+bun run auth:generate             # regenerates src/db/auth-schema.ts after editing src/lib/auth.ts
 bun run openapi                   # prints the OpenAPI spec
 ```
 
@@ -63,25 +63,28 @@ Work is done when `format:check`, `lint`, `typecheck` and `test` all pass. CI ru
 ```
 apps/api/              the API server (Bun + Hono)
   src/
-    api/               routes/ and schemas/ (one file per domain folder), auth middleware, webhook entry (hooks.ts)
-    ingest/            the pipeline: normalize → identity → gates → card linking → persist → effects
-    connectors/        github (+ gitea), slack, discord, webhook (no-code), custom; registry.ts lists them
-    activity/          the activity stream: recordActivity, the one write path
-    board/             cards, columns, entropy; drift.ts holds the nudges and their one-click answers
-    attention/         "needs you": raise, collapse, quotas, feedback
-    automations/       scheduled routines: service.ts (CRUD), run.ts (execution), runners.ts (the routines)
-    work/              one person's work: manual logs in (log.ts, + AI structuring), snapshot out
+    api/               routes/ and schemas/ (one file per API resource), auth middleware, webhook entry (hooks.ts)
+    ingest/            events in: pipeline.ts (normalize → identity → gates → card linking → persist → effects),
+                       connections.ts, commands.ts (chat commands); connectors.ts registers connectors/*.ts
+                       (github + gitea, slack, discord, webhook (no-code), custom)
+    work/              the work itself: activity.ts (recordActivity, the one write path), board.ts (cards, columns,
+                       entropy), drift.ts (nudges and their one-click answers), attention.ts ("needs you"),
+                       log.ts (manual logs, + AI structuring), snapshot.ts (one person's work, out),
+                       members.ts (workspace setup, members, invites, API tokens)
+    automations/       what runs on a schedule and where it goes: service.ts (CRUD), run.ts (execution),
+                       runners.ts (the routines), schedule.ts, briefs.ts, delivery.ts (+ sanitize.ts)
     agent/             everything that talks to a model: loop.ts (a conversation turn), generate.ts (one-shot calls),
                        models.ts, instructions.ts, conversations, compaction, voice; prompts.ts loads prompts/*.md
-                       (one file per prompt, plus constitution.md); tools.ts registers tools/*.ts (one file per tool)
+                       (one file per prompt, plus constitution.md); tools.ts registers tools/*.ts (one file per tool);
+                       memory.ts, with memory/consolidate.ts (the nightly upkeep) and memory/export.ts
     jobs/              Graphile Worker: queue.ts (enqueue), tasks.ts (the task table and cron)
-    briefs/ memory/ delivery/ members/ auth/ events/   memory/consolidate.ts is the nightly upkeep
     db/                schema.ts (ours), auth-schema.ts (generated), queries/ (one file per area), transact.ts
-    lib/               small shared helpers: errors, ids, crypto, time, assert, mailer
+    lib/               small shared helpers: errors, ids, crypto, time, assert, mailer, auth (Better Auth)
+    events.ts          the event bus: durable, sequenced log plus live fan-out
     context.ts         AppContext: everything a handler needs, built once per process
     config.ts          the only place that reads environment variables
   test/                harness.ts plus one file per area
-  scripts/             one-off tools: openapi.ts prints the spec
+  scripts/             one-off tools: openapi.ts prints the spec, auth-cli.ts feeds the Better Auth CLI
   drizzle/             generated migrations
 docs/                  ARCHITECTURE.md, CONNECTORS.md, research notes
 ```
@@ -89,7 +92,7 @@ docs/                  ARCHITECTURE.md, CONNECTORS.md, research notes
 ## Architecture rules
 
 - **One domain per folder.** Each folder exports plain functions that take `ctx: AppContext` first.
-- **Routes are thin.** A route validates with zod (`@hono/zod-openapi`), then calls a domain function, or a query for a plain read. Route and schema files are named after the domain folder they serve (`routes/attention.ts`, `schemas/attention.ts`), so one feature touches one file in each place.
+- **Routes are thin.** A route validates with zod (`@hono/zod-openapi`), then calls a domain function, or a query for a plain read. Route and schema files are named after the API resource they serve (`routes/attention.ts`, `schemas/attention.ts`), so one feature touches one file in each place.
 - **Three kinds of schema per area, in `api/schemas/`.** The base schema is the entity as the API presents it (`Card`, registered under that name in the spec). Request schemas (`CreateCardRequest`, `ListCardsQuery`) reuse its fields where the constraints are the same. Response schemas are the base, or `derived(Base, row => …)` when the row lacks a field the contract has (`signedUp` from `userId`). A route returns with `respond(c, Schema, row, status)`, never `c.json` directly: the parse turns dates into ISO strings, drops every field the schema doesn't list, and fails loudly on a shape the contract doesn't describe. Don't write `toX()` mappers; put what a response needs into the schema. Every route has a stable dotted `operationId` such as `card.close`. It becomes the SDK method name, so never rename one.
 - **Tenancy comes from the caller.** The workspace is the authenticated member's `workspaceId`. Never take a workspace id from the request.
 - **Privacy is enforced in queries.** Teammate-facing reads filter `visibility = 'team'`. Never rely on a prompt to hide private data. Delivery follows the same rule: a delivery target has a visibility too, and an automation sends team targets a version built from team-visible data only (`send` in `automations/runners.ts`).
@@ -121,7 +124,7 @@ The layout follows [Midday](https://github.com/midday-ai/midday)'s `packages/db/
 - **An index on an existing table gets `.concurrently()`** in `schema.ts` and a migration of its own: generate it with nothing else changed. `db/migrate.ts` builds it outside a transaction, so ingest keeps writing while it builds. A migration that mixes a concurrent index with other statements is refused at startup. Leave `.concurrently()` in place afterwards.
 - **Turn known constraint violations into domain errors** with `violates(error, "<constraint>")` from `db/errors.ts`, so a race returns a 409, not a 500.
 - **Lint keeps SQL in `db/`:** importing `drizzle-orm` anywhere else in `src/` fails. A few things talk to Postgres without our queries, by design:
-  - Better Auth runs its own queries through `drizzleAdapter` (`auth/auth.ts`, `auth/cli.ts`).
+  - Better Auth runs its own queries through `drizzleAdapter` (`lib/auth.ts`, `scripts/auth-cli.ts`).
   - Graphile Worker takes the pg pool (`ctx.pool`) for its migrations and runner.
   - `db/index.ts` runs the Drizzle migrations.
   - Tests may query directly to set up or inspect rows.

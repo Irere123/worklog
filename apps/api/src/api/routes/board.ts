@@ -22,10 +22,10 @@ import {
   UpdateCardRequest,
   UpdateColumnRequest,
 } from "#api/schemas/board";
-import * as board from "#board/service";
 import { getBoardWithColumns, listBoardsWithColumns } from "#db/queries/boards";
 import { getCardByNumber } from "#db/queries/cards";
-import { resolveMember } from "#members/service";
+import * as board from "#work/board";
+import { resolveMember } from "#work/members";
 
 const ws = (c: Context<Env>) => c.get("member").workspaceId;
 

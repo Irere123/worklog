@@ -1,11 +1,11 @@
 import { tool } from "ai";
 import { z } from "zod";
 
-import * as board from "#board/service";
 import type { AppContext } from "#context";
 import { getBoardWithColumns } from "#db/queries/boards";
 import { getCardByNumber } from "#db/queries/cards";
 import type { Member } from "#db/queries/members";
+import * as board from "#work/board";
 
 import { safe } from "./scope";
 import type { Scope } from "./scope";

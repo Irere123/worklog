@@ -1,5 +1,3 @@
-import { recordActivity } from "#activity/service";
-import { getConnector } from "#connectors/registry";
 import type { AppContext } from "#context";
 import {
   deleteActivityByExternalId,
@@ -27,7 +25,9 @@ import type { Member } from "#db/queries/members";
 import { transact } from "#db/transact";
 import { enqueue } from "#jobs/queue";
 import { newId } from "#lib/ids";
+import { recordActivity } from "#work/activity";
 
+import { getConnector } from "./connectors";
 import {
   applyAgentState,
   applyBoardEffects,

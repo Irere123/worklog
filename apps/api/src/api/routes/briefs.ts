@@ -6,9 +6,9 @@ import {
   CreateBriefRequest,
   ListBriefsQuery,
 } from "#api/schemas/briefs";
-import { generateBrief } from "#briefs/service";
+import { generateBrief } from "#automations/briefs";
+import { deliver } from "#automations/delivery";
 import { getBriefById, listBriefs } from "#db/queries/briefs";
-import { deliver } from "#delivery/service";
 
 export const briefRoutes = router()
   .openapi(

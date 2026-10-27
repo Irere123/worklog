@@ -201,7 +201,7 @@ describe("assistant", () => {
     env.ctx.models = { main: model, fast: model };
 
     const { logWork } = await import("#work/log");
-    const { resolveMember } = await import("#members/service");
+    const { resolveMember } = await import("#work/members");
     const { getPersonalAgent } = await import("#db/queries/members");
     const emma = await resolveMember(
       env.ctx,

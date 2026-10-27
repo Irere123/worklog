@@ -1,5 +1,3 @@
-import { recordActivity } from "#activity/service";
-import { raiseAttention } from "#attention/service";
 import type { AppContext } from "#context";
 import {
   getBoardWithColumns,
@@ -37,6 +35,9 @@ import { transact } from "#db/transact";
 import { badRequest, notFound } from "#lib/errors";
 import { newId } from "#lib/ids";
 import { DAY_MS } from "#lib/time";
+
+import { recordActivity } from "./activity";
+import { raiseAttention } from "./attention";
 
 export type CardView = CardRow & {
   columnName: string | null;

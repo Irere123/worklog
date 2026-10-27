@@ -1,9 +1,9 @@
 import { tool } from "ai";
 import { z } from "zod";
 
+import { addMemory } from "#agent/memory";
 import { getWorkspaceById } from "#db/queries/workspaces";
 import { startOfLocalDate, timezoneOf } from "#lib/time";
-import { addMemory } from "#memory/service";
 
 import { safe } from "./scope";
 import type { Scope } from "./scope";

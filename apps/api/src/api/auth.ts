@@ -5,8 +5,8 @@ import type { AppContext } from "#context";
 import { listMemberships } from "#db/queries/members";
 import type { Member } from "#db/queries/members";
 import type { ApiScope } from "#db/schema";
-import { authenticate } from "#members/service";
-import type { SignedInUser } from "#members/service";
+import { authenticate } from "#work/members";
+import type { SignedInUser } from "#work/members";
 
 import type { Env } from "./router";
 

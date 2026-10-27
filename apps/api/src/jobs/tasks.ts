@@ -4,11 +4,11 @@ import { z } from "zod";
 
 import { compactConversation } from "#agent/compaction";
 import { runDueAutomations } from "#automations/run";
-import { nudgeDrifting, sweepEntropy } from "#board/drift";
 import type { AppContext } from "#context";
 import { processInbound, replayConnection } from "#ingest/pipeline";
 import { pruneDeliveries } from "#ingest/retention";
 import { DAY_MS } from "#lib/time";
+import { nudgeDrifting, sweepEntropy } from "#work/drift";
 
 import { logger } from "./queue";
 

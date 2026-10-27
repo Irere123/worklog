@@ -155,7 +155,7 @@ database: drizzleAdapter(db, { provider: "pg", transaction: true }),
 ### 2.4 Schema generation alongside drizzle-kit [verified]
 
 ```bash
-bunx auth generate --config src/auth/cli.ts --output src/db/auth-schema.ts \
+bunx auth generate --config scripts/auth-cli.ts --output src/db/auth-schema.ts \
   --adapter drizzle --dialect postgresql --yes     # Drizzle TS file for BA tables (+ relations)
 bunx drizzle-kit generate                          # our normal migration flow; include auth-schema.ts in drizzle.config `schema`
 ```
@@ -168,7 +168,7 @@ bunx drizzle-kit generate                          # our normal migration flow; 
 **How to work with the CLI:**
 
 - **`auth migrate` is Kysely-only.** With Drizzle you always use `generate` plus drizzle-kit [docs].
-- The CLI imports your config file, so give it a side-effect-free entry point. `src/auth/cli.ts` should build `createAuth()` over `drizzle({ client: new PGlite() })` (in-memory) instead of our `openDb()`, which runs migrations. That pattern worked in the prototype.
+- The CLI imports your config file, so give it a side-effect-free entry point. `scripts/auth-cli.ts` should build `createAuth()` over `drizzle({ client: new PGlite() })` (in-memory) instead of our `openDb()`, which runs migrations. That pattern worked in the prototype.
 - `--adapter drizzle --dialect postgresql` generates without a live DB.
 
 **The workflow I'd adopt:**

@@ -1,7 +1,6 @@
 import { complete } from "#agent/generate";
+import { renderMemory } from "#agent/memory";
 import { audienceNote, CONSTITUTION, prompt } from "#agent/prompts";
-import { teamVisibleAttention } from "#attention/service";
-import { listCards } from "#board/service";
 import type { AppContext } from "#context";
 import { listActivities } from "#db/queries/activities";
 import { listOpenAttention } from "#db/queries/attention";
@@ -14,7 +13,8 @@ import { getWorkspaceById } from "#db/queries/workspaces";
 import type { Visibility } from "#db/schema";
 import { newId } from "#lib/ids";
 import { localParts, startOfLocalDay, timezoneOf } from "#lib/time";
-import { renderMemory } from "#memory/service";
+import { teamVisibleAttention } from "#work/attention";
+import { listCards } from "#work/board";
 
 export type Period = "daily" | "weekly";
 

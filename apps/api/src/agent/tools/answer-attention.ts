@@ -1,7 +1,7 @@
 import { tool } from "ai";
 import { z } from "zod";
 
-import { performAttentionAction } from "#board/drift";
+import { performAttentionAction } from "#work/drift";
 
 import { safe } from "./scope";
 import type { Scope } from "./scope";

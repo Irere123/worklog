@@ -65,7 +65,7 @@ _Prepared 2026-10-26. Scope: the canonical event model, noise reduction and data
 
 **Codebase snapshot.**
 
-- I read `apps/api/src/connectors/*`, `api/hooks.ts`, `activity/service.ts`, `members/service.ts`, `jobs/*` and `db/schema.ts`.
+- I read `apps/api/src/ingest/connectors/*`, `api/hooks.ts`, `work/activity.ts`, `team/members.ts`, `jobs/*` and `db/schema.ts`.
 - The code changed **during** this research. Between 12:00 and 12:15 CET another session added:
   - `src/ingest/{types,quality,identity,effects}.ts`
   - `jobs/queue.ts`
@@ -1043,7 +1043,7 @@ Idempotency comes in three layers:
 | --- | --- | --- | --- |
 | `api/hooks.ts` GitHub | verify, then `claimDelivery`, then `handleGithubEvent` inline | Work happens inside GitHub's 10 s budget. On failure the delivery is marked failed **and can never be reprocessed**: a redelivery is treated as a duplicate and nothing was stored | inbox and queue (§4.2) |
 | `api/hooks.ts` Slack | `void handleSlackEvent(...)` | Lost on restart; a Slack retry is deduped away | jobs (§4.1) |
-| `connectors/github.ts` ids | `pr:${ref}:${action}:${deliveryId}`, `review_requested:…:${deliveryId}` | Backfill and duplicate hooks can't dedupe; `ref` uses the renameable `full_name` | semantic ids (§2.4) |
+| `ingest/connectors/github.ts` ids | `pr:${ref}:${action}:${deliveryId}`, `review_requested:…:${deliveryId}` | Backfill and duplicate hooks can't dedupe; `ref` uses the renameable `full_name` | semantic ids (§2.4) |
 | `occurredAt` | always `ctx.now()` | wrong for redelivery, backfill and replay | source timestamps (§2.4) |
 | push | counts `commits.length`; titles "Pushed N commits to main" | double counts merges, rebases and non-distinct commits; duplicates `pr.merged`; bot pushes included | §3.5 |
 | bots | GitHub: none. Slack: `bot_id` check | dependabot and renovate flood the feed | §3.3 |

@@ -1,7 +1,7 @@
 import { tool } from "ai";
 import { z } from "zod";
 
-import { resolveMember } from "#members/service";
+import { resolveMember } from "#work/members";
 import { workSnapshot } from "#work/snapshot";
 
 import { includesPrivate, safe } from "./scope";

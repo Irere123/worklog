@@ -1,8 +1,8 @@
 import { tool } from "ai";
 import { z } from "zod";
 
-import { getCardDetail } from "#board/service";
 import { listActivities } from "#db/queries/activities";
+import { getCardDetail } from "#work/board";
 
 import { privateFor, safe } from "./scope";
 import type { Scope } from "./scope";

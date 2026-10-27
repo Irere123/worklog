@@ -5,22 +5,19 @@
         │  REST (OpenAPI 3.1)      │ SSE /v1/events         │ signed webhooks /hooks/*
         ▼                          ▼                        ▼
  ┌──────────────────────────── apps/api (Bun + Hono) ────────────────────────────┐
- │ api/routes/*  zod-openapi routes, one file per domain → docs + typed SDKs    │
+ │ api/routes/*  zod-openapi routes, one file per domain → docs + typed SDKs     │
  │ api/hooks.ts  /hooks/{connection}: verify → store raw → queue (any connector) │
- │ api/auth.ts   API keys (agents) or better-auth sessions (people) → member    │
+ │ api/auth.ts   API keys (agents) or better-auth sessions (people) → member     │
  │                                                                               │
- │ board/        Fizzy rules: stages, golden tickets, entropy, drift + answers   │
- │ activity/     the work stream: one write path, which resets entropy          │
- │ work/         one person's work: manual logs (+ AI structuring) · snapshots   │
- │ attention/    "needs you": collapse, quotas, feedback, metrics                │
- │ briefs/       data gathering → model prose (or template)                      │
- │ automations/  scheduled jobs: brief · digest · check · consolidate · custom   │
- │ agent/        the loop, one-shot calls, prompts/*.md, tools/ (one per file)   │
- │ memory/       profile · facts · journal · nightly consolidation               │
- │ delivery/     email (Resend/SMTP/console) · Slack · Discord · webhook, sanitize│
- │ connectors/   GitHub · Gitea · Slack · Discord · webhook (no-code) · custom   │
  │ ingest/       pipeline: normalize · identity · gates · merge · effects        │
- │ events/bus.ts durable, sequenced event log + live fan-out                     │
+ │   connectors/ GitHub · Gitea · Slack · Discord · webhook (no-code) · custom   │
+ │ work/         activity (one write path) · board (Fizzy rules, drift) ·        │
+ │               attention · manual logs (+ AI structuring) · snapshots · members│
+ │ automations/  routines: brief · digest · check · consolidate · custom;        │
+ │               briefs (data → prose) · delivery (email, Slack, Discord, hooks) │
+ │ agent/        the loop, one-shot calls, prompts/*.md, tools/ (one per file)   │
+ │               memory: profile · facts · journal · nightly consolidation       │
+ │ events.ts     durable, sequenced event log + live fan-out                     │
  │ jobs/         Graphile Worker: queues per connection · cron schedule          │
  └───────────────────────────────────────────────────────────────────────────────┘
         │ db/queries/* (one file per area) → Drizzle ORM (one schema, one migration set)

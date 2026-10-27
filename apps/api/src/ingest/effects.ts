@@ -1,6 +1,3 @@
-import { raiseAttention } from "#attention/service";
-import type { AttentionInput } from "#attention/service";
-import * as board from "#board/service";
 import type { AppContext } from "#context";
 import { setOpenAttentionDone } from "#db/queries/attention";
 import { findCardByExternalKey, listCardIdsByRefs } from "#db/queries/cards";
@@ -8,6 +5,9 @@ import type { CardRow } from "#db/queries/cards";
 import { findMemberById } from "#db/queries/members";
 import type { Member } from "#db/queries/members";
 import type { Priority } from "#db/schema";
+import { raiseAttention } from "#work/attention";
+import type { AttentionInput } from "#work/attention";
+import * as board from "#work/board";
 
 import { resolveActor } from "./identity";
 import type { BoardEffect, ExternalActor, Signal, WorklogEvent } from "./types";

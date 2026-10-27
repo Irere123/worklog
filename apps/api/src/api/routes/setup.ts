@@ -9,12 +9,12 @@ import {
   SetupResponse,
   WorkspaceCreatedResponse,
 } from "#api/schemas/members";
-import { enabledSocialProviders } from "#auth/auth";
 import { getPersonalAgent, listMemberships } from "#db/queries/members";
 import { countWorkspaces, getWorkspaceById } from "#db/queries/workspaces";
+import { enabledSocialProviders } from "#lib/auth";
 import { safeEqual } from "#lib/crypto";
 import { forbidden } from "#lib/errors";
-import * as people from "#members/service";
+import * as people from "#work/members";
 
 const SetupHeaders = z.object({ "x-setup-secret": z.string().optional() });
 

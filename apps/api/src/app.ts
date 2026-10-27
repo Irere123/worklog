@@ -24,8 +24,8 @@ import {
   setupRoutes,
 } from "./api/routes/setup";
 import { workRoutes } from "./api/routes/work";
-import { webOrigins } from "./auth/auth";
 import type { AppContext } from "./context";
+import { webOrigins } from "./lib/auth";
 import { ApiError } from "./lib/errors";
 
 export const API_INFO = {

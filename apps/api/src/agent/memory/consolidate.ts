@@ -1,6 +1,13 @@
 import { z } from "zod";
 
 import { complete, structured } from "#agent/generate";
+import {
+  addMemory,
+  renderMemory,
+  retireMemories,
+  writeDigest,
+  writeJournal,
+} from "#agent/memory";
 import { prompt, UNTRUSTED_NOTE } from "#agent/prompts";
 import type { AppContext } from "#context";
 import { listActivities } from "#db/queries/activities";
@@ -18,14 +25,6 @@ import {
   startOfLocalDate,
   startOfLocalDay,
 } from "#lib/time";
-
-import {
-  addMemory,
-  renderMemory,
-  retireMemories,
-  writeDigest,
-  writeJournal,
-} from "./service";
 
 const VISIBILITIES = ["team", "private"] as const;
 const SUNDAY = 0;

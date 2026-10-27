@@ -5,8 +5,8 @@ import type { ContentfulStatusCode } from "hono/utils/http-status";
 import type { AppContext } from "#context";
 import type { Member } from "#db/queries/members";
 import { forbidden } from "#lib/errors";
-import { canActFor } from "#members/service";
-import type { SignedInUser } from "#members/service";
+import { canActFor } from "#work/members";
+import type { SignedInUser } from "#work/members";
 
 import { ErrorSchema } from "./schemas/common";
 

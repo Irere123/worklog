@@ -1,8 +1,8 @@
 import { tool } from "ai";
 import { z } from "zod";
 
-import { createCard } from "#board/service";
 import { getBoardWithColumns, listBoards } from "#db/queries/boards";
+import { createCard } from "#work/board";
 
 import { safe } from "./scope";
 import type { Scope } from "./scope";

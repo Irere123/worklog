@@ -512,13 +512,13 @@ Worklog's scheduled runs already have **no tools**, which is good. The residual 
    - `raiseAttention`'s upsert resets `pushedAt: null` on every re-raise. A busy card thread (`card:${id}` watcher items) or a repeated mention can be reconsidered every cycle.
 5. **Fixed polling latency.** A blocked-on-you item can wait up to 30 minutes, while non-urgent items are considered every 30 minutes. Both ends are suboptimal.
 6. **Priority inflation surface.**
-   - Any member, **including external agents**, can create `high` items via `@mention` (`board/service.ts` `addComment`; GitHub mention handler).
+   - Any member, **including external agents**, can create `high` items via `@mention` (`work/board.ts` `addComment`; GitHub mention handler).
    - The work-log blocker classifier (`work/log.ts`) sets `priority: "high"` for any handle the LLM extracts.
    - Teammate-mode `leave_note_for_owner({urgent: true})` is decided by the model under the asker's influence.
    - None of these are rate-limited per sender.
-7. **Drift warnings are informational only.** `briefs/service.ts` lists `driftingSoon` cards, but nothing lets the owner act from the nudge.
+7. **Drift warnings are informational only.** `automations/briefs.ts` lists `driftingSoon` cards, but nothing lets the owner act from the nudge.
 8. **Delivery renders model Markdown.**
-   - `delivery/service.ts` email path: `marked.parse(message.markdown)` turns model-written Markdown, including images and arbitrary links, into HTML.
+   - `automations/delivery.ts` email path: `marked.parse(message.markdown)` turns model-written Markdown, including images and arbitrary links, into HTML.
    - Slack does not set `unfurl_media: false`.
    - Webhooks receive model prose.
    - Together this is the EchoLeak shape.

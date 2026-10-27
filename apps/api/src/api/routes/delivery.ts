@@ -7,13 +7,13 @@ import {
   TargetTestResponse,
   UpdateTargetRequest,
 } from "#api/schemas/delivery";
-import { listDeliveryTargets } from "#db/queries/delivery-targets";
 import {
   createTarget,
   deleteTarget,
   deliver,
   updateTarget,
-} from "#delivery/service";
+} from "#automations/delivery";
+import { listDeliveryTargets } from "#db/queries/delivery-targets";
 
 export const deliveryRoutes = router()
   .openapi(
