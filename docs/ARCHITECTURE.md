@@ -54,7 +54,7 @@ Ingestion is a pipeline, not a set of webhook handlers. Every delivery is stored
 6. persistence with provenance;
 7. effects: attention, the board, and agent states.
 
-Replays rebuild activity from the raw inbox. See [CONNECTORS.md](CONNECTORS.md).
+Replays rebuild activity from the raw inbox, which keeps deliveries for `INBOUND_RETENTION_DAYS` (90 by default). A replay never reaches further back, so older activity stays as it is. See [CONNECTORS.md](CONNECTORS.md).
 
 ## The board (Fizzy rules)
 
@@ -117,10 +117,17 @@ Consolidation runs **twice**: once over team-visible activity (producing team me
 
 - **Automations are rows** with a schedule (`daily` / `weekly` / `interval` with `activeHoursOnly`), evaluated on the member's local clock with DST handled.
 - **Spreading load:** a deterministic per-automation jitter keeps jobs from all firing on the same minute.
-- **Cron:** Graphile Worker's crontab (`jobs/worker.ts`) runs due automations every minute, the entropy sweep hourly and event pruning daily. Each run fires once across all workers, and the scheduled tasks share one queue, so they never overlap.
+- **Cron:** Graphile Worker's crontab (`jobs/worker.ts`) runs due automations every minute, the entropy sweep hourly, and event and delivery pruning daily. Each run fires once across all workers, and the scheduled tasks share one queue, so they never overlap.
 - **Failure handling:** an attention item after 3 consecutive failures; the automation is disabled after 10.
 - **Deployment:** run it in the API process (`RUN_SCHEDULER=true`) or as a separate worker (`bun run worker`).
 
 ## Configuration
 
 See [`apps/api/.env.example`](../apps/api/.env.example). Production requires `WORKLOG_SECRET_KEY`, which encrypts connector secrets at rest with AES-256-GCM.
+
+## Running Postgres
+
+- **Migrations run at startup.** The API and the worker take the same advisory lock, so only one of them migrates. An index on an existing table is built `CONCURRENTLY`, so ingest keeps writing while it builds.
+- **Connections:** each process keeps its own pool of 10. PgBouncer is optional; if you add it, use session pooling, because Graphile Worker `LISTEN`s for new jobs and migrations hold a session lock.
+- **Busy tables:** `identities`, `inbound_events` and `attention_items` are updated constantly. They leave free space on each page and vacuum early (migration `0002_tune_autovacuum`). Watch `n_dead_tup` and `last_autovacuum` in `pg_stat_user_tables`; an autovacuum running for hours needs tuning.
+- **Slow queries:** enable `pg_stat_statements` and set `log_min_duration_statement` (for example `500ms`) to see which queries to look at. Read plans with `EXPLAIN`; `EXPLAIN ANALYZE` runs the query.

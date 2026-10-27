@@ -2,10 +2,10 @@ import { fileURLToPath } from "node:url";
 
 import { drizzle } from "drizzle-orm/node-postgres";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
-import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { Pool } from "pg";
 
 import * as authSchema from "./auth-schema";
+import { migrate } from "./migrate";
 import * as appSchema from "./schema";
 
 export const schema = { ...appSchema, ...authSchema };
@@ -30,7 +30,7 @@ export async function openDb(
     connection.on("error", logError);
   });
   const db = drizzle({ client: pool, schema });
-  await migrate(db, { migrationsFolder });
+  await migrate(pool, migrationsFolder);
   return {
     db,
     close: async () => {

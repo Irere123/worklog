@@ -6,7 +6,9 @@ import { sql } from "drizzle-orm";
 import { normalizeGithubLike } from "#connectors/github";
 import { normalizeSlackMessage } from "#connectors/slack";
 import { webhookConnector } from "#connectors/webhook";
+import { pruneDeliveries } from "#ingest/retention";
 import { hmacHex } from "#lib/crypto";
+import { DAY_MS } from "#lib/time";
 
 import { testEnv } from "./harness";
 import type { TestEnv } from "./harness";
@@ -558,6 +560,51 @@ describe("ingestion pipeline", () => {
       })
     ).body;
     expect(deliveries).toHaveLength(2);
+  });
+
+  test("deliveries past retention are pruned, and replay keeps the activity they produced", async () => {
+    const { owner, conn, send } = await github();
+    const longAgo = new Date(Date.now() - 100 * DAY_MS);
+    env.ctx.now = () => longAgo;
+    await send("push", {
+      ref: "refs/heads/x",
+      after: "p1",
+      sender: emma,
+      commits: [{ id: "1", message: "m" }],
+    });
+    env.ctx.now = () => new Date();
+    await send("pull_request", {
+      action: "closed",
+      sender: emma,
+      pull_request: {
+        number: 3,
+        title: "Ship",
+        html_url: "u",
+        user: emma,
+        merged: true,
+        closed_at: new Date().toISOString(),
+      },
+    });
+
+    await pruneDeliveries(env.ctx);
+    const deliveries = (
+      await env.call("GET", `/v1/connections/${conn.id}/deliveries`, {
+        token: owner.token,
+      })
+    ).body;
+    expect(deliveries.map((d: any) => d.eventType)).toEqual(["pull_request"]);
+
+    await env.call("POST", `/v1/connections/${conn.id}/replay`, {
+      token: owner.token,
+      body: {},
+    });
+    await env.drain();
+    const kinds = (
+      await env.call("GET", "/v1/activities?source=github", {
+        token: owner.token,
+      })
+    ).body.map((a: any) => a.kind);
+    expect(kinds.toSorted()).toEqual(["code.pushed", "pr.merged"]);
   });
 
   test("Slack deletions remove what was recorded", async () => {

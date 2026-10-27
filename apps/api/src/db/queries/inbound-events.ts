@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, gte, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, gte, inArray, lt, sql } from "drizzle-orm";
 
 import type { DbOrTx } from "#db";
 import { inboundEvents } from "#db/schema";
@@ -134,4 +134,29 @@ export async function listInboundFailures(
     )
     .orderBy(desc(inboundEvents.receivedAt))
     .limit(params.limit);
+}
+
+// One connection and a bounded batch per call: each delete is then a short range on
+// (connection_id, received_at) that holds few locks and doesn't keep autovacuum waiting. Pending
+// deliveries stay, because the queue hasn't processed them yet.
+export async function deleteFinishedDeliveries(
+  db: DbOrTx,
+  params: { connectionId: string; before: Date; limit: number }
+) {
+  const batch = db
+    .select({ id: inboundEvents.id })
+    .from(inboundEvents)
+    .where(
+      and(
+        eq(inboundEvents.connectionId, params.connectionId),
+        lt(inboundEvents.receivedAt, params.before),
+        inArray(inboundEvents.status, ["processed", "ignored", "failed"])
+      )
+    )
+    .limit(params.limit);
+  const deleted = await db
+    .delete(inboundEvents)
+    .where(inArray(inboundEvents.id, batch))
+    .returning({ id: inboundEvents.id });
+  return deleted.length;
 }

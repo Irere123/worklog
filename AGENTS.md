@@ -51,6 +51,7 @@ bun run format         # oxfmt; `bun run format:check` only checks
 cd apps/api
 bun run test test/board.test.ts   # one test file
 bun run db:generate               # migration after editing src/db/schema.ts
+bun run db:generate --custom --name=<name>   # empty migration, for SQL drizzle-kit can't generate
 bun run auth:generate             # regenerates src/db/auth-schema.ts after editing src/auth/auth.ts
 bun run openapi                   # prints the OpenAPI spec
 ```
@@ -99,7 +100,7 @@ docs/                  ARCHITECTURE.md, CONNECTORS.md, research notes
 - **Config:** read environment variables only in `config.ts`, and add new ones to `apps/api/.env.example`.
 - **Errors:** throw the helpers in `lib/errors.ts` (`notFound`, `forbidden`, `badRequest`, `conflict`). Use `returned()` from `lib/assert.ts` for rows an insert or update must return.
 - **IDs:** use `newId(prefix)` from `lib/ids.ts`.
-- **Generated files:** never hand-edit `apps/api/drizzle/**` or `src/db/auth-schema.ts`. Regenerate them with the commands above.
+- **Generated files:** never hand-edit `apps/api/drizzle/**` or `src/db/auth-schema.ts`. Regenerate them with the commands above. The one exception is the SQL file of a custom migration, which you write yourself.
 
 ## Database
 
@@ -111,6 +112,7 @@ The layout follows [Midday](https://github.com/midday-ai/midday)'s `packages/db/
 - **Names say what comes back.** `find*` returns `undefined` when nothing matches, `get*` throws `notFound`, and `list*` and `count*` read many. `insert*`, `upsert*`, `update*`, `delete*` and `set*` write, with `ById` when the primary key is the only key.
 - **Reads may be called straight from a route or another domain** with `ctx.db`. Writes go through the domain function, which owns validation, permissions and side effects.
 - **Writes that belong together run in `transact(ctx, async (tx) => …)`** from `db/transact.ts`. Inside it, pass `tx`, never the outer `ctx`. Jobs commit with the transaction and events publish after it. A nested `transact` joins the outer one. Never call `ctx.db.transaction` directly, and keep model calls and outbound HTTP out of a transaction. Inside one, run queries one after another, never with `Promise.all`: they share one connection, and pg 9 rejects a second query on a busy one.
+- **An index on an existing table gets `.concurrently()`** in `schema.ts` and a migration of its own: generate it with nothing else changed. `db/migrate.ts` builds it outside a transaction, so ingest keeps writing while it builds. A migration that mixes a concurrent index with other statements is refused at startup. Leave `.concurrently()` in place afterwards.
 - **Turn known constraint violations into domain errors** with `violates(error, "<constraint>")` from `db/errors.ts`, so a race returns a 409, not a 500.
 - **Lint keeps SQL in `db/`:** importing `drizzle-orm` anywhere else in `src/` fails. A few things talk to Postgres without our queries, by design:
   - Better Auth runs its own queries through `drizzleAdapter` (`auth/auth.ts`, `auth/cli.ts`).

@@ -36,6 +36,7 @@ import {
 } from "./effects";
 import { resolveActor } from "./identity";
 import { gate } from "./quality";
+import { retainedSince } from "./retention";
 import type { ConnectionView, InboundRequest, WorklogEvent } from "./types";
 
 type Outcome = {
@@ -480,14 +481,17 @@ export async function replayConnection(
   connectionId: string,
   since?: Date
 ) {
+  // Activity from deliveries that retention already deleted can't be rebuilt, so it stays.
+  const kept = retainedSince(ctx);
+  const from = kept && (!since || since < kept) ? kept : since;
   const ids = await listInboundEventIds(ctx.db, {
     workspaceId,
     connectionId,
-    since,
+    since: from,
   });
   const removed = await deleteConnectionActivities(ctx.db, {
     connectionId,
-    since,
+    since: from,
   });
   for (const id of ids) {
     await processInbound(ctx, id, { replay: true });

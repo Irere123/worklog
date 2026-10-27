@@ -15,6 +15,13 @@
       "when": 1793024523361,
       "tag": "0001_drop_own_job_queue",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1793059913478,
+      "tag": "0002_tune_autovacuum",
+      "breakpoints": true
     }
   ]
 }
