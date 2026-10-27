@@ -53,3 +53,24 @@ export async function deleteDeliveryTarget(
     )
     .returning();
 }
+
+export async function updateDeliveryTargetById(
+  db: DbOrTx,
+  params: {
+    id: string;
+    memberId: string;
+    set: Partial<Pick<TargetRow, "label" | "visibility">>;
+  }
+) {
+  const [row] = await db
+    .update(deliveryTargets)
+    .set(params.set)
+    .where(
+      and(
+        eq(deliveryTargets.id, params.id),
+        eq(deliveryTargets.memberId, params.memberId)
+      )
+    )
+    .returning();
+  return row;
+}

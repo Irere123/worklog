@@ -19,6 +19,13 @@ beforeEach(() => {
   env.reset();
 });
 
+// What a custom automation answers when it has something to say.
+function notify(message: string) {
+  return {
+    text: JSON.stringify({ decision: "notify", message, summary: "sent" }),
+  };
+}
+
 describe("schedules follow each person's local clock", () => {
   // UTC+2, no DST
   const kigali = "Africa/Kigali";
@@ -180,6 +187,181 @@ describe("automations", () => {
     expect(systems.every((s) => s.startsWith(CONSTITUTION))).toBe(true);
     expect(systems[0]).toContain("# This brief");
     expect(systems[1]).toContain("# This automation");
+  });
+
+  test("private work only reaches private targets; a team channel gets the brief the team could see", async () => {
+    const { token } = await env.workspace();
+    for (const [text, visibility] of [
+      ["Shipped the retry queue", "team"],
+      ["Interview loop at Acme", "private"],
+    ] as const) {
+      await env.call("POST", "/v1/logs", { token, body: { text, visibility } });
+    }
+    const target = async (body: object) =>
+      (await env.call("POST", "/v1/delivery-targets", { token, body })).body;
+    const channel = await target({
+      kind: "webhook",
+      address: "https://hooks.test/eng",
+    });
+    const phone = await target({
+      kind: "webhook",
+      address: "https://ntfy.test/emma",
+    });
+    const lead = await target({ kind: "email", address: "lead@example.com" });
+    expect([channel, phone, lead].map((t) => t.visibility)).toEqual([
+      "team",
+      "team",
+      "team",
+    ]);
+    const marked = await env.call("PATCH", `/v1/delivery-targets/${phone.id}`, {
+      token,
+      body: { visibility: "private" },
+    });
+    expect(marked.body.visibility).toBe("private");
+    const own = (
+      await env.call("GET", "/v1/delivery-targets", { token })
+    ).body.find((t: any) => t.kind === "email" && t.id !== lead.id);
+    expect(own.visibility).toBe("private");
+
+    const autos = (await env.call("GET", "/v1/automations", { token })).body;
+    const morning = autos.find((a: any) => a.kind === "brief.daily");
+    await env.call("PATCH", `/v1/automations/${morning.id}`, {
+      token,
+      body: { targetIds: [own.id, channel.id, phone.id, lead.id] },
+    });
+    await env.call("POST", `/v1/automations/${morning.id}/run`, { token });
+
+    const posted = (url: string): string =>
+      (env.ctx.fetch as any).calls.find((c: any) => c.url === url).body
+        .markdown;
+    const mailed = (to: string): string =>
+      (env.ctx.mailer as ConsoleMailer).sent.find((m) => m.to === to)!.text;
+    for (const full of [
+      posted("https://ntfy.test/emma"),
+      mailed(own.address),
+    ]) {
+      expect(full).toContain("Interview loop at Acme");
+    }
+    for (const shared of [
+      posted("https://hooks.test/eng"),
+      mailed(lead.address),
+    ]) {
+      expect(shared).toContain("Shipped the retry queue");
+      expect(shared).not.toContain("Interview loop");
+    }
+  });
+
+  test("a team copy only mentions attention that team-visible activity raised", async () => {
+    const owner = await env.workspace();
+    const sam = await env.teammate(owner.token, "Sam");
+    const board = (
+      await env.call("POST", "/v1/boards", {
+        token: owner.token,
+        body: { name: "B" },
+      })
+    ).body;
+    const card = (
+      await env.call("POST", "/v1/cards", {
+        token: owner.token,
+        body: { boardId: board.id, title: "Retry queue" },
+      })
+    ).body;
+    await env.call("POST", `/v1/cards/${card.number}/comments`, {
+      token: sam.token,
+      body: { body: `@${owner.member.handle} can you review the backoff?` },
+    });
+    const { model } = scriptedModel([
+      {
+        tool: "leave_note_for_owner",
+        input: { note: "Sam needs the salary bands", urgent: false },
+      },
+      { text: "Left a note." },
+    ]);
+    env.ctx.models = { main: model, fast: model };
+    await env.call("POST", "/v1/conversations", {
+      token: sam.token,
+      body: { to: owner.member.handle, message: "Can I see the bands?" },
+    });
+    env.ctx.models = null;
+
+    const channel = (
+      await env.call("POST", "/v1/delivery-targets", {
+        token: owner.token,
+        body: { kind: "webhook", address: "https://hooks.test/eng" },
+      })
+    ).body;
+    const autos = (
+      await env.call("GET", "/v1/automations", { token: owner.token })
+    ).body;
+    const digest = autos.find((a: any) => a.kind === "digest");
+    await env.call("PATCH", `/v1/automations/${digest.id}`, {
+      token: owner.token,
+      body: { targetIds: [...digest.targetIds, channel.id] },
+    });
+    const run = await env.call("POST", `/v1/automations/${digest.id}/run`, {
+      token: owner.token,
+    });
+    expect(run.body.status).toBe("delivered");
+
+    const shared: string = (env.ctx.fetch as any).calls.at(-1).body.markdown;
+    expect(shared).toContain("1 thing(s)");
+    expect(shared).toContain("Sam mentioned you on #1 Retry queue");
+    expect(shared).not.toContain("salary bands");
+    const inbox = (
+      await env.call("GET", "/v1/conversations", { token: owner.token })
+    ).body.find((c: any) => c.inbox);
+    const full: string = (
+      await env.call("GET", `/v1/conversations/${inbox.id}`, {
+        token: owner.token,
+      })
+    ).body.messages.at(-1).text;
+    expect(full).toContain("2 thing(s)");
+    expect(full).toContain("salary bands");
+  });
+
+  test("a custom automation writes its team copy without private memory or its last result", async () => {
+    const { token } = await env.workspace();
+    await env.call("POST", "/v1/memories", {
+      token,
+      body: {
+        content: "Interviewing at Acme",
+        kind: "fact",
+        visibility: "private",
+      },
+    });
+    const channel = (
+      await env.call("POST", "/v1/delivery-targets", {
+        token,
+        body: { kind: "webhook", address: "https://hooks.test/eng" },
+      })
+    ).body;
+    const { model, prompts } = scriptedModel([
+      notify("Full version"),
+      notify("Team version"),
+    ]);
+    env.ctx.models = { main: model, fast: model };
+    const custom = (
+      await env.call("POST", "/v1/automations", {
+        token,
+        body: {
+          name: "Friday wrap",
+          schedule: { type: "weekly", weekday: 5, at: "15:00" },
+          instructions: "Summarize my week",
+          targetIds: [channel.id],
+        },
+      })
+    ).body;
+    await env.call("POST", `/v1/automations/${custom.id}/run`, { token });
+
+    const [own, team] = prompts.map((p) => JSON.stringify(p.prompt));
+    expect(own).toContain("Interviewing at Acme");
+    expect(own).toContain("Last result");
+    expect(team).not.toContain("Interviewing at Acme");
+    expect(team).not.toContain("Last result");
+    expect(team).toContain("Others might read this too");
+    expect((env.ctx.fetch as any).calls.at(-1).body.markdown).toBe(
+      "Team version"
+    );
   });
 
   test("the attention check stays quiet for low-key items and pings for things blocked on you", async () => {

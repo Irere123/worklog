@@ -57,6 +57,20 @@
       "when": 1793073056740,
       "tag": "0007_memory_lineage_index",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1793073176990,
+      "tag": "0008_target_visibility",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1793073179041,
+      "tag": "0009_private_targets",
+      "breakpoints": true
     }
   ]
 }

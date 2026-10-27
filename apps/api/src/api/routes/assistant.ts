@@ -36,7 +36,12 @@ import {
   TARGET_KINDS,
   VISIBILITY,
 } from "#db/schema";
-import { createTarget, deleteTarget, deliver } from "#delivery/service";
+import {
+  createTarget,
+  deleteTarget,
+  deliver,
+  updateTarget,
+} from "#delivery/service";
 import { badRequest, notFound } from "#lib/errors";
 import { resolveMember } from "#members/service";
 import { exportMemory } from "#memory/export";
@@ -432,31 +437,56 @@ export const assistantRoutes = router()
       tags: ["Delivery"],
       summary: "Add a place to receive briefs and notifications",
       description:
-        "email: an address. slack: a channel id (C…) or your user id (U…) for a DM, plus the Slack connectionId. discord: a channel id plus connectionId, or a channel webhook URL. webhook: any https URL (works with ntfy, Pushover bridges, Zapier…).",
+        "email: an address. slack: a channel id (C…) or your user id (U…) for a DM, plus the Slack connectionId. discord: a channel id plus connectionId, or a channel webhook URL. webhook: any https URL (works with ntfy, Pushover bridges, Zapier…). Only your own email address and a Slack DM to you start as private; set `visibility` to private for anything else only you read, such as your own ntfy topic.",
       request: body(
         z.object({
           kind: z.enum(TARGET_KINDS),
           address: z.string().min(1),
           label: z.string().optional(),
           connectionId: z.string().optional(),
+          visibility: z.enum(VISIBILITY).optional(),
         })
       ),
       responses: { 201: json(TargetSchema, "Created"), ...errors },
     }),
-    async (c) => {
-      const me = c.get("member");
-      return c.json(
+    async (c) =>
+      c.json(
         toTarget(
-          await createTarget(
+          await createTarget(c.get("ctx"), c.get("member"), c.req.valid("json"))
+        ),
+        201
+      )
+  )
+  .openapi(
+    createRoute({
+      method: "patch",
+      path: "/v1/delivery-targets/{id}",
+      operationId: "target.update",
+      tags: ["Delivery"],
+      summary: "Rename a target, or say who reads it",
+      request: {
+        params: Id,
+        ...body(
+          z.object({
+            label: z.string().min(1).optional(),
+            visibility: z.enum(VISIBILITY).optional(),
+          })
+        ),
+      },
+      responses: { 200: json(TargetSchema), ...errors },
+    }),
+    async (c) =>
+      c.json(
+        toTarget(
+          await updateTarget(
             c.get("ctx"),
-            me.workspaceId,
-            me.id,
+            c.get("member").id,
+            c.req.valid("param").id,
             c.req.valid("json")
           )
         ),
-        201
-      );
-    }
+        200
+      )
   )
   .openapi(
     createRoute({

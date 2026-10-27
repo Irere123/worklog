@@ -544,6 +544,10 @@ export const deliveryTargets = pgTable("delivery_targets", {
   /** email address | Slack channel/user id | Discord channel id or webhook URL | https URL */
   address: text("address").notNull(),
   connectionId: text("connection_id").references(() => connections.id),
+  /** private = only the member reads it, so private data may go there; team = others might. */
+  visibility: text("visibility", { enum: VISIBILITY })
+    .notNull()
+    .default("team"),
   enabled: boolean("enabled").notNull().default(true),
   createdAt: createdAt(),
 });
@@ -633,6 +637,8 @@ export const notifications = pgTable(
     itemIds: text("item_ids").array().notNull(),
     subject: text("subject").notNull(),
     body: text("body").notNull(),
+    /** The version team-visible targets got, built from team-visible data only; null if none did. */
+    teamBody: text("team_body"),
     reason: text("reason"),
     deliveredTo: text("delivered_to").array().notNull(),
     createdAt: createdAt(),

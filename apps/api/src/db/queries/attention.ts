@@ -13,7 +13,12 @@ import {
 } from "drizzle-orm";
 
 import type { DbOrTx } from "#db";
-import { attentionFeedback, attentionItems, notifications } from "#db/schema";
+import {
+  activities,
+  attentionFeedback,
+  attentionItems,
+  notifications,
+} from "#db/schema";
 import type { Priority } from "#db/schema";
 import { notFound } from "#lib/errors";
 
@@ -374,4 +379,26 @@ export async function countFeedbackBySignal(
       )
     )
     .groupBy(attentionFeedback.signal);
+}
+
+// An item is as visible as the activity that raised it. One that no activity raised, such as a
+// teammate's note to the owner, stays private.
+export async function listTeamVisibleAttentionIds(
+  db: DbOrTx,
+  params: { ids: string[] }
+) {
+  if (!params.ids.length) {
+    return [];
+  }
+  const rows = await db
+    .select({ id: attentionItems.id })
+    .from(attentionItems)
+    .innerJoin(activities, eq(activities.id, attentionItems.activityId))
+    .where(
+      and(
+        inArray(attentionItems.id, params.ids),
+        eq(activities.visibility, "team")
+      )
+    );
+  return rows.map((r) => r.id);
 }

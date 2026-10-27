@@ -124,6 +124,21 @@ OpenClaw's `SOUL.md` has no memory kind here: it's split into the constitution a
 - **Export:** `GET /v1/memories/export` returns active memory as Markdown files under `team/` and `private/` (`profile.md`, `facts.md`, `digest.md`, `journal/<day>.md`), so the team half can be shared and the private half kept back. Lines come in the order they were learned and nothing depends on when the export ran, so committing each export to a git repo gives git's history without making git the store.
 - **Recall:** each word of a query is matched on its own against content and aliases with `pg_trgm`'s `word_similarity`, so misspellings still match, and results are ranked with `strict_word_similarity`, which respects word boundaries. A member's memories are few, so there's no index.
 
+## Delivery
+
+Briefs, digests, pings and custom automations go to the owner's inbox and to the delivery targets they choose. Each target has a visibility, like memory and activity:
+
+- **private:** only the owner reads it. Their own email address and a Slack DM to their own linked user start as private; anything else (a personal ntfy topic, say) can be marked private with `PATCH /v1/delivery-targets/{id}`.
+- **team:** others might read it: a channel, a shared address, a webhook. Every target starts as team unless it's certainly private.
+
+The inbox and private targets get the full message. Team targets get a version built from team-visible data only, so a brief posted to a channel can't carry a private log or memory into it:
+
+- briefs and custom automations compose a second time from team-visible activity, team memory and team-visible attention, and the model is told others might read it. A custom automation's last result is left out too, because it was written from everything;
+- an attention item is as visible as the activity that raised it, and one no activity raised (a teammate's note to the owner) stays private;
+- pings keep their items but replace the model's "why now", which was written with private memory in view, with the plain reason.
+
+The team version is only composed when there are team targets, and nothing is sent to them when it would be empty. A notification records both bodies (`body`, `teamBody`).
+
 ## Scheduling
 
 - **Automations are rows** with a schedule (`daily` / `weekly` / `interval` with `activeHoursOnly`), evaluated on the member's local clock with DST handled.

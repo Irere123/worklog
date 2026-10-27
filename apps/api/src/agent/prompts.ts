@@ -1,4 +1,5 @@
 import type { Member } from "#db/queries/members";
+import type { Visibility } from "#db/schema";
 
 import constitution from "./constitution.md" with { type: "text" };
 
@@ -39,6 +40,14 @@ ${opts.recap}`
   ]
     .filter(Boolean)
     .join("\n\n");
+}
+
+// For what is delivered rather than said in a conversation. The data behind a team version is
+// already team-visible only; this tells the model why, so it doesn't hint at what was left out.
+export function audienceNote(visibility: Visibility, name: string) {
+  return visibility === "private"
+    ? `Only ${name} reads this.`
+    : `Others might read this too, so it is built only from what ${name}'s team can see. Don't hint at anything beyond it.`;
 }
 
 export function turnPreamble(now: Date, timeZone: string, asker: Member) {

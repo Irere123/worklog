@@ -11,6 +11,7 @@ import {
   listAttentionByState,
   listOpenAttention,
   listPushedAttention,
+  listTeamVisibleAttentionIds,
   setAttentionDigested,
   updateAttentionById,
   upsertAttention,
@@ -208,6 +209,7 @@ export async function recordNotification(
     itemIds: string[];
     subject: string;
     body: string;
+    teamBody?: string | null;
     reason?: string | null;
     deliveredTo: string[];
   }
@@ -215,10 +217,22 @@ export async function recordNotification(
   await insertNotification(ctx.db, {
     id: newId("ntf"),
     automationId: null,
+    teamBody: null,
     reason: null,
     ...input,
     createdAt: ctx.now(),
   });
+}
+
+// The items a team-visible message may mention.
+export async function teamVisibleAttention(
+  ctx: AppContext,
+  items: AttentionItem[]
+) {
+  const visible = new Set(
+    await listTeamVisibleAttentionIds(ctx.db, { ids: items.map((i) => i.id) })
+  );
+  return items.filter((i) => visible.has(i.id));
 }
 
 export async function pushBudget(

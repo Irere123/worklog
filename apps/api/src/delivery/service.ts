@@ -6,9 +6,12 @@ import {
   deleteDeliveryTarget,
   insertDeliveryTarget,
   listEnabledTargets,
+  updateDeliveryTargetById,
 } from "#db/queries/delivery-targets";
 import type { TargetRow } from "#db/queries/delivery-targets";
-import type { TargetKind } from "#db/schema";
+import { listIdentities } from "#db/queries/identities";
+import type { Member } from "#db/queries/members";
+import type { TargetKind, Visibility } from "#db/schema";
 import { badRequest, notFound } from "#lib/errors";
 import { newId } from "#lib/ids";
 
@@ -23,15 +26,16 @@ export type Outgoing = {
 
 export async function createTarget(
   ctx: AppContext,
-  workspaceId: string,
-  memberId: string,
+  member: Member,
   input: {
     kind: TargetKind;
     label?: string;
     address: string;
     connectionId?: string | null;
+    visibility?: Visibility;
   }
 ) {
+  const { workspaceId } = member;
   if (
     (input.kind === "slack" ||
       (input.kind === "discord" && !input.address.startsWith("https://"))) &&
@@ -56,16 +60,48 @@ export async function createTarget(
   const row: TargetRow = {
     id: newId("tgt"),
     workspaceId,
-    memberId,
+    memberId: member.id,
     kind: input.kind,
     label: input.label ?? `${input.kind}: ${input.address}`,
     address: input.address,
     connectionId: input.connectionId ?? null,
+    visibility: input.visibility ?? (await readBy(ctx, member, input)),
     enabled: true,
     createdAt: ctx.now(),
   };
   await insertDeliveryTarget(ctx.db, row);
   return row;
+}
+
+export async function updateTarget(
+  ctx: AppContext,
+  memberId: string,
+  id: string,
+  set: { label?: string; visibility?: Visibility }
+) {
+  const row = await updateDeliveryTargetById(ctx.db, { id, memberId, set });
+  if (!row) {
+    throw notFound("Delivery target");
+  }
+  return row;
+}
+
+/**
+ * Of `ids`, the member's enabled targets by who reads them. Private data only goes to the private
+ * ones; team ones get a version built from team-visible data, so a brief posted to a channel can't
+ * carry a private note into it.
+ */
+export async function splitTargets(
+  ctx: AppContext,
+  memberId: string,
+  ids: string[]
+) {
+  const targets = ids.length
+    ? await listEnabledTargets(ctx.db, { memberId, ids })
+    : [];
+  const of = (visibility: Visibility) =>
+    targets.filter((t) => t.visibility === visibility).map((t) => t.id);
+  return { private: of("private"), team: of("team") };
 }
 
 export async function deleteTarget(
@@ -110,6 +146,33 @@ export async function deliver(
     }
   }
   return { delivered, failed };
+}
+
+// Private only when the member alone certainly reads it: their own email address, or a Slack DM to
+// their own linked user. A channel, Discord or a webhook could reach anyone, so they start as team
+// until the member says otherwise.
+async function readBy(
+  ctx: AppContext,
+  member: Member,
+  input: { kind: TargetKind; address: string }
+): Promise<Visibility> {
+  if (input.kind === "email") {
+    return member.email?.toLowerCase() === input.address.toLowerCase()
+      ? "private"
+      : "team";
+  }
+  if (input.kind === "slack") {
+    const own = await listIdentities(ctx.db, {
+      workspaceId: member.workspaceId,
+      memberId: member.id,
+    });
+    return own.some(
+      (i) => i.provider === "slack" && i.externalId === input.address
+    )
+      ? "private"
+      : "team";
+  }
+  return "team";
 }
 
 async function botToken(

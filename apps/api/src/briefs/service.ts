@@ -1,7 +1,8 @@
 import { generateText } from "ai";
 
 import { TIMEOUTS } from "#agent/models";
-import { CONSTITUTION } from "#agent/prompts";
+import { audienceNote, CONSTITUTION } from "#agent/prompts";
+import { teamVisibleAttention } from "#attention/service";
 import { listCards } from "#board/service";
 import type { AppContext } from "#context";
 import { listActivities } from "#db/queries/activities";
@@ -12,6 +13,7 @@ import { countCards } from "#db/queries/cards";
 import { listMembers } from "#db/queries/members";
 import type { Member } from "#db/queries/members";
 import { getWorkspaceById } from "#db/queries/workspaces";
+import type { Visibility } from "#db/schema";
 import { newId } from "#lib/ids";
 import { localParts, startOfLocalDay } from "#lib/time";
 import { timezoneOf } from "#members/service";
@@ -72,10 +74,12 @@ export function briefWindow(
   return { start: startOfLocalDay(now, timeZone, -back), end: now, key: today };
 }
 
+// A team version leaves out private activity and the attention items private activity raised.
 export async function gatherBriefData(
   ctx: AppContext,
   member: Member,
-  period: Period
+  period: Period,
+  visibility: Visibility = "private"
 ): Promise<BriefData & { _key: Date }> {
   const ws = await getWorkspaceById(ctx.db, { id: member.workspaceId });
   const tz = timezoneOf(member, ws);
@@ -86,11 +90,12 @@ export async function gatherBriefData(
     member.settings.workdays
   );
 
-  const [mine, everyone, attention, myCards, people, triageCount, closedCount] =
+  const everything = visibility === "private";
+  const [mine, everyone, open, myCards, people, triageCount, closedCount] =
     await Promise.all([
       listActivities(ctx.db, {
         workspaceId: member.workspaceId,
-        privateFor: [member.id],
+        privateFor: everything ? [member.id] : [],
         actorIds: [member.id],
         since: start,
         until: end,
@@ -124,6 +129,7 @@ export async function gatherBriefData(
         closedSince: start,
       }),
     ]);
+  const attention = everything ? open : await teamVisibleAttention(ctx, open);
 
   const item = (a: (typeof mine)[number]): Item => ({
     title: a.title,
@@ -207,18 +213,24 @@ export async function composeBrief(
   ctx: AppContext,
   member: Member,
   data: BriefData,
-  extraInstructions?: string | null
+  extraInstructions?: string | null,
+  visibility: Visibility = "private"
 ) {
   const title = `${data.period === "daily" ? "Morning brief" : "Weekly wrap"} for ${member.name}`;
   if (!ctx.models) {
     return { title, body: templateBrief(data), composedBy: "template" };
   }
-  const memory = await renderMemory(ctx, member.id, true, 1);
+  const memory = await renderMemory(
+    ctx,
+    member.id,
+    visibility === "private",
+    1
+  );
   const result = await generateText({
     model: ctx.models.main,
     instructions: [
       CONSTITUTION,
-      `# This brief\n\nYou are ${member.name}'s assistant, writing their ${data.period} brief. ${BRIEF_INSTRUCTIONS}`,
+      `# This brief\n\nYou are ${member.name}'s assistant, writing their ${data.period} brief. ${audienceNote(visibility, member.name)} ${BRIEF_INSTRUCTIONS}`,
       extraInstructions
         ? `The reader's own preferences for this brief: ${extraInstructions}`
         : "",
@@ -233,6 +245,24 @@ export async function composeBrief(
     body: result.text.trim(),
     composedBy: result.finalStep.response.modelId,
   };
+}
+
+// What goes to team-visible targets. Not saved: the member's brief is the private one.
+export async function composeTeamBrief(
+  ctx: AppContext,
+  member: Member,
+  period: Period,
+  extraInstructions?: string | null
+) {
+  const { _key, ...data } = await gatherBriefData(ctx, member, period, "team");
+  const { title, body } = await composeBrief(
+    ctx,
+    member,
+    data,
+    extraInstructions,
+    "team"
+  );
+  return { title, body, data };
 }
 
 export function templateBrief(data: BriefData): string {

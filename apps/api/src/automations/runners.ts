@@ -4,15 +4,17 @@ import { z } from "zod";
 import { workSnapshot } from "#activity/snapshot";
 import { postToInbox } from "#agent/conversations";
 import { TIMEOUTS } from "#agent/models";
-import { CONSTITUTION, UNTRUSTED_NOTE } from "#agent/prompts";
+import type { Models } from "#agent/models";
+import { audienceNote, CONSTITUTION, UNTRUSTED_NOTE } from "#agent/prompts";
 import {
   markConsidered,
   markDigested,
   mutedKinds,
   pushBudget,
   recordNotification,
+  teamVisibleAttention,
 } from "#attention/service";
-import { generateBrief } from "#briefs/service";
+import { composeTeamBrief, generateBrief } from "#briefs/service";
 import type { AppContext } from "#context";
 import { listActivities } from "#db/queries/activities";
 import {
@@ -23,8 +25,9 @@ import {
 import type { AttentionItem } from "#db/queries/attention";
 import type { Automation, AutomationRun } from "#db/queries/automations";
 import type { Member } from "#db/queries/members";
+import type { Visibility } from "#db/schema";
 import { sanitizeMarkdown, urlsIn } from "#delivery/sanitize";
-import { deliver } from "#delivery/service";
+import { deliver, splitTargets } from "#delivery/service";
 import { DAY_MS, startOfLocalDay } from "#lib/time";
 import { renderMemory } from "#memory/service";
 
@@ -35,37 +38,46 @@ export type RunOutcome = {
   summary: string;
 };
 
-// Every outbound body is sanitized against the URLs in its source data, so injected content can't smuggle links out.
+type Message = {
+  subject: string;
+  markdown: string;
+  sources: unknown;
+  kind: string;
+  itemIds?: string[];
+  reason?: string;
+};
+
+/**
+ * Private data only reaches private targets. The inbox and private targets get `message`; team
+ * targets get `forTeam()`, a version built from team-visible data alone, which is composed only when
+ * there are team targets and skipped when it is null because there's nothing the team can see.
+ */
 async function send(
   ctx: AppContext,
   automation: Automation,
   member: Member,
-  message: {
-    subject: string;
-    markdown: string;
-    sources: unknown;
-    kind: string;
-    itemIds?: string[];
-    reason?: string;
-  }
+  message: Message,
+  forTeam: () => Promise<Message | null>
 ) {
-  const markdown = sanitizeMarkdown(
-    message.markdown,
-    urlsIn(message.sources),
-    ctx.config.PUBLIC_URL
-  );
-  await postToInbox(ctx, member, automation.name, markdown);
-  const { delivered, failed } = await deliver(
+  const targets = await splitTargets(ctx, member.id, automation.targetIds);
+  const body = sanitized(ctx, message);
+  await postToInbox(ctx, member, automation.name, body);
+  const own = await deliver(
     ctx,
     member.id,
-    automation.targetIds,
-    {
-      type: automation.kind,
-      subject: message.subject,
-      markdown,
-      url: ctx.config.PUBLIC_URL,
-    }
+    targets.private,
+    outgoing(ctx, automation, message.subject, body)
   );
+  const team = targets.team.length ? await forTeam() : null;
+  const teamBody = team ? sanitized(ctx, team) : null;
+  const shared = await deliver(
+    ctx,
+    member.id,
+    team ? targets.team : [],
+    outgoing(ctx, automation, team?.subject ?? "", teamBody ?? "")
+  );
+  const delivered = [...own.delivered, ...shared.delivered];
+  const failed = [...own.failed, ...shared.failed];
   await recordNotification(ctx, {
     workspaceId: member.workspaceId,
     memberId: member.id,
@@ -73,16 +85,40 @@ async function send(
     kind: message.kind,
     itemIds: message.itemIds ?? [],
     subject: message.subject,
-    body: markdown,
+    body,
+    teamBody,
     reason: message.reason ?? null,
     deliveredTo: delivered,
   });
-  if (failed.length && !delivered.length && automation.targetIds.length) {
+  if (failed.length && !delivered.length) {
     throw new Error(
       `Delivery failed: ${failed.map((f) => f.error).join("; ")}`
     );
   }
   return { delivered, failed };
+}
+
+// Every outbound body is sanitized against the URLs in its source data, so injected content can't smuggle links out.
+function sanitized(ctx: AppContext, message: Message) {
+  return sanitizeMarkdown(
+    message.markdown,
+    urlsIn(message.sources),
+    ctx.config.PUBLIC_URL
+  );
+}
+
+function outgoing(
+  ctx: AppContext,
+  automation: Automation,
+  subject: string,
+  markdown: string
+) {
+  return {
+    type: automation.kind,
+    subject,
+    markdown,
+    url: ctx.config.PUBLIC_URL,
+  };
 }
 
 export async function runBrief(
@@ -97,12 +133,31 @@ export async function runBrief(
     period,
     automation.instructions
   );
-  const { delivered, failed } = await send(ctx, automation, member, {
-    subject: brief.title,
-    markdown: brief.body,
-    sources: brief.data,
-    kind: "brief",
-  });
+  const { delivered, failed } = await send(
+    ctx,
+    automation,
+    member,
+    {
+      subject: brief.title,
+      markdown: brief.body,
+      sources: brief.data,
+      kind: "brief",
+    },
+    async () => {
+      const team = await composeTeamBrief(
+        ctx,
+        member,
+        period,
+        automation.instructions
+      );
+      return {
+        subject: team.title,
+        markdown: team.body,
+        sources: team.data,
+        kind: "brief",
+      };
+    }
+  );
   // The brief's "Needs your attention" section counts as having shown these.
   const shown = await listOpenAttention(ctx.db, {
     memberId: member.id,
@@ -131,25 +186,31 @@ export async function runDigest(
   if (!items.length) {
     return { status: "skipped", summary: "Nothing new since the last batch" };
   }
-  const markdown = [
-    `${items.length} thing(s) since your last update:`,
-    ...items.slice(0, 20).map(digestLine),
-    items.length > 20 ? `…and ${items.length - 20} more in Worklog.` : "",
-  ]
-    .filter(Boolean)
-    .join("\n");
-  await send(ctx, automation, member, {
-    subject: "Your Worklog digest",
-    markdown,
-    sources: items,
-    kind: "digest",
-    itemIds: items.map((i) => i.id),
+  await send(ctx, automation, member, digest(items), async () => {
+    const shared = await teamVisibleAttention(ctx, items);
+    return shared.length ? digest(shared) : null;
   });
   await markDigested(
     ctx,
     items.map((i) => i.id)
   );
   return { status: "delivered", summary: `${items.length} item(s)` };
+}
+
+function digest(shown: AttentionItem[]): Message {
+  return {
+    subject: "Your Worklog digest",
+    markdown: [
+      `${shown.length} thing(s) since your last update:`,
+      ...shown.slice(0, 20).map(digestLine),
+      shown.length > 20 ? `…and ${shown.length - 20} more in Worklog.` : "",
+    ]
+      .filter(Boolean)
+      .join("\n"),
+    sources: shown,
+    kind: "digest",
+    itemIds: shown.map((i) => i.id),
+  };
 }
 
 function digestLine(a: AttentionItem) {
@@ -355,27 +416,41 @@ async function pushDecided(
       summary: `Considered ${decisions.length} item(s); nothing worth interrupting for`,
     };
   }
-  const markdown = [
-    ...rows.map(
-      ({ item, reason }) =>
-        `- **${item.title}**${item.url ? ` — ${item.url}` : ""}\n  _Why now: ${reason}_`
-    ),
-    `\n_Reply here to ask about any of these. Not useful? Tell me, or mark it in Worklog — I'll hold pings like it for your digest._`,
-  ].join("\n");
-  await send(ctx, automation, member, {
-    subject:
-      rows.length === 1
-        ? `Needs you: ${first.item.title}`
-        : `${rows.length} things need you`,
-    markdown,
-    sources: rows.map((r) => r.item),
-    kind: "push",
-    itemIds: rows.map((r) => r.item.id),
-    reason: rows.map((r) => r.reason).join(" | "),
+  await send(ctx, automation, member, ping(rows), async () => {
+    const visibleItems = await teamVisibleAttention(
+      ctx,
+      rows.map((r) => r.item)
+    );
+    const shared = new Set(visibleItems.map((i) => i.id));
+    // The model wrote its reasons with private memory in view, so the team gets the plain ones.
+    const visible = rows
+      .filter((r) => shared.has(r.item.id))
+      .map((r) => ({ item: r.item, reason: defaultReason(r.item) }));
+    return visible.length ? ping(visible) : null;
   });
   return {
     status: "delivered",
     summary: `Pushed ${rows.length}, held ${decisions.length - rows.length} for the digest`,
+  };
+}
+
+function ping(rows: { item: AttentionItem; reason: string }[]): Message {
+  return {
+    subject:
+      rows.length === 1 && rows[0]
+        ? `Needs you: ${rows[0].item.title}`
+        : `${rows.length} things need you`,
+    markdown: [
+      ...rows.map(
+        ({ item, reason }) =>
+          `- **${item.title}**${item.url ? ` — ${item.url}` : ""}\n  _Why now: ${reason}_`
+      ),
+      `\n_Reply here to ask about any of these. Not useful? Tell me, or mark it in Worklog — I'll hold pings like it for your digest._`,
+    ].join("\n"),
+    sources: rows.map((r) => r.item),
+    kind: "push",
+    itemIds: rows.map((r) => r.item.id),
+    reason: rows.map((r) => r.reason).join(" | "),
   };
 }
 
@@ -422,26 +497,50 @@ export async function runCustom(
   automation: Automation,
   member: Member
 ): Promise<RunOutcome> {
-  if (!ctx.models) {
+  const { models } = ctx;
+  if (!models) {
     return {
       status: "skipped",
       summary: "Custom automations need AI (OPENROUTER_API_KEY)",
     };
   }
+  const own = await composeCustom(ctx, models, automation, member, "private");
+  if (!own.message) {
+    return { status: "quiet", summary: own.summary };
+  }
+  await send(ctx, automation, member, own.message, async () => {
+    const team = await composeCustom(ctx, models, automation, member, "team");
+    return team.message;
+  });
+  return { status: "delivered", summary: own.summary };
+}
+
+// The team version sees team-visible data only, and not the last result either: that summary was
+// written from everything.
+async function composeCustom(
+  ctx: AppContext,
+  models: Models,
+  automation: Automation,
+  member: Member,
+  visibility: Visibility
+): Promise<{ message: Message | null; summary: string }> {
+  const everything = visibility === "private";
   const [snapshot, attention, team, memory] = await Promise.all([
-    workSnapshot(ctx, member, { includePrivate: true, days: 7 }),
+    workSnapshot(ctx, member, { includePrivate: everything, days: 7 }),
     listOpenAttention(ctx.db, {
       memberId: member.id,
       now: ctx.now(),
       limit: 30,
-    }),
+    }).then(async (items) =>
+      everything ? items : await teamVisibleAttention(ctx, items)
+    ),
     listActivities(ctx.db, {
       workspaceId: member.workspaceId,
       privateFor: [],
       since: new Date(ctx.now().getTime() - 7 * DAY_MS),
       limit: 200,
     }),
-    renderMemory(ctx, member.id, true, 1),
+    renderMemory(ctx, member.id, everything, 1),
   ]);
   const data = {
     work: snapshot,
@@ -459,25 +558,30 @@ export async function runCustom(
       url: a.url,
     })),
   };
+  const last = everything
+    ? `Last result: ${JSON.stringify(automation.state.lastResult ?? null)}\n\n`
+    : "";
   const { output } = await generateText({
-    model: ctx.models.main,
+    model: models.main,
     instructions: `${CONSTITUTION}
 
 # This automation
 
-You are ${member.name}'s assistant, running a scheduled automation they wrote. Follow their instructions using only the data provided. If there is nothing worth telling them, decide "quiet".`,
-    prompt: `Automation "${automation.name}" instructions:\n${automation.instructions}\n\nLast result: ${JSON.stringify(automation.state.lastResult ?? null)}\n\nWhat you know about them:\n${memory}\n\nData:\n${JSON.stringify(data)}`,
+You are ${member.name}'s assistant, running a scheduled automation they wrote. Follow their instructions using only the data provided. If there is nothing worth telling them, decide "quiet". ${audienceNote(visibility, member.name)}`,
+    prompt: `Automation "${automation.name}" instructions:\n${automation.instructions}\n\n${last}What you know about them:\n${memory}\n\nData:\n${JSON.stringify(data)}`,
     output: Output.object({ schema: CustomResult }),
     timeout: TIMEOUTS.background,
   });
-  if (output.decision === "quiet" || !output.message.trim()) {
-    return { status: "quiet", summary: output.summary };
-  }
-  await send(ctx, automation, member, {
-    subject: automation.name,
-    markdown: output.message,
-    sources: data,
-    kind: "custom",
-  });
-  return { status: "delivered", summary: output.summary };
+  const quiet = output.decision === "quiet" || !output.message.trim();
+  return {
+    message: quiet
+      ? null
+      : {
+          subject: automation.name,
+          markdown: output.message,
+          sources: data,
+          kind: "custom",
+        },
+    summary: output.summary,
+  };
 }

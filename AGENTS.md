@@ -88,7 +88,7 @@ docs/                  ARCHITECTURE.md, CONNECTORS.md, research notes
 - **One domain per folder.** Each folder exports plain functions that take `ctx: AppContext` first.
 - **Routes are thin.** A route validates with zod (`@hono/zod-openapi`), then calls a domain function, or a query for a plain read. Every route has a stable dotted `operationId` such as `card.close`. It becomes the SDK method name, so never rename one.
 - **Tenancy comes from the caller.** The workspace is the authenticated member's `workspaceId`. Never take a workspace id from the request.
-- **Privacy is enforced in queries.** Teammate-facing reads filter `visibility = 'team'`. Never rely on a prompt to hide private data.
+- **Privacy is enforced in queries.** Teammate-facing reads filter `visibility = 'team'`. Never rely on a prompt to hide private data. Delivery follows the same rule: a delivery target has a visibility too, and an automation sends team targets a version built from team-visible data only (`send` in `automations/runners.ts`).
 - **One write path per concept.** Write through these functions, never into their tables directly:
   - `recordActivity` for activity;
   - `raiseAttention` for attention items;

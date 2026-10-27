@@ -233,6 +233,7 @@ export async function createMember(
           kind: "email",
           label: `Email (${member.email})`,
           address: member.email,
+          visibility: "private",
         });
       }
       await createDefaultAutomations(tx, member, emailTargetId);

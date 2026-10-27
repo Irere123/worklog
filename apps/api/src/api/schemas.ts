@@ -576,6 +576,10 @@ export const TargetSchema = z
     label: z.string(),
     address: z.string(),
     connectionId: z.string().nullable(),
+    visibility: z.enum(VISIBILITY).openapi({
+      description:
+        "private: only you read it, so it gets everything. team: others might, so it only gets what your team can see.",
+    }),
     enabled: z.boolean(),
     createdAt: Timestamp,
   })
@@ -587,6 +591,7 @@ export const toTarget = (t: TargetRow): z.infer<typeof TargetSchema> => ({
   label: t.label,
   address: t.address,
   connectionId: t.connectionId,
+  visibility: t.visibility,
   enabled: t.enabled,
   createdAt: iso(t.createdAt),
 });
