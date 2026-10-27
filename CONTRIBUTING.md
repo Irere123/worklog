@@ -26,14 +26,16 @@ Formatting and linting use the [Oxc](https://oxc.rs) tools with [Ultracite](http
 
 ## How the code is organized
 
-- **One domain per folder** under `apps/api/src` (`board/`, `ingest/`, `attention/`…). Each exposes plain functions that take an `AppContext` first.
-- **Routes are thin.** They live in `src/api/routes/`, one file per domain folder with its schemas in `src/api/schemas/` (a base schema per entity, plus request and response schemas), validate with zod (which also generates the OpenAPI spec), and call domain functions. Every response goes out through `respond()`, which parses it with its schema. Give each a stable dotted `operationId` (`card.close`): it becomes the SDK method name.
+The layout, the architecture rules and the database conventions are in [AGENTS.md](AGENTS.md), which has a table of where each kind of change goes. The short version:
+
+- **One domain per folder** under `apps/api/src` (`work/`, `ingest/`, `automations/`, `agent/`). Each exposes plain functions that take an `AppContext` first.
+- **Routes are thin.** They live in `src/http/routes/`, one file per API resource with its schemas in `src/http/schemas/`, and every response goes out through `respond()`, which parses it with its schema. Give each a stable dotted `operationId` (`card.close`): it becomes the SDK method name.
 - **One write path per concept:** `recordActivity`, `raiseAttention`, `appendMessages`. Don't insert into those tables directly.
 - **Privacy is enforced in queries.** Teammate-facing code reads `visibility = 'team'` only. Never rely on a prompt to hide data.
 
 ## Database changes
 
-Edit `src/db/schema.ts` and run `bun run db:generate` in `apps/api`. Better Auth's tables are generated: change `src/auth/auth.ts`, then run `bun run auth:generate`. Never hand-edit `src/db/auth-schema.ts`.
+Edit `src/db/schema.ts` and run `bun run db:generate` in `apps/api`. Better Auth's tables are generated: change `src/lib/auth.ts`, then run `bun run auth:generate`. Never hand-edit `src/db/auth-schema.ts`.
 
 ## Adding a connector
 
@@ -70,6 +72,6 @@ The types are `feat`, `fix`, `docs`, `refactor`, `perf`, `test`, `build`, `ci`, 
 | `commit-msg` | Checks the message with commitlint. |
 | `pre-push` | Typechecks the project. |
 
-If `bun install` didn't install the hooks, run `bunx lefthook install`. To skip them once, use `git commit --no-verify`.
+If `bun install` didn't install the hooks, run `bunx lefthook install`. Don't skip them with `--no-verify`: fix what they report.
 
 Keep changes focused and explain the _why_ in the PR description. CI checks commit messages, formatting, lint, types and tests.

@@ -1,165 +1,132 @@
 # AGENTS.md
 
-Rules for AI agents, and humans, working on Worklog. `CLAUDE.md` imports this file, so every agent reads the same rules.
+Rules for AI agents and humans working on Worklog. `CLAUDE.md` imports this file.
 
-Worklog is an open, API-first work-visibility server. Connectors turn GitHub, Gitea, Slack, Discord and webhook events into one activity stream, which feeds a board, an attention queue, briefs and a personal assistant for each member. Background: [README.md](README.md) and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+Worklog is an API-first work-visibility server. Connectors turn GitHub, Gitea, Slack, Discord and webhook events into one activity stream, which feeds a board, an attention queue, briefs and a personal assistant for each member. Background: [README.md](README.md) and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ## Comments: no narration
 
 This is the rule agents break most. Follow it at all costs.
 
-A comment says **why**: a constraint, trade-off or gotcha the code can't show. It never says **what** the code does, because the code already says that.
+A comment says **why**: a constraint, trade-off or gotcha the code can't show. It never says **what** the code does.
 
-- **Don't restate the code:** `// loop over the events`, `// return the row`, `// Step 2: check the quota`.
-- **Don't describe your change:** `// updated to use returned()`, `// now handles edits`, `// new helper`, `// fixed`. That belongs in the commit message.
-- **Don't talk to the reader or reviewer:** `// as requested`, `// note: I changed…`, `// this function…`.
-- **Don't leave commented-out code.**
-- **If code needs a what-comment, fix the code instead:** rename, extract a function, or name the constant.
+- Don't restate the code: `// loop over the events`.
+- Don't describe your change: `// now handles edits`, `// fixed`. That goes in the commit.
+- Don't address the reader (`// as requested`), and don't leave commented-out code.
+- If code needs a what-comment, rename or extract instead.
 
-Keep the why-comments that exist: they stop the next agent from "fixing" something that is deliberate. When you change code a comment explains, update the comment in the same change. A stale comment is worse than none.
+Keep existing why-comments, and update them when you change the code they explain.
 
 ```ts
-// Bad: narrates.
-// Validate the kind with a regex
-kind: z.string().regex(/^[a-z][a-z0-9_]*(?:\.[a-z0-9_]+)+$/),
-
-// Good: says why, and stops someone adding the `u` flag the linter asks for.
-// Published in the OpenAPI spec, which can't carry regex flags.
+// Bad: Validate the kind with a regex
+// Good: Published in the OpenAPI spec, which can't carry regex flags.
 kind: z.string().regex(/^[a-z][a-z0-9_]*(?:\.[a-z0-9_]+)+$/),
 ```
 
-The linter already enforces some of this:
-
-- Comments go on their own line (`no-inline-comments`).
-- `TODO` and `FIXME` fail lint (`no-warning-comments`): finish the work or open an issue.
-- A lint suppression always gives its reason: `// oxlint-disable-next-line <rule> -- <reason>`.
-
-The same goes for commit messages and PR descriptions: state the change and why, not the story of how you got there.
+Lint enforces own-line comments, no `TODO`/`FIXME`, and a reason on every suppression: `// oxlint-disable-next-line <rule> -- <reason>`. The same rules apply to commit messages and PR descriptions.
 
 ## Commands
 
-Run these from the repo root unless noted. Use Bun only: no npm, yarn or pnpm, and no other lockfiles.
+Run from the repo root unless noted. Bun only: no npm, yarn, pnpm or other lockfiles.
 
 ```bash
 bun install            # dependencies and git hooks
 bun run dev            # API on :4000; needs Postgres (DATABASE_URL in apps/api/.env)
-bun run test           # all tests; recreates the worklog_test database (TEST_DATABASE_URL) each run
+bun run test           # recreates the worklog_test database each run
 bun run typecheck
-bun run lint           # oxlint, type-aware; `bun run lint:fix` applies safe fixes
-bun run format         # oxfmt; `bun run format:check` only checks
+bun run lint           # `bun run lint:fix` applies safe fixes
+bun run format         # `bun run format:check` only checks
 
 cd apps/api
-bun run test test/board.test.ts   # one test file
+bun run test test/board.test.ts   # one file
 bun run db:generate               # migration after editing src/db/schema.ts
-bun run db:generate --custom --name=<name>   # empty migration, for SQL drizzle-kit can't generate
+bun run db:generate --custom --name=<name>   # empty migration for hand-written SQL
 bun run auth:generate             # regenerates src/db/auth-schema.ts after editing src/lib/auth.ts
-bun run openapi                   # prints the OpenAPI spec
+bun run openapi                   # prints the spec
 ```
 
-Work is done when `format:check`, `lint`, `typecheck` and `test` all pass. CI runs the same four.
+Work is done when `format:check`, `lint`, `typecheck` and `test` pass. CI runs the same four.
 
 ## Layout
 
 ```
-apps/api/              the API server (Bun + Hono)
-  src/
-    http/              routes/ and schemas/ (one file per API resource), auth middleware, webhook entry (hooks.ts)
-    ingest/            events in: pipeline.ts (normalize → identity → gates → card linking → persist → effects),
-                       connections.ts, commands.ts (chat commands); connectors.ts registers connectors/*.ts
-                       (github + gitea, slack, discord, webhook (no-code), custom)
-    work/              the work itself: activity.ts (recordActivity, the one write path), board.ts (cards, columns,
-                       entropy), drift.ts (nudges and their one-click answers), attention.ts ("needs you"),
-                       log.ts (manual logs, + AI structuring), snapshot.ts (one person's work, out),
-                       members.ts (workspace setup, members, invites, API tokens)
-    automations/       what runs on a schedule and where it goes: service.ts (CRUD), run.ts (execution),
-                       runners.ts (the routines), schedule.ts, briefs.ts, delivery.ts (+ sanitize.ts)
-    agent/             everything that talks to a model: loop.ts (a conversation turn), generate.ts (one-shot calls),
-                       models.ts, instructions.ts, conversations, compaction, voice; prompts.ts loads prompts/*.md
-                       (one file per prompt, plus constitution.md); tools.ts registers tools/*.ts (one file per tool);
-                       memory.ts, with memory/consolidate.ts (the nightly upkeep) and memory/export.ts
-    jobs/              Graphile Worker: queue.ts (enqueue), tasks.ts (the task table and cron)
-    db/                schema.ts (ours), auth-schema.ts (generated), queries/ (one file per area), transact.ts
-    lib/               small shared helpers: errors, ids, crypto, time, assert, mailer, auth (Better Auth)
-    events.ts          the event bus: durable, sequenced log plus live fan-out
-    context.ts         AppContext: everything a handler needs, built once per process
-    config.ts          the only place that reads environment variables
-  test/                harness.ts plus one file per area
-  scripts/             one-off tools: openapi.ts prints the spec, auth-cli.ts feeds the Better Auth CLI
-  drizzle/             generated migrations
-docs/                  ARCHITECTURE.md, CONNECTORS.md, research notes
+apps/api/src/
+  http/          routes/ and schemas/ (one file per resource), auth middleware, webhook entry
+  ingest/        raw delivery to activity; connectors/ (one file per tool)
+  work/          activity, board, drift, attention, manual logs, snapshots, members
+  automations/   scheduled routines, briefs, delivery
+  agent/         all model work: loop, generate, prompts/, tools/, memory/
+  jobs/          Graphile Worker tasks and cron
+  db/            schema, queries/ (one file per area), transact
+  lib/           shared helpers and Better Auth
+  events.ts      the event bus
+  context.ts     AppContext, built once per process
+  config.ts      the only reader of environment variables
+apps/api/test/   harness.ts plus one file per area
 ```
 
-## Architecture rules
+## Where new code goes
 
-- **One domain per folder.** Each folder exports plain functions that take `ctx: AppContext` first.
-- **Routes are thin.** A route validates with zod (`@hono/zod-openapi`), then calls a domain function, or a query for a plain read. Route and schema files are named after the API resource they serve (`routes/attention.ts`, `schemas/attention.ts`), so one feature touches one file in each place.
-- **Three kinds of schema per area, in `http/schemas/`.** The base schema is the entity as the API presents it (`Card`, registered under that name in the spec). Request schemas (`CreateCardRequest`, `ListCardsQuery`) reuse its fields where the constraints are the same. Response schemas are the base, or `derived(Base, row => …)` when the row lacks a field the contract has (`signedUp` from `userId`). A route returns with `respond(c, Schema, row, status)`, never `c.json` directly: the parse turns dates into ISO strings, drops every field the schema doesn't list, and fails loudly on a shape the contract doesn't describe. Don't write `toX()` mappers; put what a response needs into the schema. Every route has a stable dotted `operationId` such as `card.close`. It becomes the SDK method name, so never rename one.
-- **Tenancy comes from the caller.** The workspace is the authenticated member's `workspaceId`. Never take a workspace id from the request.
-- **Privacy is enforced in queries.** Teammate-facing reads filter `visibility = 'team'`. Never rely on a prompt to hide private data. Delivery follows the same rule: a delivery target has a visibility too, and an automation sends team targets a version built from team-visible data only (`send` in `automations/runners.ts`).
-- **One write path per concept.** Write through these functions, never into their tables directly:
-  - `recordActivity` for activity;
-  - `raiseAttention` for attention items;
-  - `appendMessages` for conversation messages.
-- **Events after writes.** Publish to the event bus after the write it describes. Inside `transact`, events wait for the commit.
-- **Background work goes through `enqueue`,** and each task is listed in `jobs/tasks.ts`. When a job must follow a write, enqueue it inside the same `transact`, so the write and the job commit together.
-- **Inject the outside world.** Use `ctx.now()`, not `new Date()`, and `ctx.fetch` for outbound HTTP, so tests control time and the network.
-- **The assistant never writes its own instructions.** `agent/prompts/constitution.md` changes only by commit, and the owner's voice only through `voice.set`. Give no tool a way to write either, so text planted in ingested data can't persist itself into every later conversation.
-- **AI is optional.** `ctx.models` is null when no `OPENROUTER_API_KEY` is set, so every AI feature needs a deterministic fallback. Models are called through the Vercel AI SDK with OpenRouter.
-- **Prompts are files, calls go through `agent/`.** What the assistant is told lives in `agent/prompts/*.md`, rendered with `prompt(name, vars)`; a placeholder the caller doesn't supply throws. A one-shot call is `structured()` or `complete()` from `agent/generate.ts`, never `generateText` directly outside `agent/`. A tool is one file in `agent/tools/`, a function of the conversation's `Scope`, registered by name in `agent/tools.ts`.
-- **Config:** read environment variables only in `config.ts`, and add new ones to `apps/api/.env.example`.
-- **Errors:** throw the helpers in `lib/errors.ts` (`notFound`, `forbidden`, `badRequest`, `conflict`). Use `returned()` from `lib/assert.ts` for rows an insert or update must return.
-- **IDs:** use `newId(prefix)` from `lib/ids.ts`.
-- **Generated files:** never hand-edit `apps/api/drizzle/**` or `src/db/auth-schema.ts`. Regenerate them with the commands above. The one exception is the SQL file of a custom migration, which you write yourself.
+| Adding | Put it in |
+| --- | --- |
+| an endpoint | `http/routes/<resource>.ts` and `http/schemas/<resource>.ts`, registered in `app.ts` |
+| a query | `db/queries/<area>.ts` |
+| domain logic | the module it belongs to, as a function taking `ctx` first |
+| a prompt | `agent/prompts/<name>.md` |
+| an assistant tool | `agent/tools/<name>.ts`, registered in `agent/tools.ts` |
+| a connector | `ingest/connectors/<name>.ts`, registered in `ingest/connectors.ts` |
+| a background task | `jobs/tasks.ts` |
+| an environment variable | `config.ts` and `apps/api/.env.example` |
+
+## Rules
+
+- **Routes are thin.** Validate with zod, call one domain function or a read query, and return with `respond(c, Schema, row, status)`, never `c.json`. The parse turns dates into ISO strings, drops unlisted fields and throws on a wrong shape.
+- **Schemas:** a base schema per entity (`Card`), request schemas that reuse its fields, and responses that are the base or `derived(Base, row => …)`. No `toX()` mappers. Never rename an `operationId`: it is the SDK method name.
+- **Tenancy comes from the caller's `workspaceId`,** never from the request.
+- **Privacy is enforced in queries,** never by a prompt. Teammate-facing reads and team delivery targets get `visibility = 'team'` data only.
+- **One write path each:** `recordActivity`, `raiseAttention`, `appendMessages`.
+- **Writes, jobs and events:** a job that must follow a write is enqueued inside the same `transact`. Events publish after the commit.
+- **Inject the outside world:** `ctx.now()` and `ctx.fetch`, never `new Date()` or `fetch`.
+- **AI is optional.** `ctx.models` is null without `OPENROUTER_API_KEY`, so every AI feature needs a fallback. Call models through `structured()` or `complete()` from `agent/generate.ts`, and render prompts with `prompt(name, vars)`.
+- **The assistant never writes its own instructions.** No tool may change `constitution.md` or the owner's voice.
+- **Helpers:** throw `notFound`, `forbidden`, `badRequest` or `conflict` from `lib/errors.ts`; use `returned()` for rows a write must return and `newId(prefix)` for ids.
+- **Never hand-edit** `drizzle/**` or `db/auth-schema.ts`. A custom migration's SQL is the one exception.
 
 ## Database
 
-The layout follows [Midday](https://github.com/midday-ai/midday)'s `packages/db/src/queries`; the transaction and constraint rules follow Elixir's Ecto.
-
-- **Queries live in `src/db/queries/`,** one file per area (`members.ts`, `api-tokens.ts`), together with their row types (`Member`, `Workspace`). There is no barrel file: import each one directly (`#db/queries/members`).
-- **A query takes `db: DbOrTx` first and one params object.** Every id is a string, so named params stop a swapped `workspaceId` and `memberId`. Tenant queries take `workspaceId`.
-- **Queries hold SQL and nothing else:** no events, jobs, models or clock. Pass `now` in.
-- **Names say what comes back.** `find*` returns `undefined` when nothing matches, `get*` throws `notFound`, and `list*` and `count*` read many. `insert*`, `upsert*`, `update*`, `delete*` and `set*` write, with `ById` when the primary key is the only key.
-- **Reads may be called straight from a route or another domain** with `ctx.db`. Writes go through the domain function, which owns validation, permissions and side effects.
-- **Writes that belong together run in `transact(ctx, async (tx) => …)`** from `db/transact.ts`. Inside it, pass `tx`, never the outer `ctx`. Jobs commit with the transaction and events publish after it. A nested `transact` joins the outer one. Never call `ctx.db.transaction` directly, and keep model calls and outbound HTTP out of a transaction. Inside one, run queries one after another, never with `Promise.all`: they share one connection, and pg 9 rejects a second query on a busy one.
-- **An index on an existing table gets `.concurrently()`** in `schema.ts` and a migration of its own: generate it with nothing else changed. `db/migrate.ts` builds it outside a transaction, so ingest keeps writing while it builds. A migration that mixes a concurrent index with other statements is refused at startup. Leave `.concurrently()` in place afterwards.
-- **Turn known constraint violations into domain errors** with `violates(error, "<constraint>")` from `db/errors.ts`, so a race returns a 409, not a 500.
-- **Lint keeps SQL in `db/`:** importing `drizzle-orm` anywhere else in `src/` fails. A few things talk to Postgres without our queries, by design:
-  - Better Auth runs its own queries through `drizzleAdapter` (`lib/auth.ts`, `scripts/auth-cli.ts`).
-  - Graphile Worker takes the pg pool (`ctx.pool`) for its migrations and runner.
-  - `db/index.ts` runs the Drizzle migrations.
-  - Tests may query directly to set up or inspect rows.
+- **Queries live in `db/queries/`,** one file per area with its row types, and no barrel file.
+- **A query takes `db: DbOrTx` and one params object,** holds SQL only, and takes `now` as a param.
+- **Names say what comes back:** `find*` may return undefined, `get*` throws `notFound`, `list*` and `count*` read many, and `insert*`, `upsert*`, `update*`, `delete*` and `set*` write.
+- **Reads can be called from anywhere** with `ctx.db`. Writes go through the domain function.
+- **Related writes share `transact(ctx, async (tx) => …)`.** Pass `tx`, keep model calls and HTTP out, and run queries one at a time, never in `Promise.all`.
+- **An index on an existing table** gets `.concurrently()` and a migration of its own.
+- **Known constraint violations become 409s** with `violates(error, "<constraint>")`.
+- **Lint bans `drizzle-orm` outside `db/`.** Better Auth and Graphile Worker reach Postgres directly by design.
 
 ## Connectors
 
-- Before writing code, check whether the `webhook` connector's mapping rules already cover the tool.
-- Keep `normalize` pure: no database, no network.
-- Build event ids from the source's own ids and timestamps, never from delivery ids, so redeliveries and replays dedupe.
-- Add fixtures for every event you map and every event you deliberately ignore.
-- Details are in [docs/CONNECTORS.md](docs/CONNECTORS.md).
+- Try the `webhook` connector's mapping rules before writing code.
+- Keep `normalize` pure, and build event ids from the source's ids, never delivery ids.
+- Add a fixture for every event you map or ignore. Details are in [docs/CONNECTORS.md](docs/CONNECTORS.md).
 
 ## Tests
 
-- Domain tests go through the HTTP API with `testEnv()` from `test/harness.ts`. Each test creates its own workspace.
-- AI features use `scriptedModel()`, which plays back tool calls and answers. Outbound HTTP uses `fetchStub()`.
-- After sending a webhook, call `env.drain()` to process the queue.
-- To fix a failing test, fix the code; don't loosen the assertion.
+- Test through the HTTP API with `testEnv()`. Each test creates its own workspace.
+- Use `scriptedModel()` for AI, `fetchStub()` for HTTP, and `env.drain()` after a webhook.
+- To fix a failing test, fix the code, not the assertion.
 
 ## Code style
 
-oxfmt and oxlint, with [Ultracite](https://www.ultracite.ai)'s presets, enforce the style, and the git hooks fix what they safely can. Our departures from the preset are in `oxlint.config.ts`, each with its reason. The ones you'll notice:
+oxfmt and oxlint with [Ultracite](https://www.ultracite.ai)'s presets enforce the style. Our departures are in `oxlint.config.ts`, each with its reason.
 
-- **`type`, not `interface`:** shapes flow into jsonb columns typed `Record<string, unknown>`, and interfaces don't fit them.
-- **Function declarations:** top-level functions are declarations, and arrows are for callbacks. Put exports first and helpers below them.
-- **Key order is for the reader:** don't sort keys alphabetically.
-- **Imports:** across folders, use the `#` aliases from `apps/api/package.json` (`#lib/errors`, `#db/schema`, `#db`); within a folder, use `./`. Lint rejects `../`.
-- **Fix lint findings instead of silencing them.** Disable a rule for one line only when it really doesn't fit there, and give the reason.
+- **`type`, not `interface`,** because shapes flow into jsonb columns.
+- **Top-level functions are declarations.** Exports go first, helpers below.
+- **Keys are ordered for the reader,** not sorted.
+- **Imports:** `#` aliases across folders, `./` within one, never `../`. Aliases resolve to files, so a folder's loader is a file of the same name beside it (`agent/tools.ts` for `agent/tools/`).
+- **Fix lint findings.** Suppress one line only, with a reason.
 
-## Commits
+## Commits and docs
 
-- Use Conventional Commits, checked by commitlint: `type(scope): subject`, with a lowercase subject and no final period. The types are `feat`, `fix`, `docs`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`, `revert` and `style`.
-- Keep messages short and concise, with one logical change per commit.
-- Don't skip the hooks with `--no-verify`; fix what they report.
-
-## Docs
-
-When you change something documented, update the doc in the same change: `docs/ARCHITECTURE.md`, `docs/CONNECTORS.md` (including the supported tools table), or the README's feature list and quick start.
+- Conventional Commits, checked by commitlint: `type(scope): subject`, lowercase, no final period.
+- Keep messages short, one logical change per commit, and never use `--no-verify`.
+- When you change something documented, update `docs/ARCHITECTURE.md`, `docs/CONNECTORS.md` or the README in the same change.

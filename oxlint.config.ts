@@ -31,8 +31,8 @@ export default defineConfig({
     },
     {
       // Queries live in src/db/queries (AGENTS.md, Database), so domain code
-      // can't build SQL. Drivers like drizzle-orm/node-postgres stay allowed:
-      // the Better Auth CLI needs one.
+      // can't build SQL. The match is on the bare name, so driver subpaths
+      // such as drizzle-orm/node-postgres pass; only db/ imports those.
       files: ["apps/api/src/**"],
       rules: {
         "no-restricted-imports": [
