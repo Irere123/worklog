@@ -38,6 +38,8 @@ export const SlackEventSchema = z.object({
       thread_ts: z.string().nullish(),
     })
     .nullish(),
+  /** message_changed: the message as it was. */
+  previous_message: z.object({ text: z.string().nullish() }).nullish(),
   /** message_deleted: which message. */
   deleted_ts: z.string().nullish(),
   user: z.string().nullish(),
@@ -202,6 +204,9 @@ export function normalizeSlackMessage(
   settings: Record<string, unknown>,
   receivedAt: Date
 ): Normalized {
+  if (unchangedEdit(e)) {
+    return { events: [], ignored: "changed without its text changing" };
+  }
   const revision = revisionOf(e, settings, receivedAt);
   if (revision) {
     return { events: [revision] };
@@ -210,16 +215,6 @@ export function normalizeSlackMessage(
   if ("ignored" in source) {
     return { events: [], ignored: source.ignored };
   }
-  // Slack sends a message to the bot twice, as a mention too: it's answered as a command, and
-  // what it records (a log) it records itself.
-  const { botUserId } = settings;
-  if (
-    typeof botUserId === "string" &&
-    (e.text ?? "").trimStart().startsWith(`<@${botUserId}`)
-  ) {
-    return { events: [], ignored: "addressed to Worklog" };
-  }
-
   const channelName = channelNameOf(settings, source.channel);
   const base = messageEvent(
     e,
@@ -228,6 +223,9 @@ export function normalizeSlackMessage(
     settings,
     receivedAt
   );
+  if (addressedToBot(e.text ?? "", settings.botUserId)) {
+    return toBot(base, settings.botUserId);
+  }
   const optedIn =
     Array.isArray(settings.channels) &&
     settings.channels.includes(source.channel);
@@ -269,6 +267,35 @@ export const HistoryPage = z.object({
   private: z.boolean(),
   messages: z.array(z.looseObject({ ts: z.string() })),
 });
+
+// Slack also says a message changed when it only added a link preview.
+function unchangedEdit(e: SlackEvent) {
+  return (
+    e.subtype === "message_changed" &&
+    Boolean(e.previous_message) &&
+    (e.previous_message?.text ?? "") === (e.message?.text ?? "")
+  );
+}
+
+// Slack sends a message to the bot twice, as a mention too: it's answered as a command, and what
+// it records (a log) it records itself. Anyone else it mentions still hears of it.
+function toBot(base: WorklogEvent, botUserId: unknown): Normalized {
+  const others = (base.signals ?? []).filter(
+    (sig) => !("who" in sig) || sig.who?.id !== botUserId
+  );
+  return others.length > 0
+    ? { events: [{ ...base, signals: others, hidden: true }] }
+    : { events: [], ignored: "addressed to Worklog" };
+}
+
+const LEADING_ID = /^\s*<@(?<id>[A-Z0-9]+)[|>]/u;
+
+function addressedToBot(text: string, botUserId: unknown) {
+  return (
+    typeof botUserId === "string" &&
+    LEADING_ID.exec(text)?.groups?.id === botUserId
+  );
+}
 
 // A message's ts is its send time in seconds; one that isn't a time leaves the delivery's.
 function sentAt(ts: string, receivedAt: Date) {

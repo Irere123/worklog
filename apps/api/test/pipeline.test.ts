@@ -932,11 +932,31 @@ describe("Slack deletions", () => {
       "F2",
       slackMessage(base + 1, "Password is hunter2-SECRET", base - 100)
     );
+    // A link preview arriving is a change with the same text: the burst keeps it.
+    await post("F2b", {
+      type: "message",
+      subtype: "message_changed",
+      channel: "C1",
+      message: {
+        user: "U1",
+        text: "The pool size is the culprit here",
+        ts: `${base}.000100`,
+      },
+      previous_message: { text: "The pool size is the culprit here" },
+      ts: `${base + 1}.5`,
+    });
+    const [previewed] = (
+      await env.call("GET", "/v1/activities?source=slack", {
+        token: owner.token,
+      })
+    ).body;
+    expect(previewed.body).toContain("The pool size is the culprit here");
     await post("F3", {
       type: "message",
       subtype: "message_changed",
       channel: "C1",
       message: { user: "U1", text: "(redacted)", ts: `${base + 1}.000100` },
+      previous_message: { text: "Password is hunter2-SECRET" },
       ts: `${base + 2}.0`,
     });
     const [burst] = (
