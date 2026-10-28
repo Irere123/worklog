@@ -88,6 +88,15 @@ describe("Discord Gateway", () => {
         `GET https://discord.com/api/v10/guilds/${guild}/channels`,
         () => [
           { id: "CH1", name: "standup", type: 0 },
+          // Hidden from @everyone (the role with the server's id).
+          {
+            id: "CH2",
+            name: "leads",
+            type: 0,
+            permission_overwrites: [
+              { id: guild, type: 0, allow: "0", deny: "1024" },
+            ],
+          },
           { id: "VC1", name: "voice", type: 2 },
         ],
       ],
@@ -111,10 +120,10 @@ describe("Discord Gateway", () => {
         token: owner.token,
       })
     ).body;
-    expect(sources.map((s: any) => s.name)).toEqual(["standup"]);
+    expect(sources.map((s: any) => s.name)).toEqual(["leads", "standup"]);
     await env.call("PUT", `/v1/connections/${conn.id}/sources`, {
       token: owner.token,
-      body: { ids: ["CH1"] },
+      body: { ids: ["CH1", "CH2"] },
     });
     await env.call("POST", "/v1/members/me/identities", {
       token: owner.token,
@@ -150,7 +159,19 @@ describe("Discord Gateway", () => {
           author: { id: "1003", username: "ci", bot: true },
         },
       },
-      { op: 0, t: "GUILD_DELETE", s: 5, d: { id: guild, guild_id: guild } },
+      {
+        op: 0,
+        t: "MESSAGE_CREATE",
+        s: 5,
+        d: {
+          ...message,
+          id: "m3",
+          channel_id: "CH2",
+          content: "The hiring plan for the platform team is final",
+          mentions: [],
+        },
+      },
+      { op: 0, t: "GUILD_DELETE", s: 6, d: { id: guild, guild_id: guild } },
     ];
     const stop = startStreams(env.ctx);
     try {
@@ -178,10 +199,28 @@ describe("Discord Gateway", () => {
         token: owner.token,
       })
     ).body;
-    expect(activities.map((a: any) => a.title)).toEqual([
-      "Posted in #standup: Shipped the retry queue to production, @sam can you watch the alerts?",
+    expect(
+      activities.map((a: any) => [a.title, a.visibility]).toSorted()
+    ).toEqual([
+      [
+        "Posted in #leads: The hiring plan for the platform team is final",
+        "private",
+      ],
+      [
+        "Posted in #standup: Shipped the retry queue to production, @sam can you watch the alerts?",
+        "team",
+      ],
     ]);
     expect(activities[0].actorId).toBe(owner.member.id);
+    // What only some can read in Discord stays the author's in Worklog.
+    const seenBySam = (
+      await env.call("GET", "/v1/activities?source=discord", {
+        token: sam.token,
+      })
+    ).body;
+    expect(seenBySam.map((a: any) => a.title)).toEqual([
+      "Posted in #standup: Shipped the retry queue to production, @sam can you watch the alerts?",
+    ]);
     const [mention] = (
       await env.call("GET", "/v1/attention", { token: sam.token })
     ).body;
