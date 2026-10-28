@@ -339,6 +339,50 @@ async function github(settings: Record<string, unknown> = {}) {
 }
 
 describe("ingestion pipeline", () => {
+  test("a mention by login reaches someone already seen by their account id", async () => {
+    const { owner, send } = await github();
+    const sam = await env.teammate(owner.token, "Sam");
+    await env.call("POST", `/v1/members/${sam.member.id}/identities`, {
+      token: sam.token,
+      body: { provider: "github", externalId: "202" },
+    });
+    const issue = {
+      number: 4,
+      title: "Retries",
+      html_url: "https://github.com/acme/api/issues/4",
+      user: emma,
+      pull_request: {},
+    };
+    const comment = (id: number, user: object, body: string) => ({
+      action: "created",
+      sender: user,
+      issue,
+      comment: {
+        id,
+        body,
+        html_url: "c",
+        user,
+        created_at: new Date().toISOString(),
+      },
+    });
+    // Sam's account is seen (by id, with its login) before anyone mentions it.
+    await send(
+      "issue_comment",
+      comment(1, { login: "Sam-GH", id: 202 }, "Taking a look at the retries")
+    );
+    await send(
+      "issue_comment",
+      comment(2, emma, "@sam-gh can you check the backoff?")
+    );
+    const items = (await env.call("GET", "/v1/attention", { token: sam.token }))
+      .body;
+    expect(items.map((i: any) => i.kind)).toEqual(["mention"]);
+    const placeholders = await env.ctx.db.execute<{ n: number }>(sql`
+      select count(*)::int as n from identities
+      where workspace_id = ${owner.workspace.id} and external_id like 'handle:%'`);
+    expect(placeholders.rows[0]?.n).toBe(0);
+  });
+
   test("bursts merge: three pushes to a branch become one activity", async () => {
     const { owner, send } = await github();
     for (let i = 0; i < 3; i += 1) {

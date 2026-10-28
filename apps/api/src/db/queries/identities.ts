@@ -75,6 +75,31 @@ export async function listIdentitiesByExternalIds(
     );
 }
 
+/**
+ * Accounts by their last-seen login (pass logins lowercase), not placeholders: a mention carries
+ * only the login. The most recently seen first, for a login that passed from one account to another.
+ */
+export async function listIdentitiesByHandles(
+  db: DbOrTx,
+  params: { workspaceId: string; provider: string; handles: string[] }
+) {
+  if (params.handles.length === 0) {
+    return [];
+  }
+  return await db
+    .select()
+    .from(identities)
+    .where(
+      and(
+        eq(identities.workspaceId, params.workspaceId),
+        eq(identities.provider, params.provider),
+        inArray(sql`lower(${identities.externalHandle})`, params.handles),
+        sql`${identities.externalId} not like 'handle:%'`
+      )
+    )
+    .orderBy(sql`${identities.lastSeenAt} desc nulls last`);
+}
+
 // `handle` matches the last-seen login case-insensitively; pass it lowercase.
 export async function findIdentityByExternalIdOrHandle(
   db: DbOrTx,

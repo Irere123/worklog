@@ -1,0 +1,1 @@
+CREATE INDEX CONCURRENTLY "identities_handle_idx" ON "identities" USING btree ("workspace_id","provider",lower("external_handle"));

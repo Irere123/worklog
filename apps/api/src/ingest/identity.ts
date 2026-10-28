@@ -5,6 +5,7 @@ import { updateActivitiesActor } from "#db/queries/activities";
 import {
   deleteIdentityById,
   findIdentityByExternalIdOrHandle,
+  listIdentitiesByHandles,
   insertIdentitiesIfNew,
   insertIdentity,
   insertIdentityIfNew,
@@ -106,15 +107,16 @@ export async function resolveActors(
     sightings
   );
   known.push(...(await recordIdentities(ctx, workspaceId, namespace, unseen)));
+  // By the identity's id, not the sighting's: a mention by login resolves to the account itself.
   const signedIn = await signedInMembers(
     ctx,
     workspaceId,
     namespace,
-    known.filter((k) => !k.identity.memberId).map((k) => k.sighting.actor.id)
+    known.filter((k) => !k.identity.memberId).map((k) => k.identity.externalId)
   );
   for (const k of known) {
     const memberId =
-      k.identity.memberId ?? signedIn.get(k.sighting.actor.id) ?? null;
+      k.identity.memberId ?? signedIn.get(k.identity.externalId) ?? null;
     out.set(k.sighting.actor.id, await sighted(ctx, k, memberId));
   }
   for (const { actor, at, n } of intricate) {
@@ -146,11 +148,17 @@ async function sortSightings(
     externalIds: [...wanted],
   });
   const found = new Map(rows.map((i) => [i.externalId, i]));
+  const byLogin = await accountsByLogin(ctx, workspaceId, namespace, sightings);
   const known: Known[] = [];
   const unseen: Sighting[] = [];
   const intricate: Sighting[] = [];
   for (const sighting of sightings) {
-    const exact = found.get(sighting.actor.id);
+    const named = found.get(sighting.actor.id);
+    const account = byLogin.get(sighting.actor.id);
+    // A mention names a login, never an id: the account last seen with that login, unless only
+    // the placeholder says whose it is.
+    const exact =
+      account && !(named?.memberId && !account.memberId) ? account : named;
     const key = placeholderOf(sighting.actor);
     const placeholder =
       key && key !== sighting.actor.id ? found.get(key) : undefined;
@@ -165,6 +173,36 @@ async function sortSightings(
   return { known, unseen, intricate };
 }
 
+// For sightings that only know a login (`handle:<login>`), the accounts seen with that login, the
+// most recently seen first.
+async function accountsByLogin(
+  ctx: AppContext,
+  workspaceId: string,
+  namespace: string,
+  sightings: Sighting[]
+) {
+  const logins = sightings
+    .map((s) => s.actor.id)
+    .filter((id) => id.startsWith("handle:"))
+    .map((id) => id.slice("handle:".length));
+  const out = new Map<string, Identity>();
+  if (logins.length === 0) {
+    return out;
+  }
+  const rows = await listIdentitiesByHandles(ctx.db, {
+    workspaceId,
+    provider: namespace,
+    handles: logins,
+  });
+  for (const row of rows) {
+    const key = handleKey(row.externalHandle ?? "");
+    if (!out.has(key)) {
+      out.set(key, row);
+    }
+  }
+  return out;
+}
+
 async function sighted(
   ctx: AppContext,
   { sighting, identity }: Known,
@@ -177,7 +215,17 @@ async function sighted(
     displayName: actor.name ?? identity.displayName,
     isBot: actor.bot ?? identity.isBot,
   });
-  if (set) {
+  if (set?.memberId) {
+    // Linked just now (the account signed in): what it did before is theirs too.
+    const linked = memberId;
+    await transact(ctx, async (tx) => {
+      await updateIdentityDetails(tx.db, { id: identity.id, set });
+      await updateActivitiesActor(tx.db, {
+        actorIdentityId: identity.id,
+        actorId: linked,
+      });
+    });
+  } else if (set) {
     await updateIdentityDetails(ctx.db, { id: identity.id, set });
   }
   ctx.tally.sighted(identity.id, at, n);

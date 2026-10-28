@@ -111,6 +111,10 @@ export const identities = pgTable(
       t.externalId
     ),
     index("identities_member_idx").on(t.memberId),
+    // A mention carries only the login, matched case-insensitively.
+    index("identities_handle_idx")
+      .on(t.workspaceId, t.provider, sql`lower(${t.externalHandle})`)
+      .concurrently(),
   ]
 );
 
