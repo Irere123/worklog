@@ -11,6 +11,8 @@ import type {
 } from "#connectors/types";
 import { safeEqual, shortHash } from "#lib/crypto";
 
+import { chosenNamespace } from "./namespaces";
+
 const Template = z.string().max(500);
 const Rule = z.object({
   when: z
@@ -270,9 +272,7 @@ export const webhookConnector: Connector = {
   ],
   endpoints: { webhook: "" },
   identityNamespace: ({ id, settings }) =>
-    typeof settings.identityNamespace === "string"
-      ? settings.identityNamespace
-      : `webhook:${id}`,
+    chosenNamespace(settings, `webhook:${id}`),
   receive(req, conn) {
     const parsed = WebhookSettings.safeParse(conn.settings);
     if (!parsed.success) {

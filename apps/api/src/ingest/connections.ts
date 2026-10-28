@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { getConnector } from "#connectors";
+import { isBuiltInNamespace } from "#connectors/namespaces";
 import { WebhookSettings } from "#connectors/webhook";
 import type { AppContext } from "#context";
 import { listBoards } from "#db/queries/boards";
@@ -69,17 +70,16 @@ function validate(
   }
   // Generic connectors get their own identity namespace: they must not be able to act as the
   // users of a built-in one (GitHub's, a Gitea server's, Slack's, Discord's).
-  // Checked when it changes: one chosen before a namespace was reserved doesn't lock the rest.
+  // Checked when it changes: one chosen before a namespace was reserved doesn't lock the rest
+  // (ingestion doesn't use it).
   const ns = settings.identityNamespace;
-  const prefix = typeof ns === "string" ? (ns.split(":")[0] ?? "") : "";
-  const builtIn = getConnector(prefix);
   if (
+    typeof ns === "string" &&
     ns !== before.identityNamespace &&
-    builtIn &&
-    builtIn.perConnection !== true
+    isBuiltInNamespace(ns)
   ) {
     throw badRequest(
-      `identityNamespace "${String(ns)}" is reserved for the built-in ${prefix} connector`
+      `identityNamespace "${ns}" is reserved for the built-in ${ns.split(":")[0] ?? ns} connector`
     );
   }
   if (provider === "webhook") {
