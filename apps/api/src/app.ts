@@ -6,9 +6,11 @@ import { HTTPException } from "hono/http-exception";
 import type { AppContext } from "./context";
 import { authMiddleware } from "./http/auth";
 import { hookRoutes } from "./http/hooks";
+import { oauthRoutes } from "./http/oauth";
 import { router } from "./http/router";
 import { activityRoutes } from "./http/routes/activity";
 import { agentRoutes } from "./http/routes/agent";
+import { appRoutes } from "./http/routes/apps";
 import { attentionRoutes } from "./http/routes/attention";
 import { automationRoutes } from "./http/routes/automations";
 import { boardRoutes } from "./http/routes/board";
@@ -126,8 +128,10 @@ export function createApp(ctx: AppContext) {
     .route("/", deliveryRoutes)
     .route("/", automationRoutes)
     .route("/", connectionRoutes)
+    .route("/", appRoutes)
     .route("/", eventRoutes)
-    .route("/", hookRoutes());
+    .route("/", hookRoutes())
+    .route("/", oauthRoutes());
 
   app.openAPIRegistry.registerComponent("securitySchemes", "bearerAuth", {
     type: "http",

@@ -1,7 +1,11 @@
 import { z } from "zod";
 
+import { API as DISCORD_API, botGet } from "#connectors/discord/app";
+import { call, ProviderError } from "#connectors/http";
+import { slackApi } from "#connectors/slack/api";
 import type { AppContext } from "#context";
 import { findConnectionById } from "#db/queries/connections";
+import { findConnectorApp } from "#db/queries/connector-apps";
 import {
   deleteDeliveryTarget,
   insertDeliveryTarget,
@@ -12,6 +16,7 @@ import type { TargetRow } from "#db/queries/delivery-targets";
 import { listIdentities } from "#db/queries/identities";
 import type { Member } from "#db/queries/members";
 import type { TargetKind, Visibility } from "#db/schema";
+import { handleProviderError } from "#ingest/lifecycle";
 import { badRequest, notFound } from "#lib/errors";
 import { newId } from "#lib/ids";
 
@@ -53,6 +58,18 @@ export async function createTarget(
     if (!conn || conn.provider !== input.kind) {
       throw badRequest(`connectionId must be a ${input.kind} connection`);
     }
+    if (
+      input.kind === "discord" &&
+      conn.externalId &&
+      !input.address.startsWith("https://")
+    ) {
+      await requireOwnChannel(
+        ctx,
+        conn.provider,
+        conn.externalId,
+        input.address
+      );
+    }
   }
   if (input.kind === "webhook" && !/^https?:\/\//u.test(input.address)) {
     throw badRequest("Webhook address must be a URL");
@@ -71,6 +88,52 @@ export async function createTarget(
   };
   await insertDeliveryTarget(ctx.db, row);
   return row;
+}
+
+const Channel = z.object({ guild_id: z.string().optional() });
+
+/**
+ * Discord servers that added the server's app share its one bot, which can post wherever it's
+ * been added: a target must be a channel in this connection's own server, or one workspace could
+ * post into another's.
+ */
+async function requireOwnChannel(
+  ctx: AppContext,
+  provider: string,
+  guildId: string,
+  channelId: string
+) {
+  const app = await findConnectorApp(ctx.db, { provider });
+  const token = app ? ctx.secrets.open(app.credentials).botToken : undefined;
+  if (!token) {
+    throw badRequest("The Discord app has no bot token");
+  }
+  let found: unknown;
+  try {
+    found = await botGet(
+      ctx,
+      "Discord channel",
+      `${DISCORD_API}/channels/${encodeURIComponent(channelId)}`,
+      token
+    );
+  } catch (error) {
+    // The bot can't see a channel it isn't in; anything else is Discord's answer, passed on.
+    if (
+      error instanceof ProviderError &&
+      (error.status === 403 || error.status === 404)
+    ) {
+      throw badRequest(
+        "That channel isn't in this connection's Discord server"
+      );
+    }
+    throw badRequest(
+      `Couldn't check the channel with Discord: ${error instanceof Error ? error.message : String(error)}`
+    );
+  }
+  const channel = Channel.safeParse(found);
+  if (!channel.success || channel.data.guild_id !== guildId) {
+    throw badRequest("That channel isn't in this connection's Discord server");
+  }
 }
 
 export async function updateTarget(
@@ -178,7 +241,7 @@ async function readBy(
 async function botToken(
   ctx: AppContext,
   connectionId: string | null
-): Promise<string> {
+): Promise<{ connectionId: string; token: string; own: boolean }> {
   if (!connectionId) {
     throw new Error("No connection configured for this target");
   }
@@ -186,14 +249,42 @@ async function botToken(
   if (!conn) {
     throw new Error("Connection no longer exists");
   }
-  const token = ctx.secrets.open(conn.secrets).botToken;
+  // Paused means record nothing, not say nothing: briefs still go out.
+  if (conn.status === "revoked" || conn.status === "suspended") {
+    throw new Error(`The ${conn.provider} connection is ${conn.status}`);
+  }
+  // A Discord server that added the server's app posts as that app's one bot. Installing created
+  // the app's row, so it's read directly (ingest/apps would load the connector registry, which
+  // imports this module), and every process brings env-sourced rows up to date when it starts.
+  const app = conn.externalId
+    ? await findConnectorApp(ctx.db, { provider: conn.provider })
+    : undefined;
+  const own = ctx.secrets.open(conn.secrets).botToken;
+  const token =
+    own ?? (app ? ctx.secrets.open(app.credentials).botToken : undefined);
   if (!token) {
     throw new Error(`The ${conn.provider} connection has no botToken`);
   }
-  return token;
+  return { connectionId, token, own: own !== undefined };
 }
 
-const SlackReply = z.object({ ok: z.boolean(), error: z.string().optional() });
+// A connection's own token the provider refused revokes it and tells whoever installed it, so a
+// dead bot doesn't fail every brief in silence. The app's shared bot token is about the app, not
+// this connection: refused, it fails the send and revokes nothing.
+async function asBot(
+  ctx: AppContext,
+  bot: { connectionId: string; own: boolean },
+  send: () => Promise<unknown>
+) {
+  try {
+    await send();
+  } catch (error) {
+    if (bot.own) {
+      await handleProviderError(ctx, bot.connectionId, error);
+    }
+    throw error;
+  }
+}
 
 async function sendTo(ctx: AppContext, target: TargetRow, message: Outgoing) {
   switch (target.kind) {
@@ -208,23 +299,26 @@ async function sendTo(ctx: AppContext, target: TargetRow, message: Outgoing) {
       return;
     }
     case "slack": {
-      const res = await ctx.fetch("https://slack.com/api/chat.postMessage", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${await botToken(ctx, target.connectionId)}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          channel: target.address,
-          text: toSlack(`*${message.subject}*\n\n${message.markdown}`),
-          unfurl_links: false,
-          unfurl_media: false,
-        }),
-      });
-      const reply = SlackReply.parse(await res.json());
-      if (!reply.ok) {
-        throw new Error(`Slack: ${reply.error ?? "unknown error"}`);
-      }
+      const bot = await botToken(ctx, target.connectionId);
+      await asBot(
+        ctx,
+        bot,
+        async () =>
+          await slackApi(
+            ctx,
+            bot.token,
+            "chat.postMessage",
+            {},
+            {
+              json: {
+                channel: target.address,
+                text: toSlack(`*${message.subject}*\n\n${message.markdown}`),
+                unfurl_links: false,
+                unfurl_media: false,
+              },
+            }
+          )
+      );
       return;
     }
     case "discord": {
@@ -233,32 +327,42 @@ async function sendTo(ctx: AppContext, target: TargetRow, message: Outgoing) {
         1990,
         message.url
       );
-      const isWebhook = target.address.startsWith("https://");
-      const res = await ctx.fetch(
-        isWebhook
-          ? target.address
-          : `https://discord.com/api/v10/channels/${target.address}/messages`,
-        {
+      const body = JSON.stringify({
+        content,
+        allowed_mentions: { parse: [] },
+        // SUPPRESS_EMBEDS: no link previews fetched on our behalf.
+        flags: 4,
+      });
+      if (target.address.startsWith("https://")) {
+        const res = await ctx.fetch(target.address, {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            ...(isWebhook
-              ? {}
-              : {
-                  Authorization: `Bot ${await botToken(ctx, target.connectionId)}`,
-                }),
-          },
-          // flags 4 = SUPPRESS_EMBEDS: no link previews fetched on our behalf.
-          body: JSON.stringify({
-            content,
-            allowed_mentions: { parse: [] },
-            flags: 4,
-          }),
+          headers: { "Content-Type": "application/json" },
+          body,
+        });
+        if (!res.ok) {
+          throw new Error(`Discord responded ${res.status}`);
         }
-      );
-      if (!res.ok) {
-        throw new Error(`Discord responded ${res.status}`);
+        return;
       }
+      const bot = await botToken(ctx, target.connectionId);
+      await asBot(
+        ctx,
+        bot,
+        async () =>
+          await call(
+            ctx,
+            "Discord",
+            `${DISCORD_API}/channels/${target.address}/messages`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bot ${bot.token}`,
+              },
+              body,
+            }
+          )
+      );
       return;
     }
     case "webhook": {

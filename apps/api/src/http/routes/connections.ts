@@ -1,5 +1,7 @@
 import { createRoute, z } from "@hono/zod-openapi";
 
+import { listConnectors } from "#connectors";
+import { registerDiscordCommands } from "#connectors/discord";
 import type { AppContext } from "#context";
 import { getConnectionById, listConnections } from "#db/queries/connections";
 import type { ConnectionRow } from "#db/queries/connections";
@@ -14,6 +16,11 @@ import {
   respond,
   router,
 } from "#http/router";
+import {
+  SetSourcesRequest,
+  Source,
+  SyncQueuedResponse,
+} from "#http/schemas/apps";
 import {
   Connection,
   ConnectionHealth,
@@ -32,10 +39,11 @@ import {
   UpdateConnectionRequest,
 } from "#http/schemas/connections";
 import * as conns from "#ingest/connections";
-import { listConnectors } from "#ingest/connectors";
-import { registerDiscordCommands } from "#ingest/connectors/discord";
-import { connectionHealth, receivePushed, viewOf } from "#ingest/pipeline";
-import { enqueue } from "#jobs/queue";
+import { connectionHealth } from "#ingest/health";
+import { receivePushed } from "#ingest/pipeline";
+import { queueReplay } from "#ingest/process";
+import { queueSync } from "#ingest/sync-queue";
+import { viewOf } from "#ingest/view";
 import { badRequest, forbidden } from "#lib/errors";
 
 const withUrls = (ctx: AppContext, row: ConnectionRow) => ({
@@ -233,17 +241,83 @@ export const connectionRoutes = router()
         id: c.req.valid("param").id,
         workspaceId: me.workspaceId,
       });
-      await enqueue(
-        ctx,
-        "ingest:replay",
-        {
-          workspaceId: me.workspaceId,
-          connectionId: conn.id,
-          since: c.req.valid("json").since ?? null,
-        },
-        { queue: `ingest:${conn.id}`, maxAttempts: 1 }
-      );
+      const { since } = c.req.valid("json");
+      await queueReplay(ctx, conn, since ? new Date(since) : undefined);
       return respond(c, ReplayQueuedResponse, { queued: true }, 202);
+    }
+  )
+  .openapi(
+    createRoute({
+      method: "get",
+      path: "/v1/connections/{id}/sources",
+      operationId: "connection.sources",
+      tags: ["Connections"],
+      summary:
+        "What this connection could watch: the repos an installation covers, the channels the bot is in (admins)",
+      request: { params: Id },
+      responses: { 200: json(z.array(Source)), ...errors },
+    }),
+    async (c) => {
+      const ctx = c.get("ctx");
+      const me = c.get("member");
+      requireAdmin(me);
+      return respond(
+        c,
+        z.array(Source),
+        await conns.listSources(ctx, me.workspaceId, c.req.valid("param").id),
+        200
+      );
+    }
+  )
+  .openapi(
+    createRoute({
+      method: "put",
+      path: "/v1/connections/{id}/sources",
+      operationId: "connection.setSources",
+      tags: ["Connections"],
+      summary:
+        "Choose what counts as work: repos for GitHub, channels for Slack (admins)",
+      description:
+        "Ids from `GET /v1/connections/{id}/sources`. Replaces the choice, and reads recent history for it.",
+      request: { params: Id, ...body(SetSourcesRequest) },
+      responses: { 200: json(Connection), ...errors },
+    }),
+    async (c) => {
+      const ctx = c.get("ctx");
+      const me = c.get("member");
+      requireAdmin(me);
+      const row = await conns.setSources(
+        ctx,
+        me.workspaceId,
+        c.req.valid("param").id,
+        c.req.valid("json").ids
+      );
+      return respond(c, Connection, withUrls(ctx, row), 200);
+    }
+  )
+  .openapi(
+    createRoute({
+      method: "post",
+      path: "/v1/connections/{id}/sync",
+      operationId: "connection.sync",
+      tags: ["Connections"],
+      summary:
+        "Catch up from the provider's API now: whatever webhooks missed since the last sync (admins)",
+      description:
+        "Runs in the background, also daily on its own. Read-back history records activity; only what happened in the last BACKFILL_NOTIFY_HOURS can still notify anyone.",
+      request: { params: Id },
+      responses: { 202: json(SyncQueuedResponse, "Queued"), ...errors },
+    }),
+    async (c) => {
+      const ctx = c.get("ctx");
+      const me = c.get("member");
+      requireAdmin(me);
+      const conn = await getConnectionById(ctx.db, {
+        id: c.req.valid("param").id,
+        workspaceId: me.workspaceId,
+      });
+      await queueSync(ctx, conn);
+      return respond(c, SyncQueuedResponse, { queued: true }, 202);
     }
   )
   .openapi(

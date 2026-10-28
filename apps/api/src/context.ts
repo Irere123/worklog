@@ -5,8 +5,11 @@ import type { Models } from "./agent/models";
 import type { Config } from "./config";
 import { openDb } from "./db";
 import type { DbOrTx } from "./db";
+import { listConnectorApps } from "./db/queries/connector-apps";
 import { findUserById } from "./db/queries/users";
 import { EventBus } from "./events";
+import { withAppSignIn } from "./ingest/sign-in";
+import { Tally } from "./ingest/tally";
 import { installQueue } from "./jobs/queue";
 import { createAuth } from "./lib/auth";
 import type { Auth } from "./lib/auth";
@@ -23,6 +26,7 @@ export type AppContext = {
   pool: Pool;
   auth: Auth;
   bus: EventBus;
+  tally: Tally;
   secrets: SecretBox;
   // null when no OPENROUTER_API_KEY: AI features fall back to deterministic templates.
   models: Models | null;
@@ -33,14 +37,23 @@ export type AppContext = {
 };
 
 export async function createContext(
-  config: Config,
+  env: Config,
   overrides: Partial<
     Pick<AppContext, "models" | "mailer" | "fetch" | "now">
   > = {}
 ): Promise<AppContext> {
-  const { db, close } = await openDb(config.DATABASE_URL);
+  const { db, close } = await openDb(env.DATABASE_URL, env.DATABASE_POOL_SIZE);
   await installQueue(db);
+  const secrets = new SecretBox(
+    env.WORKLOG_SECRET_KEY,
+    env.WORKLOG_SECRET_KEYS_PREVIOUS
+  );
+  // An app registered through the API (GitHub's manifest flow) also signs people in, from the
+  // next start; what the environment sets wins.
+  const config = withAppSignIn(env, await listConnectorApps(db), secrets);
   const mailer = overrides.mailer ?? createMailer(config);
+  const tally = new Tally(db);
+  const stopTally = tally.start();
   const ctx: AppContext = {
     config,
     db,
@@ -55,13 +68,18 @@ export async function createContext(
       },
     }),
     bus: new EventBus(db),
-    secrets: new SecretBox(config.WORKLOG_SECRET_KEY),
+    tally,
+    secrets,
     models:
       "models" in overrides ? (overrides.models ?? null) : createModels(config),
     mailer,
     fetch: overrides.fetch ?? fetch,
     now: overrides.now ?? (() => new Date()),
-    close,
+    close: async () => {
+      stopTally();
+      await tally.flush();
+      await close();
+    },
   };
   return ctx;
 }

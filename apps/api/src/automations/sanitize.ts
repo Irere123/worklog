@@ -48,7 +48,7 @@ export function urlsIn(data: unknown): string[] {
   return out;
 }
 
-const escapeHtml = (s: string) =>
+export const escapeHtml = (s: string) =>
   s
     .replaceAll("&", "&amp;")
     .replaceAll("<", "&lt;")

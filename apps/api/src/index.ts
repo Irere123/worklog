@@ -1,12 +1,20 @@
 import { createApp } from "./app";
 import { loadConfig } from "./config";
 import { createContext } from "./context";
+import { syncAppsFromEnv } from "./ingest/apps";
+import { startStreams } from "./ingest/streams";
 import { startWorker } from "./jobs/tasks";
 
 const config = loadConfig();
 const ctx = await createContext(config);
 const app = createApp(ctx);
+// Apps that come from the environment pick up what changed there since the last start.
+await syncAppsFromEnv(ctx);
 const stopWorker = config.RUN_SCHEDULER ? await startWorker(ctx) : null;
+// Sockets apps need open (Discord's Gateway) run where the jobs do.
+const stopStreams = config.RUN_SCHEDULER ? startStreams(ctx) : null;
+// Realtime streams also carry what worker processes and other replicas publish.
+const stopRelay = await ctx.bus.listen();
 
 const server = Bun.serve({
   port: config.PORT,
@@ -31,8 +39,10 @@ async function shutdown() {
   }
   shuttingDown = true;
   try {
+    await stopStreams?.();
     await stopWorker?.();
     await server.stop();
+    await stopRelay();
     await ctx.close();
     process.exit(0);
   } catch (error) {
