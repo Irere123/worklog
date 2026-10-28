@@ -93,6 +93,19 @@ async function streamed(body: string, path = "/hooks/apps/nobody") {
   });
 }
 
+// A message in channel C1 from U1, in a thread when given its first message's time.
+function slackMessage(ts: number, text: string, thread?: number) {
+  return {
+    type: "message",
+    user: "U1",
+    text,
+    channel: "C1",
+    channel_type: "channel",
+    ts: `${ts}.000100`,
+    ...(thread === undefined ? {} : { thread_ts: `${thread}.000100` }),
+  };
+}
+
 const push = (after: string, ids: string[]) => ({
   ref: "refs/heads/feature",
   after,
@@ -874,5 +887,86 @@ describe("Slack deletions", () => {
       })
     ).body;
     expect(after).toHaveLength(1);
+  });
+
+  test("an edit inside a burst takes its text, and a deleted mention takes its item's", async () => {
+    const owner = await env.workspace();
+    await env.call("POST", "/v1/members/me/identities", {
+      token: owner.token,
+      body: { provider: "slack", externalId: "U2" },
+    });
+    const conn = (
+      await env.call("POST", "/v1/connections", {
+        token: owner.token,
+        body: {
+          provider: "slack",
+          secrets: { signingSecret: "ss", botToken: "xoxb" },
+          settings: { channels: ["C1"] },
+        },
+      })
+    ).body;
+    const post = async (id: string, event: object) => {
+      const raw = JSON.stringify({
+        type: "event_callback",
+        event_id: id,
+        event,
+      });
+      const ts = Math.floor(Date.now() / 1000);
+      await env.app.request(new URL(conn.webhookUrls.events).pathname, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-slack-request-timestamp": String(ts),
+          "x-slack-signature": `v0=${hmacHex("ss", `v0:${ts}:${raw}`)}`,
+        },
+        body: raw,
+      });
+      await env.drain();
+    };
+    const base = Math.floor(Date.now() / 1000);
+    await post(
+      "F1",
+      slackMessage(base, "The pool size is the culprit here", base - 100)
+    );
+    await post(
+      "F2",
+      slackMessage(base + 1, "Password is hunter2-SECRET", base - 100)
+    );
+    await post("F3", {
+      type: "message",
+      subtype: "message_changed",
+      channel: "C1",
+      message: { user: "U1", text: "(redacted)", ts: `${base + 1}.000100` },
+      ts: `${base + 2}.0`,
+    });
+    const [burst] = (
+      await env.call("GET", "/v1/activities?source=slack", {
+        token: owner.token,
+      })
+    ).body;
+    expect(burst.count).toBe(2);
+    expect(burst.body).toBeNull();
+
+    await post(
+      "F4",
+      slackMessage(base + 3, "<@U2> the staging password is hunter2-SECRET")
+    );
+    const [item] = (
+      await env.call("GET", "/v1/attention", { token: owner.token })
+    ).body;
+    expect(item.body).toContain("hunter2-SECRET");
+    await post("F5", {
+      type: "message",
+      subtype: "message_deleted",
+      channel: "C1",
+      deleted_ts: `${base + 3}.000100`,
+      ts: `${base + 4}.0`,
+    });
+    expect(
+      (await env.call("GET", "/v1/attention", { token: owner.token })).body
+    ).toHaveLength(0);
+    const kept = await env.ctx.db.execute<{ body: string | null }>(sql`
+      select body from attention_items where id = ${item.id}`);
+    expect(kept.rows).toEqual([{ body: null }]);
   });
 });

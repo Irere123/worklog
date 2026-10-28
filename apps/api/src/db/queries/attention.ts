@@ -313,6 +313,22 @@ export async function setOpenAttentionDone(
 }
 
 // Keeps the latest source time, whichever order resolves arrive in.
+// Whatever the items' state: the text of something edited or deleted at its source mustn't linger.
+export async function updateAttentionText(
+  db: DbOrTx,
+  params: { workspaceId: string; dedupeKey: string; body: string | null }
+) {
+  await db
+    .update(attentionItems)
+    .set({ body: params.body })
+    .where(
+      and(
+        eq(attentionItems.workspaceId, params.workspaceId),
+        eq(attentionItems.dedupeKey, params.dedupeKey)
+      )
+    );
+}
+
 export async function upsertAttentionResolution(
   db: DbOrTx,
   params: {

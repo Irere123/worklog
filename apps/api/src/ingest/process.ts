@@ -14,6 +14,10 @@ import {
   updateUnmergedActivity,
 } from "#db/queries/activities";
 import {
+  setOpenAttentionDone,
+  updateAttentionText,
+} from "#db/queries/attention";
+import {
   findConnectionById,
   lockConnectionForWrites,
 } from "#db/queries/connections";
@@ -741,7 +745,16 @@ async function applyRevision(
     source: source.conn.provider,
     externalId: event.id,
   };
+  // A mention raised from it shows what it said.
+  const mention = {
+    workspaceId: source.conn.workspaceId,
+    dedupeKey: `mention:${event.id}`,
+  };
   if (event.op === "update") {
+    await updateAttentionText(ctx.db, {
+      ...mention,
+      body: event.body?.slice(0, 280) ?? null,
+    });
     const updated = await updateUnmergedActivity(ctx.db, {
       ...key,
       set: {
@@ -752,14 +765,29 @@ async function applyRevision(
     });
     if (updated > 0) {
       outcome.merged += 1;
-    } else {
+      return;
+    }
+    const entry = await findIngestedEvent(ctx.db, key);
+    const burst = entry?.activityId
+      ? await findActivityById(ctx.db, { id: entry.activityId })
+      : undefined;
+    // As with a deletion, the burst can't say which line was this one's.
+    if (burst && burst.count > 1) {
+      await forgetMergedText(ctx, burst);
       outcome.dropped.push({
         id: event.id,
-        reason: "edit of something not recorded",
+        reason: "edited inside a burst (the burst's text was removed)",
       });
+      return;
     }
+    outcome.dropped.push({
+      id: event.id,
+      reason: "edit of something not recorded",
+    });
     return;
   }
+  await setOpenAttentionDone(ctx.db, { ...mention, at: ctx.now() });
+  await updateAttentionText(ctx.db, { ...mention, body: null });
   const reason = await transact(ctx, async (tx) => {
     const entry = await findIngestedEvent(tx.db, key);
     const activity = entry?.activityId
