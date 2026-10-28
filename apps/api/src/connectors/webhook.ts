@@ -226,6 +226,7 @@ const byHandle = (handle: string | null): ExternalActor | null =>
 
 export const webhookConnector: Connector = {
   id: "webhook",
+  perConnection: true,
   name: "Custom webhook",
   description:
     "Map any tool's webhooks to Worklog events with rules — no code. Good for self-hosted GitLab, Sentry, CI, deploy bots.",

@@ -45,14 +45,14 @@ function validate(
       `${connector.name} connections need: ${missing.join(", ")}`
     );
   }
-  // Generic connectors get their own identity namespace: they must not be able to act as GitHub/Slack/Discord users.
+  // Generic connectors get their own identity namespace: they must not be able to act as the
+  // users of a built-in one (GitHub's, a Gitea server's, Slack's, Discord's).
   const ns = settings.identityNamespace;
-  if (
-    typeof ns === "string" &&
-    ["github", "slack", "discord"].includes(ns.split(":")[0] ?? "")
-  ) {
+  const prefix = typeof ns === "string" ? (ns.split(":")[0] ?? "") : "";
+  const builtIn = getConnector(prefix);
+  if (builtIn && builtIn.perConnection !== true) {
     throw badRequest(
-      `identityNamespace "${ns}" is reserved for the built-in ${ns} connector`
+      `identityNamespace "${String(ns)}" is reserved for the built-in ${prefix} connector`
     );
   }
   if (provider === "webhook") {

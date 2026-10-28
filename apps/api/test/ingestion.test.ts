@@ -900,21 +900,33 @@ describe("custom integrations", () => {
     ).toMatchObject({ kind: "mention" });
   });
 
-  test("webhook connections can't claim the built-in GitHub/Slack/Discord identity namespaces", async () => {
+  test("generic connections can't claim a built-in connector's identity namespace", async () => {
     const owner = await env.workspace();
-    const res = await env.call("POST", "/v1/connections", {
-      token: owner.token,
-      body: {
-        provider: "webhook",
-        secrets: { secret: "x" },
-        settings: {
-          verify: { type: "token", header: "X-T" },
-          identityNamespace: "github",
-          rules: [{ emit: { kind: "x.y", id: "1", title: "t" } }],
+    for (const identityNamespace of [
+      "github",
+      "gitea:git.example.com",
+      "slack",
+      "discord",
+    ]) {
+      const webhook = await env.call("POST", "/v1/connections", {
+        token: owner.token,
+        body: {
+          provider: "webhook",
+          secrets: { secret: "x" },
+          settings: {
+            verify: { type: "token", header: "X-T" },
+            identityNamespace,
+            rules: [{ emit: { kind: "x.y", id: "1", title: "t" } }],
+          },
         },
-      },
-    });
-    expect(res.status).toBe(400);
+      });
+      expect(webhook.status).toBe(400);
+      const custom = await env.call("POST", "/v1/connections", {
+        token: owner.token,
+        body: { provider: "custom", settings: { identityNamespace } },
+      });
+      expect(custom.status).toBe(400);
+    }
   });
 
   test("Standard Webhooks signatures are verified with a replay window", () => {
@@ -1042,6 +1054,55 @@ describe("custom integrations", () => {
       kind: "ticket.closed",
       actorId: owner.member.id,
     });
+  });
+});
+
+describe("connections that choose their own event ids", () => {
+  test("two in one workspace can name different events alike", async () => {
+    const owner = await env.workspace();
+    const pushTo = async (name: string) => {
+      const conn = (
+        await env.call("POST", "/v1/connections", {
+          token: owner.token,
+          body: {
+            provider: "custom",
+            name,
+            settings: { identityNamespace: `jira:${name}` },
+          },
+        })
+      ).body;
+      const pushed = await env.call(
+        "POST",
+        `/v1/connections/${conn.id}/events`,
+        {
+          token: owner.token,
+          body: {
+            events: [
+              {
+                id: "PAY-12:closed",
+                kind: "ticket.closed",
+                occurredAt: new Date().toISOString(),
+                actor: null,
+                title: `Closed PAY-12 in ${name}`,
+              },
+            ],
+          },
+        }
+      );
+      expect(pushed.status).toBe(202);
+    };
+    await pushTo("billing");
+    await pushTo("payroll");
+    await env.drain();
+    const closed = (
+      await env.call("GET", "/v1/activities?kind=ticket.closed", {
+        token: owner.token,
+      })
+    ).body;
+    expect(closed.map((a: any) => a.title).toSorted()).toEqual([
+      "Closed PAY-12 in billing",
+      "Closed PAY-12 in payroll",
+    ]);
   });
 });
 

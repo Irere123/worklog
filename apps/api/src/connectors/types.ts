@@ -322,6 +322,11 @@ export type Connector = {
   settings: { key: string; description: string }[];
   /** E.g. "github", or "gitea:git.example.com" for self-hosted. */
   identityNamespace: (conn: ConnectionView) => string;
+  /**
+   * Whoever sets the connection up chooses its identity namespace and its event ids (the webhook
+   * mapping, the push API), so ids are only unique within the connection.
+   */
+  perConnection?: boolean;
   receive: (req: InboundRequest, keys: Keys) => Promise<Received> | Received;
   normalize: (
     input: { eventType: string; payload: unknown; receivedAt: Date },
