@@ -11,6 +11,8 @@ import { transact } from "#db/transact";
 import { newId } from "#lib/ids";
 
 export type ActivityInput = {
+  /** Chosen by the caller when something written before it must point at it. */
+  id?: string;
   workspaceId: string;
   actorId: string | null;
   source: string;
@@ -90,7 +92,7 @@ function newActivity(
   now: Date
 ): ActivityRow {
   return {
-    id: newId("act"),
+    id: input.id ?? newId("act"),
     workspaceId: input.workspaceId,
     actorId: input.actorId,
     source: input.source,

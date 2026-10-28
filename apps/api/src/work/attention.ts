@@ -46,6 +46,8 @@ export type AttentionInput = {
   onlyIfNew?: boolean;
   /** Replace kind and priority instead of keeping the highest seen (an agent's thread reflects its latest state). */
   replace?: boolean;
+  /** When what raised it happened at its source, for a later resolve to compare with. */
+  sourceAt?: Date | null;
 };
 
 /** How many high-priority items one sender may raise for one person per day; the rest become normal. */
@@ -76,6 +78,7 @@ export async function raiseAttention(
         dedupeKey: input.dedupeKey,
         actions: input.actions ?? null,
         meta: input.meta ?? null,
+        sourceAt: input.sourceAt ?? null,
         createdAt: now,
         updatedAt: now,
       },

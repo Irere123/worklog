@@ -2,7 +2,8 @@ import { Logger, runMigrations } from "graphile-worker";
 
 import type { AppContext } from "#context";
 import type { Db } from "#db";
-import { addJob } from "#db/queries/jobs";
+import { addJob, unlockStaleJobs } from "#db/queries/jobs";
+import type { NewJob } from "#db/queries/jobs";
 
 export type JobHandler = (
   ctx: AppContext,
@@ -21,20 +22,51 @@ export async function installQueue(db: Db) {
 
 /**
  * Inside `transact`, the job commits with the transaction. Jobs in the same `queue` run one at a
- * time, oldest first, but a failed job retries after the ones behind it. A job added with the `key`
- * of one still waiting replaces it instead of queuing a second.
+ * time, but a failed job retries after the ones behind it. A job added with the `key` of one still
+ * waiting replaces it instead of queuing a second. Lower `priority` runs first; within a queue it
+ * lets a live event overtake history waiting to be processed.
  */
 export async function enqueue(
   ctx: AppContext,
   task: string,
   payload: Record<string, unknown>,
-  opts: { queue?: string; maxAttempts?: number; key?: string } = {}
+  opts: JobOptions = {}
 ) {
-  await addJob(ctx.db, {
+  await addJob(ctx.db, newJob(task, payload, opts));
+}
+
+type JobOptions = {
+  queue?: string;
+  maxAttempts?: number;
+  key?: string;
+  priority?: number;
+  runAt?: Date;
+};
+
+/** A job as `enqueue` adds it, for a query that adds it in the same statement as its write. */
+export function newJob(
+  task: string,
+  payload: Record<string, unknown>,
+  opts: JobOptions = {}
+): NewJob {
+  return {
     task,
     payload,
     queue: opts.queue ?? null,
     maxAttempts: opts.maxAttempts ?? 5,
     key: opts.key ?? null,
-  });
+    priority: opts.priority ?? 0,
+    runAt: opts.runAt ?? null,
+  };
+}
+
+/** Nothing Worklog runs as a job takes this long: one still locked lost its worker. */
+const ABANDONED_MS = 60 * 60_000;
+
+/**
+ * Unlocks jobs whose worker died, after an hour instead of Graphile Worker's four: such a job holds
+ * its queue (a person's automations, a connection's sync, the scheduler) until then.
+ */
+export async function releaseAbandonedJobs(ctx: AppContext) {
+  return await unlockStaleJobs(ctx.db, { olderThanMs: ABANDONED_MS });
 }

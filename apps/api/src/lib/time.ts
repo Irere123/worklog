@@ -169,7 +169,8 @@ export function isWithinHours(
   return start <= end ? now >= start && now < end : now >= start || now < end;
 }
 
-export const DAY_MS = 24 * 60 * 60 * 1000;
+export const HOUR_MS = 60 * 60 * 1000;
+export const DAY_MS = 24 * HOUR_MS;
 
 // A member's clock is their own, or the workspace's until they set one.
 export function timezoneOf(

@@ -3,26 +3,94 @@ import type { Context } from "hono";
 
 import type { AppContext } from "#context";
 import { receive } from "#ingest/pipeline";
+import { receiveForApp } from "#ingest/routing";
 
 type HookEnv = { Variables: { ctx: AppContext } };
 
 // Not bearer-authenticated: the provider's signature over the raw body authenticates the request.
 export function hookRoutes() {
   const app = new Hono<HookEnv>();
+  // Before the per-connection routes, which would read "apps" as a connection id.
+  app.post("/hooks/apps/:provider", async (c) => await handleApp(c));
+  app.post("/hooks/apps/:provider/:channel", async (c) => await handleApp(c));
   app.post("/hooks/:id", async (c) => await handle(c));
   app.post("/hooks/:id/:channel", async (c) => await handle(c));
   return app;
+}
+
+async function handleApp(
+  c: Context<
+    HookEnv,
+    "/hooks/apps/:provider" | "/hooks/apps/:provider/:channel"
+  >
+) {
+  const ctx = c.get("ctx");
+  const rawBody = await boundedBody(c.req.raw);
+  if (rawBody === null) {
+    return tooLarge();
+  }
+  const result = await receiveForApp(ctx, c.req.param("provider"), {
+    channel: c.req.param("channel") ?? "",
+    headers: c.req.raw.headers,
+    rawBody,
+    receivedAt: ctx.now(),
+  });
+  return Response.json(result.body, { status: result.status });
 }
 
 async function handle(
   c: Context<HookEnv, "/hooks/:id" | "/hooks/:id/:channel">
 ) {
   const ctx = c.get("ctx");
+  const rawBody = await boundedBody(c.req.raw);
+  if (rawBody === null) {
+    return tooLarge();
+  }
   const result = await receive(ctx, c.req.param("id"), {
     channel: c.req.param("channel") ?? "",
     headers: c.req.raw.headers,
-    rawBody: await c.req.text(),
+    rawBody,
     receivedAt: ctx.now(),
   });
   return Response.json(result.body, { status: result.status });
+}
+
+// GitHub's own cap on a webhook payload.
+const MAX_BODY = 25 * 1024 * 1024;
+
+/**
+ * The body as text, or null past the cap. Read before the signature is checked, so it bounds what
+ * an unauthenticated caller can make the server buffer, whatever Content-Length claims. Read
+ * straight from the stream: Hono's `bodyLimit` rebuilds the request around a new stream, and Bun
+ * (1.3) sometimes fails to read a rebuilt one, about one webhook in two hundred under load.
+ */
+async function boundedBody(req: Request): Promise<string | null> {
+  const declared = Number(req.headers.get("content-length") ?? 0);
+  if (declared > MAX_BODY || !req.body) {
+    return declared > MAX_BODY ? null : "";
+  }
+  const reader = req.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  for (;;) {
+    const read = await reader.read();
+    if (read.done) {
+      break;
+    }
+    const chunk: unknown = read.value;
+    if (!(chunk instanceof Uint8Array)) {
+      throw new TypeError("A request body chunk wasn't bytes");
+    }
+    size += chunk.byteLength;
+    if (size > MAX_BODY) {
+      await reader.cancel();
+      return null;
+    }
+    chunks.push(chunk);
+  }
+  return new TextDecoder().decode(Buffer.concat(chunks));
+}
+
+function tooLarge() {
+  return Response.json({ error: "payload too large" }, { status: 413 });
 }
