@@ -260,6 +260,11 @@ export const discordConnector: Connector = {
       description:
         'Display names, e.g. {"123": "standup"}; set by PUT …/sources',
     },
+    {
+      key: "privateChannels",
+      description:
+        "Chosen channels hidden from @everyone; set by PUT …/sources. Their messages stay private to their author, as in a private Slack channel",
+    },
   ],
   endpoints: { interactions: "interactions" },
   identityNamespace: () => "discord",
@@ -311,6 +316,9 @@ export const discordConnector: Connector = {
     settings: (chosen) => ({
       channels: chosen.map((c) => c.id),
       channelNames: Object.fromEntries(chosen.map((c) => [c.id, c.name])),
+      privateChannels: chosen
+        .filter((c) => c.private === true)
+        .map((c) => c.id),
     }),
   },
 };

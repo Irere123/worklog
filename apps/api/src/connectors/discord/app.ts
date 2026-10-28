@@ -79,8 +79,30 @@ export async function botGet(
 }
 
 const Channels = z.array(
-  z.object({ id: z.string(), name: z.string().optional(), type: z.number() })
+  z.object({
+    id: z.string(),
+    name: z.string().optional(),
+    type: z.number(),
+    permission_overwrites: z
+      .array(z.object({ id: z.string(), type: z.number(), deny: z.string() }))
+      .optional(),
+  })
 );
+
+const VIEW_CHANNEL = 1024;
+
+// Hidden from @everyone (the role with the server's own id): only some people can read it.
+function restricted(
+  overwrites: { id: string; type: number; deny: string }[] | undefined,
+  guildId: string
+) {
+  const everyone = (overwrites ?? []).find(
+    (o) => o.type === 0 && o.id === guildId
+  );
+  return everyone
+    ? Math.floor(Number(everyone.deny) / VIEW_CHANNEL) % 2 === 1
+    : false;
+}
 
 // Text and announcement channels: where people write updates.
 const READABLE = new Set([0, 5]);
@@ -107,7 +129,11 @@ export async function guildChannels(
   );
   return channels
     .filter((c) => READABLE.has(c.type))
-    .map((c) => ({ id: c.id, name: c.name ?? c.id }))
+    .map((c) => ({
+      id: c.id,
+      name: c.name ?? c.id,
+      private: restricted(c.permission_overwrites, guildId),
+    }))
     .toSorted((a, b) => a.name.localeCompare(b.name));
 }
 

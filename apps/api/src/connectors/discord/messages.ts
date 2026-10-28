@@ -25,6 +25,12 @@ const DiscordMessage = z.object({
 type Message = z.infer<typeof DiscordMessage>;
 
 const ChannelNames = z.record(z.string(), z.string());
+const Ids = z.array(z.string());
+
+function listed(settings: Record<string, unknown>, key: string) {
+  const ids = Ids.safeParse(settings[key]);
+  return ids.success ? ids.data : [];
+}
 
 function channelName(settings: Record<string, unknown>, channel: string) {
   const names = ChannelNames.safeParse(settings.channelNames);
@@ -158,11 +164,12 @@ export function normalizeDiscordMessage(
     object: { type: "message", key: `discord:${m.channel_id}:${m.id}`, url },
     cardRefs: { numbers: cardNumbersIn(text) },
     signals,
-    visibility: "team",
+    // As in Slack, what only some can read stays the author's own.
+    visibility: listed(settings, "privateChannels").includes(m.channel_id)
+      ? "private"
+      : "team",
   };
-  const optedIn =
-    Array.isArray(settings.channels) &&
-    settings.channels.includes(m.channel_id);
+  const optedIn = listed(settings, "channels").includes(m.channel_id);
   if (!optedIn || isChatter(m.content ?? "")) {
     if (signals.length === 0) {
       return {
