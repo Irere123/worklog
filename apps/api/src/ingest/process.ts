@@ -416,7 +416,8 @@ function normalizeDelivery({ connector, view }: Loaded, inbound: InboundEvent) {
     },
     view
   );
-  // Two such connections in a workspace can name different events alike.
+  // Two such connections in a workspace can name different events alike. Threads are names
+  // their owners give conversations, and two naming one alike mean the same one.
   return connector.perConnection === true
     ? {
         ...normalized,

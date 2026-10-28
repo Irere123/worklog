@@ -46,7 +46,8 @@ function validate(
   provider: string,
   secrets: Record<string, string>,
   settings: Record<string, unknown>,
-  installed = false
+  installed = false,
+  before: Record<string, unknown> = {}
 ) {
   const connector = getConnector(provider);
   if (!connector) {
@@ -68,10 +69,15 @@ function validate(
   }
   // Generic connectors get their own identity namespace: they must not be able to act as the
   // users of a built-in one (GitHub's, a Gitea server's, Slack's, Discord's).
+  // Checked when it changes: one chosen before a namespace was reserved doesn't lock the rest.
   const ns = settings.identityNamespace;
   const prefix = typeof ns === "string" ? (ns.split(":")[0] ?? "") : "";
   const builtIn = getConnector(prefix);
-  if (builtIn && builtIn.perConnection !== true) {
+  if (
+    ns !== before.identityNamespace &&
+    builtIn &&
+    builtIn.perConnection !== true
+  ) {
     throw badRequest(
       `identityNamespace "${String(ns)}" is reserved for the built-in ${prefix} connector`
     );
@@ -169,10 +175,11 @@ export async function updateConnection(
     current.provider,
     secrets,
     settings ?? current.settings,
-    current.externalId !== null
+    current.externalId !== null,
+    current.settings
   );
   if (settings) {
-    await requireBoard(ctx, current.workspaceId, settings);
+    await requireBoard(ctx, current.workspaceId, settings, current.settings);
   }
   const resumed = patch.status === "active" && current.status !== "active";
   return await transact(ctx, async (tx) => {
