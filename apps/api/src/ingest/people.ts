@@ -4,7 +4,7 @@ import { listMembersByIds } from "#db/queries/members";
 import type { Member } from "#db/queries/members";
 
 import { resolveActors } from "./identity";
-import type { Resolved } from "./identity";
+import type { Resolved, Sighting } from "./identity";
 
 /** `member` is null unless the identity is linked. */
 export type Person = {
@@ -17,15 +17,22 @@ export type Person = {
 /** Everyone a delivery's events name, by account id. */
 export type People = Map<string, Person>;
 
+// `acted`: the account did something in these events, not only got named in them (a mention,
+// an assignment): only that counts as seeing it.
 function named(events: WorklogEvent[]) {
-  const seen = new Map<string, { actor: ExternalActor; at: Date; n: number }>();
-  const add = (actor: ExternalActor | null | undefined, at: Date) => {
+  const seen = new Map<string, Sighting>();
+  const add = (
+    actor: ExternalActor | null | undefined,
+    at: Date,
+    acted = false
+  ) => {
     if (!actor) {
       return;
     }
     const entry = seen.get(actor.id);
     if (entry) {
       entry.n += 1;
+      entry.acted = entry.acted === true || acted;
       // A mention carries only an id, an author a login and a name: keep what any of them said.
       entry.actor = {
         id: actor.id,
@@ -34,11 +41,11 @@ function named(events: WorklogEvent[]) {
         bot: actor.bot ?? entry.actor.bot,
       };
     } else {
-      seen.set(actor.id, { actor, at, n: 1 });
+      seen.set(actor.id, { actor, at, n: 1, acted });
     }
   };
   for (const e of events) {
-    add(e.actor, e.occurredAt);
+    add(e.actor, e.occurredAt, true);
     add(e.agent?.onBehalfOf, e.occurredAt);
     for (const s of e.signals ?? []) {
       add(s.who, e.occurredAt);

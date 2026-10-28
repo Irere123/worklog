@@ -34,7 +34,7 @@ export async function resolveActor(
   namespace: string,
   actor: ExternalActor,
   at: Date,
-  sightings = 1
+  opts: { sightings?: number; acted?: boolean } = {}
 ) {
   const identity =
     (await matchIdentity(ctx, workspaceId, namespace, actor)) ??
@@ -44,7 +44,10 @@ export async function resolveActor(
     (await signedInMember(ctx, workspaceId, namespace, actor.id));
   return await sighted(
     ctx,
-    { sighting: { actor, at, n: sightings }, identity },
+    {
+      sighting: { actor, at, n: opts.sightings ?? 1, acted: opts.acted },
+      identity,
+    },
     memberId
   );
 }
@@ -73,7 +76,13 @@ function changes(current: Identity, next: Details): Partial<Details> | null {
   return Object.keys(set).length > 0 ? set : null;
 }
 
-export type Sighting = { actor: ExternalActor; at: Date; n: number };
+/** `acted`: seen doing something, not only named; only that counts as a sighting. */
+export type Sighting = {
+  actor: ExternalActor;
+  at: Date;
+  n: number;
+  acted?: boolean;
+};
 export type Resolved = {
   identityId: string;
   memberId: string | null;
@@ -119,10 +128,13 @@ export async function resolveActors(
       k.identity.memberId ?? signedIn.get(k.identity.externalId) ?? null;
     out.set(k.sighting.actor.id, await sighted(ctx, k, memberId));
   }
-  for (const { actor, at, n } of intricate) {
+  for (const { actor, at, n, acted } of intricate) {
     out.set(
       actor.id,
-      await resolveActor(ctx, workspaceId, namespace, actor, at, n)
+      await resolveActor(ctx, workspaceId, namespace, actor, at, {
+        sightings: n,
+        acted,
+      })
     );
   }
   return out;
@@ -209,9 +221,9 @@ async function sighted(
   memberId: string | null
 ): Promise<Resolved> {
   const { actor, at, n } = sighting;
-  // Named by a mention rather than seen acting: the mention's login (lowercased) isn't news about
-  // the account, and naming it isn't a sighting.
-  const seen = actor.id === identity.externalId;
+  // Named rather than seen acting (a mention, found by its login or not): what it says (a
+  // login, lowercased) isn't news about the account, and naming it isn't a sighting.
+  const seen = sighting.acted !== false && actor.id === identity.externalId;
   const set = changes(identity, {
     memberId,
     externalHandle: seen
