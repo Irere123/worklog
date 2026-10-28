@@ -99,6 +99,13 @@
       "when": 1793161605078,
       "tag": "0013_automation_claims",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1793170396490,
+      "tag": "0014_identity_handles",
+      "breakpoints": true
     }
   ]
 }

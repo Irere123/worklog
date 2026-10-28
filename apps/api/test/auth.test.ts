@@ -119,7 +119,7 @@ describe("signing in", () => {
     expect(elsewhere.status).toBe(403);
   });
 
-  test("signing in with GitHub is enough for GitHub events to be attributed", async () => {
+  test("signing in with GitHub is enough for GitHub events to be attributed, earlier ones too", async () => {
     const owner = await env.workspace("Attrib");
     await env.call("POST", "/v1/members", {
       token: owner.token,
@@ -127,6 +127,34 @@ describe("signing in", () => {
     });
     const token = await signIn("dev@example.com");
     const session = (await env.call("GET", "/v1/session", { token })).body;
+    const conn = (
+      await env.call("POST", "/v1/connections", {
+        token: owner.token,
+        body: { provider: "github", secrets: { webhookSecret: "s" } },
+      })
+    ).body;
+    const push = async (n: number) => {
+      const raw = JSON.stringify({
+        ref: `refs/heads/b${n}`,
+        after: `abc${n}`,
+        commits: [{ id: String(n), message: "Fix" }],
+        repository: { full_name: "acme/api" },
+        sender: { login: "renamed-dev", id: 4242 },
+      });
+      await env.app.request(new URL(conn.webhookUrls.webhook).pathname, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-github-event": "push",
+          "x-github-delivery": `auth-${n}`,
+          "x-hub-signature-256": `sha256=${hmacHex("s", raw)}`,
+        },
+        body: raw,
+      });
+      await env.drain();
+    };
+    // Pushed before signing in with GitHub: nobody's yet.
+    await push(1);
     // What Better Auth stores after "Sign in with GitHub": the numeric GitHub user id.
     await env.ctx.db.insert(account).values({
       id: "acc_test_github",
@@ -136,36 +164,16 @@ describe("signing in", () => {
       createdAt: new Date(),
       updatedAt: new Date(),
     });
-    const conn = (
-      await env.call("POST", "/v1/connections", {
-        token: owner.token,
-        body: { provider: "github", secrets: { webhookSecret: "s" } },
-      })
-    ).body;
-    const raw = JSON.stringify({
-      ref: "refs/heads/main",
-      after: "abc",
-      commits: [{ id: "1", message: "Fix" }],
-      repository: { full_name: "acme/api" },
-      sender: { login: "renamed-dev", id: 4242 },
-    });
-    await env.app.request(new URL(conn.webhookUrls.webhook).pathname, {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        "x-github-event": "push",
-        "x-github-delivery": "auth-1",
-        "x-hub-signature-256": `sha256=${hmacHex("s", raw)}`,
-      },
-      body: raw,
-    });
-    await env.drain();
-    const [push] = (
+    await push(2);
+    const pushes = (
       await env.call("GET", "/v1/activities?kind=code.pushed", {
         token: owner.token,
       })
     ).body;
-    expect(push.actorId).toBe(session.memberships[0].member.id);
+    expect(pushes.map((p: any) => p.actorId)).toEqual([
+      session.memberships[0].member.id,
+      session.memberships[0].member.id,
+    ]);
   });
 });
 
