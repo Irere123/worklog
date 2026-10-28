@@ -34,7 +34,7 @@ export async function resolveActor(
   namespace: string,
   actor: ExternalActor,
   at: Date,
-  opts: { sightings?: number; acted?: boolean } = {}
+  opts: { sightings?: number; acted?: boolean; since?: Date } = {}
 ) {
   const identity =
     (await matchIdentity(ctx, workspaceId, namespace, actor)) ??
@@ -45,7 +45,13 @@ export async function resolveActor(
   return await sighted(
     ctx,
     {
-      sighting: { actor, at, n: opts.sightings ?? 1, acted: opts.acted },
+      sighting: {
+        actor,
+        at,
+        n: opts.sightings ?? 1,
+        acted: opts.acted,
+        since: opts.since,
+      },
       identity,
     },
     memberId
@@ -132,12 +138,13 @@ export async function resolveActors(
       k.identity.memberId ?? signedIn.get(k.identity.externalId) ?? null;
     out.set(k.sighting.actor.id, await sighted(ctx, k, memberId));
   }
-  for (const { actor, at, n, acted } of intricate) {
+  for (const { actor, at, n, acted, since } of intricate) {
     out.set(
       actor.id,
       await resolveActor(ctx, workspaceId, namespace, actor, at, {
         sightings: n,
         acted,
+        since,
       })
     );
   }
