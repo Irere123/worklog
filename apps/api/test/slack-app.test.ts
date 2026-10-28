@@ -326,8 +326,9 @@ describe("Slack app", () => {
     expect(replies[0]?.body).toMatchObject({
       channel: "C0STANDUP",
       user: "U0EMMA",
-      thread_ts: "1793000000.000100",
     });
+    // Asked at the top of the channel: Slack wouldn't show a private reply in a thread not there.
+    expect(replies[0]?.body).not.toHaveProperty("thread_ts");
     expect(replies[0]?.headers.get("authorization")).toBe(
       "Bearer xoxb-installed"
     );

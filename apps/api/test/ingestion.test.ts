@@ -233,6 +233,36 @@ describe("Slack normalizer", () => {
       now
     );
 
+  const toBot = (text: string) =>
+    normalizeSlackMessage(
+      {
+        type: "message",
+        user: "U0EMMA",
+        text,
+        channel: "C0STANDUP",
+        channel_type: "channel",
+        ts: "1793000000.000100",
+      },
+      "Ev1",
+      { ...settings, botUserId: "UBOT" },
+      now
+    );
+
+  test("a message to the bot isn't a post, but whoever else it mentions hears of it", () => {
+    expect(toBot("<@UBOT> log Shipped the retry queue").ignored).toBe(
+      "addressed to Worklog"
+    );
+    const [withSam] = toBot(
+      "<@UBOT> log Shipped the retry queue with <@U0SAM>"
+    ).events;
+    expect(withSam).toMatchObject({ hidden: true });
+    expect(withSam?.signals?.map((sig) => sig.who?.id)).toContain("U0SAM");
+    // Another bot whose id starts the same way is someone else.
+    expect(
+      toBot("<@UBOTX> Shipped the retry queue to staging").ignored
+    ).not.toBe("addressed to Worklog");
+  });
+
   test("chatter is dropped, short news is kept, DMs are never ingested", () => {
     expect(msg("ok 👍").ignored).toBe("too short to be a work update");
     expect(msg("thanks!").ignored).toBe("too short to be a work update");

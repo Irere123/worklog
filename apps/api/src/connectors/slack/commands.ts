@@ -153,7 +153,8 @@ export async function followUpSlack(
           channel: e.channel,
           user: e.user,
           text: toSlack(reply),
-          thread_ts: e.thread_ts ?? e.ts,
+          // In the thread it was asked in; Slack doesn't show one in a thread that isn't there.
+          ...(e.thread_ts ? { thread_ts: e.thread_ts } : {}),
         },
       }
     );
