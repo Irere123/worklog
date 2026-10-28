@@ -117,8 +117,9 @@ Every connector emits `WorklogEvent`s (`apps/api/src/connectors/types.ts`). The 
 - **Merged into one activity:** commits per branch per person (60 min), and comments per thread per person (30 min).
 - **Effects:**
   - review requests reach the reviewer; submitting the review resolves the request and tells the author;
-  - a closed PR resolves outstanding review requests;
-  - issues become cards in Maybe? when the connection has a `boardId`.
+  - a closed PR resolves outstanding review requests, even when a bot closed it: a bot's event isn't recorded, but what it changes (a resolved request, a closed card) still applies;
+  - issues become cards in Maybe? when the connection has a `boardId` (one that isn't the workspace's is refused; one deleted later costs only the card).
+- **@mentions by login** reach the account last seen with that login, as well as one linked by login.
 
 **Slack:**
 
@@ -126,9 +127,10 @@ Every connector emits `WorklogEvent`s (`apps/api/src/connectors/types.ts`). The 
 - Messages count as work only in opted-in `channels`, and only with substance. "ok", "thanks 🙏" and emoji-only messages are dropped; short news like "deployed v2.3" or "blocked on keys" is kept.
 - Thread replies merge per person per thread.
 - @mentions always reach people, at normal priority, wherever the bot can see them.
-- Edits and deletions are applied, and private channels stay private.
+- Edits and deletions are applied, to the attention items they raised too; an edit or deletion inside a burst takes the burst's text, which can't say which line was whose. Private channels stay private.
+- `@worklog …` in a channel is answered to the person who asked alone (the answer can hold what's private to them), and isn't recorded as a post.
 
-**Discord:** with the server's app, messages come over the Gateway, a socket one worker process keeps open (whichever takes its lock; another takes over if it goes). A dropped socket resumes from the last message stored, so nothing sent meanwhile is lost. The same rules as Slack apply: work updates only from the chosen channels and only with substance, mentions everywhere the bot reads, replies to one message merged per person, edits and deletions applied, bots and webhooks dropped. The bot needs the **Message Content** intent (Bot → Privileged Gateway Intents); without it the Gateway refuses, and the worker logs why. The bot leaving a server revokes its connection at once; the daily catch-up also asks which servers it's still in, as it asks GitHub which installations still exist.
+**Discord:** with the server's app, messages come over the Gateway, a socket one worker process keeps open (whichever takes its lock; another takes over if it goes). A dropped socket resumes from the last message stored, so nothing sent meanwhile is lost. The same rules as Slack apply: work updates only from the chosen channels and only with substance, mentions everywhere the bot reads, replies to one message merged per person, edits and deletions applied, bots and webhooks dropped, and a channel hidden from @everyone private to the author. The bot needs the **Message Content** intent (Bot → Privileged Gateway Intents); without it the Gateway refuses, and the worker logs why. The bot leaving a server revokes its connection at once; the daily catch-up also asks which servers it's still in, as it asks GitHub which installations still exist.
 
 **Backfill and catch-up:**
 
@@ -143,10 +145,10 @@ Every connector emits `WorklogEvent`s (`apps/api/src/connectors/types.ts`). The 
 - **Matching order:**
   1. the stable id;
   2. a login placeholder created by a manual link (upgraded to the stable id the first time the account is seen);
-  3. the account someone **signed in with** (GitHub, Slack or Discord), so signing in is all attribution needs;
+  3. the account someone **signed in with** (GitHub, Slack or Discord), so signing in is all attribution needs, for what the account did before too;
   4. for Slack, the account's email from the directory, when exactly one person in the workspace has it.
 - **A login reused after a rename never inherits someone else's identity:** only placeholders are upgraded.
-- **Namespaces are scoped:** `github`, `slack`, `discord`, `gitea:git.example.com`, `webhook:{connectionId}`. Generic connectors cannot claim the built-in ones.
+- **Namespaces are scoped:** `github`, `slack`, `discord`, `gitea:git.example.com`, `webhook:{connectionId}`. Generic connectors cannot claim the built-in ones, and their event ids count within their connection: two in a workspace can use the same ids.
 
 ## Adding a tool
 
