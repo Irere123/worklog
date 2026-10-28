@@ -1,73 +1,123 @@
-import { createHash } from "node:crypto";
+import { z } from "zod";
 
 import type {
-  ConnectionView,
-  Connector,
   ExternalActor,
   Normalized,
   Signal,
   WorklogEvent,
-} from "#ingest/types";
-import { hmacHex, safeEqual } from "#lib/crypto";
+} from "#connectors/types";
 
-type User = { login: string; id?: number | null; type?: string; name?: string };
-type Repo = { full_name: string; html_url?: string; default_branch?: string };
-type Issue = {
-  number: number;
-  title: string;
-  html_url: string;
-  body?: string | null;
-  user: User;
-  draft?: boolean;
-  merged?: boolean;
-  pull_request?: unknown;
-  requested_reviewers?: User[];
-  updated_at?: string;
-  closed_at?: string | null;
-  merged_at?: string | null;
-};
-type Payload = {
-  action?: string;
-  sender?: User;
-  repository?: Repo;
-  issue?: Issue;
-  pull_request?: Issue;
-  review?: {
-    id: number;
-    state: string;
-    body?: string | null;
-    html_url: string;
-    user: User;
-    submitted_at?: string;
-  };
-  comment?: {
-    id: number;
-    body: string;
-    html_url: string;
-    user: User;
-    created_at?: string;
-  };
-  requested_reviewer?: User;
-  assignee?: User;
-  release?: {
-    id: number;
-    tag_name: string;
-    name?: string | null;
-    html_url: string;
-    body?: string | null;
-    draft?: boolean;
-    prerelease?: boolean;
-  };
-  ref?: string;
-  after?: string;
-  deleted?: boolean;
-  forced?: boolean;
-  compare?: string;
-  commits?: { id: string; message: string; distinct?: boolean }[];
-  /** Gitea/Forgejo cap the commit list; this is the real count. */
-  total_commits?: number;
-  head_commit?: { timestamp?: string } | null;
-};
+// Payloads are only signature-verified. Parsed leniently, so the handlers can trust these types: a
+// field of the wrong type reads as missing, an object without what it can't do without as absent,
+// a bad item drops out of its list, and a date that doesn't parse isn't one.
+const optional = <T extends z.ZodType>(schema: T) =>
+  schema.optional().catch(undefined);
+const listOf = <T extends z.ZodType>(item: T) =>
+  z.array(z.unknown()).transform((items) =>
+    items.flatMap((i): z.infer<T>[] => {
+      const parsed = item.safeParse(i);
+      return parsed.success ? [parsed.data] : [];
+    })
+  );
+const when = z.string().refine((s) => !Number.isNaN(Date.parse(s)));
+
+const UserSchema = z.object({
+  login: z.string().min(1),
+  id: optional(z.number().nullable()),
+  type: optional(z.string()),
+  name: optional(z.string()),
+});
+const RepoSchema = z.object({
+  id: optional(z.number()),
+  full_name: z.string().min(1),
+  html_url: optional(z.string()),
+  default_branch: optional(z.string()),
+});
+const IssueSchema = z.object({
+  number: z.number(),
+  title: z.string(),
+  html_url: z.string(),
+  body: optional(z.string().nullable()),
+  // GitHub allows these to be null; a missing author doesn't make the event less real.
+  user: optional(UserSchema),
+  draft: optional(z.boolean()),
+  merged: optional(z.boolean()),
+  pull_request: z.unknown().optional(),
+  requested_reviewers: optional(listOf(UserSchema)),
+  created_at: optional(when),
+  updated_at: optional(when),
+  closed_at: optional(when.nullable()),
+  merged_at: optional(when.nullable()),
+});
+const PayloadSchema = z
+  .object({
+    action: optional(z.string()),
+    sender: optional(UserSchema),
+    repository: optional(RepoSchema),
+    issue: optional(IssueSchema),
+    pull_request: optional(IssueSchema),
+    review: optional(
+      z.object({
+        /** Gitea's review webhooks carry no id: theirs is built from the PR, reviewer and time. */
+        id: z.union([z.number(), z.string()]),
+        state: z.string(),
+        body: optional(z.string().nullable()),
+        html_url: z.string(),
+        user: optional(UserSchema),
+        submitted_at: optional(when),
+      })
+    ),
+    comment: optional(
+      z.object({
+        id: z.number(),
+        body: z.string(),
+        html_url: z.string(),
+        user: optional(UserSchema),
+        created_at: optional(when),
+      })
+    ),
+    requested_reviewer: optional(UserSchema),
+    assignee: optional(UserSchema),
+    release: optional(
+      z.object({
+        id: z.number(),
+        tag_name: z.string(),
+        name: optional(z.string().nullable()),
+        html_url: z.string(),
+        body: optional(z.string().nullable()),
+        draft: optional(z.boolean()),
+        prerelease: optional(z.boolean()),
+        published_at: optional(when.nullable()),
+      })
+    ),
+    ref: optional(z.string()),
+    after: optional(z.string()),
+    deleted: optional(z.boolean()),
+    forced: optional(z.boolean()),
+    compare: optional(z.string()),
+    commits: optional(
+      listOf(
+        z.object({
+          id: z.string(),
+          message: z.string(),
+          distinct: optional(z.boolean()),
+        })
+      )
+    ),
+    /** Gitea/Forgejo cap the commit list; this is the real count. */
+    total_commits: optional(z.number()),
+    head_commit: optional(z.object({ timestamp: optional(when) }).nullable()),
+  })
+  .catch({});
+
+export function parsePayload(payload: unknown): Payload {
+  return PayloadSchema.parse(payload);
+}
+
+export type User = z.infer<typeof UserSchema>;
+export type Repo = z.infer<typeof RepoSchema>;
+export type Issue = z.infer<typeof IssueSchema>;
+export type Payload = z.infer<typeof PayloadSchema>;
 
 const CLOSES =
   /\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\s+#(?<number>\d+)/giu;
@@ -75,7 +125,7 @@ const WL_REF = /\bWL-(?<number>\d+)\b/giu;
 const MENTION = /(?:^|[^\w`/])@(?<login>[a-z0-9](?:[a-z0-9-]{0,38}))/giu;
 const MERGE_COMMIT = /^Merge (?:pull request|branch) |\(#\d+\)\s*$/u;
 
-const actorFor = (u: User): ExternalActor => ({
+export const actorFor = (u: User): ExternalActor => ({
   id:
     u.id === undefined || u.id === null
       ? `handle:${u.login.toLowerCase()}`
@@ -190,10 +240,11 @@ const REVIEW_VERBS = new Map([
 export function normalizeGithubLike(
   ns: string,
   eventType: string,
-  p: Payload,
+  payload: unknown,
   receivedAt: Date,
   settings: { repos?: unknown }
 ): Normalized {
+  const p = parsePayload(payload);
   const repo = p.repository?.full_name;
   if (!repo) {
     return ignore(`${eventType}: no repository`);
@@ -319,15 +370,24 @@ function onPrOpened(
   if (pr.draft === true) {
     return ignore("draft pull request");
   }
-  const verb = p.action === "reopened" ? "Reopened" : "Opened";
+  const reopened = p.action === "reopened";
+  // A PR is opened once, whether it was opened ready or marked ready later: one id, which a
+  // backfill reading the PR's current state reproduces.
+  const id = reopened
+    ? `pr:${key(pr.number)}:reopened:${stamp(pr.updated_at)}`
+    : `pr:${key(pr.number)}:opened`;
   return {
     events: [
       event({
         ...common,
-        id: `pr:${key(pr.number)}:${p.action}:${stamp(pr.updated_at)}`,
+        id,
         kind: "pr.opened",
-        occurredAt: at(pr.updated_at),
-        title: `${verb} PR ${ref(pr.number)}: ${pr.title}`,
+        occurredAt: at(
+          p.action === "opened"
+            ? (pr.created_at ?? pr.updated_at)
+            : pr.updated_at
+        ),
+        title: `${reopened ? "Reopened" : "Opened"} PR ${ref(pr.number)}: ${pr.title}`,
         body: pr.body?.slice(0, 600) ?? null,
         signals: [
           ...(pr.requested_reviewers ?? []).map((u): Signal => ({
@@ -656,7 +716,7 @@ function onIssueAssigned(
   };
 }
 
-function onRelease({ ns, repo, p, receivedAt, event }: Delivery): Normalized {
+function onRelease({ ns, repo, p, at, event }: Delivery): Normalized {
   const r = p.release;
   if (p.action !== "published" || !r || r.draft === true) {
     return ignore(`release.${p.action}`);
@@ -667,7 +727,7 @@ function onRelease({ ns, repo, p, receivedAt, event }: Delivery): Normalized {
       event({
         id: `release:${ns}:${r.id}`,
         kind: "release.published",
-        occurredAt: receivedAt,
+        occurredAt: at(r.published_at),
         title: `Released ${repo} ${(r.name ?? "") || r.tag_name}${prerelease ? " (pre-release)" : ""}`,
         body: r.body?.slice(0, 800) ?? null,
         url: r.html_url,
@@ -677,145 +737,3 @@ function onRelease({ ns, repo, p, receivedAt, event }: Delivery): Normalized {
     ],
   };
 }
-
-const SETTINGS_DOC = [
-  {
-    key: "boardId",
-    description: "Board where new issues land as cards in Maybe? (optional)",
-  },
-  {
-    key: "repos",
-    description:
-      'Only these repositories, e.g. ["acme/api"] (optional; default all)',
-  },
-  {
-    key: "bots",
-    description:
-      '"quiet" (default: keep only bot PRs/releases), "drop", or "keep"',
-  },
-  {
-    key: "ignoreKinds",
-    description: 'Event kinds to never record, e.g. ["code.pushed"]',
-  },
-];
-
-const digest = (s: string) =>
-  createHash("sha256").update(s).digest("hex").slice(0, 32);
-
-// The body is only signature-verified, not schema-validated: handlers must treat every field as optional.
-const asPayload = (payload: unknown): Payload =>
-  typeof payload === "object" && payload !== null ? payload : {};
-
-export const githubConnector: Connector = {
-  id: "github",
-  name: "GitHub",
-  description:
-    "Pull requests, reviews, issues, comments, pushes and releases. Review requests, assignments and @mentions become attention items.",
-  secrets: [
-    {
-      key: "webhookSecret",
-      required: true,
-      description: "The webhook's secret (Settings → Webhooks)",
-    },
-  ],
-  settings: SETTINGS_DOC,
-  endpoints: { webhook: "" },
-  identityNamespace: () => "github",
-  receive(req, conn) {
-    const secret = conn.secrets.webhookSecret;
-    const signature = req.headers.get("x-hub-signature-256");
-    if (
-      !secret ||
-      !signature ||
-      !safeEqual(signature, `sha256=${hmacHex(secret, req.rawBody)}`)
-    ) {
-      return { type: "reject", status: 401, error: "bad signature" };
-    }
-    const eventType = req.headers.get("x-github-event") ?? "unknown";
-    if (eventType === "ping") {
-      return { type: "respond", body: { ok: true } };
-    }
-    return {
-      type: "event",
-      eventType,
-      deliveryId: req.headers.get("x-github-delivery") ?? digest(req.rawBody),
-      payload: JSON.parse(req.rawBody),
-    };
-  },
-  normalize: ({ eventType, payload, receivedAt }, conn) =>
-    normalizeGithubLike(
-      "github",
-      eventType,
-      asPayload(payload),
-      receivedAt,
-      conn.settings
-    ),
-};
-
-function hostOf(conn: ConnectionView) {
-  const { baseUrl } = conn.settings;
-  try {
-    return new URL(typeof baseUrl === "string" ? baseUrl : "").host;
-  } catch {
-    return conn.id;
-  }
-}
-
-export const giteaConnector: Connector = {
-  id: "gitea",
-  name: "Gitea / Forgejo (self-hosted)",
-  description:
-    "For self-hosted Gitea or Forgejo. GitHub-compatible webhooks, mapped with the same rules as GitHub.",
-  secrets: [
-    {
-      key: "webhookSecret",
-      required: true,
-      description: "The webhook's secret",
-    },
-  ],
-  settings: [
-    {
-      key: "baseUrl",
-      description:
-        "Your server, e.g. https://git.example.com (namespaces identities and links)",
-    },
-    ...SETTINGS_DOC,
-  ],
-  endpoints: { webhook: "" },
-  identityNamespace: (conn) => `gitea:${hostOf(conn)}`,
-  receive(req, conn) {
-    const secret = conn.secrets.webhookSecret;
-    const signature =
-      req.headers.get("x-forgejo-signature") ??
-      req.headers.get("x-gitea-signature");
-    if (
-      !secret ||
-      !signature ||
-      !safeEqual(signature, hmacHex(secret, req.rawBody))
-    ) {
-      return { type: "reject", status: 401, error: "bad signature" };
-    }
-    const eventType =
-      req.headers.get("x-forgejo-event") ??
-      req.headers.get("x-gitea-event") ??
-      "unknown";
-    const deliveryId =
-      req.headers.get("x-forgejo-delivery") ??
-      req.headers.get("x-gitea-delivery") ??
-      digest(req.rawBody);
-    return {
-      type: "event",
-      eventType,
-      deliveryId,
-      payload: JSON.parse(req.rawBody),
-    };
-  },
-  normalize: ({ eventType, payload, receivedAt }, conn) =>
-    normalizeGithubLike(
-      `gitea:${hostOf(conn)}`,
-      eventType,
-      asPayload(payload),
-      receivedAt,
-      conn.settings
-    ),
-};

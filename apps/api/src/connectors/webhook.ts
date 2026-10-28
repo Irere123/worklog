@@ -1,14 +1,15 @@
-import { createHash, createHmac } from "node:crypto";
+import { createHmac } from "node:crypto";
 
 import { z } from "zod";
 
 import type {
   Connector,
   ExternalActor,
+  InboundRequest,
   Signal,
   WorklogEvent,
-} from "#ingest/types";
-import { safeEqual } from "#lib/crypto";
+} from "#connectors/types";
+import { safeEqual, shortHash } from "#lib/crypto";
 
 const Template = z.string().max(500);
 const Rule = z.object({
@@ -71,6 +72,9 @@ export const WebhookSettings = z.object({
     .object({ header: z.string().optional(), path: z.string().optional() })
     .optional(),
   deliveryId: z
+    .object({ header: z.string().optional(), path: z.string().optional() })
+    .optional(),
+  partition: z
     .object({ header: z.string().optional(), path: z.string().optional() })
     .optional(),
   identityNamespace: z
@@ -184,6 +188,38 @@ function pick(
   return src?.path ? scalarText(readPath(payload, src.path)) : undefined;
 }
 
+// The reason it's refused, or null when it checks out.
+function verify(s: Settings, secret: string, req: InboundRequest) {
+  if (s.verify.type === "hmac-sha256") {
+    const got = req.headers.get(s.verify.header) ?? "";
+    const mac = createHmac("sha256", secret)
+      .update(req.rawBody)
+      .digest(s.verify.encoding ?? "hex");
+    return secret && safeEqual(got, `${s.verify.prefix ?? ""}${mac}`)
+      ? null
+      : "bad signature";
+  }
+  if (s.verify.type === "token") {
+    return secret && safeEqual(req.headers.get(s.verify.header) ?? "", secret)
+      ? null
+      : "bad token";
+  }
+  if (s.verify.type === "standard-webhooks") {
+    return verifyStandardWebhook(
+      secret,
+      req.headers,
+      req.rawBody,
+      req.receivedAt,
+      s.verify.toleranceSeconds ?? 300
+    )
+      ? null
+      : "bad signature";
+  }
+  return s.allowUnsigned === true
+    ? null
+    : "unsigned webhooks are disabled for this connection";
+}
+
 // Rules carry no ids, so actors resolve by handle.
 const byHandle = (handle: string | null): ExternalActor | null =>
   handle ? { id: `handle:${handle.toLowerCase()}`, handle } : null;
@@ -216,6 +252,11 @@ export const webhookConnector: Connector = {
         '{ "header": "X-Request-Id" } or { "path": "id" } (default: hash of the body)',
     },
     {
+      key: "partition",
+      description:
+        '{ "path": "project.id" }: deliveries with the same value are processed in order, others in parallel (default: all in order)',
+    },
+    {
       key: "identityNamespace",
       description:
         'Where actors live, e.g. "gitlab:git.example.com" (default: this connection)',
@@ -241,40 +282,9 @@ export const webhookConnector: Connector = {
       };
     }
     const s: Settings = parsed.data;
-    const secret = conn.secrets.secret ?? "";
-    if (s.verify.type === "hmac-sha256") {
-      const got = req.headers.get(s.verify.header) ?? "";
-      const mac = createHmac("sha256", secret)
-        .update(req.rawBody)
-        .digest(s.verify.encoding ?? "hex");
-      if (!secret || !safeEqual(got, `${s.verify.prefix ?? ""}${mac}`)) {
-        return { type: "reject", status: 401, error: "bad signature" };
-      }
-    } else if (s.verify.type === "token") {
-      if (
-        !secret ||
-        !safeEqual(req.headers.get(s.verify.header) ?? "", secret)
-      ) {
-        return { type: "reject", status: 401, error: "bad token" };
-      }
-    } else if (s.verify.type === "standard-webhooks") {
-      if (
-        !verifyStandardWebhook(
-          secret,
-          req.headers,
-          req.rawBody,
-          req.receivedAt,
-          s.verify.toleranceSeconds ?? 300
-        )
-      ) {
-        return { type: "reject", status: 401, error: "bad signature" };
-      }
-    } else if (s.allowUnsigned !== true) {
-      return {
-        type: "reject",
-        status: 401,
-        error: "unsigned webhooks are disabled for this connection",
-      };
+    const refused = verify(s, conn.secrets.secret ?? "", req);
+    if (refused) {
+      return { type: "reject", status: 401, error: refused };
     }
     let payload: unknown;
     try {
@@ -286,9 +296,9 @@ export const webhookConnector: Connector = {
       type: "event",
       eventType: pick(s.eventType, req.headers, payload) ?? "event",
       deliveryId:
-        pick(s.deliveryId, req.headers, payload) ??
-        createHash("sha256").update(req.rawBody).digest("hex").slice(0, 32),
+        pick(s.deliveryId, req.headers, payload) ?? shortHash(req.rawBody),
       payload,
+      partition: pick(s.partition, req.headers, payload) ?? "",
     };
   },
   normalize({ eventType, payload, receivedAt }, conn) {

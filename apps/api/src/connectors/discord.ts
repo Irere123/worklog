@@ -2,13 +2,15 @@ import { createPublicKey, verify } from "node:crypto";
 
 import { z } from "zod";
 
+import { needsDeferral, runCommand } from "#connectors/commands";
+import { call } from "#connectors/http";
+import type { ConnectionView, Connector, Interacted } from "#connectors/types";
 import type { AppContext } from "#context";
 import { findMemberByIdentity } from "#db/queries/members";
-import type { Member } from "#db/queries/members";
-import { needsDeferral, runCommand } from "#ingest/commands";
-import type { ConnectionView, Connector } from "#ingest/types";
 
-const API = "https://discord.com/api/v10";
+import { API, discordApp, guildChannels, putCommands } from "./discord/app";
+import { discordGateway } from "./discord/gateway";
+import { normalizeDiscordMessage } from "./discord/messages";
 
 const Ping = z.object({ type: z.literal(1) });
 
@@ -114,88 +116,109 @@ async function handleInteraction(
   ctx: AppContext,
   conn: ConnectionView,
   i: Interaction
-) {
+): Promise<Interacted> {
   if (i.type !== 2 || !i.data) {
-    return UNSUPPORTED;
+    return { body: UNSUPPORTED };
   }
   const userId = i.member?.user.id ?? i.user?.id ?? "";
-  const author = await findMemberByIdentity(ctx.db, {
-    workspaceId: conn.workspaceId,
-    provider: "discord",
-    externalIds: userId,
-  });
   const options = i.data.options ?? [];
   const opt = (name: string) => options.find((o) => o.name === name)?.value;
   const personId = opt("person");
-  let target: Member | undefined;
-  if (personId) {
-    target = await findMemberByIdentity(ctx.db, {
-      workspaceId: conn.workspaceId,
-      provider: "discord",
-      externalIds: personId,
-    });
-    if (!target) {
-      return {
+  if (personId && !(await memberOf(ctx, conn, personId))) {
+    return {
+      body: {
         type: 4,
         data: {
           content:
             "That person hasn't signed in with Discord or linked their account yet.",
           flags: EPHEMERAL,
         },
-      };
-    }
-  }
-  const cmd = {
-    name: i.data.name,
-    text: opt("text") ?? opt("question") ?? "",
-    target,
-  };
-
-  if (!needsDeferral(cmd.name)) {
-    return {
-      type: 4,
-      data: {
-        content: clip(await runCommand(ctx, author, "discord", userId, cmd)),
-        flags: EPHEMERAL,
       },
     };
   }
-  void followUp(
-    ctx,
-    i,
-    async () => await runCommand(ctx, author, "discord", userId, cmd)
-  );
-  // Type 5: deferred response, shown to the user as "Worklog is thinking…".
-  return { type: 5, data: { flags: EPHEMERAL } };
+  const job = {
+    name: i.data.name,
+    text: opt("text") ?? opt("question") ?? "",
+    userId,
+    personId: personId ?? null,
+  };
+  if (!needsDeferral(job.name)) {
+    return {
+      body: {
+        type: 4,
+        data: { content: clip(await answer(ctx, conn, job)), flags: EPHEMERAL },
+      },
+    };
+  }
+  // Type 5: deferred, shown as "Worklog is thinking…" until the follow-up edits it.
+  return {
+    body: { type: 5, data: { flags: EPHEMERAL } },
+    later: {
+      payload: { ...job, applicationId: i.application_id, token: i.token },
+      once: i.id,
+    },
+  };
 }
 
-// Already acknowledged, so failures are only logged.
-async function followUp(
+const Job = z.object({
+  name: z.string(),
+  text: z.string(),
+  userId: z.string(),
+  personId: z.string().nullable(),
+  applicationId: z.string().optional(),
+  token: z.string().optional(),
+});
+
+async function memberOf(ctx: AppContext, conn: ConnectionView, userId: string) {
+  return await findMemberByIdentity(ctx.db, {
+    workspaceId: conn.workspaceId,
+    provider: "discord",
+    externalIds: userId,
+  });
+}
+
+async function answer(
   ctx: AppContext,
-  i: Interaction,
-  answer: () => Promise<string>
+  conn: ConnectionView,
+  job: z.infer<typeof Job>
 ) {
+  const author = await memberOf(ctx, conn, job.userId);
+  const target = job.personId
+    ? await memberOf(ctx, conn, job.personId)
+    : undefined;
+  return await runCommand(ctx, author, "discord", job.userId, {
+    name: job.name,
+    text: job.text,
+    target,
+  });
+}
+
+// The person is waiting on the deferred reply: a failure gets an answer that says so.
+async function followUpDiscord(
+  ctx: AppContext,
+  conn: ConnectionView,
+  payload: Record<string, unknown>
+) {
+  const job = Job.parse(payload);
   let content: string;
   try {
-    content = await answer();
+    content = await answer(ctx, conn, job);
   } catch (error) {
     content = `Sorry, that failed: ${error instanceof Error ? error.message : String(error)}`;
   }
-  try {
-    await ctx.fetch(
-      `${API}/webhooks/${i.application_id}/${i.token}/messages/@original`,
-      {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          content: clip(content),
-          allowed_mentions: { parse: [] },
-        }),
-      }
-    );
-  } catch (error) {
-    console.error("[discord] follow-up failed", error);
-  }
+  await call(
+    ctx,
+    "Discord follow-up",
+    `${API}/webhooks/${job.applicationId}/${job.token}/messages/@original`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        content: clip(content),
+        allowed_mentions: { parse: [] },
+      }),
+    }
+  );
 }
 
 export async function registerDiscordCommands(
@@ -203,17 +226,7 @@ export async function registerDiscordCommands(
   conn: ConnectionView
 ) {
   const { applicationId, botToken } = conn.secrets;
-  const res = await ctx.fetch(`${API}/applications/${applicationId}/commands`, {
-    method: "PUT",
-    headers: {
-      Authorization: `Bot ${botToken}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(DISCORD_COMMANDS),
-  });
-  if (!res.ok) {
-    throw new Error(`Discord responded ${res.status}: ${await res.text()}`);
-  }
+  await putCommands(ctx, applicationId ?? "", botToken ?? "", DISCORD_COMMANDS);
   return DISCORD_COMMANDS.map((c) => c.name);
 }
 
@@ -226,7 +239,8 @@ export const discordConnector: Connector = {
     {
       key: "publicKey",
       required: true,
-      description: "General information → Public key",
+      description:
+        "General information → Public key. Not needed when installed through the server's Discord app",
     },
     {
       key: "applicationId",
@@ -235,11 +249,22 @@ export const discordConnector: Connector = {
     },
     { key: "botToken", required: true, description: "Bot → Token" },
   ],
-  settings: [],
+  settings: [
+    {
+      key: "channels",
+      description:
+        "Channel ids whose messages count as work updates (needs the server's Discord app, which reads messages over the Gateway; mentions are tracked everywhere the bot is)",
+    },
+    {
+      key: "channelNames",
+      description:
+        'Display names, e.g. {"123": "standup"}; set by PUT …/sources',
+    },
+  ],
   endpoints: { interactions: "interactions" },
   identityNamespace: () => "discord",
-  receive(req, conn) {
-    const { publicKey } = conn.secrets;
+  receive(req, keys) {
+    const { publicKey } = keys.secrets;
     if (!publicKey) {
       return { type: "reject", status: 401, error: "no public key configured" };
     }
@@ -265,12 +290,27 @@ export const discordConnector: Connector = {
     }
     return { type: "interaction", payload };
   },
-  normalize: () => ({ events: [], ignored: "Discord sends interactions only" }),
+  normalize: ({ eventType, payload, receivedAt }, conn) =>
+    normalizeDiscordMessage(eventType, payload, conn.settings, receivedAt),
   async interact(ctx, conn, payload) {
     const interaction = InteractionSchema.safeParse(payload);
     if (!interaction.success) {
-      return UNSUPPORTED;
+      return { body: UNSUPPORTED };
     }
     return await handleInteraction(ctx, conn, interaction.data);
+  },
+  followUp: followUpDiscord,
+  unavailable: (message) => ({
+    type: 4,
+    data: { content: message, flags: EPHEMERAL },
+  }),
+  app: { ...discordApp(DISCORD_COMMANDS), stream: discordGateway },
+  sources: {
+    list: async (ctx, conn, app) =>
+      await guildChannels(ctx, conn.externalId, app?.credentials.botToken),
+    settings: (chosen) => ({
+      channels: chosen.map((c) => c.id),
+      channelNames: Object.fromEntries(chosen.map((c) => [c.id, c.name])),
+    }),
   },
 };
