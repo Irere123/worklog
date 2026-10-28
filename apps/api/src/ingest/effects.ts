@@ -1,5 +1,15 @@
+import type {
+  BoardEffect,
+  ExternalActor,
+  Signal,
+  WorklogEvent,
+} from "#connectors/types";
 import type { AppContext } from "#context";
-import { setOpenAttentionDone } from "#db/queries/attention";
+import {
+  findAttentionResolvedThrough,
+  setOpenAttentionDone,
+  upsertAttentionResolution,
+} from "#db/queries/attention";
 import { findCardByExternalKey, listCardIdsByRefs } from "#db/queries/cards";
 import type { CardRow } from "#db/queries/cards";
 import { findMemberById } from "#db/queries/members";
@@ -10,13 +20,15 @@ import type { AttentionInput } from "#work/attention";
 import * as board from "#work/board";
 
 import { resolveActor } from "./identity";
-import type { BoardEffect, ExternalActor, Signal, WorklogEvent } from "./types";
+import type { People } from "./people";
 
-type Scope = {
+export type BoardScope = {
   workspaceId: string;
   namespace: string;
   boardId?: string;
   source: string;
+  /** Resolved before the transaction, so effects don't write identities inside it. */
+  people?: People;
 };
 
 export async function findCardIds(
@@ -36,10 +48,14 @@ export async function findCardIds(
 
 async function memberFor(
   ctx: AppContext,
-  scope: Scope,
+  scope: BoardScope,
   who: ExternalActor,
   at: Date
 ): Promise<Member | null> {
+  const known = scope.people?.get(who.id);
+  if (known) {
+    return known.member;
+  }
   const { memberId } = await resolveActor(
     ctx,
     scope.workspaceId,
@@ -56,7 +72,7 @@ async function memberFor(
 // Run before the activity is written so it can link to the card. Silent: the source event's own activity is the record.
 export async function applyBoardEffects(
   ctx: AppContext,
-  scope: Scope,
+  scope: BoardScope,
   effects: BoardEffect[],
   actor: Member | null,
   at: Date
@@ -80,7 +96,7 @@ export async function applyBoardEffects(
 
 async function applyBoardEffect(
   ctx: AppContext,
-  scope: Scope,
+  scope: BoardScope,
   effect: BoardEffect,
   card: CardRow | undefined,
   by: { actor: Member | null; at: Date }
@@ -169,46 +185,85 @@ type Notice = Pick<
   "kind" | "title" | "body" | "priority" | "dedupeKey"
 >;
 
-// Never raises attention for the person who acted.
+type SignalContext = {
+  actor: Member | null;
+  actorIsBot: boolean;
+  activityId: string | null;
+  cardId: string | null;
+  raise: boolean;
+  /** Read back from an API: create what's missing, never reopen what someone dismissed. */
+  onlyIfNew?: boolean;
+};
+
+// With `raise` off (history read back from an API), only resolves run: they catch state up
+// without pinging anyone.
 export async function applySignals(
   ctx: AppContext,
-  scope: Scope,
+  scope: BoardScope,
   event: WorklogEvent,
-  ctxInfo: {
-    actor: Member | null;
-    actorIsBot: boolean;
-    activityId: string | null;
-    cardId: string | null;
-  }
+  info: SignalContext
 ) {
-  const actorName =
-    ctxInfo.actor?.name ??
-    event.actor?.name ??
-    event.actor?.handle ??
-    "Someone";
   const thread = event.thread ?? event.id;
-
   for (const signal of event.signals ?? []) {
     if (signal.type === "resolve") {
       await resolveItems(ctx, scope, thread, signal, event.occurredAt);
-      continue;
+    } else if (info.raise) {
+      await raiseFor(ctx, scope, event, signal, info);
     }
-    const who = await memberFor(ctx, scope, signal.who, event.occurredAt);
-    if (!who || who.id === ctxInfo.actor?.id) {
-      continue;
-    }
-    const notice = describeSignal(signal, event, actorName);
-    await raiseAttention(ctx, {
-      workspaceId: scope.workspaceId,
-      memberId: who.id,
-      url: event.object?.url ?? event.url ?? null,
-      cardId: ctxInfo.cardId,
-      activityId: ctxInfo.activityId,
-      fromId: ctxInfo.actor?.id ?? null,
-      ...notice,
-      priority: capForBots(notice.priority, ctxInfo.actorIsBot),
-    });
   }
+}
+
+// Never raises attention for the person who acted.
+async function raiseFor(
+  ctx: AppContext,
+  scope: BoardScope,
+  event: WorklogEvent,
+  signal: Exclude<Signal, { type: "resolve" }>,
+  info: SignalContext
+) {
+  const who = await memberFor(ctx, scope, signal.who, event.occurredAt);
+  if (!who || who.id === info.actor?.id) {
+    return;
+  }
+  const actorName =
+    info.actor?.name ?? event.actor?.name ?? event.actor?.handle ?? "Someone";
+  const notice = describeSignal(signal, event, actorName);
+  if (await resolvedSince(ctx, scope, who.id, notice, event.occurredAt)) {
+    return;
+  }
+  await raiseAttention(ctx, {
+    workspaceId: scope.workspaceId,
+    memberId: who.id,
+    url: event.object?.url ?? event.url ?? null,
+    cardId: info.cardId,
+    activityId: info.activityId,
+    fromId: info.actor?.id ?? null,
+    ...notice,
+    priority: capForBots(notice.priority, info.actorIsBot),
+    onlyIfNew: info.onlyIfNew,
+    sourceAt: event.occurredAt,
+  });
+}
+
+const RESOLVABLE = new Set(["review.requested", "assigned"]);
+
+// A request that happened before its resolution, arriving late (a retry, a backfill), stays resolved.
+async function resolvedSince(
+  ctx: AppContext,
+  scope: BoardScope,
+  memberId: string,
+  notice: Notice,
+  at: Date
+) {
+  if (!RESOLVABLE.has(notice.kind)) {
+    return false;
+  }
+  const through = await findAttentionResolvedThrough(ctx.db, {
+    workspaceId: scope.workspaceId,
+    memberId,
+    dedupeKey: notice.dedupeKey,
+  });
+  return through !== null && through >= at;
 }
 
 /** Bots can ask, but they can't interrupt: their signals are never high priority. */
@@ -269,7 +324,7 @@ function mentionPlace(event: WorklogEvent, what: string) {
 
 async function resolveItems(
   ctx: AppContext,
-  scope: Scope,
+  scope: BoardScope,
   thread: string,
   signal: Extract<Signal, { type: "resolve" }>,
   at: Date
@@ -282,10 +337,17 @@ async function resolveItems(
   if (signal.who && !who) {
     return;
   }
+  await upsertAttentionResolution(ctx.db, {
+    workspaceId: scope.workspaceId,
+    memberId: who?.id ?? "",
+    dedupeKey: key,
+    at,
+  });
   await setOpenAttentionDone(ctx.db, {
     workspaceId: scope.workspaceId,
     dedupeKey: key,
     memberId: who?.id,
+    before: at,
     at: ctx.now(),
   });
 }
