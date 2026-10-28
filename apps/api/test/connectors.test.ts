@@ -1,8 +1,6 @@
 import { beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { generateKeyPairSync, sign } from "node:crypto";
 
-import { sql } from "drizzle-orm";
-
 import { hmacHex } from "#lib/crypto";
 
 import { testEnv } from "./harness";
@@ -129,17 +127,57 @@ describe("GitHub", () => {
     expect(cards[0].stage).toBe("done");
   });
 
-  test("a board that isn't there is refused, and one deleted later costs only the card", async () => {
-    const { owner, conn, send } = await github();
+  test("a bot's close is applied once: read again, it doesn't undo a reopen", async () => {
+    const { owner, send } = await github();
+    const issue = {
+      number: 11,
+      title: "Flaky export test",
+      html_url: "https://github.com/acme/api/issues/11",
+      user: { login: "emma-gh" },
+    };
+    await send("issues", {
+      action: "opened",
+      issue,
+      repository: repo,
+      sender: { login: "emma-gh" },
+    });
+    const closedByBot = {
+      action: "closed",
+      issue: { ...issue, closed_at: "2026-10-27T10:00:00Z" },
+      repository: repo,
+      sender: { login: "stale[bot]", id: 999, type: "Bot" },
+    };
+    await send("issues", closedByBot, { delivery: "bot-close" });
+    let [card] = (await env.call("GET", "/v1/cards", { token: owner.token }))
+      .body;
+    expect(card.stage).toBe("done");
+    await env.call("DELETE", `/v1/cards/${card.number}/closure`, {
+      token: owner.token,
+    });
+    // The same close, read back by a sync under another delivery id.
+    await send("issues", closedByBot, { delivery: "bot-close-again" });
+    [card] = (await env.call("GET", "/v1/cards", { token: owner.token })).body;
+    expect(card.stage).not.toBe("done");
+  });
+
+  test("a board that isn't there is refused, and one archived later takes no more cards", async () => {
+    const { owner, board, conn, send } = await github();
     const refused = await env.call("PATCH", `/v1/connections/${conn.id}`, {
       token: owner.token,
       body: { settings: { boardId: "brd_nope" } },
     });
     expect(refused.status).toBe(400);
-    // As if its board had been deleted since it was chosen.
-    await env.ctx.db.execute(sql`
-      update connections set settings = jsonb_set(settings, '{boardId}', '"brd_gone"')
-      where id = ${conn.id}`);
+    const archived = await env.call("PATCH", `/v1/boards/${board.id}`, {
+      token: owner.token,
+      body: { archived: true },
+    });
+    expect(archived.status).toBe(200);
+    // What else the connection holds can still change.
+    const renamed = await env.call("PATCH", `/v1/connections/${conn.id}`, {
+      token: owner.token,
+      body: { name: "Acme code" },
+    });
+    expect(renamed.status).toBe(200);
     await send("issues", {
       action: "opened",
       issue: {

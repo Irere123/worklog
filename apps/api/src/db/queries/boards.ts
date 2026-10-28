@@ -35,6 +35,24 @@ export async function listBoards(db: DbOrTx, params: { workspaceId: string }) {
     .orderBy(asc(boards.createdAt));
 }
 
+// Archived boards take no new cards.
+export async function findActiveBoard(
+  db: DbOrTx,
+  params: { workspaceId: string; id: string }
+) {
+  const [row] = await db
+    .select({ id: boards.id })
+    .from(boards)
+    .where(
+      and(
+        eq(boards.workspaceId, params.workspaceId),
+        eq(boards.id, params.id),
+        isNull(boards.archivedAt)
+      )
+    );
+  return row;
+}
+
 // One columns query for every board, not one per board.
 export async function listBoardsWithColumns(
   db: DbOrTx,
