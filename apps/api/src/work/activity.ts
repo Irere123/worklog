@@ -5,7 +5,7 @@ import {
   updateActivityById,
 } from "#db/queries/activities";
 import type { ActivityRow } from "#db/queries/activities";
-import { updateCardById } from "#db/queries/cards";
+import { setCardActiveAt } from "#db/queries/cards";
 import type { Visibility } from "#db/schema";
 import { transact } from "#db/transact";
 import { newId } from "#lib/ids";
@@ -76,9 +76,9 @@ export async function recordActivity(
       return null;
     }
     if (created.cardId) {
-      await updateCardById(tx.db, {
+      await setCardActiveAt(tx.db, {
         id: created.cardId,
-        set: { lastActiveAt: created.occurredAt },
+        at: created.occurredAt,
       });
     }
     await announce(tx, created, "activity.created");
@@ -134,7 +134,8 @@ async function mergeInto(
   const existing = await findCoalescingActivity(ctx.db, {
     workspaceId: input.workspaceId,
     coalesceKey: key,
-    since: new Date(occurredAt.getTime() - windowMinutes * 60_000),
+    at: occurredAt,
+    windowMs: windowMinutes * 60_000,
   });
   if (!existing) {
     return null;
@@ -154,14 +155,15 @@ async function mergeInto(
       importance: clamp(
         Math.max(existing.importance, input.importance ?? 0.5) + 0.05
       ),
-      updatedAt: occurredAt,
+      // The burst spans its events, whichever order they arrive in.
+      occurredAt:
+        occurredAt < existing.occurredAt ? occurredAt : existing.occurredAt,
+      updatedAt:
+        occurredAt > existing.updatedAt ? occurredAt : existing.updatedAt,
     },
   });
   if (row.cardId) {
-    await updateCardById(ctx.db, {
-      id: row.cardId,
-      set: { lastActiveAt: occurredAt },
-    });
+    await setCardActiveAt(ctx.db, { id: row.cardId, at: occurredAt });
   }
   await announce(ctx, row, "activity.updated");
   return { ...row, merged: true };

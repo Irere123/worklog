@@ -307,6 +307,9 @@ beforeEach(() => {
   env.reset();
 });
 
+const daysAgo = (d: number, minutes = 0) =>
+  new Date(Date.now() - d * 86_400_000 + minutes * 60_000).toISOString();
+
 async function github(settings: Record<string, unknown> = {}) {
   const owner = await env.workspace();
   const conn = (
@@ -381,6 +384,34 @@ describe("ingestion pipeline", () => {
       select count(*)::int as n from identities
       where workspace_id = ${owner.workspace.id} and external_id like 'handle:%'`);
     expect(placeholders.rows[0]?.n).toBe(0);
+  });
+
+  test("bursts read back newest first stay apart by days, and together within minutes", async () => {
+    const { owner, send } = await github();
+    // A backfill reads history newest first.
+    const times = [daysAgo(1, 2), daysAgo(1), daysAgo(5), daysAgo(9)];
+    for (const [i, at] of times.entries()) {
+      await send("push", {
+        ref: "refs/heads/main",
+        after: `old${i}`,
+        sender: emma,
+        commits: [{ id: `o${i}`, message: `step ${i}` }],
+        head_commit: { timestamp: at },
+      });
+    }
+    const pushes = (
+      await env.call("GET", "/v1/activities?kind=code.pushed", {
+        token: owner.token,
+      })
+    ).body;
+    expect(pushes.map((p: any) => p.title)).toEqual([
+      "Pushed 2 commits to acme/api:main",
+      "Pushed 1 commit to acme/api:main",
+      "Pushed 1 commit to acme/api:main",
+    ]);
+    // The burst spans both pushes: from the older, though it came second.
+    const [burst] = pushes;
+    expect(burst.occurredAt).toBe(times[1]);
   });
 
   test("bursts merge: three pushes to a branch become one activity", async () => {
