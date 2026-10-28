@@ -97,7 +97,10 @@ export async function listIdentitiesByHandles(
         sql`${identities.externalId} not like 'handle:%'`
       )
     )
-    .orderBy(sql`${identities.lastSeenAt} desc nulls last`);
+    // An account new enough that its sightings aren't counted yet still ranks by when it was.
+    .orderBy(
+      sql`coalesce(${identities.lastSeenAt}, ${identities.firstSeenAt}, ${identities.createdAt}) desc`
+    );
 }
 
 // `handle` matches the last-seen login case-insensitively; pass it lowercase.
