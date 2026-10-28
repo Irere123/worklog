@@ -213,26 +213,50 @@ describe("Discord app", () => {
     });
   });
 
-  test("a channel hidden from @everyone is private, unless the whole server is", async () => {
-    const hidden = { id: "G1", type: 0, allow: "0", deny: "1024" };
+  test("a channel hidden from @everyone is private, unless it's hidden only behind the member role", async () => {
+    const everyoneOut = { id: "G1", type: 0, allow: "0", deny: "1024" };
     expect(
       await channelsOf([
         { id: "C1", name: "general", type: 0 },
-        { id: "C2", name: "leads", type: 0, permission_overwrites: [hidden] },
+        {
+          id: "C2",
+          name: "leads",
+          type: 0,
+          permission_overwrites: [everyoneOut, letIn("R_LEADS")],
+        },
       ])
     ).toEqual([
       { id: "C1", name: "general", private: false },
       { id: "C2", name: "leads", private: true },
     ]);
-    // Every channel hidden: a server that lets people in by a role.
+    // A #welcome open to all, the rest behind a Member role, and one channel for leads alone.
     expect(
       await channelsOf([
-        { id: "C1", name: "general", type: 0, permission_overwrites: [hidden] },
-        { id: "C2", name: "leads", type: 0, permission_overwrites: [hidden] },
+        { id: "C0", name: "welcome", type: 0 },
+        {
+          id: "C1",
+          name: "general",
+          type: 0,
+          permission_overwrites: [everyoneOut, letIn("R_MEMBER")],
+        },
+        {
+          id: "C2",
+          name: "dev",
+          type: 0,
+          permission_overwrites: [everyoneOut, letIn("R_MEMBER")],
+        },
+        {
+          id: "C3",
+          name: "leads",
+          type: 0,
+          permission_overwrites: [everyoneOut, letIn("R_LEADS")],
+        },
       ])
     ).toEqual([
+      { id: "C2", name: "dev", private: false },
       { id: "C1", name: "general", private: false },
-      { id: "C2", name: "leads", private: false },
+      { id: "C3", name: "leads", private: true },
+      { id: "C0", name: "welcome", private: false },
     ]);
   });
 });
@@ -243,4 +267,9 @@ async function channelsOf(channels: object[]) {
     ["GET https://discord.com/api/v10/guilds/G1/channels", () => channels],
   ]);
   return await guildChannels(env.ctx, "G1", "bot");
+}
+
+// A role's overwrite that lets it read the channel.
+function letIn(role: string) {
+  return { id: role, type: 0, allow: "1024", deny: "0" };
 }
