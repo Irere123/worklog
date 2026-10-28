@@ -102,6 +102,7 @@ export async function testEnv() {
 
   const drain = async () => {
     await runJobsOnce(ctx);
+    await ctx.tally.flush();
   };
 
   return { ctx, app, call, workspace, teammate, reset, drain };
@@ -154,6 +155,53 @@ export function fetchStub() {
     calls.push({ url: urlOf(input), init, body });
     return Response.json({ ok: true });
   }) as unknown as typeof fetch & { calls: typeof calls };
+  fn.calls = calls;
+  return fn;
+}
+
+type Routed = {
+  url: string;
+  method: string;
+  headers: Headers;
+  body: any;
+};
+
+/**
+ * A provider API scripted per test: "POST https://api.github.com/app/installations" matches by
+ * method and URL prefix, first match wins, and a plain value is sent as JSON. Anything unmatched
+ * answers `{ ok: true }`. Every call is recorded in `calls`.
+ */
+export function routedFetch(
+  routes: [string, (req: Routed) => unknown][]
+): typeof fetch & { calls: Routed[] } {
+  const calls: Routed[] = [];
+  const fn = (async (input: string | URL | Request, init?: RequestInit) => {
+    const raw =
+      init?.body === undefined || init.body === null
+        ? ""
+        : await new Response(init.body).text();
+    let body: any = raw;
+    try {
+      body = raw ? JSON.parse(raw) : undefined;
+    } catch {
+      body = Object.fromEntries(new URLSearchParams(raw));
+    }
+    const req = {
+      url: urlOf(input),
+      method: init?.method ?? "GET",
+      headers: new Headers(init?.headers),
+      body,
+    };
+    calls.push(req);
+    for (const [pattern, handle] of routes) {
+      const [method, prefix = ""] = pattern.split(" ");
+      if (method === req.method && req.url.startsWith(prefix)) {
+        const out = await handle(req);
+        return out instanceof Response ? out : Response.json(out);
+      }
+    }
+    return Response.json({ ok: true });
+  }) as unknown as typeof fetch & { calls: Routed[] };
   fn.calls = calls;
   return fn;
 }
