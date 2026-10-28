@@ -569,6 +569,18 @@ async function applyState(
   if (resolves.length === 0 && board.length === 0) {
     return;
   }
+  // Once: read again (a sync page, a redelivery), it mustn't close a card someone has reopened
+  // since. Under a key of its own, so a replay that keeps the event after all can still record it.
+  const first = await insertIngestedEventIfNew(ctx.db, {
+    workspaceId: source.conn.workspaceId,
+    source: source.conn.provider,
+    externalId: `state:${event.id}`,
+    connectionId: source.conn.id,
+    activityId: null,
+  });
+  if (!first) {
+    return;
+  }
   const scope = scopeOf(source);
   if (board.length > 0) {
     await applyBoardEffects(ctx, scope, board, who.member, event.occurredAt);

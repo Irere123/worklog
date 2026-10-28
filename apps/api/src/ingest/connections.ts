@@ -21,14 +21,16 @@ import { handleProviderError } from "./lifecycle";
 import { queueSync } from "./sync-queue";
 import { viewOf } from "./view";
 
-// Issues become cards on this board: one that isn't the workspace's would fail them all.
+// Issues become cards on this board, so a new choice must be one of the workspace's boards in
+// use. One archived since stays as it is; it just takes no more cards.
 async function requireBoard(
   ctx: AppContext,
   workspaceId: string,
-  settings: Record<string, unknown>
+  settings: Record<string, unknown>,
+  before: Record<string, unknown> = {}
 ) {
   const { boardId } = settings;
-  if (boardId === undefined || boardId === null) {
+  if (boardId === undefined || boardId === null || boardId === before.boardId) {
     return;
   }
   const boards = await listBoards(ctx.db, { workspaceId });
