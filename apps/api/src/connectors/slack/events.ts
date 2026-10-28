@@ -223,8 +223,11 @@ export function normalizeSlackMessage(
     settings,
     receivedAt
   );
+  // Slack sends a message to the bot twice, as a mention too: it's answered as a command, and
+  // what it records (a log) it records itself. Whoever it names is what the command is about
+  // (`ask @sam`), not someone it's said to, so nobody is pinged.
   if (addressedToBot(e.text ?? "", settings.botUserId)) {
-    return toBot(base, settings.botUserId);
+    return { events: [], ignored: "addressed to Worklog" };
   }
   const optedIn =
     Array.isArray(settings.channels) &&
@@ -275,17 +278,6 @@ function unchangedEdit(e: SlackEvent) {
     Boolean(e.previous_message) &&
     (e.previous_message?.text ?? "") === (e.message?.text ?? "")
   );
-}
-
-// Slack sends a message to the bot twice, as a mention too: it's answered as a command, and what
-// it records (a log) it records itself. Anyone else it mentions still hears of it.
-function toBot(base: WorklogEvent, botUserId: unknown): Normalized {
-  const others = (base.signals ?? []).filter(
-    (sig) => !("who" in sig) || sig.who?.id !== botUserId
-  );
-  return others.length > 0
-    ? { events: [{ ...base, signals: others, hidden: true }] }
-    : { events: [], ignored: "addressed to Worklog" };
 }
 
 const LEADING_ID = /^\s*<@(?<id>[A-Z0-9]+)[|>]/u;
