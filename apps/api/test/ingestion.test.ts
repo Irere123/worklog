@@ -1336,6 +1336,39 @@ describe("custom integrations", () => {
     expect(await closerAfterWrongMention(true)).toBeNull();
   });
 
+  test("nor can it when it comes before anyone is linked by that login", async () => {
+    const owner = await env.workspace();
+    const conn = (
+      await env.call("POST", "/v1/connections", {
+        token: owner.token,
+        body: {
+          provider: "custom",
+          settings: { identityNamespace: "jira:eps" },
+        },
+      })
+    ).body;
+    const push = async (events: object[]) => {
+      await env.call("POST", `/v1/connections/${conn.id}/events`, {
+        token: owner.token,
+        body: { events },
+      });
+      await env.drain();
+    };
+    await push([mentionOfU1("c10", "2026-10-03T09:00:00Z")]);
+    const sammy = await env.teammate(owner.token, "Sammy");
+    await env.call("POST", `/v1/members/${sammy.member.id}/identities`, {
+      token: sammy.token,
+      body: { provider: "jira:eps", handle: "sammy" },
+    });
+    await push([closedByU1("PAY-10", "2026-10-04T09:00:00Z")]);
+    const [closed] = (
+      await env.call("GET", "/v1/activities?kind=ticket.closed", {
+        token: owner.token,
+      })
+    ).body;
+    expect(closed.actorId).toBeNull();
+  });
+
   test("namespaces under the generic prefixes are free, but not another connection's own", async () => {
     const owner = await env.workspace();
     for (const name of ["one", "two"]) {
