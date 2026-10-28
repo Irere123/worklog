@@ -52,6 +52,7 @@ const PushedBatch = z.object({ events: z.array(z.unknown()).optional() });
 
 export const customConnector: Connector = {
   id: "custom",
+  perConnection: true,
   name: "Custom (push API)",
   description:
     "Your own code pushes Worklog events (POST /v1/connections/{id}/events) and gets the same quality pipeline as built-in connectors.",

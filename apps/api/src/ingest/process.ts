@@ -408,7 +408,7 @@ export async function processInbound(
 }
 
 function normalizeDelivery({ connector, view }: Loaded, inbound: InboundEvent) {
-  return connector.normalize(
+  const normalized = connector.normalize(
     {
       eventType: inbound.eventType,
       payload: inbound.payload,
@@ -416,6 +416,16 @@ function normalizeDelivery({ connector, view }: Loaded, inbound: InboundEvent) {
     },
     view
   );
+  // Two such connections in a workspace can name different events alike.
+  return connector.perConnection === true
+    ? {
+        ...normalized,
+        events: normalized.events.map((e) => ({
+          ...e,
+          id: `${view.id}:${e.id}`,
+        })),
+      }
+    : normalized;
 }
 
 /** A delivery's events, in the caller's transaction, and the status that says what came of them. */
