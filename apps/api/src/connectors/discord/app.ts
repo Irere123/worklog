@@ -78,30 +78,56 @@ export async function botGet(
   );
 }
 
+const PermissionOverwrite = z.object({
+  id: z.string(),
+  type: z.number(),
+  allow: z.string(),
+  deny: z.string(),
+});
+type Overwrite = z.infer<typeof PermissionOverwrite>;
+
 const Channels = z.array(
   z.object({
     id: z.string(),
     name: z.string().optional(),
     type: z.number(),
-    permission_overwrites: z
-      .array(z.object({ id: z.string(), type: z.number(), deny: z.string() }))
-      .optional(),
+    permission_overwrites: z.array(PermissionOverwrite).optional(),
   })
 );
 
 const VIEW_CHANNEL = 1024;
+const grants = (bits: string) =>
+  Math.floor(Number(bits) / VIEW_CHANNEL) % 2 === 1;
 
-// Hidden from @everyone (the role with the server's own id): only some people can read it.
-function restricted(
-  overwrites: { id: string; type: number; deny: string }[] | undefined,
-  guildId: string
-) {
-  const everyone = (overwrites ?? []).find(
-    (o) => o.type === 0 && o.id === guildId
+// Overwrites of type 0 are roles; @everyone is the role with the server's own id.
+const hiddenFromEveryone = (overwrites: Overwrite[], guildId: string) =>
+  overwrites.some((o) => o.type === 0 && o.id === guildId && grants(o.deny));
+const rolesLetIn = (overwrites: Overwrite[]) =>
+  new Set(
+    overwrites.filter((o) => o.type === 0 && grants(o.allow)).map((o) => o.id)
   );
-  return everyone
-    ? Math.floor(Number(everyone.deny) / VIEW_CHANNEL) % 2 === 1
-    : false;
+
+/**
+ * The role a server lets its members in by, if it hides most channels from @everyone (a #welcome
+ * open to all, everything else behind a "Member" role): the role most hidden channels let in. A
+ * channel that role reads is no more private than the server. A small server whose hidden
+ * channels are mostly one team's reads as gated by that team's role.
+ */
+function membersRole(
+  hidden: Overwrite[][],
+  readable: number
+): string | undefined {
+  if (hidden.length < 2 || hidden.length <= readable / 2) {
+    return undefined;
+  }
+  const counts = new Map<string, number>();
+  for (const overwrites of hidden) {
+    for (const role of rolesLetIn(overwrites)) {
+      counts.set(role, (counts.get(role) ?? 0) + 1);
+    }
+  }
+  const [role, n] = [...counts].toSorted((a, b) => b[1] - a[1])[0] ?? [];
+  return n !== undefined && n > hidden.length / 2 ? role : undefined;
 }
 
 // Text and announcement channels: where people write updates.
@@ -129,16 +155,22 @@ export async function guildChannels(
   );
   const readable = channels
     .filter((c) => READABLE.has(c.type))
+    .map((c) => ({ ...c, overwrites: c.permission_overwrites ?? [] }));
+  const hidden = readable.filter((c) =>
+    hiddenFromEveryone(c.overwrites, guildId)
+  );
+  const members = membersRole(
+    hidden.map((c) => c.overwrites),
+    readable.length
+  );
+  return readable
     .map((c) => ({
       id: c.id,
       name: c.name ?? c.id,
-      private: restricted(c.permission_overwrites, guildId),
-    }));
-  // A server that hides every channel from @everyone lets people in by a role: hidden says
-  // nothing there about who reads what.
-  const gated = readable.every((c) => c.private);
-  return readable
-    .map((c) => (gated ? { ...c, private: false } : c))
+      private:
+        hiddenFromEveryone(c.overwrites, guildId) &&
+        !(members !== undefined && rolesLetIn(c.overwrites).has(members)),
+    }))
     .toSorted((a, b) => a.name.localeCompare(b.name));
 }
 
