@@ -37,14 +37,13 @@ export async function resolveActor(
   at: Date,
   opts: { sightings?: number; acted?: boolean; since?: Date } = {}
 ) {
-  const trusted = trustsLogin({ acted: opts.acted }, namespace);
+  const { actor: said } = told(
+    { actor, at, n: 1, acted: opts.acted },
+    namespace
+  );
   const identity =
-    (await matchIdentity(
-      ctx,
-      workspaceId,
-      namespace,
-      trusted ? actor : { ...actor, handle: null }
-    )) ?? (await recordIdentity(ctx, workspaceId, namespace, actor, at));
+    (await matchIdentity(ctx, workspaceId, namespace, said)) ??
+    (await recordIdentity(ctx, workspaceId, namespace, said, at));
   const memberId =
     identity.memberId ??
     (await signedInMember(ctx, workspaceId, namespace, actor.id));
@@ -165,6 +164,17 @@ export async function resolveActors(
  */
 function trustsLogin(sighting: Pick<Sighting, "acted">, namespace: string) {
   return sighting.acted !== false || isBuiltInNamespace(namespace);
+}
+
+/**
+ * The sighting as far as it can be taken at its word: a generic connection's sender naming
+ * someone else says nothing about their login or name that can link or describe them, even when
+ * it's what first records them (a member linked by that login later would match it).
+ */
+function told(sighting: Sighting, namespace: string): Sighting {
+  return trustsLogin(sighting, namespace)
+    ? sighting
+    : { ...sighting, actor: { ...sighting.actor, handle: null, name: null } };
 }
 
 async function sortSightings(
@@ -305,17 +315,20 @@ async function recordIdentities(
     );
     const rows = await insertIdentitiesIfNew(
       tx.db,
-      ordered.map(({ actor, at, since }) => ({
-        id: newId("idn"),
-        workspaceId,
-        provider: namespace,
-        externalId: actor.id,
-        externalHandle: actor.handle ?? null,
-        displayName: actor.name ?? null,
-        isBot: actor.bot ?? false,
-        firstSeenAt: since ?? at,
-        createdAt: tx.now(),
-      }))
+      ordered.map((sighting) => {
+        const { actor, at, since } = told(sighting, namespace);
+        return {
+          id: newId("idn"),
+          workspaceId,
+          provider: namespace,
+          externalId: actor.id,
+          externalHandle: actor.handle ?? null,
+          displayName: actor.name ?? null,
+          isBot: actor.bot ?? false,
+          firstSeenAt: since ?? at,
+          createdAt: tx.now(),
+        };
+      })
     );
     for (const row of rows) {
       if (enrich && !row.externalId.startsWith("handle:")) {
