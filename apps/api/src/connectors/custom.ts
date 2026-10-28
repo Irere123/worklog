@@ -2,6 +2,8 @@ import { z } from "zod";
 
 import type { Connector, WorklogEvent } from "#connectors/types";
 
+import { chosenNamespace } from "./namespaces";
+
 const Actor = z.object({
   id: z.string().min(1),
   handle: z.string().nullish(),
@@ -67,9 +69,7 @@ export const customConnector: Connector = {
   ],
   endpoints: {},
   identityNamespace: (conn) =>
-    typeof conn.settings.identityNamespace === "string"
-      ? conn.settings.identityNamespace
-      : `custom:${conn.id}`,
+    chosenNamespace(conn.settings, `custom:${conn.id}`),
   receive: () => ({
     type: "reject",
     status: 404,

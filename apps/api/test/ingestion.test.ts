@@ -4,8 +4,10 @@ import { readFileSync } from "node:fs";
 
 import { sql } from "drizzle-orm";
 
+import { listConnectors } from "#connectors";
 import { normalizeGithubLike } from "#connectors/github";
 import { normalizeSyncPage } from "#connectors/github/sync";
+import { isBuiltInNamespace } from "#connectors/namespaces";
 import { normalizeSlackMessage } from "#connectors/slack";
 import { normalizeHistory } from "#connectors/slack/events";
 import { webhookConnector } from "#connectors/webhook";
@@ -988,6 +990,56 @@ describe("custom integrations", () => {
       body: { settings: { identityNamespace: "slack" } },
     });
     expect(moved.status).toBe(400);
+  });
+
+  test("a namespace held from before it was reserved isn't used: its users aren't impersonated", async () => {
+    const owner = await env.workspace();
+    await env.call("POST", "/v1/members/me/identities", {
+      token: owner.token,
+      body: { provider: "github", externalId: "101" },
+    });
+    const conn = (
+      await env.call("POST", "/v1/connections", {
+        token: owner.token,
+        body: {
+          provider: "custom",
+          settings: { identityNamespace: "jira:acme" },
+        },
+      })
+    ).body;
+    await env.ctx.db.execute(sql`
+      update connections set settings = jsonb_set(settings, '{identityNamespace}', '"github"')
+      where id = ${conn.id}`);
+    await env.call("POST", `/v1/connections/${conn.id}/events`, {
+      token: owner.token,
+      body: {
+        events: [
+          {
+            id: "fake-1",
+            kind: "pr.merged",
+            occurredAt: new Date().toISOString(),
+            actor: { id: "101" },
+            title: "Merged something as Emma",
+          },
+        ],
+      },
+    });
+    await env.drain();
+    const [merged] = (
+      await env.call("GET", "/v1/activities?kind=pr.merged", {
+        token: owner.token,
+      })
+    ).body;
+    expect(merged.actorId).toBeNull();
+  });
+
+  test("every built-in connector's namespace is reserved", () => {
+    for (const connector of listConnectors()) {
+      expect([connector.id, isBuiltInNamespace(connector.id)]).toEqual([
+        connector.id,
+        connector.perConnection !== true,
+      ]);
+    }
   });
 
   test("Standard Webhooks signatures are verified with a replay window", () => {
