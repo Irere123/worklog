@@ -2,8 +2,8 @@ import { customConnector } from "./connectors/custom";
 import { discordConnector } from "./connectors/discord";
 import { giteaConnector, githubConnector } from "./connectors/github";
 import { slackConnector } from "./connectors/slack";
+import type { Connector } from "./connectors/types";
 import { webhookConnector } from "./connectors/webhook";
-import type { Connector } from "./types";
 
 const registry = new Map<string, Connector>();
 
