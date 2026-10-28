@@ -43,7 +43,13 @@ export async function resolveActor(
   );
   const identity =
     (await matchIdentity(ctx, workspaceId, namespace, said)) ??
-    (await recordIdentity(ctx, workspaceId, namespace, said, at));
+    (await recordIdentity(
+      ctx,
+      workspaceId,
+      namespace,
+      said,
+      opts.acted === false ? null : at
+    ));
   const memberId =
     identity.memberId ??
     (await signedInMember(ctx, workspaceId, namespace, actor.id));
@@ -168,13 +174,17 @@ function trustsLogin(sighting: Pick<Sighting, "acted">, namespace: string) {
 
 /**
  * The sighting as far as it can be taken at its word: a generic connection's sender naming
- * someone else says nothing about their login or name that can link or describe them, even when
- * it's what first records them (a member linked by that login later would match it).
+ * someone else says nothing about their login, name or being a bot that can link, describe or
+ * silence them, even when it's what first records them (a member linked by that login later
+ * would match it).
  */
 function told(sighting: Sighting, namespace: string): Sighting {
   return trustsLogin(sighting, namespace)
     ? sighting
-    : { ...sighting, actor: { ...sighting.actor, handle: null, name: null } };
+    : {
+        ...sighting,
+        actor: { id: sighting.actor.id, handle: null, name: null },
+      };
 }
 
 async function sortSightings(
@@ -316,7 +326,7 @@ async function recordIdentities(
     const rows = await insertIdentitiesIfNew(
       tx.db,
       ordered.map((sighting) => {
-        const { actor, at, since } = told(sighting, namespace);
+        const { actor, at, since, acted } = told(sighting, namespace);
         return {
           id: newId("idn"),
           workspaceId,
@@ -325,7 +335,8 @@ async function recordIdentities(
           externalHandle: actor.handle ?? null,
           displayName: actor.name ?? null,
           isBot: actor.bot ?? false,
-          firstSeenAt: since ?? at,
+          // Being named isn't being seen: its first action dates it.
+          firstSeenAt: acted === false ? null : (since ?? at),
           createdAt: tx.now(),
         };
       })
@@ -420,7 +431,7 @@ async function recordIdentity(
   workspaceId: string,
   namespace: string,
   actor: ExternalActor,
-  at: Date
+  seenAt: Date | null
 ): Promise<Identity> {
   const created = await transact(ctx, async (tx) => {
     const row = await insertIdentityIfNew(tx.db, {
@@ -431,7 +442,7 @@ async function recordIdentity(
       externalHandle: actor.handle ?? null,
       displayName: actor.name ?? null,
       isBot: actor.bot ?? false,
-      firstSeenAt: at,
+      firstSeenAt: seenAt,
       createdAt: tx.now(),
     });
     // Where the provider has a directory, look the account up once: its email can link it.

@@ -1336,6 +1336,48 @@ describe("custom integrations", () => {
     expect(await closerAfterWrongMention(true)).toBeNull();
   });
 
+  test("nor make an account a bot, or date it", async () => {
+    const owner = await env.workspace();
+    const conn = (
+      await env.call("POST", "/v1/connections", {
+        token: owner.token,
+        body: {
+          provider: "custom",
+          settings: { identityNamespace: "jira:zeta" },
+        },
+      })
+    ).body;
+    const push = async (events: object[]) => {
+      await env.call("POST", `/v1/connections/${conn.id}/events`, {
+        token: owner.token,
+        body: { events },
+      });
+      await env.drain();
+    };
+    await push([
+      {
+        ...mentionOfU1("c11", "2026-09-01T09:00:00Z"),
+        mentions: [{ id: "u1", bot: true }],
+      },
+    ]);
+    await push([closedByU1("PAY-11", "2026-10-05T09:00:00Z")]);
+    const closed = (
+      await env.call("GET", "/v1/activities?kind=ticket.closed", {
+        token: owner.token,
+      })
+    ).body;
+    expect(closed).toHaveLength(1);
+    const [u1] = (
+      await env.ctx.db.execute<{ bot: boolean; first: Date }>(sql`
+        select is_bot as bot, first_seen_at as first from identities
+        where workspace_id = ${owner.workspace.id} and external_id = 'u1'`)
+    ).rows;
+    expect(u1?.bot).toBe(false);
+    expect(new Date(u1?.first ?? 0).toISOString()).toBe(
+      "2026-10-05T09:00:00.000Z"
+    );
+  });
+
   test("nor can it when it comes before anyone is linked by that login", async () => {
     const owner = await env.workspace();
     const conn = (
