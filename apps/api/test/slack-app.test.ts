@@ -284,7 +284,12 @@ describe("Slack app", () => {
   });
 
   test("events route by team; a mention is answered once, however often Slack retries it", async () => {
-    const { owner, fetch, post, event } = await installed();
+    const { owner, conn, fetch, post, event } = await installed();
+    await env.call("PUT", `/v1/connections/${conn.id}/sources`, {
+      token: owner.token,
+      body: { ids: ["C0STANDUP"] },
+    });
+    await env.drain();
     await env.call("POST", "/v1/members/me/identities", {
       token: owner.token,
       body: { provider: "slack", externalId: "U0EMMA" },
@@ -298,12 +303,29 @@ describe("Slack app", () => {
     });
     expect((await post("events", mention)).status).toBe(200);
     await post("events", mention, { "x-slack-retry-num": "1" });
+    // The same message as a channel message, which Slack sends as well: not a post to record.
+    await post(
+      "events",
+      event("Ev-mention-message", {
+        type: "message",
+        user: "U0EMMA",
+        text: "<@UBOT> log Paired with Sam on the retry bug",
+        channel: "C0STANDUP",
+        channel_type: "channel",
+        ts: "1793000000.000100",
+      })
+    );
+    // Only the person who asked sees the answer: it can hold what's private to them.
+    expect(
+      fetch.calls.filter((c) => c.url === `${API}/chat.postMessage`)
+    ).toHaveLength(0);
     const replies = fetch.calls.filter(
-      (c) => c.url === `${API}/chat.postMessage`
+      (c) => c.url === `${API}/chat.postEphemeral`
     );
     expect(replies).toHaveLength(1);
     expect(replies[0]?.body).toMatchObject({
       channel: "C0STANDUP",
+      user: "U0EMMA",
       thread_ts: "1793000000.000100",
     });
     expect(replies[0]?.headers.get("authorization")).toBe(
@@ -315,6 +337,12 @@ describe("Slack app", () => {
       })
     ).body;
     expect(logged.title).toContain("Paired with Sam");
+    const posted = (
+      await env.call("GET", "/v1/activities?kind=message.posted", {
+        token: owner.token,
+      })
+    ).body;
+    expect(posted.filter((a: any) => a.title.includes("Paired"))).toEqual([]);
   });
 
   test("a paused connection still answers commands; a revoked one says so in Slack's terms", async () => {
