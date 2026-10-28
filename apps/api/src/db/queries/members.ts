@@ -259,3 +259,76 @@ export async function findMemberBySignIn(
     : [];
   return row?.member;
 }
+
+// Who hears about a connection nobody is recorded as having installed.
+export async function findWorkspaceOwner(
+  db: DbOrTx,
+  params: { workspaceId: string }
+) {
+  const [row] = await db
+    .select()
+    .from(members)
+    .where(
+      and(
+        eq(members.workspaceId, params.workspaceId),
+        eq(members.kind, "human"),
+        eq(members.role, "owner"),
+        active
+      )
+    )
+    .orderBy(asc(members.createdAt))
+    .limit(1);
+  return row;
+}
+
+// Active people whose email is `email`, compared case-insensitively.
+export async function listHumansByEmail(
+  db: DbOrTx,
+  params: { workspaceId: string; email: string }
+) {
+  return await db
+    .select()
+    .from(members)
+    .where(
+      and(
+        eq(members.workspaceId, params.workspaceId),
+        eq(members.kind, "human"),
+        sql`lower(${members.email}) = ${params.email.toLowerCase()}`,
+        active
+      )
+    )
+    .limit(2);
+}
+
+// Who signed in with each of these provider accounts, for resolving a delivery's people at once.
+export async function listMembersBySignIn(
+  db: DbOrTx,
+  params: { workspaceId: string; provider: string; accountIds: string[] }
+) {
+  if (params.accountIds.length === 0) {
+    return [];
+  }
+  return await db
+    .select({ accountId: account.accountId, member: members })
+    .from(account)
+    .innerJoin(
+      members,
+      and(
+        eq(members.userId, account.userId),
+        eq(members.workspaceId, params.workspaceId)
+      )
+    )
+    .where(
+      and(
+        eq(account.providerId, params.provider),
+        inArray(account.accountId, params.accountIds)
+      )
+    );
+}
+
+export async function listMembersByIds(db: DbOrTx, params: { ids: string[] }) {
+  if (params.ids.length === 0) {
+    return [];
+  }
+  return await db.select().from(members).where(inArray(members.id, params.ids));
+}

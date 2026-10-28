@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, asc, eq, inArray, isNotNull, lt, sql } from "drizzle-orm";
 
 import type { DbOrTx } from "#db";
 import { connections } from "#db/schema";
@@ -21,11 +21,99 @@ export async function listConnections(
     .where(eq(connections.workspaceId, params.workspaceId));
 }
 
-// `workspaceId` is optional for webhooks and jobs, which only know the connection id.
+// Active connections of these providers in every workspace, for the daily catch-up sync.
+export async function listActiveConnectionsByProvider(
+  db: DbOrTx,
+  params: { providers: string[] }
+) {
+  if (params.providers.length === 0) {
+    return [];
+  }
+  return await db
+    .select()
+    .from(connections)
+    .where(
+      and(
+        eq(connections.status, "active"),
+        inArray(connections.provider, params.providers)
+      )
+    );
+}
+
+// Active connections that last received something before `before`.
+export async function listQuietConnections(
+  db: DbOrTx,
+  params: { before: Date }
+) {
+  return await db
+    .select()
+    .from(connections)
+    .where(
+      and(
+        eq(connections.status, "active"),
+        lt(connections.lastEventAt, params.before)
+      )
+    );
+}
+
+export async function listConnectionSecrets(db: DbOrTx) {
+  return await db
+    .select({ id: connections.id, secrets: connections.secrets })
+    .from(connections);
+}
+
+// Only if nobody changed them since they were read; false otherwise.
+export async function updateConnectionSecretsIfUnchanged(
+  db: DbOrTx,
+  params: { id: string; from: string; to: string }
+) {
+  const rows = await db
+    .update(connections)
+    .set({ secrets: params.to })
+    .where(
+      and(eq(connections.id, params.id), eq(connections.secrets, params.from))
+    )
+    .returning({ id: connections.id });
+  return rows.length > 0;
+}
+
+// Every connection installed through a provider's app that isn't revoked yet, in every workspace.
+export async function listInstalledConnections(
+  db: DbOrTx,
+  params: { provider: string }
+) {
+  return await db
+    .select()
+    .from(connections)
+    .where(
+      and(
+        eq(connections.provider, params.provider),
+        inArray(connections.status, ["active", "paused", "suspended"]),
+        isNotNull(connections.externalId)
+      )
+    );
+}
+
 // Every workspace's connections, for jobs that sweep them all.
 export async function listAllConnectionIds(db: DbOrTx) {
   const rows = await db.select({ id: connections.id }).from(connections);
   return rows.map((r) => r.id);
+}
+
+// `workspaceId` is optional for webhooks and jobs, which only know the connection id.
+/**
+ * Taken first by a transaction that writes rows referring to the connection: deleting it then
+ * waits for the transaction to finish instead of deadlocking with it.
+ */
+export async function lockConnectionForWrites(
+  db: DbOrTx,
+  params: { id: string }
+) {
+  await db
+    .select({ id: connections.id })
+    .from(connections)
+    .where(eq(connections.id, params.id))
+    .for("key share");
 }
 
 export async function findConnectionById(
@@ -62,7 +150,16 @@ export async function updateConnectionById(
   params: {
     id: string;
     set: Partial<
-      Pick<ConnectionRow, "name" | "status" | "settings" | "secrets">
+      Pick<
+        ConnectionRow,
+        | "name"
+        | "status"
+        | "statusReason"
+        | "settings"
+        | "secrets"
+        | "installedById"
+        | "externalId"
+      >
     >;
   }
 ) {
@@ -74,16 +171,100 @@ export async function updateConnectionById(
   return returned(rows, "connection");
 }
 
-// No returned row: a connection deleted while its webhook is in flight matches nothing, and the
-// delivery it already stored still gets its 200.
-export async function setConnectionLastEventAt(
+// Where an app's webhook for this installation goes.
+export async function findConnectionByExternalId(
   db: DbOrTx,
-  params: { id: string; at: Date }
+  params: { provider: string; externalId: string }
 ) {
-  await db
-    .update(connections)
-    .set({ lastEventAt: params.at })
-    .where(eq(connections.id, params.id));
+  const [row] = await db
+    .select()
+    .from(connections)
+    .where(
+      and(
+        eq(connections.provider, params.provider),
+        eq(connections.externalId, params.externalId)
+      )
+    );
+  return row;
+}
+
+// Oldest first, so the order is stable when a workspace has several.
+export async function listActiveConnections(
+  db: DbOrTx,
+  params: { workspaceId: string; provider: string }
+) {
+  return await db
+    .select()
+    .from(connections)
+    .where(
+      and(
+        eq(connections.workspaceId, params.workspaceId),
+        eq(connections.provider, params.provider),
+        eq(connections.status, "active")
+      )
+    )
+    .orderBy(asc(connections.createdAt));
+}
+
+// The workspace's revoked installation of the same account: reinstalling gets it back.
+export async function findRevokedConnection(
+  db: DbOrTx,
+  params: { workspaceId: string; provider: string; account: string }
+) {
+  const [row] = await db
+    .select()
+    .from(connections)
+    .where(
+      and(
+        eq(connections.workspaceId, params.workspaceId),
+        eq(connections.provider, params.provider),
+        sql`${connections.settings}->>'account' = ${params.account}`,
+        eq(connections.status, "revoked")
+      )
+    )
+    .orderBy(asc(connections.createdAt))
+    .limit(1);
+  return row;
+}
+
+export type ConnectionTally = {
+  id: string;
+  lastEventAt: Date | null;
+  rejections: number;
+  lastRejectedAt: Date | null;
+  lastRejection: string | null;
+};
+
+// One statement for a batch of counters (ingest/tally.ts). Rows for deleted connections match
+// nothing.
+export async function updateConnectionTallies(
+  db: DbOrTx,
+  rows: ConnectionTally[]
+) {
+  if (rows.length === 0) {
+    return;
+  }
+  const values = sql.join(
+    rows.map(
+      (r) =>
+        sql`(${r.id}::text, ${r.lastEventAt}::timestamptz, ${r.rejections}::int, ${r.lastRejectedAt}::timestamptz, ${r.lastRejection}::text)`
+    ),
+    sql`, `
+  );
+  await db.execute(sql`
+    update connections as c set
+      last_event_at = greatest(c.last_event_at, v.last_event_at),
+      rejections = c.rejections + v.rejections,
+      last_rejected_at = greatest(c.last_rejected_at, v.last_rejected_at),
+      last_rejection = case
+        when v.last_rejected_at is not null
+          and (c.last_rejected_at is null or v.last_rejected_at >= c.last_rejected_at)
+        then v.last_rejection
+        else c.last_rejection
+      end
+    from (values ${values}) as v(id, last_event_at, rejections, last_rejected_at, last_rejection)
+    where c.id = v.id
+  `);
 }
 
 export async function deleteConnectionById(db: DbOrTx, params: { id: string }) {

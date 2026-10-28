@@ -36,6 +36,29 @@ export async function insertIdentityIfNew(
   return created;
 }
 
+// Several new accounts in one statement; the ones another delivery created first are left out.
+export async function insertIdentitiesIfNew(
+  db: DbOrTx,
+  rows: (typeof identities.$inferInsert)[]
+) {
+  if (rows.length === 0) {
+    return [];
+  }
+  return await db
+    .insert(identities)
+    .values(rows)
+    .onConflictDoNothing()
+    .returning();
+}
+
+export async function findIdentityById(db: DbOrTx, params: { id: string }) {
+  const [row] = await db
+    .select()
+    .from(identities)
+    .where(eq(identities.id, params.id));
+  return row;
+}
+
 export async function listIdentitiesByExternalIds(
   db: DbOrTx,
   params: { workspaceId: string; provider: string; externalIds: string[] }
@@ -138,26 +161,53 @@ export async function updateIdentityById(
   return row;
 }
 
-// Counts the sighting along with the fresh details.
-export async function updateIdentitySighting(
+// Only when something about the account changed; the sighting count goes through the tally.
+export async function updateIdentityDetails(
   db: DbOrTx,
   params: {
     id: string;
-    set: Pick<
-      Identity,
-      | "memberId"
-      | "externalHandle"
-      | "displayName"
-      | "isBot"
-      | "lastSeenAt"
-      | "firstSeenAt"
+    set: Partial<
+      Pick<
+        Identity,
+        | "memberId"
+        | "externalHandle"
+        | "displayName"
+        | "isBot"
+        | "email"
+        | "enrichedAt"
+      >
     >;
   }
 ) {
   await db
     .update(identities)
-    .set({ ...params.set, eventCount: sql`${identities.eventCount} + 1` })
+    .set(params.set)
     .where(eq(identities.id, params.id));
+}
+
+// One statement for a batch of sightings (ingest/tally.ts).
+export async function updateIdentitySightings(
+  db: DbOrTx,
+  rows: { id: string; n: number; first: Date; last: Date }[]
+) {
+  if (rows.length === 0) {
+    return;
+  }
+  const values = sql.join(
+    rows.map(
+      (r) =>
+        sql`(${r.id}::text, ${r.n}::int, ${r.first}::timestamptz, ${r.last}::timestamptz)`
+    ),
+    sql`, `
+  );
+  await db.execute(sql`
+    update identities as i set
+      event_count = i.event_count + v.n,
+      first_seen_at = least(i.first_seen_at, v.first),
+      last_seen_at = greatest(i.last_seen_at, v.last)
+    from (values ${values}) as v(id, n, first, last)
+    where i.id = v.id
+  `);
 }
 
 export async function deleteIdentityById(db: DbOrTx, params: { id: string }) {

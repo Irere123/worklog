@@ -9,6 +9,7 @@ import {
   pgTable,
   primaryKey,
   real,
+  smallint,
   text,
   timestamp,
   uniqueIndex,
@@ -95,6 +96,9 @@ export const identities = pgTable(
     externalHandle: text("external_handle"),
     displayName: text("display_name"),
     isBot: boolean("is_bot").notNull().default(false),
+    /** From the provider's directory (Slack users.info), so a verified address can link it to a member. */
+    email: text("email"),
+    enrichedAt: ts("enriched_at"),
     eventCount: integer("event_count").notNull().default(0),
     firstSeenAt: ts("first_seen_at"),
     lastSeenAt: ts("last_seen_at"),
@@ -138,25 +142,129 @@ export const apiTokens = pgTable("api_tokens", {
 /** Open-ended: the connector registry decides which ids exist. */
 export type Provider = string;
 
-export const connections = pgTable("connections", {
+/**
+ * pending: installed but not yet linked; suspended: paused at the provider (GitHub suspend);
+ * revoked: uninstalled or its token stopped working. Only active connections ingest.
+ */
+export const CONNECTION_STATUSES = [
+  "pending",
+  "active",
+  "paused",
+  "suspended",
+  "revoked",
+] as const;
+export type ConnectionStatus = (typeof CONNECTION_STATUSES)[number];
+
+export const connections = pgTable(
+  "connections",
+  {
+    id: text("id").primaryKey(),
+    workspaceId: text("workspace_id")
+      .notNull()
+      .references(() => workspaces.id),
+    provider: text("provider").notNull(),
+    name: text("name").notNull(),
+    status: text("status", { enum: CONNECTION_STATUSES })
+      .notNull()
+      .default("active"),
+    statusReason: text("status_reason"),
+    /**
+     * The provider-side account the instance's app is installed on (a GitHub installation id, a
+     * Slack team id), which routes its webhooks here. Null for hand-configured connections.
+     */
+    externalId: text("external_id"),
+    installedById: text("installed_by_id").references(() => members.id, {
+      onDelete: "set null",
+    }),
+    settings: jsonb("settings")
+      .$type<Record<string, unknown>>()
+      .notNull()
+      .default({}),
+    /** AES-GCM sealed JSON. */
+    secrets: text("secrets").notNull(),
+    lastEventAt: ts("last_event_at"),
+    /** Deliveries refused before they were stored: a wrong secret shows up here and nowhere else. */
+    rejections: integer("rejections").notNull().default(0),
+    lastRejectedAt: ts("last_rejected_at"),
+    lastRejection: text("last_rejection"),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    // One workspace per installation: the app's webhooks for it route to exactly one connection.
+    uniqueIndex("connections_external_uq")
+      .on(t.provider, t.externalId)
+      .concurrently(),
+  ]
+);
+
+/**
+ * The instance's own registration with a provider (a GitHub App, a Slack app), created once and
+ * shared by every workspace that installs it. A provider app has one webhook URL, so it can't be
+ * shared between instances.
+ */
+export const connectorApps = pgTable("connector_apps", {
+  provider: text("provider").primaryKey(),
+  /** GitHub App id, Slack app id, Discord application id. */
+  appId: text("app_id"),
+  /** GitHub's URL name for the app, used in install links. */
+  slug: text("slug"),
+  name: text("name"),
+  /** AES-GCM sealed JSON: client secret, webhook or signing secret, private key. */
+  credentials: text("credentials").notNull(),
+  createdVia: text("created_via", {
+    enum: ["env", "manifest", "manual"],
+  }).notNull(),
+  /** Deliveries for installations no connection claims. */
+  unrouted: integer("unrouted").notNull().default(0),
+  lastUnroutedAt: ts("last_unrouted_at"),
+  /** Deliveries whose signature the app's secret didn't verify: a secret that doesn't match. */
+  rejections: integer("rejections").notNull().default(0),
+  lastRejectedAt: ts("last_rejected_at"),
+  lastRejection: text("last_rejection"),
+  createdAt: createdAt(),
+  updatedAt: ts("updated_at").notNull().defaultNow(),
+});
+
+/**
+ * One row per in-flight install or app creation, bound to the admin who started it. The token
+ * itself is never stored, only its hash, and the row is deleted when it is used.
+ */
+export const installStates = pgTable("install_states", {
   id: text("id").primaryKey(),
+  provider: text("provider").notNull(),
+  purpose: text("purpose", { enum: ["install", "create_app"] }).notNull(),
   workspaceId: text("workspace_id")
     .notNull()
-    .references(() => workspaces.id),
-  provider: text("provider").notNull(),
-  name: text("name").notNull(),
-  status: text("status", { enum: ["active", "paused"] })
+    .references(() => workspaces.id, { onDelete: "cascade" }),
+  memberId: text("member_id")
     .notNull()
-    .default("active"),
-  settings: jsonb("settings")
-    .$type<Record<string, unknown>>()
-    .notNull()
-    .default({}),
-  /** AES-GCM sealed JSON. */
-  secrets: text("secrets").notNull(),
-  lastEventAt: ts("last_event_at"),
+    .references(() => members.id, { onDelete: "cascade" }),
+  data: jsonb("data").$type<Record<string, unknown>>().notNull().default({}),
+  expiresAt: ts("expires_at").notNull(),
   createdAt: createdAt(),
 });
+
+/** Where a sync stream (one repo's history, one channel's messages) has read up to. */
+export const connectionCursors = pgTable(
+  "connection_cursors",
+  {
+    connectionId: text("connection_id")
+      .notNull()
+      .references(() => connections.id, { onDelete: "cascade" }),
+    stream: text("stream").notNull(),
+    cursor: jsonb("cursor")
+      .$type<Record<string, unknown>>()
+      .notNull()
+      .default({}),
+    state: text("state", { enum: ["idle", "running", "failed"] })
+      .notNull()
+      .default("idle"),
+    error: text("error"),
+    syncedAt: ts("synced_at"),
+    updatedAt: ts("updated_at").notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.connectionId, t.stream] })]
+);
 
 // Deliveries are stored before they are interpreted, so ingestion is idempotent and replayable after a connector fix.
 export const inboundEvents = pgTable(
@@ -170,6 +278,13 @@ export const inboundEvents = pgTable(
       .notNull()
       .references(() => connections.id, { onDelete: "cascade" }),
     deliveryId: text("delivery_id").notNull(),
+    via: text("via", { enum: ["webhook", "app", "push", "sync"] })
+      .notNull()
+      .default("webhook"),
+    /** The repo or channel it concerns. Deliveries in one partition are processed in order. */
+    partitionKey: text("partition_key").notNull().default(""),
+    /** Which of the connection's ordered queues processes it, derived from the partition. */
+    lane: smallint("lane").notNull().default(0),
     eventType: text("event_type").notNull(),
     payload: jsonb("payload").$type<unknown>().notNull(),
     status: text("status", {
@@ -181,12 +296,19 @@ export const inboundEvents = pgTable(
     outcome: jsonb("outcome").$type<Record<string, unknown>>(),
     error: text("error"),
     attempts: integer("attempts").notNull().default(0),
+    /** When a failed delivery is tried again; null once it has used up its attempts. */
+    retryAt: ts("retry_at"),
     receivedAt: ts("received_at").notNull().defaultNow(),
     processedAt: ts("processed_at"),
   },
   (t) => [
     uniqueIndex("inbound_delivery_uq").on(t.connectionId, t.deliveryId),
     index("inbound_connection_time_idx").on(t.connectionId, t.receivedAt),
+    // What a lane's drain reads next: small, since processed rows leave it.
+    index("inbound_waiting_idx")
+      .on(t.connectionId, t.lane, t.receivedAt)
+      .concurrently()
+      .where(sql`${t.status} in ('pending', 'failed')`),
   ]
 );
 
@@ -395,6 +517,38 @@ export const activities = pgTable(
   ]
 );
 
+/**
+ * Every source event that produced something, merged or not. An activity row only carries the id
+ * of the first event merged into it, so this is what makes a retried delivery, a redelivery or a
+ * backfill of an event already folded into a burst a no-op. Deleting an activity deletes its
+ * entries, so a replay can rebuild it.
+ */
+export const ingestedEvents = pgTable(
+  "ingested_events",
+  {
+    workspaceId: text("workspace_id").notNull(),
+    source: text("source").notNull(),
+    externalId: text("external_id").notNull(),
+    connectionId: text("connection_id").references(() => connections.id, {
+      onDelete: "cascade",
+    }),
+    /**
+     * Null for hidden events (signals and board effects only) and for deletions. The reference
+     * is checked at commit (migration 0012), so a claim can name the activity about to be written;
+     * changing it here would drop that.
+     */
+    activityId: text("activity_id").references(() => activities.id, {
+      onDelete: "cascade",
+    }),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.workspaceId, t.source, t.externalId] }),
+    index("ingested_events_activity_idx").on(t.activityId),
+    index("ingested_events_connection_idx").on(t.connectionId, t.createdAt),
+  ]
+);
+
 export const ATTENTION_STATES = [
   "open",
   "done",
@@ -435,6 +589,11 @@ export const attentionItems = pgTable(
     createdAt: createdAt(),
     updatedAt: ts("updated_at").notNull().defaultNow(),
     resolvedAt: ts("resolved_at"),
+    /**
+     * When the source event that last raised it happened. A resolve closes only what was raised
+     * before it, so a late one can't close a newer request.
+     */
+    sourceAt: ts("source_at"),
     /** When the proactive check last evaluated it (reset when something new happens on it). */
     consideredAt: ts("considered_at"),
     disposition: text("disposition", { enum: ["push", "digest", "drop"] }),
@@ -449,6 +608,33 @@ export const attentionItems = pgTable(
   (t) => [
     uniqueIndex("attention_dedupe_uq").on(t.memberId, t.dedupeKey),
     index("attention_member_state_idx").on(t.memberId, t.state),
+    // Closing a PR resolves its review requests for everyone, by thread alone.
+    index("attention_open_thread_idx")
+      .on(t.workspaceId, t.dedupeKey)
+      .concurrently()
+      .where(sql`${t.state} = 'open'`),
+  ]
+);
+
+/**
+ * When a thread's request was last resolved, by source time. A request that arrives after its
+ * resolution (out of order, a retry, a backfill) but happened before it must not reopen anything,
+ * even if no item existed when the resolve was processed. `memberId` is empty when it was resolved
+ * for everyone, as closing a PR does.
+ */
+export const attentionResolutions = pgTable(
+  "attention_resolutions",
+  {
+    workspaceId: text("workspace_id").notNull(),
+    memberId: text("member_id").notNull(),
+    dedupeKey: text("dedupe_key").notNull(),
+    resolvedThrough: ts("resolved_through").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.workspaceId, t.dedupeKey, t.memberId] }),
+    // Pruned by when the thread was last resolved, not first.
+    index("attention_resolutions_time_idx").on(t.resolvedThrough),
   ]
 );
 
@@ -584,6 +770,11 @@ export const automations = pgTable(
     state: jsonb("state").$type<AutomationState>().notNull().default({}),
     enabled: boolean("enabled").notNull().default(true),
     nextRunAt: ts("next_run_at"),
+    /**
+     * When the scheduler queued its run, which the run clears: a job that finds another value here
+     * was overtaken (by a retry after the run finished, or a later claim) and does nothing.
+     */
+    claimedAt: ts("claimed_at"),
     lastRunAt: ts("last_run_at"),
     lastStatus: text("last_status"),
     failureCount: integer("failure_count").notNull().default(0),
