@@ -349,6 +349,15 @@ const mentionOfU1 = (id: string, at: string) => ({
   mentions: [{ id: "u1", handle: "SAMMY", name: "wrong" }],
 });
 
+// A pushed ticket close by u1, known by its login "sam".
+const closedByU1 = (id: string, at: string) => ({
+  id,
+  kind: "ticket.closed",
+  occurredAt: at,
+  actor: { id: "u1", handle: "sam" },
+  title: `Closed ${id}`,
+});
+
 const daysAgo = (d: number, minutes = 0) =>
   new Date(Date.now() - d * 86_400_000 + minutes * 60_000).toISOString();
 
@@ -1217,6 +1226,45 @@ describe("custom integrations", () => {
       })
     ).body;
     expect(closed).toHaveLength(2);
+  });
+
+  test("an account linked by login before it's seen spans its first delivery's actions too", async () => {
+    const owner = await env.workspace();
+    await env.call("POST", "/v1/members/me/identities", {
+      token: owner.token,
+      body: { provider: "jira:gamma", handle: "sam" },
+    });
+    const conn = (
+      await env.call("POST", "/v1/connections", {
+        token: owner.token,
+        body: {
+          provider: "custom",
+          settings: { identityNamespace: "jira:gamma" },
+        },
+      })
+    ).body;
+    await env.call("POST", `/v1/connections/${conn.id}/events`, {
+      token: owner.token,
+      body: {
+        events: [
+          closedByU1("PAY-5", "2026-10-05T09:00:00Z"),
+          closedByU1("PAY-2", "2026-10-02T09:00:00Z"),
+        ],
+      },
+    });
+    await env.drain();
+    const [u1] = (
+      await env.ctx.db.execute<{ first: Date; last: Date; member: string }>(sql`
+        select first_seen_at as first, last_seen_at as last, member_id as member
+        from identities where workspace_id = ${owner.workspace.id} and external_id = 'u1'`)
+    ).rows;
+    expect(u1?.member).toBe(owner.member.id);
+    expect(new Date(u1?.first ?? 0).toISOString()).toBe(
+      "2026-10-02T09:00:00.000Z"
+    );
+    expect(new Date(u1?.last ?? 0).toISOString()).toBe(
+      "2026-10-05T09:00:00.000Z"
+    );
   });
 
   test("namespaces under the generic prefixes are free, but not another connection's own", async () => {
