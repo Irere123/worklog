@@ -209,11 +209,18 @@ async function sighted(
   memberId: string | null
 ): Promise<Resolved> {
   const { actor, at, n } = sighting;
+  // Named by a mention rather than seen acting: the mention's login (lowercased) isn't news about
+  // the account, and naming it isn't a sighting.
+  const seen = actor.id === identity.externalId;
   const set = changes(identity, {
     memberId,
-    externalHandle: actor.handle ?? identity.externalHandle,
-    displayName: actor.name ?? identity.displayName,
-    isBot: actor.bot ?? identity.isBot,
+    externalHandle: seen
+      ? (actor.handle ?? identity.externalHandle)
+      : identity.externalHandle,
+    displayName: seen
+      ? (actor.name ?? identity.displayName)
+      : identity.displayName,
+    isBot: seen ? (actor.bot ?? identity.isBot) : identity.isBot,
   });
   if (set?.memberId) {
     // Linked just now (the account signed in): what it did before is theirs too.
@@ -228,11 +235,13 @@ async function sighted(
   } else if (set) {
     await updateIdentityDetails(ctx.db, { id: identity.id, set });
   }
-  ctx.tally.sighted(identity.id, at, n);
+  if (seen) {
+    ctx.tally.sighted(identity.id, at, n);
+  }
   return {
     identityId: identity.id,
     memberId,
-    isBot: actor.bot ?? identity.isBot,
+    isBot: seen ? (actor.bot ?? identity.isBot) : identity.isBot,
   };
 }
 

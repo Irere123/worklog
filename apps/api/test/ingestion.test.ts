@@ -415,6 +415,11 @@ describe("ingestion pipeline", () => {
       select count(*)::int as n from identities
       where workspace_id = ${owner.workspace.id} and external_id like 'handle:%'`);
     expect(placeholders.rows[0]?.n).toBe(0);
+    // Being mentioned isn't being seen: Sam's account keeps its login as written, and its count.
+    const account = await env.ctx.db.execute<{ handle: string; n: number }>(sql`
+      select external_handle as handle, event_count as n from identities
+      where workspace_id = ${owner.workspace.id} and external_id = '202'`);
+    expect(account.rows).toEqual([{ handle: "Sam-GH", n: 1 }]);
   });
 
   test("bursts read back newest first stay apart by days, and together within minutes", async () => {
