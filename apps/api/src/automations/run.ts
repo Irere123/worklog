@@ -1,8 +1,9 @@
 import { runConsolidate } from "#agent/memory/consolidate";
 import type { AppContext } from "#context";
 import {
+  claimDueAutomations,
+  findAutomationById,
   insertAutomationRun,
-  listDueAutomations,
   updateAutomationById,
 } from "#db/queries/automations";
 import type { Automation } from "#db/queries/automations";
@@ -10,6 +11,7 @@ import { findMemberById } from "#db/queries/members";
 import type { Member } from "#db/queries/members";
 import { getWorkspaceById } from "#db/queries/workspaces";
 import { transact } from "#db/transact";
+import { enqueue } from "#jobs/queue";
 import { notFound } from "#lib/errors";
 import { newId } from "#lib/ids";
 import { timezoneOf } from "#lib/time";
@@ -21,27 +23,72 @@ import { jitterFor, nextRun } from "./schedule";
 
 const FAILURE_ALERT_AT = 3;
 const FAILURE_DISABLE_AT = 10;
+/**
+ * How long a queued run has before its automation comes due again, if its job is gone. A worker
+ * that died mid-run holds its job, and the person's queue, until Graphile frees stale locks (four
+ * hours); the claim keeps that job from running the automation again if it had finished.
+ */
+const LEASE_MS = 15 * 60_000;
 
-export async function runDueAutomations(
+/**
+ * Queues a run for everything due, to run on any worker: briefs wait on a model for seconds each,
+ * so the morning's briefs of a few thousand people can't run one after another in the scheduler.
+ * One person's automations queue behind each other. Returns how many were queued.
+ */
+export async function queueDueAutomations(
   ctx: AppContext,
-  opts: { batch?: number; budgetMs?: number } = {}
+  opts: { batch?: number } = {}
 ) {
-  const batch = opts.batch ?? 25;
-  const deadline = Date.now() + (opts.budgetMs ?? 45_000);
-  const results = [];
-  while (Date.now() < deadline) {
-    const due = await listDueAutomations(ctx.db, {
-      now: ctx.now(),
-      limit: batch,
+  const batch = opts.batch ?? 200;
+  let queued = 0;
+  for (;;) {
+    const claimed = await transact(ctx, async (tx) => {
+      const now = tx.now();
+      const rows = await claimDueAutomations(tx.db, {
+        now,
+        leaseUntil: new Date(now.getTime() + LEASE_MS),
+        limit: batch,
+      });
+      for (const row of rows) {
+        await enqueue(
+          tx,
+          "automation:run",
+          { automationId: row.id, claimedAt: now.toISOString() },
+          {
+            queue: `automations:${row.memberId}`,
+            key: `automation:${row.id}`,
+            maxAttempts: 3,
+          }
+        );
+      }
+      return rows.length;
     });
-    for (const automation of due) {
-      results.push(await runAutomation(ctx, automation));
-    }
-    if (due.length < batch) {
-      break;
+    queued += claimed;
+    if (claimed < batch) {
+      return queued;
     }
   }
-  return results;
+}
+
+/**
+ * The job `queueDueAutomations` queued, if its claim still stands. The scheduled run clears it in
+ * the transaction that records the run, so a retry after the run finished (its event wasn't
+ * published, or its worker died before saying it was done) does nothing, and neither does a
+ * second job queued while a slow run outlasted its lease. Edits, manual runs and checks pulled
+ * earlier leave it alone.
+ */
+export async function runQueuedAutomation(
+  ctx: AppContext,
+  id: string,
+  claimedAt: string | null
+) {
+  const automation = await findAutomationById(ctx.db, { id });
+  const claimed =
+    claimedAt === null ||
+    automation?.claimedAt?.getTime() === Date.parse(claimedAt);
+  if (automation?.enabled === true && claimed) {
+    await runAutomation(ctx, automation);
+  }
 }
 
 export async function runAutomation(
@@ -89,8 +136,10 @@ export async function runAutomation(
         lastStatus: outcome.status,
         failureCount,
         state,
-        enabled:
-          failureCount >= FAILURE_DISABLE_AT ? false : automation.enabled,
+        // Only to turn it off: written back as loaded, it would undo someone turning it off
+        // while it ran.
+        ...(failureCount >= FAILURE_DISABLE_AT ? { enabled: false } : {}),
+        ...(opts.manual === true ? {} : { claimedAt: null }),
         nextRunAt:
           opts.manual === true
             ? automation.nextRunAt
