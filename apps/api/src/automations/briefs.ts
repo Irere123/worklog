@@ -11,7 +11,7 @@ import { listMembers } from "#db/queries/members";
 import type { Member } from "#db/queries/members";
 import { getWorkspaceById } from "#db/queries/workspaces";
 import type { Visibility } from "#db/schema";
-import { newId } from "#lib/ids";
+import { generateId } from "#lib/ids";
 import { localParts, startOfLocalDay, timezoneOf } from "#lib/time";
 import { teamVisibleAttention } from "#work/attention";
 import { listCards } from "#work/board";
@@ -319,7 +319,7 @@ export async function generateBrief(
     extraInstructions
   );
   const row: BriefRow = {
-    id: newId("brf"),
+    id: generateId(),
     workspaceId: member.workspaceId,
     memberId: member.id,
     period,

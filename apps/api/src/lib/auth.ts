@@ -6,16 +6,8 @@ import { bearer, magicLink } from "better-auth/plugins";
 
 import type { Config } from "#config";
 
-import { newId } from "./ids";
-import type { IdPrefix } from "./ids";
+import { generateId } from "./ids";
 import type { Mailer } from "./mailer";
-
-const PREFIX: Record<string, IdPrefix> = {
-  user: "usr",
-  session: "ses",
-  account: "acc",
-  verification: "ver",
-};
 
 export type SocialProvider = "github" | "discord" | "slack";
 
@@ -71,7 +63,7 @@ export function createAuth(
       transaction: true,
     }),
     advanced: {
-      database: { generateId: ({ model }) => newId(PREFIX[model] ?? "usr") },
+      database: { generateId },
     },
     socialProviders: {
       ...(github ? { github } : {}),

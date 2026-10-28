@@ -5,7 +5,8 @@ const BUILT_IN = new Set(["github", "gitea", "slack", "discord"]);
 
 // A generic connection's own namespace, used when it names none ("custom:<id>", "webhook:<id>"):
 // another connection taking it would act as its users. Others under those prefixes are free.
-const PER_CONNECTION = /^(?:custom|webhook):con_/u;
+// Connections made before ids were bare KSUIDs keep their "con_" ids.
+const PER_CONNECTION = /^(?:custom|webhook):(?:con_|[0-9A-Za-z]{27}$)/u;
 
 export function isBuiltInNamespace(namespace: string) {
   return BUILT_IN.has(namespace.split(":")[0] ?? "");

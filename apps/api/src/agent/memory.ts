@@ -10,7 +10,7 @@ import type { MemoryRow } from "#db/queries/memories";
 import type { MemoryKind, Visibility } from "#db/schema";
 import { transact } from "#db/transact";
 import { notFound } from "#lib/errors";
-import { newId } from "#lib/ids";
+import { generateId } from "#lib/ids";
 
 export async function addMemory(
   ctx: AppContext,
@@ -29,7 +29,7 @@ export async function addMemory(
 ) {
   const now = ctx.now();
   const row: MemoryRow = {
-    id: newId("mmr"),
+    id: generateId(),
     workspaceId: input.workspaceId,
     memberId: input.memberId,
     kind: input.kind,

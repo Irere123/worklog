@@ -90,7 +90,7 @@ apps/api/test/   harness.ts plus one file per area
 - **Inject the outside world:** `ctx.now()` and `ctx.fetch`, never `new Date()` or `fetch`.
 - **AI is optional.** `ctx.models` is null without `OPENROUTER_API_KEY`, so every AI feature needs a fallback. Call models through `structured()` or `complete()` from `agent/generate.ts`, and render prompts with `prompt(name, vars)`.
 - **The assistant never writes its own instructions.** No tool may change `constitution.md` or the owner's voice.
-- **Helpers:** throw `notFound`, `forbidden`, `badRequest` or `conflict` from `lib/errors.ts`; use `returned()` for rows a write must return and `newId(prefix)` for ids.
+- **Helpers:** throw `notFound`, `forbidden`, `badRequest` or `conflict` from `lib/errors.ts`; use `returned()` for rows a write must return and `generateId(prefix)` for ids.
 - **Never hand-edit** `drizzle/**` or `db/auth-schema.ts`. A custom migration's SQL is the one exception.
 
 ## Database

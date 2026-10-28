@@ -1,48 +1,7 @@
-import { randomBytes } from "node:crypto";
+import KSUID from "ksuid";
 
-const ALPHABET = "0123456789abcdefghjkmnpqrstvwxyz";
-
-// ULID layout (48-bit ms timestamp + 80 random bits): sorting by id sorts by creation time.
-export function newId(prefix: IdPrefix): string {
-  let time = Date.now();
-  let ts = "";
-  for (let i = 0; i < 10; i += 1) {
-    ts = ALPHABET.charAt(time % 32) + ts;
-    time = Math.floor(time / 32);
-  }
-  let rand = "";
-  for (const byte of randomBytes(16)) {
-    rand += ALPHABET.charAt(byte % 32);
-  }
-  return `${prefix}_${ts}${rand}`;
+// Sorts by creation time to the second, in byte order. Under a collation other than C its mixed
+// case breaks that, so order by a timestamp and use the id only to break ties.
+export function generateId(): string {
+  return KSUID.randomSync().string;
 }
-
-export type IdPrefix =
-  | "ws"
-  | "usr"
-  | "ses"
-  | "acc"
-  | "ver"
-  | "mem"
-  | "idn"
-  | "tok"
-  | "con"
-  | "dlv"
-  | "brd"
-  | "col"
-  | "crd"
-  | "cmt"
-  | "tag"
-  | "act"
-  | "att"
-  | "brf"
-  | "tgt"
-  | "aut"
-  | "run"
-  | "mmr"
-  | "vce"
-  | "cnv"
-  | "msg"
-  | "inb"
-  | "ntf"
-  | "fbk";

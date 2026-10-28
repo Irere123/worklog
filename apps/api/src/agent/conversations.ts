@@ -18,7 +18,7 @@ import type { Member } from "#db/queries/members";
 import { transact } from "#db/transact";
 import { enqueue } from "#jobs/queue";
 import { forbidden, notFound } from "#lib/errors";
-import { newId } from "#lib/ids";
+import { generateId } from "#lib/ids";
 
 import { needsCompaction } from "./compaction";
 
@@ -29,7 +29,7 @@ export async function createConversation(
   opts: { inbox?: boolean; title?: string } = {}
 ) {
   const row: ConversationRow = {
-    id: newId("cnv"),
+    id: generateId(),
     workspaceId: agent.workspaceId,
     agentId: agent.id,
     askerId: asker.id,
@@ -109,7 +109,7 @@ export async function appendMessages(
         );
       }
       return {
-        id: newId("msg"),
+        id: generateId(),
         conversationId: conversation.id,
         seq: next + i,
         role: m.role,

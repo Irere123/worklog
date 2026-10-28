@@ -2,7 +2,7 @@ import type { AppContext } from "#context";
 import type { Member } from "#db/queries/members";
 import { insertVoice } from "#db/queries/voices";
 import type { VoiceRow } from "#db/queries/voices";
-import { newId } from "#lib/ids";
+import { generateId } from "#lib/ids";
 
 // It rides along in every conversation, so it stays about a page.
 export const MAX_VOICE_CHARS = 4000;
@@ -18,7 +18,7 @@ export async function setVoice(
   content: string
 ) {
   const row: VoiceRow = {
-    id: newId("vce"),
+    id: generateId(),
     workspaceId: member.workspaceId,
     memberId: member.id,
     content: content.trim(),

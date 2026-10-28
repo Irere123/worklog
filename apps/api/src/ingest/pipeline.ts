@@ -18,7 +18,7 @@ import type { InboundEvent } from "#db/queries/inbound-events";
 import { addJob, unlockStaleJobs } from "#db/queries/jobs";
 import { transact } from "#db/transact";
 import { newJob } from "#jobs/queue";
-import { newId } from "#lib/ids";
+import { generateId } from "#lib/ids";
 
 import { queueFollowUp } from "./follow-up";
 import { laneOf, laneQueue } from "./lanes";
@@ -145,7 +145,7 @@ export async function store(
   const lane = laneOf(delivery.partitionKey);
   const row = await insertInboundEventWithJob(ctx.db, {
     row: {
-      id: newId("inb"),
+      id: generateId(),
       workspaceId: conn.workspaceId,
       connectionId: conn.id,
       lane,

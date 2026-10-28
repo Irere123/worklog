@@ -8,7 +8,7 @@ import type { ActivityRow } from "#db/queries/activities";
 import { setCardActiveAt } from "#db/queries/cards";
 import type { Visibility } from "#db/schema";
 import { transact } from "#db/transact";
-import { newId } from "#lib/ids";
+import { generateId } from "#lib/ids";
 
 export type ActivityInput = {
   /** Chosen by the caller when something written before it must point at it. */
@@ -92,7 +92,7 @@ function newActivity(
   now: Date
 ): ActivityRow {
   return {
-    id: input.id ?? newId("act"),
+    id: input.id ?? generateId(),
     workspaceId: input.workspaceId,
     actorId: input.actorId,
     source: input.source,

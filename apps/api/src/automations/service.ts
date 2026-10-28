@@ -12,7 +12,7 @@ import { getWorkspaceById } from "#db/queries/workspaces";
 import type { AutomationKind, Schedule } from "#db/schema";
 import { transact } from "#db/transact";
 import { badRequest, notFound } from "#lib/errors";
-import { newId } from "#lib/ids";
+import { generateId } from "#lib/ids";
 import { timezoneOf } from "#lib/time";
 
 import { jitterFor, nextRun } from "./schedule";
@@ -95,7 +95,7 @@ export async function createAutomation(
     member,
     await getWorkspaceById(ctx.db, { id: member.workspaceId })
   );
-  const id = newId("aut");
+  const id = generateId();
   const row = {
     id,
     workspaceId: member.workspaceId,

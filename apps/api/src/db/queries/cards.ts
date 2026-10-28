@@ -18,7 +18,7 @@ import {
 import type { CardStage } from "#db/schema";
 import { returned } from "#lib/assert";
 import { conflict, notFound } from "#lib/errors";
-import { newId } from "#lib/ids";
+import { generateId } from "#lib/ids";
 
 export type CardRow = typeof cards.$inferSelect;
 export type CommentRow = typeof comments.$inferSelect;
@@ -285,7 +285,7 @@ export async function setCardTags(
   }
   await db
     .insert(tags)
-    .values(names.map((name) => ({ id: newId("tag"), workspaceId, name })))
+    .values(names.map((name) => ({ id: generateId(), workspaceId, name })))
     .onConflictDoNothing();
   const rows = await db
     .select()

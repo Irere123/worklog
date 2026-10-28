@@ -26,7 +26,7 @@ import type { ApiScope, MemberSettings } from "#db/schema";
 import { transact } from "#db/transact";
 import { generateToken, hashToken } from "#lib/crypto";
 import { badRequest, conflict, forbidden, notFound } from "#lib/errors";
-import { newId } from "#lib/ids";
+import { generateId } from "#lib/ids";
 import { isValidTimeZone } from "#lib/time";
 
 function slugify(value: string) {
@@ -70,9 +70,10 @@ async function createWorkspace(
     throw badRequest(`Unknown time zone ${timezone}`);
   }
   const workspace: Workspace = {
-    id: newId("ws"),
+    id: generateId(),
     name: input.name,
-    slug: `${slugify(input.name)}-${newId("ws").slice(-6)}`,
+    // Ids mix cases; slugs, which go in URLs, don't.
+    slug: `${slugify(input.name)}-${generateId().slice(-6).toLowerCase()}`,
     timezone,
     entropyDays: 30,
     cardSeq: 0,
@@ -186,7 +187,7 @@ export async function createMember(
   }
   return await transact(ctx, async (tx) => {
     const member: Member = {
-      id: newId("mem"),
+      id: generateId(),
       workspaceId,
       kind: input.kind,
       role: input.role ?? "member",
@@ -211,7 +212,7 @@ export async function createMember(
     if (member.kind === "human") {
       await insertMembers(tx.db, [
         {
-          id: newId("mem"),
+          id: generateId(),
           workspaceId,
           kind: "agent",
           role: "member",
@@ -283,7 +284,7 @@ export async function createToken(
 ) {
   const token = generateToken();
   const row = {
-    id: newId("tok"),
+    id: generateId(),
     workspaceId: member.workspaceId,
     memberId: member.id,
     name,

@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, setSystemTime, test } from "bun:test";
 
 import { eq, sql } from "drizzle-orm";
 
@@ -10,7 +10,7 @@ import { events } from "#db/schema";
 import { transact } from "#db/transact";
 import { SecretBox } from "#lib/crypto";
 import { ApiError } from "#lib/errors";
-import { newId } from "#lib/ids";
+import { generateId } from "#lib/ids";
 
 import { testEnv } from "./harness";
 
@@ -22,7 +22,7 @@ async function failure(promise: Promise<unknown>) {
 }
 
 function workspaceRow(ctx: AppContext) {
-  const id = newId("ws");
+  const id = generateId();
   return {
     id,
     name: "Rollback",
@@ -137,7 +137,7 @@ test("a taken handle is a conflict, not a database error", async () => {
   const { workspace, member } = await env.workspace();
   const duplicate = insertMembers(env.ctx.db, [
     {
-      id: newId("mem"),
+      id: generateId(),
       workspaceId: workspace.id,
       kind: "human",
       name: "Twin",
@@ -169,5 +169,20 @@ describe("secret keys", () => {
     const v2 = box.seal({ token: "t2" });
     const legacy = v2.split(".").slice(2).join(".");
     expect(new SecretBox(b, [a]).open(legacy)).toEqual({ token: "t2" });
+  });
+});
+
+describe("ids", () => {
+  test("are KSUIDs, ordered by the second they were made", () => {
+    try {
+      setSystemTime(new Date("2026-10-28T12:00:00.900Z"));
+      const first = generateId();
+      setSystemTime(new Date("2026-10-28T12:00:01.000Z"));
+      const later = generateId();
+      expect(first).toMatch(/^[0-9A-Za-z]{27}$/u);
+      expect(first < later).toBe(true);
+    } finally {
+      setSystemTime();
+    }
   });
 });

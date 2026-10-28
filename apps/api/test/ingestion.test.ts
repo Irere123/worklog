@@ -1413,6 +1413,7 @@ describe("custom integrations", () => {
 
   test("namespaces under the generic prefixes are free, but not another connection's own", async () => {
     const owner = await env.workspace();
+    const ids: string[] = [];
     for (const name of ["one", "two"]) {
       const shared = await env.call("POST", "/v1/connections", {
         token: owner.token,
@@ -1423,15 +1424,18 @@ describe("custom integrations", () => {
         },
       });
       expect(shared.status).toBe(201);
+      ids.push(shared.body.id);
     }
-    const taking = await env.call("POST", "/v1/connections", {
-      token: owner.token,
-      body: {
-        provider: "custom",
-        settings: { identityNamespace: "webhook:con_01abc" },
-      },
-    });
-    expect(taking.status).toBe(400);
+    for (const namespace of [`custom:${ids[0]}`, "webhook:con_01abc"]) {
+      const taking = await env.call("POST", "/v1/connections", {
+        token: owner.token,
+        body: {
+          provider: "custom",
+          settings: { identityNamespace: namespace },
+        },
+      });
+      expect([namespace, taking.status]).toEqual([namespace, 400]);
+    }
   });
 
   test("every built-in connector's namespace is reserved", () => {

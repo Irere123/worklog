@@ -22,7 +22,7 @@ import { findMemberById } from "#db/queries/members";
 import type { FEEDBACK_SIGNALS, Priority } from "#db/schema";
 import { transact } from "#db/transact";
 import { badRequest, notFound } from "#lib/errors";
-import { newId } from "#lib/ids";
+import { generateId } from "#lib/ids";
 import { DAY_MS } from "#lib/time";
 
 export type FeedbackSignal = (typeof FEEDBACK_SIGNALS)[number];
@@ -64,7 +64,7 @@ export async function raiseAttention(
     const priority = await applySenderQuota(tx, input);
     const row = await upsertAttention(tx.db, {
       row: {
-        id: newId("att"),
+        id: generateId(),
         workspaceId: input.workspaceId,
         memberId: input.memberId,
         kind: input.kind,
@@ -218,7 +218,7 @@ export async function recordNotification(
   }
 ) {
   await insertNotification(ctx.db, {
-    id: newId("ntf"),
+    id: generateId(),
     automationId: null,
     teamBody: null,
     reason: null,
@@ -258,7 +258,7 @@ export async function giveFeedback(
 ) {
   const item = await getAttentionById(ctx.db, { id, memberId });
   await insertFeedback(ctx.db, {
-    id: newId("fbk"),
+    id: generateId(),
     workspaceId: item.workspaceId,
     memberId,
     attentionId: item.id,

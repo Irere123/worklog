@@ -18,7 +18,7 @@ import type { Member } from "#db/queries/members";
 import type { TargetKind, Visibility } from "#db/schema";
 import { handleProviderError } from "#ingest/lifecycle";
 import { badRequest, notFound } from "#lib/errors";
-import { newId } from "#lib/ids";
+import { generateId } from "#lib/ids";
 
 import { toEmailHtml } from "./sanitize";
 
@@ -75,7 +75,7 @@ export async function createTarget(
     throw badRequest("Webhook address must be a URL");
   }
   const row: TargetRow = {
-    id: newId("tgt"),
+    id: generateId(),
     workspaceId,
     memberId: member.id,
     kind: input.kind,

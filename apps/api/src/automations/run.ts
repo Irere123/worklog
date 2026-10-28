@@ -13,7 +13,7 @@ import { getWorkspaceById } from "#db/queries/workspaces";
 import { transact } from "#db/transact";
 import { enqueue } from "#jobs/queue";
 import { notFound } from "#lib/errors";
-import { newId } from "#lib/ids";
+import { generateId } from "#lib/ids";
 import { timezoneOf } from "#lib/time";
 import { raiseAttention } from "#work/attention";
 
@@ -153,7 +153,7 @@ export async function runAutomation(
       },
     });
     await insertAutomationRun(tx.db, {
-      id: newId("run"),
+      id: generateId(),
       automationId: automation.id,
       status: outcome.status,
       summary: outcome.summary.slice(0, 2000),

@@ -45,7 +45,7 @@ import {
 import type { Member } from "#db/queries/members";
 import { transact } from "#db/transact";
 import { enqueue } from "#jobs/queue";
-import { newId } from "#lib/ids";
+import { generateId } from "#lib/ids";
 import { HOUR_MS } from "#lib/time";
 import { recordActivity } from "#work/activity";
 
@@ -505,7 +505,7 @@ async function ingestEvent(
   };
   await transact(ctx, async (tx) => {
     // The claim names the activity it is about to write, so a new event costs one ledger write.
-    const planned = event.hidden === true ? null : newId("act");
+    const planned = event.hidden === true ? null : generateId();
     const claimed = await insertIngestedEventIfNew(tx.db, {
       ...key,
       connectionId: source.conn.id,

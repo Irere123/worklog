@@ -148,7 +148,7 @@ Every connector emits `WorklogEvent`s (`apps/api/src/connectors/types.ts`). The 
   3. the account someone **signed in with** (GitHub, Slack or Discord), so signing in is all attribution needs, for what the account did before too;
   4. for Slack, the account's email from the directory, when exactly one person in the workspace has it.
 - **A login reused after a rename never inherits someone else's identity:** only placeholders are upgraded.
-- **Namespaces are scoped:** `github`, `slack`, `discord`, `gitea:git.example.com`, `webhook:{connectionId}`. Generic connectors cannot claim the built-in ones or another connection's own (`custom:con_…`, `webhook:con_…`; one held from before they were reserved falls back to the connection's own; health shows the namespace in use), and their event ids count within their connection: two in a workspace can use the same ids.
+- **Namespaces are scoped:** `github`, `slack`, `discord`, `gitea:git.example.com`, `webhook:{connectionId}`. Generic connectors cannot claim the built-in ones or another connection's own (`custom:<connection id>`, `webhook:<connection id>`; one held from before they were reserved falls back to the connection's own; health shows the namespace in use), and their event ids count within their connection: two in a workspace can use the same ids.
 - **Only acting counts as being seen.** Being mentioned or assigned names an account without changing it, its count or when it was last seen, even in a delivery where it also acts. What a built-in connector's provider says of someone it names (a GitHub reviewer's id and login) can still link them to a member linked by login; what a generic connection's sender writes of someone else can't.
 
 ## Adding a tool

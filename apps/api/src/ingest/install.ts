@@ -23,7 +23,7 @@ import type { Member } from "#db/queries/members";
 import { transact } from "#db/transact";
 import { hashToken } from "#lib/crypto";
 import { ApiError, badRequest, conflict } from "#lib/errors";
-import { newId } from "#lib/ids";
+import { generateId } from "#lib/ids";
 import { HOUR_MS } from "#lib/time";
 
 import { callbackUrl, loadApp, requireServerAdmin, saveApp } from "./apps";
@@ -306,7 +306,7 @@ async function insertNew(
   }
 ) {
   const row: ConnectionRow = {
-    id: newId("con"),
+    id: generateId(),
     workspaceId: params.workspaceId,
     provider: params.provider,
     name: params.installed.name,

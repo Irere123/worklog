@@ -17,7 +17,7 @@ import {
 import type { ConnectionRow } from "#db/queries/connections";
 import { transact } from "#db/transact";
 import { badRequest } from "#lib/errors";
-import { newId } from "#lib/ids";
+import { generateId } from "#lib/ids";
 
 import { loadApp } from "./apps";
 import { queueHooks } from "./hooks";
@@ -121,7 +121,7 @@ export async function createConnection(
   );
   await requireBoard(ctx, workspaceId, input.settings ?? {});
   const row: ConnectionRow = {
-    id: newId("con"),
+    id: generateId(),
     workspaceId,
     provider: input.provider,
     name: input.name ?? connector.name,

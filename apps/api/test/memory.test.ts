@@ -341,7 +341,7 @@ test("memory exports as Markdown files split by visibility, unchanged until memo
   ]);
   const file = (path: string) => files.find((f) => f.path === path)?.content;
   expect(file("team/profile.md")).toMatch(
-    /^# Profile\n\n- Owns the payments service \(also: billing\) \[mmr_\w+\]\n$/u
+    /^# Profile\n\n- Owns the payments service \(also: billing\) \[[0-9A-Za-z]{27}\]\n$/u
   );
   expect(file("team/facts.md")).toContain(
     "- On leave until 30 Oct (until 2026-10-30)"

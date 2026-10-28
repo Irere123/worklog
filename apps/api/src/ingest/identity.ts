@@ -20,7 +20,7 @@ import { transact } from "#db/transact";
 import { enqueue } from "#jobs/queue";
 import { returned } from "#lib/assert";
 import { conflict, notFound } from "#lib/errors";
-import { newId } from "#lib/ids";
+import { generateId } from "#lib/ids";
 
 /** Logins compare case-insensitively; ids are stored as given. */
 const handleKey = (handle: string) => `handle:${handle.toLowerCase()}`;
@@ -328,7 +328,7 @@ async function recordIdentities(
       ordered.map((sighting) => {
         const { actor, at, since, acted } = told(sighting, namespace);
         return {
-          id: newId("idn"),
+          id: generateId(),
           workspaceId,
           provider: namespace,
           externalId: actor.id,
@@ -435,7 +435,7 @@ async function recordIdentity(
 ): Promise<Identity> {
   const created = await transact(ctx, async (tx) => {
     const row = await insertIdentityIfNew(tx.db, {
-      id: newId("idn"),
+      id: generateId(),
       workspaceId,
       provider: namespace,
       externalId: actor.id,
@@ -552,7 +552,7 @@ export async function linkByHandle(
     return await linkIdentityToMember(ctx, workspaceId, existing.id, memberId);
   }
   const identity = await insertIdentity(ctx.db, {
-    id: newId("idn"),
+    id: generateId(),
     workspaceId,
     memberId,
     provider: link.provider,

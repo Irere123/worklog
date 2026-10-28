@@ -33,7 +33,7 @@ import type { Member } from "#db/queries/members";
 import type { CardStage } from "#db/schema";
 import { transact } from "#db/transact";
 import { badRequest, notFound } from "#lib/errors";
-import { newId } from "#lib/ids";
+import { generateId } from "#lib/ids";
 import { DAY_MS } from "#lib/time";
 
 import { recordActivity } from "./activity";
@@ -63,7 +63,7 @@ export async function createBoard(
   }
 ) {
   const board: Board = {
-    id: newId("brd"),
+    id: generateId(),
     workspaceId: actor.workspaceId,
     name: input.name,
     description: input.description ?? null,
@@ -78,7 +78,7 @@ export async function createBoard(
     await insertColumns(
       tx.db,
       names.map((name, position) => ({
-        id: newId("col"),
+        id: generateId(),
         boardId: board.id,
         name,
         position,
@@ -131,7 +131,7 @@ export async function addColumn(
     const position = input.position ?? board.columns.length;
     await updateColumnPositions(tx.db, { boardId, from: position, by: 1 });
     const col = {
-      id: newId("col"),
+      id: generateId(),
       boardId,
       name: input.name,
       color: input.color ?? "gray",
@@ -242,7 +242,7 @@ function newCardRow(
 ): CardRow {
   const now = ctx.now();
   return {
-    id: newId("crd"),
+    id: generateId(),
     workspaceId,
     boardId: input.boardId,
     number,
@@ -666,7 +666,7 @@ export async function addComment(
       number,
     });
     const comment = {
-      id: newId("cmt"),
+      id: generateId(),
       cardId: card.id,
       authorId: actor.id,
       body,
