@@ -41,16 +41,28 @@ function named(events: WorklogEvent[]) {
     }
     const entry = seen.get(actor.id);
     if (!entry) {
-      seen.set(actor.id, { actor, at, n: acted ? 1 : 0, acted });
+      seen.set(actor.id, {
+        actor,
+        at,
+        n: acted ? 1 : 0,
+        acted,
+        ...(acted ? { since: at } : {}),
+      });
       return;
     }
     if (!acted) {
-      // What others call it only fills in what nothing has said yet.
-      entry.actor = fill(entry.actor, actor);
+      // What others call it only stands in until it acts, and only fills in what they left out.
+      if (entry.acted !== true) {
+        entry.actor = fill(entry.actor, actor);
+      }
       return;
     }
-    // What it says of itself when acting wins over what mentions called it.
-    entry.actor = fill(actor, entry.actor);
+    // Only what it says of itself when acting describes it.
+    entry.actor = entry.acted === true ? fill(actor, entry.actor) : actor;
+    entry.since =
+      entry.acted === true && entry.since && entry.since < at
+        ? entry.since
+        : at;
     entry.at = entry.acted === true && entry.at > at ? entry.at : at;
     entry.n += 1;
     entry.acted = true;

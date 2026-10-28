@@ -1155,6 +1155,70 @@ describe("custom integrations", () => {
     );
   });
 
+  test("an action that leaves things out isn't filled in by a mention, and a burst of actions spans its times", async () => {
+    const owner = await env.workspace();
+    const conn = (
+      await env.call("POST", "/v1/connections", {
+        token: owner.token,
+        body: {
+          provider: "custom",
+          settings: { identityNamespace: "jira:beta" },
+        },
+      })
+    ).body;
+    await env.call("POST", `/v1/connections/${conn.id}/events`, {
+      token: owner.token,
+      body: {
+        events: [
+          {
+            id: "d1",
+            kind: "ticket.closed",
+            occurredAt: "2026-10-05T09:00:00Z",
+            actor: { id: "u1" },
+            title: "Closed PAY-2",
+          },
+          {
+            ...mentionOfU1("c1", "2026-10-03T09:00:00Z"),
+            mentions: [{ id: "u1", handle: "SAMMY", name: "wrong", bot: true }],
+          },
+          {
+            id: "d0",
+            kind: "ticket.closed",
+            occurredAt: "2026-10-02T09:00:00Z",
+            actor: { id: "u1" },
+            title: "Closed PAY-1",
+          },
+        ],
+      },
+    });
+    await env.drain();
+    const [u1] = (
+      await env.ctx.db.execute<{
+        handle: string | null;
+        bot: boolean;
+        first: Date;
+        last: Date;
+      }>(sql`
+        select external_handle as handle, is_bot as bot, first_seen_at as first,
+          last_seen_at as last
+        from identities where workspace_id = ${owner.workspace.id} and external_id = 'u1'`)
+    ).rows;
+    expect(u1).toMatchObject({ handle: null, bot: false });
+    expect(new Date(u1?.first ?? 0).toISOString()).toBe(
+      "2026-10-02T09:00:00.000Z"
+    );
+    expect(new Date(u1?.last ?? 0).toISOString()).toBe(
+      "2026-10-05T09:00:00.000Z"
+    );
+    // Not taken for a bot, so its own closes are recorded.
+    const closed = (
+      await env.call("GET", "/v1/activities?kind=ticket.closed", {
+        token: owner.token,
+      })
+    ).body;
+    expect(closed).toHaveLength(2);
+  });
+
   test("namespaces under the generic prefixes are free, but not another connection's own", async () => {
     const owner = await env.workspace();
     for (const name of ["one", "two"]) {
