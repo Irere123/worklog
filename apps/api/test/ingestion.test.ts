@@ -1200,6 +1200,18 @@ describe("upgrading to ids counted within the connection", () => {
       update activities set external_id = 'PAY-12:closed' where connection_id = ${conn.id}`);
     await env.ctx.db.execute(sql`
       update ingested_events set external_id = 'PAY-12:closed' where connection_id = ${conn.id}`);
+    // And an event redelivered between the two changes, recorded both ways.
+    await env.call("POST", `/v1/connections/${conn.id}/events`, {
+      token: owner.token,
+      body: {
+        events: [{ ...event, id: "PAY-13:closed", title: "Closed PAY-13" }],
+      },
+    });
+    await env.drain();
+    await env.ctx.db.execute(sql`
+      insert into activities (id, workspace_id, source, kind, title, visibility, external_id, data, connection_id, importance, count, occurred_at, updated_at, created_at)
+      select 'act_old_twin', workspace_id, source, kind, title, visibility, 'PAY-13:closed', data, connection_id, importance, count, occurred_at, updated_at, created_at
+      from activities where connection_id = ${conn.id} and external_id like '%PAY-13:closed'`);
     const migration = readFileSync(
       new URL("../drizzle/0015_generic_ids.sql", import.meta.url),
       "utf-8"
@@ -1213,7 +1225,10 @@ describe("upgrading to ids counted within the connection", () => {
         token: owner.token,
       })
     ).body;
-    expect(closed).toHaveLength(1);
+    expect(closed.map((a: any) => a.title).toSorted()).toEqual([
+      "Closed PAY-12",
+      "Closed PAY-13",
+    ]);
   });
 });
 
