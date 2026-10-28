@@ -28,7 +28,7 @@ Formatting and linting use the [Oxc](https://oxc.rs) tools with [Ultracite](http
 
 The layout, the architecture rules and the database conventions are in [AGENTS.md](AGENTS.md), which has a table of where each kind of change goes. The short version:
 
-- **One domain per folder** under `apps/api/src` (`work/`, `ingest/`, `automations/`, `agent/`). Each exposes plain functions that take an `AppContext` first.
+- **One domain per folder** under `apps/api/src` (`work/`, `ingest/`, `connectors/`, `automations/`, `agent/`). Each exposes plain functions that take an `AppContext` first.
 - **Routes are thin.** They live in `src/http/routes/`, one file per API resource with its schemas in `src/http/schemas/`, and every response goes out through `respond()`, which parses it with its schema. Give each a stable dotted `operationId` (`card.close`): it becomes the SDK method name.
 - **One write path per concept:** `recordActivity`, `raiseAttention`, `appendMessages`. Don't insert into those tables directly.
 - **Privacy is enforced in queries.** Teammate-facing code reads `visibility = 'team'` only. Never rely on a prompt to hide data.
@@ -44,7 +44,7 @@ Read [docs/CONNECTORS.md](docs/CONNECTORS.md):
 - **No code first.** If the tool only sends webhooks, the `webhook` connector with mapping rules may be all you need.
 - **Keep `normalize` pure** (no database, no network) so you can test it.
 - **Test with fixtures.** Add recorded payloads for every event you map _and_ every event you deliberately ignore. Noise rules need tests as much as features do.
-- **Build event ids from the source's own ids and timestamps,** never from delivery ids.
+- **Build event ids from the source's own ids and timestamps,** never from delivery ids. A sync of the same history must produce the same ids.
 
 ## Tests
 

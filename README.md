@@ -12,7 +12,7 @@ See what everyone is working on · know what needs _you_ · ask anyone's assista
 
 Work is scattered across GitHub, Slack, Discord and calls, and agents now do a growing share of it. Worklog pulls the signal into one place, keeps a living board, tells you only what's blocked on you, and gives everyone an assistant that knows their work.
 
-- 🌊 **One activity stream.** GitHub, Gitea, Slack, Discord, any webhook, manual logs and agents become one feed, deduplicated, credited to the right person and filtered for noise.
+- 🌊 **One activity stream.** GitHub, Gitea, Slack, Discord, any webhook, manual logs and agents become one feed, deduplicated, credited to the right person and filtered for noise. GitHub and Slack install with one click and bring their recent history with them.
 - 🗂 **A board that stays honest.** [Fizzy](https://fizzy.do)-style cards with golden tickets instead of priorities. Untouched cards drift away.
 - 🔔 **Attention that respects your time.** Pings only for what's blocked on you, within a daily budget. Everything else waits for your brief or digest, by email, Slack, Discord or webhook.
 - 🤖 **An assistant that knows your work.** Teammates can ask it about your work while you're away. Private things stay private. It follows a [constitution](apps/api/src/agent/prompts/constitution.md) and the instructions you write for it.
