@@ -3,6 +3,7 @@ import { z } from "zod";
 import { getConnector } from "#connectors";
 import { WebhookSettings } from "#connectors/webhook";
 import type { AppContext } from "#context";
+import { listBoards } from "#db/queries/boards";
 import {
   deleteConnectionById,
   getConnectionById,
@@ -19,6 +20,24 @@ import { queueHooks } from "./hooks";
 import { handleProviderError } from "./lifecycle";
 import { queueSync } from "./sync-queue";
 import { viewOf } from "./view";
+
+// Issues become cards on this board: one that isn't the workspace's would fail them all.
+async function requireBoard(
+  ctx: AppContext,
+  workspaceId: string,
+  settings: Record<string, unknown>
+) {
+  const { boardId } = settings;
+  if (boardId === undefined || boardId === null) {
+    return;
+  }
+  const boards = await listBoards(ctx.db, { workspaceId });
+  if (typeof boardId !== "string" || !boards.some((b) => b.id === boardId)) {
+    throw badRequest(
+      `boardId ${JSON.stringify(boardId)} isn't a board in this workspace`
+    );
+  }
+}
 
 // A connection installed through the instance's app has no pasted secrets to require.
 function validate(
@@ -84,6 +103,7 @@ export async function createConnection(
     input.secrets ?? {},
     input.settings ?? {}
   );
+  await requireBoard(ctx, workspaceId, input.settings ?? {});
   const row: ConnectionRow = {
     id: newId("con"),
     workspaceId,
@@ -149,6 +169,9 @@ export async function updateConnection(
     settings ?? current.settings,
     current.externalId !== null
   );
+  if (settings) {
+    await requireBoard(ctx, current.workspaceId, settings);
+  }
   const resumed = patch.status === "active" && current.status !== "active";
   return await transact(ctx, async (tx) => {
     const row = await updateConnectionById(tx.db, {
