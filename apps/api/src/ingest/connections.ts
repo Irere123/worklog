@@ -1,7 +1,10 @@
 import { z } from "zod";
 
 import { getConnector } from "#connectors";
-import { isBuiltInNamespace } from "#connectors/namespaces";
+import {
+  isBuiltInNamespace,
+  isConnectionNamespace,
+} from "#connectors/namespaces";
 import { WebhookSettings } from "#connectors/webhook";
 import type { AppContext } from "#context";
 import { listBoards } from "#db/queries/boards";
@@ -73,14 +76,19 @@ function validate(
   // Checked when it changes: one chosen before a namespace was reserved doesn't lock the rest
   // (ingestion doesn't use it).
   const ns = settings.identityNamespace;
-  if (
-    typeof ns === "string" &&
-    ns !== before.identityNamespace &&
-    isBuiltInNamespace(ns)
-  ) {
-    throw badRequest(
-      `identityNamespace "${ns}" is reserved for the built-in ${ns.split(":")[0] ?? ns} connector`
-    );
+  if (typeof ns === "string" && ns !== before.identityNamespace) {
+    if (isBuiltInNamespace(ns)) {
+      throw badRequest(
+        `identityNamespace "${ns}" is reserved for the built-in ${ns.split(":")[0] ?? ns} connector`
+      );
+    }
+    // A connection's own is the default: there's no need to name it, and naming another's is
+    // acting as its users.
+    if (isConnectionNamespace(ns)) {
+      throw badRequest(
+        `identityNamespace "${ns}" is a connection's own; leave it out to use this one's`
+      );
+    }
   }
   if (provider === "webhook") {
     const parsed = WebhookSettings.safeParse(settings);

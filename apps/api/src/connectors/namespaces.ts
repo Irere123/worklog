@@ -3,20 +3,31 @@
 // its id here (a test checks every registered one is).
 const BUILT_IN = new Set(["github", "gitea", "slack", "discord"]);
 
+// A generic connection's own namespace, used when it names none ("custom:<id>", "webhook:<id>"):
+// another connection taking it would act as its users.
+const PER_CONNECTION = new Set(["custom", "webhook"]);
+
 export function isBuiltInNamespace(namespace: string) {
   return BUILT_IN.has(namespace.split(":")[0] ?? "");
 }
 
+export function isConnectionNamespace(namespace: string) {
+  return PER_CONNECTION.has(namespace.split(":")[0] ?? "");
+}
+
 /**
  * A generic connection's namespace: the one its settings name, unless that is a built-in
- * connector's, which a connection set up before it was reserved might still hold.
+ * connector's or another connection's own, which a connection set up before they were reserved
+ * might still hold.
  */
 export function chosenNamespace(
   settings: Record<string, unknown>,
-  fallback: string
+  own: string
 ) {
   const chosen = settings.identityNamespace;
-  return typeof chosen === "string" && !isBuiltInNamespace(chosen)
+  return typeof chosen === "string" &&
+    !isBuiltInNamespace(chosen) &&
+    !(isConnectionNamespace(chosen) && chosen !== own)
     ? chosen
-    : fallback;
+    : own;
 }

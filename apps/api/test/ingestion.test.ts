@@ -1072,6 +1072,34 @@ describe("custom integrations", () => {
     expect(merged.actorId).toBeNull();
   });
 
+  test("a connection can't take another's own namespace, and health says which one is used", async () => {
+    const owner = await env.workspace();
+    const other = (
+      await env.call("POST", "/v1/connections", {
+        token: owner.token,
+        body: { provider: "custom", name: "Jira" },
+      })
+    ).body;
+    const taking = await env.call("POST", "/v1/connections", {
+      token: owner.token,
+      body: {
+        provider: "custom",
+        settings: { identityNamespace: `custom:${other.id}` },
+      },
+    });
+    expect(taking.status).toBe(400);
+    // One that held a reserved namespace from before uses its own, and says so.
+    await env.ctx.db.execute(sql`
+      update connections set settings = jsonb_set(settings, '{identityNamespace}', '"github"')
+      where id = ${other.id}`);
+    const health = (
+      await env.call("GET", `/v1/connections/${other.id}/health`, {
+        token: owner.token,
+      })
+    ).body;
+    expect(health.identityNamespace).toBe(`custom:${other.id}`);
+  });
+
   test("every built-in connector's namespace is reserved", () => {
     for (const connector of listConnectors()) {
       expect([connector.id, isBuiltInNamespace(connector.id)]).toEqual([
