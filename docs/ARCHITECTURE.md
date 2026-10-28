@@ -6,19 +6,21 @@
         ▼                          ▼                        ▼
  ┌──────────────────────────── apps/api (Bun + Hono) ────────────────────────────┐
  │ http/routes/* zod-openapi routes, one file per resource → docs + typed SDKs   │
- │ http/hooks.ts /hooks/{connection}: verify → store raw → queue (any connector) │
- │ http/auth.ts  API keys (agents) or better-auth sessions (people) → member     │
+ │ http/hooks.ts /hooks/apps/{provider} (an app's) · /hooks/{connection} (pasted)│
+ │ http/oauth.ts install and app-creation redirects; http/auth.ts keys, sessions │
  │                                                                               │
- │ ingest/       pipeline: normalize · identity · gates · merge · effects        │
- │   connectors/ GitHub · Gitea · Slack · Discord · webhook (no-code) · custom   │
+ │ connectors/   GitHub · Gitea · Slack · Discord · webhook (no-code) · custom:  │
+ │               receive · normalize · app install · sync · sources · directory  │
+ │ ingest/       inbox → lanes → ledger → identity · gates · merge · effects;    │
+ │               apps · installs · lifecycle · sync · health · token errors      │
  │ work/         activity (one write path) · board (Fizzy rules, drift) ·        │
  │               attention · manual logs (+ AI structuring) · snapshots · members│
  │ automations/  routines: brief · digest · check · consolidate · custom;        │
  │               briefs (data → prose) · delivery (email, Slack, Discord, hooks) │
  │ agent/        the loop, one-shot calls, prompts/*.md, tools/ (one per file)   │
  │               memory: profile · facts · journal · nightly consolidation       │
- │ events.ts     durable, sequenced event log + live fan-out                     │
- │ jobs/         Graphile Worker: queues per connection · cron schedule          │
+ │ events.ts     sequenced event log, live fan-out, relay across processes       │
+ │ jobs/         Graphile Worker: lanes per connection · sync · cron schedule    │
  └───────────────────────────────────────────────────────────────────────────────┘
         │ db/queries/* (one file per area) → Drizzle ORM (one schema, one migration set)
         ▼
@@ -38,21 +40,22 @@
 - **Humans and agents are both members.** Every human gets a personal assistant (`agentProvider: "worklog"`, `ownerId` = the human). External agents are members with their own tokens. Board changes made by an assistant are attributed to the assistant, so the team can see which moves an agent made.
 - **One write path per concept.** `recordActivity` (which also resets the card's entropy clock), `raiseAttention` (which collapses, applies quotas and triggers checks), `appendMessages` (append-only, row-locked).
 - **Queries in one place, transactions that compose.** Every query lives in `db/queries/` and takes the pool or a transaction as its first argument, so any of them can run inside a transaction (Midday's layout). Domain code wraps related writes in `transact`, which gives callees a context bound to the transaction (Ecto's `Repo.transact`). Jobs commit with it, and events publish only after the commit.
-- **Events after writes.** Changes publish to `events` (with a `seq`), then to live SSE subscribers. Private items carry an `audienceId`. Clients resume with `Last-Event-ID`; events are pruned after 7 days.
+- **Events after writes.** Changes publish to `events` (with a `seq`), then to live SSE subscribers. Private items carry an `audienceId`. Clients resume with `Last-Event-ID`; events are pruned after 7 days. Every API process reads new events four times a second, so it also relays what workers and other replicas publish. It reads rather than LISTENs: Postgres commits transactions that NOTIFY one at a time, so a NOTIFY on every insert would queue up every write that publishes. For the same reason a webhook whose lane already has a drain waiting to start doesn't queue another (Graphile Worker NOTIFYs on each job added): it locks the waiting one until it commits.
 
 ## The activity stream
 
-Ingestion is a pipeline, not a set of webhook handlers. Every delivery is stored raw (`inbound_events`), then processed from the job queue in order per connection:
+Ingestion is a pipeline, not a set of webhook handlers. See [CONNECTORS.md](CONNECTORS.md) for what each tool sends and how to add one.
 
-1. normalize: each connector translates a delivery into canonical events (a pure function);
-2. identity resolution;
-3. quality gates;
-4. card linking;
-5. burst merging;
-6. persistence with provenance;
-7. effects: attention, the board, and agent states.
+- **Two ways in.** An instance's app (a GitHub App, a Slack app) has one webhook URL, `/hooks/apps/{provider}`; the installation each delivery names picks its connection. A hand-configured connection has its own, `/hooks/{connectionId}`. Both verify the signature, then store the raw delivery and its job in one statement and answer at once.
+- **Lanes.** A delivery's partition (its repo, its channel) hashes to one of 16 lanes per connection. A lane is drained by one job at a time, in order, live deliveries before pages of history; different lanes run in parallel. A delivery that fails is retried with backoff on its own, so one bad payload doesn't hold up the lane. Every minute a sweep queues a drain for any lane with a delivery left waiting over a minute, since queuing a drain can lose a race with that drain starting, and unlocks a drain whose worker died, to run again (locked over five minutes, when a drain hands over after twenty seconds; Graphile Worker would keep its lane locked for four hours).
+- **Deliveries commit with their effects.** A delivery's events, their effects and its new status commit together, without waiting for the disk: lost in a crash, the delivery is still pending and runs again. New deliveries waiting in a lane share one transaction and one lookup of the people they name, so a busy lane pays for one commit, not one each; if any of them fails, the transaction rolls back and each is tried on its own, so only the one that failed waits for a retry. People are resolved before the transaction opens, so it holds no lock on anyone's identity.
+- **Exactly once.** Event ids come from the source's own ids, and `ingested_events` records every event that did something, including those merged into a burst. A retry, a redelivery or a sync re-reading a webhook's event changes nothing.
+- **Order doesn't matter for requests.** Resolving a review request records when (`attention_resolutions`), so a request that arrives later but happened earlier doesn't reopen it.
+- **Sync.** Connectors that can read the provider's API backfill `BACKFILL_DAYS` on install and catch up daily, into the same inbox. History records activity; only what happened in the last `BACKFILL_NOTIFY_HOURS` may notify or add cards. The daily run also asks each app which installations it still has, since Discord never says when its bot is removed.
+- **Sockets.** What a provider only sends over a socket (Discord's Gateway) comes in through one worker process per server, elected with an advisory lock, into the same inbox.
+- **Counters off the hot path.** Sightings and last-delivery times add up per process and are written every two seconds (`ingest/tally.ts`), so a busy bot's identity row isn't what every event waits on.
 
-Replays rebuild activity from the raw inbox, which keeps deliveries for `INBOUND_RETENTION_DAYS` (90 by default). A replay never reaches further back, so older activity stays as it is. See [CONNECTORS.md](CONNECTORS.md).
+Replays rebuild activity from the inbox, which keeps deliveries for `INBOUND_RETENTION_DAYS` (90 by default), lane by lane on the lane's own queue.
 
 ## The board (Fizzy rules)
 
@@ -141,18 +144,26 @@ The team version is only composed when there are team targets, and nothing is se
 
 - **Automations are rows** with a schedule (`daily` / `weekly` / `interval` with `activeHoursOnly`), evaluated on the member's local clock with DST handled.
 - **Spreading load:** a deterministic per-automation jitter keeps jobs from all firing on the same minute.
-- **Cron:** Graphile Worker's crontab (`jobs/tasks.ts`) runs due automations every minute, the entropy sweep hourly, and event and delivery pruning daily. Each run fires once across all workers, and the scheduled tasks share one queue, so they never overlap.
+- **Cron:** Graphile Worker's crontab (`jobs/tasks.ts`) looks for due automations and for lanes with deliveries left waiting every minute, runs the entropy sweep and the check for connections gone quiet hourly, and event and delivery pruning, the catch-up sync and re-sealing secrets daily. Each run fires once across all workers, and the scheduled tasks share one queue, so they never overlap. Two sweeps stay off it, so nothing there can hold them up: the one for lanes, every minute, and one every five minutes that unlocks any job locked over an hour, whose worker died, with its queue (a person's automations, a connection's sync, the scheduler's own).
+- **Runs fan out.** The minute's check doesn't run what is due: it queues a job for each, so a morning's briefs, which wait on a model for seconds each, run on every worker at once. A person's automations queue behind each other. Queuing one moves its next run 15 minutes out, so two schedulers never take the same one and one whose job is lost comes due again then; a worker that dies mid-run holds its job until Graphile frees stale locks, after four hours. A job retried after its run finished doesn't run it again.
 - **Failure handling:** an attention item after 3 consecutive failures; the automation is disabled after 10.
 - **Deployment:** run it in the API process (`RUN_SCHEDULER=true`) or as a separate worker (`bun run worker`).
 
 ## Configuration
 
-See [`apps/api/.env.example`](../apps/api/.env.example). Production requires `WORKLOG_SECRET_KEY`, which encrypts connector secrets at rest with AES-256-GCM.
+See [`apps/api/.env.example`](../apps/api/.env.example). Production requires `WORKLOG_SECRET_KEY`, which encrypts connection secrets and app credentials at rest with AES-256-GCM. Each sealed value names its key, so the key can be rotated: set the new one, move the old one to `WORKLOG_SECRET_KEYS_PREVIOUS`, and `bun run secrets:reseal` (or the nightly run) moves everything to the new key.
 
 ## Running Postgres
 
 - **Migrations run at startup.** The API and the worker take the same advisory lock, so only one of them migrates. An index on an existing table is built `CONCURRENTLY`, so ingest keeps writing while it builds.
-- **Connections:** each process keeps its own pool of 10. PgBouncer is optional; if you add it, use session pooling, because Graphile Worker `LISTEN`s for new jobs and migrations hold a session lock.
+- **Connections:** each process keeps its own pool (`DATABASE_POOL_SIZE`, 20 by default); keep it above `WORKER_CONCURRENCY` (8), since every running job holds one while it writes. PgBouncer is optional; if you add it, use session pooling, because Graphile Worker `LISTEN`s and migrations hold a session lock.
+- **Scale:** lanes of different repos and channels run in parallel up to `WORKER_CONCURRENCY` per process, and each worker process (`bun run worker`) adds its own CPU: a worker is bound by its JavaScript (building queries costs more than running them), and API processes scale the same way behind a load balancer. Postgres is the one part that doesn't scale out, so the write paths avoid what serializes it: no NOTIFY for realtime events or for a webhook whose lane already has a drain waiting, one statement per acknowledgement, deliveries waiting in a lane committed together without waiting for the disk.
+- **Measured** with `bun scripts/bench-ingest.ts`, against a scratch database, on a small 6-core machine that also runs Postgres. 5,000 people in 10 workspaces, half of what happens involving members, half GitHub (pushes, comments, review requests, reviews) and half Slack (updates, thread replies, mentions, chatter), sent over HTTP to API processes, with workers in their own processes:
+  - **Steady, for ten minutes:** 60 webhooks a second, one API process, two workers. 36,000 deliveries, all done on the first attempt, in each of two runs; the backlog never above 250 and gone within a second of the stream stopping; acknowledged in 0.1 s at the median and 0.5–0.8 s at the 95th percentile, done 0.6 s after arriving at the median and about 3 s at the 95th. Memory flat after warming up: about 190 MB per API process, 210 MB per worker. CPU per delivery: about 13 ms in the API, 27 ms in the workers, 21–25 ms in Postgres.
+  - **A worker killed mid-run:** the same stream for 25 minutes, one of the two workers killed outright (SIGKILL) at minute 5 and replaced. All 90,000 deliveries done, none needing another attempt (what the killed worker was doing rolled back) and no event recorded twice; the lanes it held waited the five minutes until the sweep unlocked them, so that 1% was done in about 1.5 minutes instead of under a second. Memory flat for the 25 minutes.
+  - **Retention:** the nightly prune removes a million deliveries and two million ledger entries past `INBOUND_RETENTION_DAYS` in about 40 seconds, in batches that leave ingestion running; a day at 5,000 people is about half that.
+  - **Bursts:** two API processes acknowledge about 320 a second; a worker works through a backlog at about 100 a second (150 for GitHub alone), since deliveries waiting together share a transaction.
+- **Capacity for a team of 5,000,** as an estimate: 70 to 100 deliveries a person a working day (about 20 from GitHub, the rest messages in channels the bot is in) is 350,000 to 500,000 a day, peaking around 35 to 50 a second. At the measured costs that is under a core each for the API processes and Postgres and about one and a half for workers; two API replicas, two or three workers and a 4-core Postgres leave room for bursts, which wait in the inbox (`backlog` in health) and drain at a worker's burst rate.
 - **Busy tables:** `identities`, `inbound_events` and `attention_items` are updated constantly. They leave free space on each page and vacuum early (migration `0002_tune_autovacuum`). Watch `n_dead_tup` and `last_autovacuum` in `pg_stat_user_tables`; an autovacuum running for hours needs tuning.
 - **Extensions:** memory recall needs `pg_trgm` (migration `0004_pg_trgm`). It ships with Postgres and is trusted, so the database owner can create it.
 - **Slow queries:** enable `pg_stat_statements` and set `log_min_duration_statement` (for example `500ms`) to see which queries to look at. Read plans with `EXPLAIN`; `EXPLAIN ANALYZE` runs the query.

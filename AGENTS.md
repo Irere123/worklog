@@ -51,8 +51,9 @@ Work is done when `format:check`, `lint`, `typecheck` and `test` pass. CI runs t
 
 ```
 apps/api/src/
-  http/          routes/ and schemas/ (one file per resource), auth middleware, webhook entry
-  ingest/        raw delivery to activity; connectors/ (one file per tool)
+  http/          routes/ and schemas/ (one file per resource), auth, webhooks, install redirects
+  connectors/    one file per tool (+ a folder when it grows): mapping, app install, sync
+  ingest/        delivery to activity: inbox, lanes, ledger, identity, effects, sync, apps
   work/          activity, board, drift, attention, manual logs, snapshots, members
   automations/   scheduled routines, briefs, delivery
   agent/         all model work: loop, generate, prompts/, tools/, memory/
@@ -74,7 +75,7 @@ apps/api/test/   harness.ts plus one file per area
 | domain logic | the module it belongs to, as a function taking `ctx` first |
 | a prompt | `agent/prompts/<name>.md` |
 | an assistant tool | `agent/tools/<name>.ts`, registered in `agent/tools.ts` |
-| a connector | `ingest/connectors/<name>.ts`, registered in `ingest/connectors.ts` |
+| a connector | `connectors/<name>.ts`, registered in `connectors.ts` |
 | a background task | `jobs/tasks.ts` |
 | an environment variable | `config.ts` and `apps/api/.env.example` |
 
@@ -95,7 +96,7 @@ apps/api/test/   harness.ts plus one file per area
 ## Database
 
 - **Queries live in `db/queries/`,** one file per area with its row types, and no barrel file.
-- **A query takes `db: DbOrTx` and one params object,** holds SQL only, and takes `now` as a param.
+- **A query takes `db: DbOrTx` and one params object,** holds SQL only, and takes `now` as a param. Retry and job timing are the exception: they use the database's `now()`, the clock Graphile Worker schedules by.
 - **Names say what comes back:** `find*` may return undefined, `get*` throws `notFound`, `list*` and `count*` read many, and `insert*`, `upsert*`, `update*`, `delete*` and `set*` write.
 - **Reads can be called from anywhere** with `ctx.db`. Writes go through the domain function.
 - **Related writes share `transact(ctx, async (tx) => …)`.** Pass `tx`, keep model calls and HTTP out, and run queries one at a time, never in `Promise.all`.
@@ -106,7 +107,10 @@ apps/api/test/   harness.ts plus one file per area
 ## Connectors
 
 - Try the `webhook` connector's mapping rules before writing code.
-- Keep `normalize` pure, and build event ids from the source's ids, never delivery ids.
+- Keep `normalize` pure, and build event ids from the source's ids, never delivery ids. A sync page must produce the same ids its webhooks do.
+- Connector code never imports `ingest/`; it gets what it needs as arguments.
+- Call providers through `connectors/http.ts`, so a dead token revokes the connection and a rate limit waits.
+- Never trust a redirect's parameters in `completeInstall`: verify the installation with the provider.
 - Add a fixture for every event you map or ignore. Details are in [docs/CONNECTORS.md](docs/CONNECTORS.md).
 
 ## Tests

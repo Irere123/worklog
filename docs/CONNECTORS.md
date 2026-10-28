@@ -6,45 +6,81 @@ Everything Worklog does depends on the activity stream: the board, briefs, "what
 
 | Tool | What Worklog picks up | How |
 | --- | --- | --- |
-| **GitHub** | PRs, reviews, issues, comments, pushes, releases. Review requests reach the reviewer; issues can become cards. | Webhook + secret |
-| **Slack** | Work updates from the channels you choose, @mentions, edits and deletes; `/log`, `/worklog`, and `@worklog` in any thread. | Slack app |
-| **Discord** | `/log`, `/now`, `/ask`, `/brief`, and delivery of briefs to a channel. | Interactions URL |
-| **Gitea / Forgejo** | Same as GitHub, for self-hosted forges. | Webhook + secret |
+| **GitHub** | PRs, reviews, issues, comments, pushes, releases. Review requests reach the reviewer; issues can become cards. Recent history on install, and a daily catch-up. | The server's GitHub App (one click), or a webhook + secret |
+| **Slack** | Work updates from the channels you choose, @mentions, edits and deletes; `/log`, `/worklog`, and `@worklog` in any thread. People are linked by their Slack email. | The server's Slack app (one click), or your own app's secrets |
+| **Discord** | Work updates from the channels you choose and @mentions (through the server's app); `/log`, `/now`, `/ask`, `/brief`; delivery of briefs to a channel. | The server's Discord app (one click), or your own app's secrets (commands only) |
+| **Gitea / Forgejo** | Same as GitHub, for self-hosted forges. Recent history and a daily catch-up with a token. | A bot user's token: Worklog creates the webhooks. Or a webhook + secret |
 | **Anything with webhooks** | Map payloads to events with rules: GitLab, Sentry, CI, deploy bots. | `webhook` connector, no code |
 | **Your own code** | Push events from scripts and sync jobs. | `custom` connector + an `ingest` key |
 | **Agents** | Progress reports with _working / needs you / finished / failed_. | `POST /v1/activities` |
 
 `GET /v1/connectors` lists every connector and what it needs.
 
+## Installing through an app
+
+A provider app has one webhook URL, so each Worklog server registers its own, once; every workspace on the server then installs it with one click.
+
+1. **Register the app** (once per server, an admin):
+   - **GitHub:** `POST /v1/apps/github/manifest` returns a link. GitHub creates the app with the right webhook, permissions and redirects, hands its credentials back, and goes straight on to installing it. From the next start it also signs people in with GitHub, unless `GITHUB_CLIENT_ID` says otherwise; the same goes for the Slack and Discord apps.
+   - **Slack:** create an app at api.slack.com with the scopes in `GET /v1/apps`, point Event Subscriptions at `webhookUrls.events`, slash commands at `webhookUrls.commands` and the redirect at `callbackUrl`, then `PUT /v1/apps/slack` with its client id, client secret and signing secret.
+   - **Discord:** create an application in the developer portal, set its Interactions Endpoint URL to `webhookUrls.interactions` and add `callbackUrl` as a redirect, then `PUT /v1/apps/discord` with its client id, client secret, public key and bot token. Installing registers the slash commands.
+   - Or set the app's variables in the environment (`GITHUB_APP_*`, `SLACK_*`, `DISCORD_*`; see `.env.example`). The server follows them: change a secret there and restart.
+2. **Install it:** `POST /v1/apps/{provider}/install` returns the provider's install page. Approving there creates the connection and starts reading `BACKFILL_DAYS` of history.
+3. **Choose what counts:** `GET /v1/connections/{id}/sources` lists the repos or channels, `PUT` picks them, and their history is read too.
+
+**Security:**
+
+- Every link carries a random, single-use state bound to the admin who asked for it, valid for an hour.
+- The redirect's own parameters are never trusted: GitHub's `installation_id` is checked against the installations the returning user can manage, and Slack's team and Discord's server come from exchanging the code with the app's secret.
+- One installation feeds one workspace.
+- Uninstalling on the provider's side revokes the connection, drops its tokens and tells whoever installed it. Its activity stays.
+- On a server with several workspaces, registering an app also takes the setup secret.
+
+## Managed webhooks (Gitea, Forgejo)
+
+Forges have no apps. Give the connection a `token` for a bot user who administers the chosen `repos`, and leave out `webhookSecret`. Worklog creates each repo's webhook itself, with a secret of its own, and the daily catch-up recreates one that's gone and turns one the forge disabled back on. How each hook stands shows in health, as `hook:<repo>`. Gitea and Forgejo refuse to deliver to private addresses by default: a Worklog on the same network needs the forge's `webhook.ALLOWED_HOST_LIST` set.
+
 ## The pipeline
 
 ```
-tool ──webhook──▶ /hooks/{connectionId}[/{channel}]
-                    │ 1. receive   verify signature · store raw delivery (inbound_events) and its job together · ack fast
+tool ──webhook──▶ /hooks/apps/{provider} (the server's app: routed by installation)
+             or ▶ /hooks/{connectionId}[/{channel}] (configured by hand)
+                    │ 1. receive   verify signature · store the raw delivery and its job together · ack fast
                     ▼
-               job queue (Graphile Worker on Postgres: in order per connection, retries with backoff)
-                    │ 2. normalize connector turns one delivery into canonical events (pure function)
-                    │ 3. identity  actor → identity (recorded even if unknown) → member (links · sign-in accounts)
+               lanes: 16 per connection, by repo or channel; in order within a lane, parallel across lanes;
+                      what's waiting in a lane commits together, and one that fails is retried alone
+                    │ 2. normalize connector turns one delivery into canonical events (a pure function)
+                    │ 3. identity  actor → identity (recorded even if unknown) → member (links · sign-in · email)
                     │ 4. gate      bot policy · ignored kinds · importance score
-                    │ 5. link      card refs (closes #3, WL-12, issue keys)
-                    │ 6. merge     bursts within a window become one activity (commits, comments, replies)
-                    │ 7. persist   activities (+ provenance: connection, raw delivery, identity, thread)
-                    ▼ 8. effects   signals → attention · issues → cards · agent states → the human they work for
+                    │ 5. ledger    each event once, merged into a burst or not
+                    │ 6. link      card refs (closes #3, WL-12, issue keys)
+                    │ 7. merge     bursts within a window become one activity (commits, comments, replies)
+                    │ 8. persist   activities (+ provenance: connection, raw delivery, identity, thread)
+                    ▼ 9. effects   signals → attention · issues → cards · agent states → the human they work for
+
+provider API ──sync──▶ the same inbox (backfill on install, daily catch-up): history records activity;
+                       only the last BACKFILL_NOTIFY_HOURS may notify or add cards
 ```
 
 Each stage is visible from the API:
 
 | Question | Endpoint |
 | --- | --- |
-| Is this connection producing signal? Why were things skipped? | `GET /v1/connections/{id}/health` |
+| Is this connection producing signal? Why were things skipped? Is a wrong secret rejecting deliveries? How far behind is it? | `GET /v1/connections/{id}/health` |
 | What exactly arrived, and what happened to each delivery? | `GET /v1/connections/{id}/deliveries` |
 | Which accounts haven't been matched to anyone? | `GET /v1/identities?unlinked=true` |
 | Match an account to a person; their past activity is re-attributed | `PATCH /v1/identities/{id}` |
+| Catch up from the provider's API now | `POST /v1/connections/{id}/sync` |
 | Rebuild activity after changing settings or fixing a connector (from deliveries kept for `INBOUND_RETENTION_DAYS`) | `POST /v1/connections/{id}/replay` |
+| Deliveries for installations no connection claims | `GET /v1/apps` (`unrouted`) |
+
+Pausing a connection (`PATCH /v1/connections/{id}` with `status: "paused"`) stops it recording; commands and briefs through it still work, and resuming catches up from the provider's API where it can.
+
+A connection that usually hears from its tool every day and goes quiet for four days raises an attention item for whoever installed it: that's how a disabled webhook or a rotated secret shows up.
 
 ## The canonical event (schema v1)
 
-Every connector emits `WorklogEvent`s (`apps/api/src/ingest/types.ts`). The shape follows Activity Streams 2.0: an actor does a kind of thing to an object, inside a container.
+Every connector emits `WorklogEvent`s (`apps/api/src/connectors/types.ts`). The shape follows Activity Streams 2.0: an actor does a kind of thing to an object, inside a container.
 
 | Field | Meaning |
 | --- | --- |
@@ -92,7 +128,14 @@ Every connector emits `WorklogEvent`s (`apps/api/src/ingest/types.ts`). The shap
 - @mentions always reach people, at normal priority, wherever the bot can see them.
 - Edits and deletions are applied, and private channels stay private.
 
-**Discord:** commands and delivery only. Reading channel messages needs a Gateway bot, which is on the roadmap.
+**Discord:** with the server's app, messages come over the Gateway, a socket one worker process keeps open (whichever takes its lock; another takes over if it goes). A dropped socket resumes from the last message stored, so nothing sent meanwhile is lost. The same rules as Slack apply: work updates only from the chosen channels and only with substance, mentions everywhere the bot reads, replies to one message merged per person, edits and deletions applied, bots and webhooks dropped. The bot needs the **Message Content** intent (Bot → Privileged Gateway Intents); without it the Gateway refuses, and the worker logs why. The bot leaving a server revokes its connection at once; the daily catch-up also asks which servers it's still in, as it asks GitHub which installations still exist.
+
+**Backfill and catch-up:**
+
+- **GitHub** (an app installation, or a connection's `token`): PRs, reviews and their inline comments, issue and PR comments, issues, releases, and pushes (the 100 most recent per repo per run, from the repository's activity, each with its commits).
+- **Gitea and Forgejo** (a connection's `token`, for a bot user who administers `repos`): issues, PRs, comments, releases, and pushes from the repository's activity feed (Gitea and Forgejo 1.21 and later). Their review webhooks are mapped live; the API's reviews aren't read back.
+- **Slack:** the chosen channels' messages, the replies in threads they started, and new replies in the 200 most recent threads it has seen with replies, however old their first message.
+- **From webhooks only:** replies in a Slack thread the sync never saw with replies.
 
 ## Identity: credit goes to the right person
 
@@ -100,7 +143,8 @@ Every connector emits `WorklogEvent`s (`apps/api/src/ingest/types.ts`). The shap
 - **Matching order:**
   1. the stable id;
   2. a login placeholder created by a manual link (upgraded to the stable id the first time the account is seen);
-  3. the account someone **signed in with** (GitHub, Slack or Discord), so signing in is all attribution needs.
+  3. the account someone **signed in with** (GitHub, Slack or Discord), so signing in is all attribution needs;
+  4. for Slack, the account's email from the directory, when exactly one person in the workspace has it.
 - **A login reused after a rename never inherits someone else's identity:** only placeholders are upgraded.
 - **Namespaces are scoped:** `github`, `slack`, `discord`, `gitea:git.example.com`, `webhook:{connectionId}`. Generic connectors cannot claim the built-in ones.
 
@@ -181,7 +225,7 @@ Coding agents (Cursor, Grok Bot, Claude Code, OpenCode, your own) are members wi
 
 ### 4. A code connector
 
-Implement `Connector` (`apps/api/src/ingest/types.ts`) and register it in `apps/api/src/ingest/connectors.ts`:
+Implement `Connector` (`apps/api/src/connectors/types.ts`) in `apps/api/src/connectors/<name>.ts` and register it in `apps/api/src/connectors.ts`:
 
 ```ts
 export const linearConnector: Connector = {
@@ -192,8 +236,8 @@ export const linearConnector: Connector = {
   settings: [{ key: "boardId", description: "..." }],
   endpoints: { webhook: "" },
   identityNamespace: () => "linear",
-  receive(req, conn) {
-    /* verify signature; return { type: "event", deliveryId, eventType, payload } */
+  receive(req, keys) {
+    /* verify signature with keys.secrets; return { type: "event", deliveryId, eventType, payload, partition } */
   },
   normalize({ eventType, payload, receivedAt }, conn) {
     /* pure: return { events } or { events: [], ignored: "why" } */
@@ -201,4 +245,13 @@ export const linearConnector: Connector = {
 };
 ```
 
-`normalize` must stay pure (no database, no network). Test it against recorded payloads, as `test/ingestion.test.ts` does for GitHub and Slack, so every mapping and every noise rule has a fixture.
+- **`normalize` stays pure** (no database, no network). Test it against recorded payloads, as `test/ingestion.test.ts` does for GitHub and Slack, so every mapping and every noise rule has a fixture.
+- **`normalize` never throws.** A payload is only signature-verified, so parse it with a schema (zod) whose wrong-typed fields read as missing, and fall back to the delivery's time when a date doesn't parse: a throw, or an event Postgres can't store, fails the whole delivery on every attempt. Add the connector's payloads to `test/fuzz.test.ts`, which breaks them at random and checks what comes out.
+- **`partition`** is the repo or channel the delivery concerns: its deliveries are processed in order, others in parallel.
+- **Optional capabilities**, each tested against a scripted provider API (`routedFetch` in `test/harness.ts`):
+  - `app`: install through the server's app. `completeInstall` must verify the installation belongs to whoever came back, never trust the redirect alone.
+  - `sync`: read history into the inbox page by page, with a cursor. A page is normalized like a delivery, and its events must get the same ids the webhooks give them; GitHub's sync rebuilds webhook-shaped payloads for exactly that.
+  - `sources`: what a connection can watch, and the settings that record a choice.
+  - `enrich`: look up an account first seen in events (its email links it to a member).
+  - `interact` and `followUp`: answer commands at once, and finish slow answers as a job.
+- **Provider calls** go through `call()` in `connectors/http.ts`, which turns a refused token into `revoked` (the connection is revoked and its installer told) and a rate limit into a retry at the right time.
