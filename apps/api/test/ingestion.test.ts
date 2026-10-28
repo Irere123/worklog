@@ -358,6 +358,43 @@ const closedByU1 = (id: string, at: string) => ({
   title: `Closed ${id}`,
 });
 
+// u1 closes a ticket and another person names it by the wrong login, in either order, while
+// Sammy is linked by that login: who the close is credited to.
+async function closerAfterWrongMention(mentionFirst: boolean) {
+  const owner = await env.workspace();
+  const sammy = await env.teammate(owner.token, "Sammy");
+  await env.call("POST", `/v1/members/${sammy.member.id}/identities`, {
+    token: sammy.token,
+    body: { provider: "jira:delta", handle: "sammy" },
+  });
+  const conn = (
+    await env.call("POST", "/v1/connections", {
+      token: owner.token,
+      body: {
+        provider: "custom",
+        settings: { identityNamespace: "jira:delta" },
+      },
+    })
+  ).body;
+  const push = async (events: object[]) => {
+    await env.call("POST", `/v1/connections/${conn.id}/events`, {
+      token: owner.token,
+      body: { events },
+    });
+    await env.drain();
+  };
+  const close = closedByU1("PAY-9", "2026-10-02T09:00:00Z");
+  const mention = mentionOfU1("c9", "2026-10-03T09:00:00Z");
+  await push([mentionFirst ? mention : close]);
+  await push([mentionFirst ? close : mention]);
+  const [closed] = (
+    await env.call("GET", "/v1/activities?kind=ticket.closed", {
+      token: owner.token,
+    })
+  ).body;
+  return closed.actorId;
+}
+
 const daysAgo = (d: number, minutes = 0) =>
   new Date(Date.now() - d * 86_400_000 + minutes * 60_000).toISOString();
 
@@ -441,6 +478,33 @@ describe("ingestion pipeline", () => {
       select external_handle as handle, event_count as n from identities
       where workspace_id = ${owner.workspace.id} and external_id = '202'`);
     expect(account.rows).toEqual([{ handle: "Sam-GH", n: 1 }]);
+  });
+
+  test("what GitHub says of someone it names (a reviewer) still links them by login", async () => {
+    const { owner, send } = await github();
+    const sam = await env.teammate(owner.token, "Sam");
+    await env.call("POST", `/v1/members/${sam.member.id}/identities`, {
+      token: sam.token,
+      body: { provider: "github", handle: "Sam-GH" },
+    });
+    await send("pull_request", {
+      action: "review_requested",
+      sender: emma,
+      requested_reviewer: { login: "Sam-GH", id: 202 },
+      pull_request: {
+        number: 8,
+        title: "Backoff",
+        html_url: "https://github.com/acme/api/pull/8",
+        user: emma,
+      },
+    });
+    const items = (await env.call("GET", "/v1/attention", { token: sam.token }))
+      .body;
+    expect(items.map((i: any) => i.kind)).toEqual(["review.requested"]);
+    const linked = await env.ctx.db.execute<{ member: string }>(sql`
+      select member_id as member from identities
+      where workspace_id = ${owner.workspace.id} and external_id = '202'`);
+    expect(linked.rows).toEqual([{ member: sam.member.id }]);
   });
 
   test("a mention of a login placeholder isn't a sighting of it", async () => {
@@ -1265,6 +1329,11 @@ describe("custom integrations", () => {
     expect(new Date(u1?.last ?? 0).toISOString()).toBe(
       "2026-10-05T09:00:00.000Z"
     );
+  });
+
+  test("a generic connection's mention can't link an account to whoever has the login it says", async () => {
+    expect(await closerAfterWrongMention(false)).toBeNull();
+    expect(await closerAfterWrongMention(true)).toBeNull();
   });
 
   test("namespaces under the generic prefixes are free, but not another connection's own", async () => {

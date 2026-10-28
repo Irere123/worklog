@@ -1,4 +1,5 @@
 import { getConnector } from "#connectors";
+import { isBuiltInNamespace } from "#connectors/namespaces";
 import type { ExternalActor } from "#connectors/types";
 import type { AppContext } from "#context";
 import { updateActivitiesActor } from "#db/queries/activities";
@@ -36,9 +37,14 @@ export async function resolveActor(
   at: Date,
   opts: { sightings?: number; acted?: boolean; since?: Date } = {}
 ) {
+  const trusted = trustsLogin({ acted: opts.acted }, namespace);
   const identity =
-    (await matchIdentity(ctx, workspaceId, namespace, actor)) ??
-    (await recordIdentity(ctx, workspaceId, namespace, actor, at));
+    (await matchIdentity(
+      ctx,
+      workspaceId,
+      namespace,
+      trusted ? actor : { ...actor, handle: null }
+    )) ?? (await recordIdentity(ctx, workspaceId, namespace, actor, at));
   const memberId =
     identity.memberId ??
     (await signedInMember(ctx, workspaceId, namespace, actor.id));
@@ -151,6 +157,16 @@ export async function resolveActors(
   return out;
 }
 
+/**
+ * Whether a sighting's login may link the account to a placeholder (a member linked by login),
+ * moving its history there. An account's own action says its login, and so does what a built-in
+ * connector's provider says of someone it names (a GitHub assignee); what a generic connection's
+ * sender writes of someone else is only their word.
+ */
+function trustsLogin(sighting: Pick<Sighting, "acted">, namespace: string) {
+  return sighting.acted !== false || isBuiltInNamespace(namespace);
+}
+
 async function sortSightings(
   ctx: AppContext,
   workspaceId: string,
@@ -182,7 +198,9 @@ async function sortSightings(
     // the placeholder says whose it is.
     const exact =
       account && !(named?.memberId && !account.memberId) ? account : named;
-    const key = placeholderOf(sighting.actor);
+    const key = trustsLogin(sighting, namespace)
+      ? placeholderOf(sighting.actor)
+      : null;
     const placeholder =
       key && key !== sighting.actor.id ? found.get(key) : undefined;
     if (placeholder && (!exact || (!exact.memberId && placeholder.memberId))) {
