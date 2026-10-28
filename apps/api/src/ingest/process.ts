@@ -475,6 +475,9 @@ async function ingestEvent(
   const verdict = gate(event, who.isBot, source.conn.settings);
   if (!verdict.keep) {
     outcome.dropped.push({ id: event.id, reason: verdict.reason });
+    if (source.mode !== "replay") {
+      await applyState(ctx, source, event, who);
+    }
     return;
   }
   const scope = scopeOf(source);
@@ -533,6 +536,42 @@ async function ingestEvent(
       });
     }
   });
+}
+
+/**
+ * What a dropped event says about the state of things still holds: a bot closing a PR resolves the
+ * review requests on it and closes its card. Nothing is recorded and nobody is pinged.
+ */
+async function applyState(
+  ctx: AppContext,
+  source: Source,
+  event: WorklogEvent,
+  who: Who
+) {
+  const resolves = (event.signals ?? []).filter((s) => s.type === "resolve");
+  const board = (event.board ?? []).filter(
+    (e) => e.type === "close_card" || e.type === "reopen_card"
+  );
+  if (resolves.length === 0 && board.length === 0) {
+    return;
+  }
+  const scope = scopeOf(source);
+  if (board.length > 0) {
+    await applyBoardEffects(ctx, scope, board, who.member, event.occurredAt);
+  }
+  await applySignals(
+    ctx,
+    scope,
+    { ...event, signals: resolves },
+    {
+      actor: who.member,
+      actorIsBot: who.isBot,
+      activityId: null,
+      cardId: null,
+      raise: false,
+      onlyIfNew: true,
+    }
+  );
 }
 
 function effectsFor(ctx: AppContext, mode: Mode, event: WorklogEvent): Effects {

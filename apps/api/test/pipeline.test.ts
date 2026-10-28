@@ -464,6 +464,32 @@ describe("ordering", () => {
     ).toHaveLength(0);
   });
 
+  test("a bot closing a PR isn't recorded, and still resolves its review requests", async () => {
+    const { teammate, deliver, activities } = await github();
+    await deliver("pull_request", {
+      action: "review_requested",
+      sender: emma,
+      pull_request: pr,
+      requested_reviewer: sam,
+    });
+    expect(
+      (await env.call("GET", "/v1/attention", { token: teammate.token })).body
+    ).toHaveLength(1);
+    await deliver("pull_request", {
+      action: "closed",
+      sender: { login: "stale[bot]", id: 999, type: "Bot" },
+      pull_request: {
+        ...pr,
+        merged: false,
+        closed_at: new Date().toISOString(),
+      },
+    });
+    expect(
+      (await env.call("GET", "/v1/attention", { token: teammate.token })).body
+    ).toHaveLength(0);
+    expect(await activities("?kind=pr.closed")).toHaveLength(0);
+  });
+
   test("a late resolve leaves a newer request open", async () => {
     const { teammate, deliver } = await github();
     await deliver("pull_request", {
