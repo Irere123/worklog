@@ -15,6 +15,7 @@ import type { CardRow } from "#db/queries/cards";
 import { findMemberById } from "#db/queries/members";
 import type { Member } from "#db/queries/members";
 import type { Priority } from "#db/schema";
+import { ApiError } from "#lib/errors";
 import { raiseAttention } from "#work/attention";
 import type { AttentionInput } from "#work/attention";
 import * as board from "#work/board";
@@ -107,21 +108,30 @@ async function applyBoardEffect(
       if (card || !scope.boardId) {
         return null;
       }
-      const created = await board.createCard(
-        ctx,
-        by.actor,
-        scope.workspaceId,
-        {
-          boardId: scope.boardId,
-          title: effect.title,
-          body: effect.body,
-          source: scope.source,
-          externalKey: effect.externalKey,
-          externalUrl: effect.url,
-        },
-        silent
-      );
-      return created.id;
+      try {
+        const created = await board.createCard(
+          ctx,
+          by.actor,
+          scope.workspaceId,
+          {
+            boardId: scope.boardId,
+            title: effect.title,
+            body: effect.body,
+            source: scope.source,
+            externalKey: effect.externalKey,
+            externalUrl: effect.url,
+          },
+          silent
+        );
+        return created.id;
+      } catch (error) {
+        // The board was deleted after it was chosen: the event still counts, without a card.
+        // Found missing before anything was written, so the transaction is still good.
+        if (error instanceof ApiError && error.status === 404) {
+          return null;
+        }
+        throw error;
+      }
     }
     case "close_card": {
       if (card && card.stage !== "done") {

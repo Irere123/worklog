@@ -1,6 +1,8 @@
 import { beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { generateKeyPairSync, sign } from "node:crypto";
 
+import { sql } from "drizzle-orm";
+
 import { hmacHex } from "#lib/crypto";
 
 import { testEnv } from "./harness";
@@ -125,6 +127,39 @@ describe("GitHub", () => {
     });
     cards = (await env.call("GET", "/v1/cards", { token: owner.token })).body;
     expect(cards[0].stage).toBe("done");
+  });
+
+  test("a board that isn't there is refused, and one deleted later costs only the card", async () => {
+    const { owner, conn, send } = await github();
+    const refused = await env.call("PATCH", `/v1/connections/${conn.id}`, {
+      token: owner.token,
+      body: { settings: { boardId: "brd_nope" } },
+    });
+    expect(refused.status).toBe(400);
+    // As if its board had been deleted since it was chosen.
+    await env.ctx.db.execute(sql`
+      update connections set settings = jsonb_set(settings, '{boardId}', '"brd_gone"')
+      where id = ${conn.id}`);
+    await send("issues", {
+      action: "opened",
+      issue: {
+        number: 9,
+        title: "Exports time out",
+        html_url: "https://github.com/acme/api/issues/9",
+        user: { login: "emma-gh" },
+      },
+      repository: repo,
+      sender: { login: "emma-gh" },
+    });
+    const deliveries = (
+      await env.call("GET", `/v1/connections/${conn.id}/deliveries`, {
+        token: owner.token,
+      })
+    ).body;
+    expect(deliveries.map((d: any) => d.status)).toEqual(["processed"]);
+    expect(
+      (await env.call("GET", "/v1/cards", { token: owner.token })).body
+    ).toHaveLength(0);
   });
 
   test("review requests reach the reviewer; submitting the review resolves it and tells the author", async () => {
