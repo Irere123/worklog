@@ -709,7 +709,7 @@ The in-progress `coalesce { key, windowMinutes, units, template }` is the right 
   - `message_changed` carries a nested `message` and `edited`.
   - Replies (`message_replied`) arrive _without_ a subtype over the Events API, so detect them by `thread_ts != ts`.
 - **Emails:** `users.info` returns `profile.email` with `users:read.email`.
-- **History limits:** for commercially distributed apps **not on the Slack Marketplace**, `conversations.history` and `conversations.replies` drop to 1 request per minute with `limit` ≤ 15. This applied from 2025-05-29 for new installs and from 2026-03-03 for existing ones. Internal custom apps keep 50+ requests per minute.
+- **History limits:** for commercially distributed apps **not on the Slack Marketplace**, `conversations.history` and `conversations.replies` drop to 1 request per minute with `limit` ≤ 15. This applied from 2025-05-29 for new installs. For existing installs the sources conflict: docs.slack.dev now says they are not affected, the api.slack.com changelog mirror says 2026-03-03 ([integrations.md §7](integrations.md#7-corrections-to-activity-ingestionmd)). Internal custom apps keep 50+ requests per minute.
 - **API Terms** (2025-10-10), for apps used outside your organization: no "us[ing] API Data to train a large language model", no bulk export, and retention of other organizations' data limited to "the minimum necessary".
 
 **Rules**
@@ -1001,7 +1001,7 @@ Idempotency comes in three layers:
 
 **Slack**
 
-- Retries cover short outages: 3 attempts over about 6 min.
+- Retries cover short outages: 3 attempts over about 6 min. Delayed Events (2026-02-05, opt-in) adds hourly retries for 24 h.
 - For longer outages, backfill opted-in channels with `conversations.history` and `conversations.replies` since the last seen `ts` per channel. That works with internal-app limits; non-Marketplace distributed apps are throttled to 1 request per minute (§3.8).
 
 **Discord** [P]
@@ -1009,7 +1009,7 @@ Idempotency comes in three layers:
 - Guild messages arrive **only over the Gateway** (`GUILD_MESSAGES`, plus `MESSAGE_CONTENT` for text).
 - HTTP "Webhook Events" (2024) cover app authorization, entitlements, lobby messages and game direct messages, but not guild messages.
 - The current Discord connector is interactions-only, which is fine for the MVP. Ingesting Discord messages needs a `stream` capability: a long-lived gateway worker.
-- Privileged-intent review now triggers at 10,000 users the app can reach, with annual reapplication [S].
+- Privileged-intent review now triggers at 10,000 users the app can reach, with annual reapplication (confirmed by the 2026-06-10 changelog). Search Guild Messages (2026-03-19) can backfill guild messages over HTTP.
 
 **Checkpoints:** store per-connection, per-stream cursors (`connection_cursors`). Save them only **after** the page's rows commit (Airbyte STATE and Nango `saveCheckpoint` semantics [P]).
 
