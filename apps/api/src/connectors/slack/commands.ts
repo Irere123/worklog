@@ -138,21 +138,22 @@ export async function followUpSlack(
       e.user ?? "",
       (e.text ?? "").replace(LEADING_MENTION, "")
     );
-    if (!e.channel) {
+    if (!e.channel || !e.user) {
       return;
     }
+    // Seen only by whoever asked: the answer can hold their private logs, items and brief, and a
+    // channel is a team place.
     await slackApi(
       ctx,
       botTokenOf(conn.secrets),
-      "chat.postMessage",
+      "chat.postEphemeral",
       {},
       {
         json: {
           channel: e.channel,
+          user: e.user,
           text: toSlack(reply),
           thread_ts: e.thread_ts ?? e.ts,
-          unfurl_links: false,
-          unfurl_media: false,
         },
       }
     );

@@ -210,6 +210,15 @@ export function normalizeSlackMessage(
   if ("ignored" in source) {
     return { events: [], ignored: source.ignored };
   }
+  // Slack sends a message to the bot twice, as a mention too: it's answered as a command, and
+  // what it records (a log) it records itself.
+  const { botUserId } = settings;
+  if (
+    typeof botUserId === "string" &&
+    (e.text ?? "").trimStart().startsWith(`<@${botUserId}`)
+  ) {
+    return { events: [], ignored: "addressed to Worklog" };
+  }
 
   const channelName = channelNameOf(settings, source.channel);
   const base = messageEvent(
