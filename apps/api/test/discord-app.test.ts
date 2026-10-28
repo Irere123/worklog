@@ -2,6 +2,7 @@ import { beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { generateKeyPairSync, randomInt, sign } from "node:crypto";
 
 import { deliver } from "#automations/delivery";
+import { guildChannels } from "#connectors/discord/app";
 import { reconcileInstallations } from "#ingest/installations";
 
 import { routedFetch, testEnv } from "./harness";
@@ -211,4 +212,35 @@ describe("Discord app", () => {
       statusReason: "the app is no longer installed there",
     });
   });
+
+  test("a channel hidden from @everyone is private, unless the whole server is", async () => {
+    const hidden = { id: "G1", type: 0, allow: "0", deny: "1024" };
+    expect(
+      await channelsOf([
+        { id: "C1", name: "general", type: 0 },
+        { id: "C2", name: "leads", type: 0, permission_overwrites: [hidden] },
+      ])
+    ).toEqual([
+      { id: "C1", name: "general", private: false },
+      { id: "C2", name: "leads", private: true },
+    ]);
+    // Every channel hidden: a server that lets people in by a role.
+    expect(
+      await channelsOf([
+        { id: "C1", name: "general", type: 0, permission_overwrites: [hidden] },
+        { id: "C2", name: "leads", type: 0, permission_overwrites: [hidden] },
+      ])
+    ).toEqual([
+      { id: "C1", name: "general", private: false },
+      { id: "C2", name: "leads", private: false },
+    ]);
+  });
 });
+
+// The channels Discord lists for server G1, as Worklog offers them.
+async function channelsOf(channels: object[]) {
+  env.ctx.fetch = routedFetch([
+    ["GET https://discord.com/api/v10/guilds/G1/channels", () => channels],
+  ]);
+  return await guildChannels(env.ctx, "G1", "bot");
+}

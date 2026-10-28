@@ -127,13 +127,18 @@ export async function guildChannels(
       botToken
     )
   );
-  return channels
+  const readable = channels
     .filter((c) => READABLE.has(c.type))
     .map((c) => ({
       id: c.id,
       name: c.name ?? c.id,
       private: restricted(c.permission_overwrites, guildId),
-    }))
+    }));
+  // A server that hides every channel from @everyone lets people in by a role: hidden says
+  // nothing there about who reads what.
+  const gated = readable.every((c) => c.private);
+  return readable
+    .map((c) => (gated ? { ...c, private: false } : c))
     .toSorted((a, b) => a.name.localeCompare(b.name));
 }
 
