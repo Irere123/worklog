@@ -249,15 +249,14 @@ describe("Slack normalizer", () => {
       now
     );
 
-  test("a message to the bot isn't a post, but whoever else it mentions hears of it", () => {
+  test("a message to the bot isn't a post, and whoever it's about isn't pinged", () => {
     expect(toBot("<@UBOT> log Shipped the retry queue").ignored).toBe(
       "addressed to Worklog"
     );
-    const [withSam] = toBot(
-      "<@UBOT> log Shipped the retry queue with <@U0SAM>"
-    ).events;
-    expect(withSam).toMatchObject({ hidden: true });
-    expect(withSam?.signals?.map((sig) => sig.who?.id)).toContain("U0SAM");
+    // Asking Sam's assistant is how not to interrupt Sam.
+    expect(
+      toBot("<@UBOT> ask <@U0SAM> where is the retry logic?").events
+    ).toEqual([]);
     // Another bot whose id starts the same way is someone else.
     expect(
       toBot("<@UBOTX> Shipped the retry queue to staging").ignored
