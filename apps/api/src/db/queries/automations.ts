@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, lte, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, lte, sql } from "drizzle-orm";
 
 import type { DbOrTx } from "#db";
 import { automationRuns, automations } from "#db/schema";
@@ -79,18 +79,37 @@ export async function deleteAutomationById(
   return rows.length > 0;
 }
 
-export async function listDueAutomations(
+/**
+ * Due automations, each marked claimed at `now` and moved out of the way until `leaseUntil`: a
+ * scheduler in another process skips the ones this one is taking, and one whose job is lost
+ * comes due again then.
+ */
+export async function claimDueAutomations(
   db: DbOrTx,
-  params: { now: Date; limit: number }
+  params: { now: Date; leaseUntil: Date; limit: number }
 ) {
-  return await db
-    .select()
+  const due = db
+    .select({ id: automations.id })
     .from(automations)
     .where(
       and(eq(automations.enabled, true), lte(automations.nextRunAt, params.now))
     )
     .orderBy(asc(automations.nextRunAt))
-    .limit(params.limit);
+    .limit(params.limit)
+    .for("update", { skipLocked: true });
+  return await db
+    .update(automations)
+    .set({ nextRunAt: params.leaseUntil, claimedAt: params.now })
+    .where(inArray(automations.id, due))
+    .returning({ id: automations.id, memberId: automations.memberId });
+}
+
+export async function findAutomationById(db: DbOrTx, params: { id: string }) {
+  const [row] = await db
+    .select()
+    .from(automations)
+    .where(eq(automations.id, params.id));
+  return row;
 }
 
 // Never pushes the check later than it already was.

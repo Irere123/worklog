@@ -1,8 +1,8 @@
-import { and, desc, eq, gte, ilike, inArray, lt, or } from "drizzle-orm";
+import { and, desc, eq, gte, ilike, inArray, lt, lte, or } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
 
 import type { DbOrTx } from "#db";
-import { activities } from "#db/schema";
+import { activities, inboundEvents } from "#db/schema";
 import { returned } from "#lib/assert";
 
 export type ActivityRow = typeof activities.$inferSelect;
@@ -195,17 +195,29 @@ export async function updateUnmergedActivity(
   return updated.length;
 }
 
-// Replay rebuilds these from the connection's stored deliveries.
-export async function deleteConnectionActivities(
+// Replay rebuilds these from the stored deliveries of one lane, received in the window. Their
+// ingested_events entries go with them.
+export async function deleteLaneActivities(
   db: DbOrTx,
-  params: { connectionId: string; since?: Date }
+  params: { connectionId: string; lane: number; since?: Date; until: Date }
 ) {
+  const deliveries = db
+    .select({ id: inboundEvents.id })
+    .from(inboundEvents)
+    .where(
+      and(
+        eq(inboundEvents.connectionId, params.connectionId),
+        eq(inboundEvents.lane, params.lane),
+        params.since ? gte(inboundEvents.receivedAt, params.since) : undefined,
+        lte(inboundEvents.receivedAt, params.until)
+      )
+    );
   const deleted = await db
     .delete(activities)
     .where(
       and(
         eq(activities.connectionId, params.connectionId),
-        params.since ? gte(activities.occurredAt, params.since) : undefined
+        inArray(activities.inboundEventId, deliveries)
       )
     )
     .returning({ id: activities.id });

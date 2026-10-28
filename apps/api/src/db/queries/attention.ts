@@ -6,7 +6,9 @@ import {
   gte,
   inArray,
   isNull,
+  lt,
   lte,
+  max,
   ne,
   or,
   sql,
@@ -17,6 +19,7 @@ import {
   activities,
   attentionFeedback,
   attentionItems,
+  attentionResolutions,
   notifications,
 } from "#db/schema";
 import type { Priority } from "#db/schema";
@@ -59,6 +62,7 @@ export async function upsertAttention(
             consideredAt: null,
             disposition: null,
             reason: null,
+            sourceAt: sql`greatest(${attentionItems.sourceAt}, excluded.source_at)`,
             updatedAt: row.updatedAt,
           },
         })
@@ -275,12 +279,15 @@ export async function listPushedAttention(
 }
 
 // Without `memberId`, closes the open item for everyone who has it.
+// With `before`, only items raised by something that happened before then: a late resolve leaves
+// a newer request open.
 export async function setOpenAttentionDone(
   db: DbOrTx,
   params: {
     workspaceId: string;
     dedupeKey: string;
     memberId?: string;
+    before?: Date;
     at: Date;
   }
 ) {
@@ -294,9 +301,75 @@ export async function setOpenAttentionDone(
         eq(attentionItems.state, "open"),
         params.memberId
           ? eq(attentionItems.memberId, params.memberId)
+          : undefined,
+        params.before
+          ? or(
+              isNull(attentionItems.sourceAt),
+              lte(attentionItems.sourceAt, params.before)
+            )
           : undefined
       )
     );
+}
+
+// Keeps the latest source time, whichever order resolves arrive in.
+export async function upsertAttentionResolution(
+  db: DbOrTx,
+  params: {
+    workspaceId: string;
+    /** Empty when resolved for everyone. */
+    memberId: string;
+    dedupeKey: string;
+    at: Date;
+  }
+) {
+  await db
+    .insert(attentionResolutions)
+    .values({
+      workspaceId: params.workspaceId,
+      memberId: params.memberId,
+      dedupeKey: params.dedupeKey,
+      resolvedThrough: params.at,
+    })
+    .onConflictDoUpdate({
+      target: [
+        attentionResolutions.workspaceId,
+        attentionResolutions.dedupeKey,
+        attentionResolutions.memberId,
+      ],
+      set: {
+        resolvedThrough: sql`greatest(${attentionResolutions.resolvedThrough}, excluded.resolved_through)`,
+      },
+    });
+}
+
+// The member's own resolution or one for everyone, whichever is later.
+export async function findAttentionResolvedThrough(
+  db: DbOrTx,
+  params: { workspaceId: string; memberId: string; dedupeKey: string }
+) {
+  const [row] = await db
+    .select({ at: max(attentionResolutions.resolvedThrough) })
+    .from(attentionResolutions)
+    .where(
+      and(
+        eq(attentionResolutions.workspaceId, params.workspaceId),
+        eq(attentionResolutions.dedupeKey, params.dedupeKey),
+        inArray(attentionResolutions.memberId, [params.memberId, ""])
+      )
+    );
+  return row?.at ?? null;
+}
+
+export async function deleteAttentionResolutionsBefore(
+  db: DbOrTx,
+  params: { before: Date }
+) {
+  const deleted = await db
+    .delete(attentionResolutions)
+    .where(lt(attentionResolutions.resolvedThrough, params.before))
+    .returning({ key: attentionResolutions.dedupeKey });
+  return deleted.length;
 }
 
 export async function insertNotification(

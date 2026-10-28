@@ -22,9 +22,10 @@ const migrationsFolder = fileURLToPath(
 // *strings* (oven-sh/bun#28819) — reads look fine, but `data->>'repo'` is null in SQL.
 // test/postgres.test.ts guards this.
 export async function openDb(
-  url: string
+  url: string,
+  poolSize = 10
 ): Promise<{ db: Db; close: () => Promise<void> }> {
-  const pool = new Pool({ connectionString: url, max: 10 });
+  const pool = new Pool({ connectionString: url, max: poolSize });
   pool.on("error", logError);
   pool.on("connect", (connection) => {
     connection.on("error", logError);

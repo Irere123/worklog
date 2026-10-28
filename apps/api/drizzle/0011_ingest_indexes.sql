@@ -1,0 +1,3 @@
+CREATE INDEX CONCURRENTLY "attention_open_thread_idx" ON "attention_items" USING btree ("workspace_id","dedupe_key") WHERE "attention_items"."state" = 'open';--> statement-breakpoint
+CREATE UNIQUE INDEX CONCURRENTLY "connections_external_uq" ON "connections" USING btree ("provider","external_id");--> statement-breakpoint
+CREATE INDEX CONCURRENTLY "inbound_waiting_idx" ON "inbound_events" USING btree ("connection_id","lane","received_at") WHERE "inbound_events"."status" in ('pending', 'failed');

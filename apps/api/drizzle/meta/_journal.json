@@ -71,6 +71,34 @@
       "when": 1793073179041,
       "tag": "0009_private_targets",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1793141328555,
+      "tag": "0010_connector_apps",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1793141330935,
+      "tag": "0011_ingest_indexes",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1793161591212,
+      "tag": "0012_ledger_deferred",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1793161605078,
+      "tag": "0013_automation_claims",
+      "breakpoints": true
     }
   ]
 }
