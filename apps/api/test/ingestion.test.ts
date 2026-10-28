@@ -1155,6 +1155,29 @@ describe("custom integrations", () => {
     );
   });
 
+  test("namespaces under the generic prefixes are free, but not another connection's own", async () => {
+    const owner = await env.workspace();
+    for (const name of ["one", "two"]) {
+      const shared = await env.call("POST", "/v1/connections", {
+        token: owner.token,
+        body: {
+          provider: "custom",
+          name,
+          settings: { identityNamespace: "webhook:gitlab" },
+        },
+      });
+      expect(shared.status).toBe(201);
+    }
+    const taking = await env.call("POST", "/v1/connections", {
+      token: owner.token,
+      body: {
+        provider: "custom",
+        settings: { identityNamespace: "webhook:con_01abc" },
+      },
+    });
+    expect(taking.status).toBe(400);
+  });
+
   test("every built-in connector's namespace is reserved", () => {
     for (const connector of listConnectors()) {
       expect([connector.id, isBuiltInNamespace(connector.id)]).toEqual([
