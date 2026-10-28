@@ -160,6 +160,53 @@ describe("GitHub", () => {
     expect(card.stage).not.toBe("done");
   });
 
+  // Closed by a bot under one bot policy, reopened by hand, then read again under the other.
+  const stageAfterReread = async (first: string, then: string) => {
+    const { owner, board, conn, send } = await github();
+    const policy = async (bots: string) =>
+      await env.call("PATCH", `/v1/connections/${conn.id}`, {
+        token: owner.token,
+        body: { settings: { boardId: board.id, bots } },
+      });
+    const issue = {
+      number: 12,
+      title: "Slow search",
+      html_url: "https://github.com/acme/api/issues/12",
+      user: { login: "emma-gh" },
+    };
+    await send("issues", {
+      action: "opened",
+      issue,
+      repository: repo,
+      sender: { login: "emma-gh" },
+    });
+    const closedByBot = {
+      action: "closed",
+      issue: { ...issue, closed_at: "2026-10-27T10:00:00Z" },
+      repository: repo,
+      sender: { login: "stale[bot]", id: 999, type: "Bot" },
+    };
+    await policy(first);
+    await send("issues", closedByBot, { delivery: `close-${first}` });
+    const [closed] = (
+      await env.call("GET", "/v1/cards", { token: owner.token })
+    ).body;
+    expect(closed.stage).toBe("done");
+    await env.call("DELETE", `/v1/cards/${closed.number}/closure`, {
+      token: owner.token,
+    });
+    await policy(then);
+    await send("issues", closedByBot, { delivery: `close-${then}` });
+    const [card] = (await env.call("GET", "/v1/cards", { token: owner.token }))
+      .body;
+    return card.stage;
+  };
+
+  test("a bot's close read again after the bot policy changed doesn't undo a reopen either", async () => {
+    expect(await stageAfterReread("keep", "drop")).not.toBe("done");
+    expect(await stageAfterReread("drop", "keep")).not.toBe("done");
+  });
+
   test("a board that isn't there is refused, and one archived later takes no more cards", async () => {
     const { owner, board, conn, send } = await github();
     const refused = await env.call("PATCH", `/v1/connections/${conn.id}`, {

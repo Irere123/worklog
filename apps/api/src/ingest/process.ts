@@ -1,5 +1,6 @@
 import { getConnector } from "#connectors";
 import type {
+  BoardEffect,
   ConnectionView,
   Connector,
   Normalized,
@@ -514,10 +515,13 @@ async function ingestEvent(
       outcome.duplicates += 1;
       return;
     }
-    const cardId = await linkCard(tx, scope, source.mode, event, {
-      actor: who.member,
-      board: effects.board,
-    });
+    const cardId = await linkCard(
+      tx,
+      scope,
+      source.mode,
+      await withoutAppliedState(tx, source, event),
+      { actor: who.member, board: effects.board }
+    );
     const onBehalfOf = event.agent?.onBehalfOf;
     const onBehalfOfId =
       (onBehalfOf && source.people.get(onBehalfOf.id)?.resolved.memberId) ??
@@ -564,18 +568,24 @@ async function applyState(
   who: Who
 ) {
   const resolves = (event.signals ?? []).filter((s) => s.type === "resolve");
-  const board = (event.board ?? []).filter(
-    (e) => e.type === "close_card" || e.type === "reopen_card"
-  );
+  const board = (event.board ?? []).filter(changesState);
   if (resolves.length === 0 && board.length === 0) {
     return;
   }
   // Once: read again (a sync page, a redelivery), it mustn't close a card someone has reopened
-  // since. Under a key of its own, so a replay that keeps the event after all can still record it.
-  const first = await insertIngestedEventIfNew(ctx.db, {
+  // since, whether it was dropped or kept the first time (the bot policy may have changed). Under
+  // a key of its own, so a replay that keeps the event after all can still record it.
+  const key = {
     workspaceId: source.conn.workspaceId,
     source: source.conn.provider,
-    externalId: `state:${event.id}`,
+    externalId: event.id,
+  };
+  if (await findIngestedEvent(ctx.db, key)) {
+    return;
+  }
+  const first = await insertIngestedEventIfNew(ctx.db, {
+    ...key,
+    externalId: stateKey(event),
     connectionId: source.conn.id,
     activityId: null,
   });
@@ -599,6 +609,36 @@ async function applyState(
       onlyIfNew: true,
     }
   );
+}
+
+function stateKey(event: WorklogEvent) {
+  return `state:${event.id}`;
+}
+
+function changesState(e: BoardEffect) {
+  return e.type === "close_card" || e.type === "reopen_card";
+}
+
+/**
+ * The event, less the closes and reopens that already ran when it was dropped: kept now (the bot
+ * policy changed), it mustn't close a card again that someone has reopened since.
+ */
+async function withoutAppliedState(
+  ctx: AppContext,
+  source: Source,
+  event: WorklogEvent
+) {
+  if (!(event.board ?? []).some(changesState)) {
+    return event;
+  }
+  const applied = await findIngestedEvent(ctx.db, {
+    workspaceId: source.conn.workspaceId,
+    source: source.conn.provider,
+    externalId: stateKey(event),
+  });
+  return applied
+    ? { ...event, board: (event.board ?? []).filter((e) => !changesState(e)) }
+    : event;
 }
 
 function effectsFor(ctx: AppContext, mode: Mode, event: WorklogEvent): Effects {
