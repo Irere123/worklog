@@ -38,9 +38,19 @@ export async function findActivityById(db: DbOrTx, params: { id: string }) {
   return row;
 }
 
+/**
+ * The burst an event at `at` belongs to: one whose span, from its first event to its last, comes
+ * within `windowMs` of it on either side. History read newest first arrives before what it
+ * preceded, so the window looks both ways.
+ */
 export async function findCoalescingActivity(
   db: DbOrTx,
-  params: { workspaceId: string; coalesceKey: string; since: Date }
+  params: {
+    workspaceId: string;
+    coalesceKey: string;
+    at: Date;
+    windowMs: number;
+  }
 ) {
   const [row] = await db
     .select()
@@ -49,7 +59,14 @@ export async function findCoalescingActivity(
       and(
         eq(activities.workspaceId, params.workspaceId),
         eq(activities.coalesceKey, params.coalesceKey),
-        gte(activities.updatedAt, params.since)
+        gte(
+          activities.updatedAt,
+          new Date(params.at.getTime() - params.windowMs)
+        ),
+        lte(
+          activities.occurredAt,
+          new Date(params.at.getTime() + params.windowMs)
+        )
       )
     )
     .orderBy(desc(activities.updatedAt))
@@ -71,6 +88,7 @@ export async function updateActivityById(
         | "count"
         | "data"
         | "importance"
+        | "occurredAt"
         | "updatedAt"
       >
     >;

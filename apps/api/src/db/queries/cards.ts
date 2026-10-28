@@ -84,6 +84,17 @@ export async function updateCardById(
   await db.update(cards).set(params.set).where(eq(cards.id, params.id));
 }
 
+// Never backwards: activity read back from history is older than what the card has seen since.
+export async function setCardActiveAt(
+  db: DbOrTx,
+  params: { id: string; at: Date }
+) {
+  await db
+    .update(cards)
+    .set({ lastActiveAt: sql`greatest(${cards.lastActiveAt}, ${params.at})` })
+    .where(eq(cards.id, params.id));
+}
+
 export async function updateCardsByColumn(
   db: DbOrTx,
   params: { columnId: string; set: Partial<CardRow> }
