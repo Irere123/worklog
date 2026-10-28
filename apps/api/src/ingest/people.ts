@@ -17,8 +17,18 @@ export type Person = {
 /** Everyone a delivery's events name, by account id. */
 export type People = Map<string, Person>;
 
+// A mention carries only an id, an author a login and a name: `first` wins, `then` fills in.
+function fill(first: ExternalActor, then: ExternalActor): ExternalActor {
+  return {
+    id: first.id,
+    handle: first.handle ?? then.handle,
+    name: first.name ?? then.name,
+    bot: first.bot ?? then.bot,
+  };
+}
+
 // `acted`: the account did something in these events, not only got named in them (a mention,
-// an assignment): only that counts as seeing it.
+// an assignment): only that counts as seeing it, and when.
 function named(events: WorklogEvent[]) {
   const seen = new Map<string, Sighting>();
   const add = (
@@ -30,19 +40,20 @@ function named(events: WorklogEvent[]) {
       return;
     }
     const entry = seen.get(actor.id);
-    if (entry) {
-      entry.n += 1;
-      entry.acted = entry.acted === true || acted;
-      // A mention carries only an id, an author a login and a name: keep what any of them said.
-      entry.actor = {
-        id: actor.id,
-        handle: actor.handle ?? entry.actor.handle,
-        name: actor.name ?? entry.actor.name,
-        bot: actor.bot ?? entry.actor.bot,
-      };
-    } else {
-      seen.set(actor.id, { actor, at, n: 1, acted });
+    if (!entry) {
+      seen.set(actor.id, { actor, at, n: acted ? 1 : 0, acted });
+      return;
     }
+    if (!acted) {
+      // What others call it only fills in what nothing has said yet.
+      entry.actor = fill(entry.actor, actor);
+      return;
+    }
+    // What it says of itself when acting wins over what mentions called it.
+    entry.actor = fill(actor, entry.actor);
+    entry.at = entry.acted === true && entry.at > at ? entry.at : at;
+    entry.n += 1;
+    entry.acted = true;
   };
   for (const e of events) {
     add(e.actor, e.occurredAt, true);

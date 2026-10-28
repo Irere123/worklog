@@ -339,6 +339,16 @@ beforeEach(() => {
   env.reset();
 });
 
+// A pushed comment by u2 that mentions u1, under another handle and name than u1's own.
+const mentionOfU1 = (id: string, at: string) => ({
+  id,
+  kind: "ticket.commented",
+  occurredAt: at,
+  actor: { id: "u2", handle: "ana" },
+  title: `Commented ${id}`,
+  mentions: [{ id: "u1", handle: "SAMMY", name: "wrong" }],
+});
+
 const daysAgo = (d: number, minutes = 0) =>
   new Date(Date.now() - d * 86_400_000 + minutes * 60_000).toISOString();
 
@@ -1098,6 +1108,51 @@ describe("custom integrations", () => {
       })
     ).body;
     expect(health.identityNamespace).toBe(`custom:${other.id}`);
+  });
+
+  test("named and acting in one delivery, an account counts once, as it said, when it acted", async () => {
+    const owner = await env.workspace();
+    const conn = (
+      await env.call("POST", "/v1/connections", {
+        token: owner.token,
+        body: {
+          provider: "custom",
+          settings: { identityNamespace: "jira:acme" },
+        },
+      })
+    ).body;
+    await env.call("POST", `/v1/connections/${conn.id}/events`, {
+      token: owner.token,
+      body: {
+        events: [
+          mentionOfU1("c1", "2026-10-01T09:00:00Z"),
+          {
+            id: "d1",
+            kind: "ticket.closed",
+            occurredAt: "2026-10-20T09:00:00Z",
+            actor: { id: "u1", handle: "sam.k", name: "Sam K" },
+            title: "Closed PAY-1",
+          },
+          mentionOfU1("c2", "2026-10-02T09:00:00Z"),
+        ],
+      },
+    });
+    await env.drain();
+    const [u1] = (
+      await env.ctx.db.execute<{
+        handle: string;
+        name: string;
+        n: number;
+        last: Date;
+      }>(sql`
+        select external_handle as handle, display_name as name, event_count as n,
+          last_seen_at as last
+        from identities where workspace_id = ${owner.workspace.id} and external_id = 'u1'`)
+    ).rows;
+    expect(u1).toMatchObject({ handle: "sam.k", name: "Sam K", n: 1 });
+    expect(new Date(u1?.last ?? 0).toISOString()).toBe(
+      "2026-10-20T09:00:00.000Z"
+    );
   });
 
   test("every built-in connector's namespace is reserved", () => {
