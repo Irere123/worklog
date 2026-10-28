@@ -1,8 +1,12 @@
 import { beforeAll, beforeEach, describe, expect, test } from "bun:test";
 
+import { sql } from "drizzle-orm";
+
 import { CONSTITUTION } from "#agent/prompts";
 import { briefWindow } from "#automations/briefs";
+import { queueDueAutomations, runAutomation } from "#automations/run";
 import { nextRun } from "#automations/schedule";
+import { findAutomationById } from "#db/queries/automations";
 import { enqueue } from "#jobs/queue";
 import { startWorker } from "#jobs/tasks";
 import type { ConsoleMailer } from "#lib/mailer";
@@ -12,6 +16,20 @@ import { scriptedModel, testEnv } from "./harness";
 import type { TestEnv } from "./harness";
 
 let env: TestEnv;
+
+const listOf = (values: string[]) =>
+  sql`(${sql.join(
+    values.map((v) => sql`${v}`),
+    sql`, `
+  )})`;
+
+// The scheduler runs what is due everywhere: the automations of every workspace that earlier
+// tests made would come due too.
+async function onlyDue(workspaceId: string) {
+  await env.ctx.db.execute(sql`
+    update automations set next_run_at = next_run_at + interval '10 years'
+    where workspace_id <> ${workspaceId}`);
+}
 beforeAll(async () => {
   env = await testEnv();
 });
@@ -407,9 +425,10 @@ describe("automations", () => {
   });
 
   test("the scheduler runs whatever is due", async () => {
-    const { token } = await env.workspace();
+    const { token, workspace } = await env.workspace();
     const autos = (await env.call("GET", "/v1/automations", { token })).body;
     const morning = autos.find((a: any) => a.kind === "brief.daily");
+    await onlyDue(workspace.id);
     env.ctx.now = () => new Date(new Date(morning.nextRunAt).getTime() + 1000);
     await enqueue(env.ctx, "automations:run", {});
     await env.drain();
@@ -420,6 +439,151 @@ describe("automations", () => {
     expect(new Date(after.nextRunAt).getTime()).toBeGreaterThan(
       new Date(morning.nextRunAt).getTime()
     );
+  });
+
+  test("what is due runs on the workers, once each, however many schedulers look", async () => {
+    const { token, workspace } = await env.workspace();
+    const autos = (await env.call("GET", "/v1/automations", { token })).body;
+    await onlyDue(workspace.id);
+    const latest = Math.max(
+      ...autos.map((a: any) => new Date(a.nextRunAt).getTime())
+    );
+    const due = new Date(latest + 1000);
+    env.ctx.now = () => due;
+    // Two processes' schedulers in the same minute.
+    const queued = await Promise.all([
+      queueDueAutomations(env.ctx),
+      queueDueAutomations(env.ctx),
+    ]);
+    expect(queued[0] + queued[1]).toBe(autos.length);
+    // A run that never happened (its worker died) comes due again once its lease is up, and is
+    // queued in place of the one still waiting, not beside it.
+    env.ctx.now = () => new Date(due.getTime() + 16 * 60_000);
+    expect(await queueDueAutomations(env.ctx)).toBe(autos.length);
+    const jobs = await env.ctx.db.execute<{ n: number }>(sql`
+      select count(*)::int as n from graphile_worker._private_jobs
+      where key in ${listOf(autos.map((a: any) => `automation:${a.id}`))}`);
+    expect(jobs.rows[0]?.n).toBe(autos.length);
+    await env.drain();
+    const runs = await env.ctx.db.execute<{ id: string; n: number }>(sql`
+      select automation_id as id, count(*)::int as n from automation_runs
+      where automation_id in ${listOf(autos.map((a: any) => a.id))} group by 1`);
+    expect(runs.rows).toHaveLength(autos.length);
+    expect(runs.rows.every((r) => r.n === 1)).toBe(true);
+  });
+
+  test("a run retried after it finished isn't sent again; one edited while queued still runs", async () => {
+    const { token, workspace } = await env.workspace();
+    const autos = (await env.call("GET", "/v1/automations", { token })).body;
+    const digest = autos.find((a: any) => a.kind === "digest");
+    const morning = autos.find((a: any) => a.kind === "brief.daily");
+    await onlyDue(workspace.id);
+    await env.ctx.db.execute(sql`
+      update automations set next_run_at = next_run_at + interval '10 years'
+      where workspace_id = ${workspace.id} and id not in (${digest.id}, ${morning.id})`);
+    const due = new Date(
+      Math.max(
+        new Date(digest.nextRunAt).getTime(),
+        new Date(morning.nextRunAt).getTime()
+      ) + 1000
+    );
+    env.ctx.now = () => due;
+    expect(await queueDueAutomations(env.ctx)).toBe(2);
+    // Renamed and run by hand while waiting: neither cancels the scheduled run or delays it.
+    await env.call("PATCH", `/v1/automations/${morning.id}`, {
+      token,
+      body: { name: "Morning" },
+    });
+    expect(
+      (await env.call("POST", `/v1/automations/${morning.id}/run`, { token }))
+        .status
+    ).toBe(200);
+    // The digest runs, then fails to say so; the job is retried.
+    const { bus } = env.ctx;
+    const publish = bus.publish.bind(bus);
+    let failed = false;
+    bus.publish = async (input) => {
+      if (input.type === "automation.ran" && !failed) {
+        failed = true;
+        throw new Error("events insert failed");
+      }
+      await publish(input);
+    };
+    try {
+      await env.drain();
+      await env.ctx.db.execute(sql`
+        update graphile_worker._private_jobs set run_at = now()
+        where key = ${`automation:${digest.id}`}`);
+      await env.drain();
+    } finally {
+      bus.publish = publish;
+    }
+    const runs = await env.ctx.db.execute<{ id: string; n: number }>(sql`
+      select automation_id as id, count(*)::int as n from automation_runs
+      where automation_id in (${digest.id}, ${morning.id}) group by 1 order by 1`);
+    expect(runs.rows).toEqual(
+      [
+        { id: digest.id, n: 1 },
+        { id: morning.id, n: 2 },
+      ].toSorted((a, b) => (a.id < b.id ? -1 : 1))
+    );
+    const after = (await env.call("GET", "/v1/automations", { token })).body;
+    for (const a of after.filter((x: any) =>
+      [digest.id, morning.id].includes(x.id)
+    )) {
+      // The next slot, not the lease the claim left.
+      expect(new Date(a.nextRunAt).getTime()).toBeGreaterThan(
+        due.getTime() + 60 * 60_000
+      );
+    }
+  });
+
+  test("a run whose worker died is released and runs, instead of waiting hours", async () => {
+    const { token, workspace } = await env.workspace();
+    const autos = (await env.call("GET", "/v1/automations", { token })).body;
+    const digest = autos.find((a: any) => a.kind === "digest");
+    await onlyDue(workspace.id);
+    await env.ctx.db.execute(sql`
+      update automations set next_run_at = next_run_at + interval '10 years'
+      where workspace_id = ${workspace.id} and id <> ${digest.id}`);
+    env.ctx.now = () => new Date(new Date(digest.nextRunAt).getTime() + 1000);
+    expect(await queueDueAutomations(env.ctx)).toBe(1);
+    // Taken by a worker that was then killed: the job and the person's queue stay locked.
+    await env.ctx.db.execute(sql`
+      update graphile_worker._private_jobs
+      set locked_at = now() - interval '2 hours', locked_by = 'dead-worker', attempts = 1
+      where key = ${`automation:${digest.id}`}`);
+    await env.ctx.db.execute(sql`
+      update graphile_worker._private_job_queues
+      set locked_at = now() - interval '2 hours', locked_by = 'dead-worker'
+      where queue_name like 'automations:%'
+        and id = (select job_queue_id from graphile_worker._private_jobs
+          where key = ${`automation:${digest.id}`})`);
+    await env.drain();
+    const before = await env.ctx.db.execute<{ n: number }>(sql`
+      select count(*)::int as n from automation_runs where automation_id = ${digest.id}`);
+    expect(before.rows[0]?.n).toBe(0);
+    await enqueue(env.ctx, "jobs:release", {});
+    await env.drain();
+    const after = await env.ctx.db.execute<{ n: number }>(sql`
+      select count(*)::int as n from automation_runs where automation_id = ${digest.id}`);
+    expect(after.rows[0]?.n).toBe(1);
+  });
+
+  test("turning an automation off while it runs keeps it off", async () => {
+    const { token } = await env.workspace();
+    const autos = (await env.call("GET", "/v1/automations", { token })).body;
+    const digest = autos.find((a: any) => a.kind === "digest");
+    const loaded = await findAutomationById(env.ctx.db, { id: digest.id });
+    await env.call("PATCH", `/v1/automations/${digest.id}`, {
+      token,
+      body: { enabled: false },
+    });
+    if (loaded) {
+      await runAutomation(env.ctx, loaded);
+    }
+    const after = (await env.call("GET", "/v1/automations", { token })).body;
+    expect(after.find((a: any) => a.id === digest.id).enabled).toBe(false);
   });
 
   test("the worker starts with its cron schedule", async () => {

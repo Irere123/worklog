@@ -1,6 +1,6 @@
-import { expect, test } from "bun:test";
+import { describe, expect, test } from "bun:test";
 
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 
 import type { AppContext } from "#context";
 import type { StoredEvent } from "#db/queries/events";
@@ -8,6 +8,7 @@ import { insertMembers } from "#db/queries/members";
 import { getWorkspaceById, insertWorkspace } from "#db/queries/workspaces";
 import { events } from "#db/schema";
 import { transact } from "#db/transact";
+import { SecretBox } from "#lib/crypto";
 import { ApiError } from "#lib/errors";
 import { newId } from "#lib/ids";
 
@@ -59,6 +60,37 @@ test("a nested transact joins the outer transaction", async () => {
   expect(
     await failure(getWorkspaceById(ctx.db, { id: row.id }))
   ).toHaveProperty("status", 404);
+});
+
+test("a write that committed stays a success when its events can't be published", async () => {
+  const { ctx } = await testEnv();
+  const row = workspaceRow(ctx);
+  await ctx.db.execute(
+    sql.raw(`
+      create function test_events_down() returns trigger language plpgsql
+        as $$ begin raise exception 'events down'; end $$;
+      create trigger test_events_down before insert on events
+        execute function test_events_down();
+    `)
+  );
+  try {
+    await transact(ctx, async (tx) => {
+      await insertWorkspace(tx.db, row);
+      await tx.bus.publish({
+        workspaceId: row.id,
+        type: "card.updated",
+        data: {},
+      });
+    });
+  } finally {
+    await ctx.db.execute(
+      sql.raw(`
+        drop trigger test_events_down on events;
+        drop function test_events_down();
+      `)
+    );
+  }
+  expect((await getWorkspaceById(ctx.db, { id: row.id })).id).toBe(row.id);
 });
 
 test("events publish after the commit, and not at all after a rollback", async () => {
@@ -116,4 +148,26 @@ test("a taken handle is a conflict, not a database error", async () => {
   const error = await failure(duplicate);
   expect(error).toBeInstanceOf(ApiError);
   expect(error).toHaveProperty("status", 409);
+});
+
+describe("secret keys", () => {
+  const a = "a".repeat(64);
+  const b = "b".repeat(64);
+
+  test("a rotated key still opens what it sealed, and says it's stale", () => {
+    const sealed = new SecretBox(a).seal({ token: "t1" });
+    const rotated = new SecretBox(b, [a]);
+    expect(rotated.open(sealed)).toEqual({ token: "t1" });
+    expect(rotated.stale(sealed)).toBe(true);
+    const resealed = rotated.seal(rotated.open(sealed));
+    expect(rotated.stale(resealed)).toBe(false);
+    expect(() => new SecretBox(b).open(sealed)).toThrow("isn't configured");
+  });
+
+  test("values sealed before key ids still open", () => {
+    const box = new SecretBox(a);
+    const v2 = box.seal({ token: "t2" });
+    const legacy = v2.split(".").slice(2).join(".");
+    expect(new SecretBox(b, [a]).open(legacy)).toEqual({ token: "t2" });
+  });
 });

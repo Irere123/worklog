@@ -3,9 +3,11 @@ import { createHmac } from "node:crypto";
 
 import { sql } from "drizzle-orm";
 
-import { normalizeGithubLike } from "#ingest/connectors/github";
-import { normalizeSlackMessage } from "#ingest/connectors/slack";
-import { webhookConnector } from "#ingest/connectors/webhook";
+import { normalizeGithubLike } from "#connectors/github";
+import { normalizeSyncPage } from "#connectors/github/sync";
+import { normalizeSlackMessage } from "#connectors/slack";
+import { normalizeHistory } from "#connectors/slack/events";
+import { webhookConnector } from "#connectors/webhook";
 import { pruneDeliveries } from "#ingest/retention";
 import { hmacHex } from "#lib/crypto";
 import { DAY_MS } from "#lib/time";
@@ -586,6 +588,10 @@ describe("ingestion pipeline", () => {
       },
     });
 
+    // The ledger goes with the deliveries.
+    await env.ctx.db.execute(sql`
+      update ingested_events set created_at = now() - interval '100 days'
+      where connection_id = ${conn.id} and external_id like 'push:%'`);
     await pruneDeliveries(env.ctx);
     const deliveries = (
       await env.call("GET", `/v1/connections/${conn.id}/deliveries`, {
@@ -593,6 +599,9 @@ describe("ingestion pipeline", () => {
       })
     ).body;
     expect(deliveries.map((d: any) => d.eventType)).toEqual(["pull_request"]);
+    const ledger = await env.ctx.db.execute<{ id: string }>(sql`
+      select external_id as id from ingested_events where connection_id = ${conn.id}`);
+    expect(ledger.rows.map((r) => r.id.split(":")[0])).toEqual(["pr"]);
 
     await env.call("POST", `/v1/connections/${conn.id}/replay`, {
       token: owner.token,
@@ -1013,5 +1022,232 @@ describe("agents as teammates", () => {
       priority: "low",
       title: "Cursor agent finished: Fixed the flaky test (PR #31)",
     });
+  });
+});
+
+// The id GitHub's webhook for this would give the event.
+const webhook = (type: string, payload: object) =>
+  gh(type, payload).events[0]?.id ?? "none";
+
+describe("history read back from APIs", () => {
+  const since = "2026-10-20T00:00:00Z";
+  const author = { __typename: "User", login: "emma-gh", databaseId: 101 };
+  const reviewer = { __typename: "User", login: "sam-gh", databaseId: 202 };
+  const page = (stage: string, nodes: unknown[]) => ({
+    repo: { id: 501, full_name: "acme/api" },
+    since,
+    stage,
+    nodes,
+  });
+
+  const node = (number: number, extra: object) => ({
+    number,
+    title: `PR ${number}`,
+    url: `u${number}`,
+    isDraft: false,
+    createdAt: "2026-10-01T08:00:00Z",
+    updatedAt: "2026-10-23T08:00:00Z",
+    closedAt: null,
+    mergedAt: null,
+    author,
+    mergedBy: null,
+    reviewRequests: { nodes: [] },
+    reviews: { nodes: [] },
+    comments: { nodes: [] },
+    timelineItems: { nodes: [] },
+    ...extra,
+  });
+
+  test("a GitHub PR read back gets the same event ids as its webhooks", () => {
+    const pr = {
+      number: 7,
+      title: "Retry payments",
+      url: "https://github.com/acme/api/pull/7",
+      isDraft: false,
+      createdAt: "2026-10-21T08:00:00Z",
+      updatedAt: "2026-10-22T09:00:00Z",
+      closedAt: "2026-10-22T09:00:00Z",
+      mergedAt: "2026-10-22T09:00:00Z",
+      author,
+      mergedBy: author,
+      reviewRequests: { nodes: [] },
+      reviews: {
+        nodes: [
+          {
+            databaseId: 9,
+            state: "APPROVED",
+            body: "LGTM",
+            url: "r",
+            submittedAt: "2026-10-22T08:00:00Z",
+            author: reviewer,
+            comments: {
+              nodes: [
+                {
+                  databaseId: 77,
+                  body: "Cap this",
+                  url: "lc",
+                  createdAt: "2026-10-22T08:00:00Z",
+                  author: reviewer,
+                },
+              ],
+            },
+          },
+        ],
+      },
+      comments: { nodes: [] },
+      timelineItems: { nodes: [] },
+    };
+    const synced = normalizeSyncPage("github", page("pulls", [pr]), now, {});
+    const ids = synced.events
+      .map((e) => e.id)
+      .toSorted((a, b) => a.localeCompare(b));
+    expect(ids).toEqual(
+      [
+        webhook("pull_request", {
+          action: "opened",
+          pull_request: {
+            number: 7,
+            title: "Retry payments",
+            html_url: pr.url,
+            user: emma,
+            created_at: pr.createdAt,
+            updated_at: pr.createdAt,
+          },
+        }),
+        webhook("pull_request", {
+          action: "closed",
+          pull_request: {
+            number: 7,
+            title: "Retry payments",
+            html_url: pr.url,
+            user: emma,
+            merged: true,
+            closed_at: pr.closedAt,
+          },
+        }),
+        webhook("pull_request_review_comment", {
+          action: "created",
+          pull_request: {
+            number: 7,
+            title: "Retry payments",
+            html_url: "https://github.com/acme/api/pull/7",
+            user: emma,
+          },
+          comment: {
+            id: 77,
+            body: "Cap this",
+            html_url: "lc",
+            user: { login: "sam-gh", id: 202 },
+          },
+        }),
+        webhook("pull_request_review", {
+          action: "submitted",
+          pull_request: {
+            number: 7,
+            title: "Retry payments",
+            html_url: pr.url,
+            user: emma,
+          },
+          review: {
+            id: 9,
+            state: "approved",
+            body: "LGTM",
+            html_url: "r",
+            user: { login: "sam-gh", id: 202 },
+          },
+        }),
+      ].toSorted((a, b) => a.localeCompare(b))
+    );
+  });
+
+  test("a draft is not opened, history before the window is skipped, and open requests are kept hidden", () => {
+    const synced = normalizeSyncPage(
+      "github",
+      page("pulls", [
+        node(1, { isDraft: true, createdAt: "2026-10-22T08:00:00Z" }),
+        node(2, {
+          reviewRequests: {
+            nodes: [{ requestedReviewer: reviewer }, { requestedReviewer: {} }],
+          },
+        }),
+      ]),
+      now,
+      {}
+    );
+    expect(synced.events).toHaveLength(1);
+    expect(synced.events[0]).toMatchObject({
+      id: "pr:github:acme/api#2:awaiting:202",
+      hidden: true,
+      signals: [{ type: "review_requested", who: { id: "202" } }],
+    });
+  });
+
+  test("a push read back from the repository's activity matches its webhook", () => {
+    const after = "f".repeat(40);
+    const synced = normalizeSyncPage(
+      "github",
+      {
+        ...page("pushes", [
+          {
+            before: "e".repeat(40),
+            after,
+            ref: "refs/heads/retry",
+            timestamp: "2026-10-22T10:00:00Z",
+            actor: { login: "emma-gh", id: 101, type: "User" },
+            total_commits: 2,
+            commits: [
+              { id: "1", message: "Add jitter" },
+              { id: "2", message: "Cap at 5" },
+            ],
+          },
+        ]),
+        repo: { id: 501, full_name: "acme/api", default_branch: "main" },
+      },
+      now,
+      {}
+    );
+    const live = gh("push", {
+      ref: "refs/heads/retry",
+      after,
+      commits: [
+        { id: "1", message: "Add jitter" },
+        { id: "2", message: "Cap at 5" },
+      ],
+    });
+    expect(synced.events.map((e) => [e.id, e.title])).toEqual(
+      live.events.map((e) => [e.id, e.title])
+    );
+  });
+
+  test("Slack history goes through the same rules as live messages", () => {
+    const settings = { channels: ["C1"], channelNames: { C1: "standup" } };
+    const out = normalizeHistory(
+      {
+        channel: "C1",
+        private: false,
+        messages: [
+          {
+            type: "message",
+            user: "U1",
+            text: "Shipped billing retries to prod",
+            ts: "1793000000.000100",
+          },
+          { type: "message", user: "U1", text: "ok", ts: "1793000001.000100" },
+          {
+            type: "message",
+            subtype: "channel_join",
+            user: "U2",
+            text: "joined",
+            ts: "1793000002.000100",
+          },
+        ],
+      },
+      settings,
+      now
+    );
+    expect(out.events.map((e) => e.id)).toEqual(["slack:C1:1793000000.000100"]);
+    expect(out.events[0]?.title).toBe(
+      "Posted in #standup: Shipped billing retries to prod"
+    );
   });
 });
