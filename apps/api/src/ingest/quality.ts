@@ -1,4 +1,4 @@
-import type { WorklogEvent } from "./types";
+import type { WorklogEvent } from "#connectors/types";
 
 const BASE_IMPORTANCE: Record<string, number> = {
   "release.published": 0.9,

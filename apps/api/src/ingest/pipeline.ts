@@ -1,80 +1,83 @@
+import { getConnector } from "#connectors";
+import type {
+  ConnectionView,
+  Connector,
+  InboundRequest,
+  Received,
+} from "#connectors/types";
 import type { AppContext } from "#context";
-import {
-  deleteActivityByExternalId,
-  deleteConnectionActivities,
-  updateUnmergedActivity,
-} from "#db/queries/activities";
-import {
-  findConnectionById,
-  setConnectionLastEventAt,
-} from "#db/queries/connections";
+import { findConnectionById } from "#db/queries/connections";
 import type { ConnectionRow } from "#db/queries/connections";
-import { countUnlinkedIdentities } from "#db/queries/identities";
 import {
-  countInboundEventsByStatus,
-  findInboundEventById,
-  insertInboundEvent,
-  listInboundEventIds,
-  listInboundFailures,
-  listInboundOutcomes,
-  updateInboundAttempt,
+  findInboundEventByDelivery,
+  insertInboundEventWithJob,
+  listStrandedLanes,
+  requeueInboundEvent,
 } from "#db/queries/inbound-events";
 import type { InboundEvent } from "#db/queries/inbound-events";
-import { findMemberById } from "#db/queries/members";
-import type { Member } from "#db/queries/members";
+import { addJob, unlockStaleJobs } from "#db/queries/jobs";
 import { transact } from "#db/transact";
-import { enqueue } from "#jobs/queue";
+import { newJob } from "#jobs/queue";
 import { newId } from "#lib/ids";
-import { recordActivity } from "#work/activity";
 
-import { getConnector } from "./connectors";
-import {
-  applyAgentState,
-  applyBoardEffects,
-  applySignals,
-  findCardIds,
-} from "./effects";
-import { resolveActor } from "./identity";
-import { gate } from "./quality";
-import { retainedSince } from "./retention";
-import type { ConnectionView, InboundRequest, WorklogEvent } from "./types";
+import { queueFollowUp } from "./follow-up";
+import { laneOf, laneQueue } from "./lanes";
+import { viewOf } from "./view";
 
-type Outcome = {
-  kept: number;
-  merged: number;
-  dropped: { id: string; reason: string }[];
-  duplicates: number;
-  ignored?: string;
-};
+export type Reply = { status: number; body: unknown };
 
-export function viewOf(ctx: AppContext, conn: ConnectionRow): ConnectionView {
-  return {
-    id: conn.id,
-    workspaceId: conn.workspaceId,
-    provider: conn.provider,
-    settings: conn.settings,
-    secrets: ctx.secrets.open(conn.secrets),
-  };
-}
+export type Delivery = Pick<
+  InboundEvent,
+  "deliveryId" | "eventType" | "payload" | "receivedAt" | "via" | "partitionKey"
+>;
 
+/** The per-connection endpoint, for webhooks configured by hand with the connection's own secret. */
 export async function receive(
   ctx: AppContext,
   connectionId: string,
   req: InboundRequest
-): Promise<{ status: number; body: unknown }> {
+): Promise<Reply> {
   const conn = await findConnectionById(ctx.db, { id: connectionId });
   const connector = conn ? getConnector(conn.provider) : undefined;
-  if (!conn || !connector || conn.status !== "active") {
+  if (!conn || !connector) {
     return { status: 404, body: { error: "unknown connection" } };
   }
   const view = viewOf(ctx, conn);
   const received = await connector.receive(req, view);
-
   if (received.type === "reject") {
+    ctx.tally.rejected(conn.id, req.receivedAt, received.error);
     return { status: received.status, body: { error: received.error } };
   }
+  return await accept(ctx, { connector, conn, view }, req, received, "webhook");
+}
+
+/** What happens to a verified request, whichever endpoint it came in on. */
+export async function accept(
+  ctx: AppContext,
+  to: { connector: Connector; conn: ConnectionRow; view: ConnectionView },
+  req: InboundRequest,
+  received: Exclude<Received, { type: "reject" }>,
+  via: "webhook" | "app"
+): Promise<Reply> {
+  const { connector, conn, view } = to;
   if (received.type === "respond") {
     return { status: received.status ?? 200, body: received.body };
+  }
+  // A command is someone asking, not something to record: a pause doesn't silence it.
+  const answers =
+    received.type === "interaction" &&
+    (conn.status === "active" || conn.status === "paused");
+  if (conn.status !== "active" && !answers) {
+    // Acknowledged, so the tool doesn't give up on the hook, and dropped: a connection that isn't
+    // active records nothing.
+    const message = `Worklog's connection here is ${conn.status}; an admin can reconnect it.`;
+    return {
+      status: 200,
+      body:
+        received.type === "interaction" && connector.unavailable
+          ? connector.unavailable(message)
+          : { ok: true, ignored: `connection is ${conn.status}` },
+    };
   }
   if (received.type === "interaction") {
     if (!connector.interact) {
@@ -82,25 +85,31 @@ export async function receive(
         `The ${connector.id} connector received an interaction but can't answer it`
       );
     }
-    return {
-      status: 200,
-      body: await connector.interact(ctx, view, received.payload, req.channel),
-    };
+    const answered = await connector.interact(
+      ctx,
+      view,
+      received.payload,
+      req.channel
+    );
+    if (answered.later) {
+      await queueFollowUp(ctx, view, answered.later.payload, {
+        once: answered.later.once,
+      });
+    }
+    return { status: 200, body: answered.body };
   }
   const stored = await store(ctx, conn, {
     deliveryId: received.deliveryId,
     eventType: received.eventType,
     payload: received.payload,
     receivedAt: req.receivedAt,
+    via,
+    partitionKey: received.partition ?? "",
   });
-  if (!stored) {
-    return { status: 200, body: { ok: true, duplicate: true } };
-  }
-  await setConnectionLastEventAt(ctx.db, {
-    id: conn.id,
-    at: req.receivedAt,
-  });
-  return { status: 200, body: { ok: true } };
+  ctx.tally.received(conn.id, req.receivedAt);
+  return stored
+    ? { status: 200, body: { ok: true } }
+    : { status: 200, body: { ok: true, duplicate: true } };
 }
 
 export async function receivePushed(
@@ -114,7 +123,10 @@ export async function receivePushed(
     eventType: "worklog.events",
     payload: { events },
     receivedAt: ctx.now(),
+    via: "push",
+    partitionKey: "",
   });
+  ctx.tally.received(conn.id, ctx.now());
   if (!stored) {
     return { duplicate: true };
   }
@@ -123,433 +135,123 @@ export async function receivePushed(
 
 /**
  * The delivery and its job commit together. Stored without a job, a delivery would never be
- * processed: the provider's retry is a duplicate and gets a 200.
+ * processed: the provider's retry is a duplicate and gets a 200. Null for a duplicate.
  */
-async function store(
+export async function store(
   ctx: AppContext,
-  conn: ConnectionRow,
-  delivery: Pick<
-    InboundEvent,
-    "deliveryId" | "eventType" | "payload" | "receivedAt"
-  >
+  conn: Pick<ConnectionRow, "id" | "workspaceId">,
+  delivery: Delivery
 ): Promise<string | null> {
-  return await transact(ctx, async (tx) => {
-    const row = await insertInboundEvent(tx.db, {
+  const lane = laneOf(delivery.partitionKey);
+  const row = await insertInboundEventWithJob(ctx.db, {
+    row: {
       id: newId("inb"),
       workspaceId: conn.workspaceId,
       connectionId: conn.id,
+      lane,
       ...delivery,
-    });
-    if (!row) {
-      return null;
-    }
-    // One connection's deliveries are processed in order (merging and thread state depend on it).
-    await enqueue(
-      tx,
-      "ingest:process",
-      { inboundEventId: row.id },
-      { queue: `ingest:${conn.id}` }
-    );
-    return row.id;
-  });
-}
-
-export async function processInbound(
-  ctx: AppContext,
-  inboundEventId: string,
-  { replay = false }: { replay?: boolean } = {}
-) {
-  const inbound = await findInboundEventById(ctx.db, { id: inboundEventId });
-  if (!inbound) {
-    return;
-  }
-  const conn = await findConnectionById(ctx.db, { id: inbound.connectionId });
-  const connector = conn ? getConnector(conn.provider) : undefined;
-  if (!conn || !connector) {
-    return;
-  }
-  const view = viewOf(ctx, conn);
-
-  try {
-    const normalized = connector.normalize(
-      {
-        eventType: inbound.eventType,
-        payload: inbound.payload,
-        receivedAt: inbound.receivedAt,
-      },
-      view
-    );
-    const outcome: Outcome = {
-      kept: 0,
-      merged: 0,
-      dropped: [],
-      duplicates: 0,
-      ignored: normalized.ignored,
-    };
-    const source = {
-      conn: view,
-      namespace: connector.identityNamespace(view),
-      inboundId: inbound.id,
-      replay,
-    };
-    for (const event of normalized.events) {
-      await ingestEvent(ctx, source, event, outcome);
-    }
-    const status =
-      outcome.kept + outcome.merged > 0 || normalized.events.some(actsOnPeople)
-        ? "processed"
-        : "ignored";
-    await updateInboundAttempt(ctx.db, {
-      id: inbound.id,
-      set: { status, outcome, error: null, processedAt: ctx.now() },
-    });
-  } catch (error) {
-    await updateInboundAttempt(ctx.db, {
-      id: inbound.id,
-      set: {
-        status: "failed",
-        error: error instanceof Error ? error.message : String(error),
-      },
-    });
-    // The queue retries with backoff.
-    throw error;
-  }
-}
-
-/** Hidden events and signals still did something (a nudge, a board change), even with no activity. */
-function actsOnPeople(event: WorklogEvent) {
-  return event.hidden === true || (event.signals ?? []).length > 0;
-}
-
-type Source = {
-  conn: ConnectionView;
-  namespace: string;
-  inboundId: string;
-  /** Rebuilding activity: board effects and signals already happened and aren't re-run. */
-  replay: boolean;
-};
-
-/** `member` is null unless the identity is linked. */
-type Who = {
-  resolved: Awaited<ReturnType<typeof resolveActor>> | null;
-  member: Member | null;
-  /** Bots are quiet by default; an account linked to a Worklog agent is a teammate, not bot noise. */
-  isBot: boolean;
-};
-
-async function ingestEvent(
-  ctx: AppContext,
-  source: Source,
-  event: WorklogEvent,
-  outcome: Outcome
-) {
-  if (event.op === "delete" || event.op === "update") {
-    await applyRevision(ctx, source.conn, event, outcome);
-    return;
-  }
-  const who = await identify(ctx, source, event.actor, event.occurredAt);
-  const verdict = gate(event, who.isBot, source.conn.settings);
-  if (!verdict.keep) {
-    outcome.dropped.push({ id: event.id, reason: verdict.reason });
-    return;
-  }
-  const scope = scopeOf(source);
-  const cardId = await linkCard(ctx, scope, source, event, who.member);
-  const onBehalfOf = event.agent?.onBehalfOf
-    ? await resolveActor(
-        ctx,
-        scope.workspaceId,
-        scope.namespace,
-        event.agent.onBehalfOf,
-        event.occurredAt
-      )
-    : null;
-  const onBehalfOfId = onBehalfOf?.memberId ?? null;
-
-  const activityId =
-    event.hidden === true
-      ? null
-      : await persist(ctx, source, event, outcome, {
-          who,
-          cardId,
-          onBehalfOfId,
-          importance: verdict.importance,
-        });
-  if (source.replay) {
-    return;
-  }
-  await notify(ctx, scope, event, { who, cardId, onBehalfOfId, activityId });
-}
-
-async function identify(
-  ctx: AppContext,
-  source: Source,
-  actor: WorklogEvent["actor"],
-  at: Date
-): Promise<Who> {
-  if (!actor) {
-    return { resolved: null, member: null, isBot: false };
-  }
-  const resolved = await resolveActor(
-    ctx,
-    source.conn.workspaceId,
-    source.namespace,
-    actor,
-    at
-  );
-  const member = resolved.memberId
-    ? await findMemberById(ctx.db, { id: resolved.memberId })
-    : undefined;
-  return {
-    resolved,
-    member: member ?? null,
-    isBot: resolved.isBot && member?.kind !== "agent",
-  };
-}
-
-function scopeOf(source: Source) {
-  const { boardId } = source.conn.settings;
-  return {
-    workspaceId: source.conn.workspaceId,
-    namespace: source.namespace,
-    boardId: typeof boardId === "string" ? boardId : undefined,
-    source: source.conn.provider,
-  };
-}
-
-/** Effects run before card refs so the activity can link to the card they create. */
-async function linkCard(
-  ctx: AppContext,
-  scope: ReturnType<typeof scopeOf>,
-  source: Source,
-  event: WorklogEvent,
-  actor: Member | null
-) {
-  const touched =
-    !source.replay && event.board && event.board.length > 0
-      ? await applyBoardEffects(
-          ctx,
-          scope,
-          event.board,
-          actor,
-          event.occurredAt
-        )
-      : [];
-  const [referenced] = await findCardIds(
-    ctx,
-    scope.workspaceId,
-    event.cardRefs
-  );
-  return referenced ?? touched[0] ?? null;
-}
-
-async function persist(
-  ctx: AppContext,
-  source: Source,
-  event: WorklogEvent,
-  outcome: Outcome,
-  links: {
-    who: Who;
-    cardId: string | null;
-    onBehalfOfId: string | null;
-    importance: number;
-  }
-) {
-  const row = await recordActivity(ctx, {
-    workspaceId: source.conn.workspaceId,
-    actorId: links.who.resolved?.memberId ?? null,
-    actorIdentityId: links.who.resolved?.identityId ?? null,
-    source: source.conn.provider,
-    kind: event.kind,
-    title: event.title,
-    body: event.body,
-    url: event.url ?? event.object?.url ?? null,
-    cardId: links.cardId,
-    visibility: event.visibility,
-    externalId: event.id,
-    occurredAt: event.occurredAt,
-    connectionId: source.conn.id,
-    inboundEventId: source.inboundId,
-    onBehalfOfId: links.onBehalfOfId,
-    agentState: event.agent?.state ?? null,
-    threadKey: event.thread ?? null,
-    importance: links.importance,
-    coalesce: event.coalesce,
-    data: activityData(event, links.who),
-  });
-  if (!row) {
-    outcome.duplicates += 1;
-    return null;
-  }
-  if (row.merged === true) {
-    outcome.merged += 1;
-  } else {
-    outcome.kept += 1;
-  }
-  return row.id;
-}
-
-function activityData(event: WorklogEvent, who: Who) {
-  return {
-    ...event.data,
-    schema: 1,
-    object: event.object ?? undefined,
-    container: event.container ?? undefined,
-    externalActor:
-      event.actor && !who.resolved?.memberId
-        ? { handle: event.actor.handle, name: event.actor.name }
-        : undefined,
-  };
-}
-
-async function notify(
-  ctx: AppContext,
-  scope: ReturnType<typeof scopeOf>,
-  event: WorklogEvent,
-  links: {
-    who: Who;
-    cardId: string | null;
-    onBehalfOfId: string | null;
-    activityId: string | null;
-  }
-) {
-  const { member } = links.who;
-  await applySignals(ctx, scope, event, {
-    actor: member,
-    actorIsBot: links.who.isBot,
-    activityId: links.activityId,
-    cardId: links.cardId,
-  });
-  if (event.agent?.state) {
-    await applyAgentState(ctx, {
-      workspaceId: scope.workspaceId,
-      agentName: member?.name ?? event.actor?.name ?? "An agent",
-      onBehalfOfId: links.onBehalfOfId,
-      state: event.agent.state,
-      title: event.title,
-      url: event.url ?? null,
-      activityId: links.activityId,
-      thread: event.thread ?? event.id,
-      agentId: member?.id ?? null,
-    });
-  }
-}
-
-async function applyRevision(
-  ctx: AppContext,
-  conn: ConnectionView,
-  event: WorklogEvent,
-  outcome: Outcome
-) {
-  const key = {
-    workspaceId: conn.workspaceId,
-    source: conn.provider,
-    externalId: event.id,
-  };
-  if (event.op === "delete") {
-    const removed = await deleteActivityByExternalId(ctx.db, key);
-    outcome.dropped.push({
-      id: event.id,
-      reason:
-        removed > 0
-          ? "deleted at the source"
-          : "deleted at the source (nothing recorded)",
-    });
-    return;
-  }
-  const updated = await updateUnmergedActivity(ctx.db, {
-    ...key,
-    set: {
-      title: event.title,
-      body: event.body?.slice(0, 4000) ?? null,
-      updatedAt: event.occurredAt,
+      payload: storable(delivery.payload),
     },
+    job: drainJob(conn.id, lane),
   });
-  if (updated > 0) {
-    outcome.merged += 1;
-  } else {
-    outcome.dropped.push({
-      id: event.id,
-      reason: "edit of something not recorded",
+  if (row) {
+    return row.id;
+  }
+  return await transact(ctx, async (tx) => {
+    // A redelivery of one that failed gets another go, even after it used up its attempts.
+    const existing = await findInboundEventByDelivery(tx.db, {
+      connectionId: conn.id,
+      deliveryId: delivery.deliveryId,
     });
-  }
+    if (existing?.status === "failed") {
+      await requeueInboundEvent(tx.db, { id: existing.id });
+      await enqueueDrain(tx, conn.id, existing.lane);
+    }
+    return null;
+  });
 }
 
-export async function replayConnection(
+// Postgres can't keep U+0000 in jsonb, and the provider would send the delivery again on every
+// retry. Rare, so the payload is only walked when its JSON has one.
+function storable(payload: unknown) {
+  return JSON.stringify(payload).includes(String.raw`\u0000`)
+    ? withoutNul(payload)
+    : payload;
+}
+
+function withoutNul(value: unknown): unknown {
+  if (typeof value === "string") {
+    return value.replaceAll("\u0000", "");
+  }
+  if (Array.isArray(value)) {
+    return value.map(withoutNul);
+  }
+  if (typeof value === "object" && value !== null) {
+    return Object.fromEntries(
+      Object.entries(value).map(([k, v]) => [
+        k.replaceAll("\u0000", ""),
+        withoutNul(v),
+      ])
+    );
+  }
+  return value;
+}
+
+/**
+ * One job drains a lane: every delivery waiting in it, in order, live ones before history. A lane
+ * with a drain already waiting gets no second one (the key), and two never run at once (the
+ * queue). A retry is its own job, due later, so it can't push back the drain for new deliveries.
+ */
+export async function enqueueDrain(
   ctx: AppContext,
-  workspaceId: string,
   connectionId: string,
-  since?: Date
+  lane: number,
+  runAt?: Date,
+  why: "retry" | "stuck" = "retry"
 ) {
-  // Activity from deliveries that retention already deleted can't be rebuilt, so it stays.
-  const kept = retainedSince(ctx);
-  const from = kept && (!since || since < kept) ? kept : since;
-  const ids = await listInboundEventIds(ctx.db, {
-    workspaceId,
-    connectionId,
-    since: from,
-  });
-  const removed = await deleteConnectionActivities(ctx.db, {
-    connectionId,
-    since: from,
-  });
-  for (const id of ids) {
-    await processInbound(ctx, id, { replay: true });
-  }
-  return { reprocessed: ids.length, rebuiltFrom: removed };
+  await addJob(ctx.db, drainJob(connectionId, lane, runAt, why));
 }
 
-export async function connectionHealth(
-  ctx: AppContext,
-  conn: ConnectionRow,
-  days = 7
-) {
-  const since = new Date(ctx.now().getTime() - days * 86_400_000);
-  const connector = getConnector(conn.provider);
-  const [byStatus, recent, unlinked, failures] = await Promise.all([
-    countInboundEventsByStatus(ctx.db, { connectionId: conn.id, since }),
-    listInboundOutcomes(ctx.db, { connectionId: conn.id, since, limit: 2000 }),
-    connector
-      ? countUnlinkedIdentities(ctx.db, {
-          workspaceId: conn.workspaceId,
-          provider: connector.identityNamespace(viewOf(ctx, conn)),
-        })
-      : 0,
-    listInboundFailures(ctx.db, { connectionId: conn.id, limit: 5 }),
-  ]);
-  const reasons = new Map<string, number>();
-  let kept = 0;
-  let merged = 0;
-  for (const outcome of recent) {
-    const o = (outcome ?? {}) as Partial<Outcome>;
-    kept += o.kept ?? 0;
-    merged += o.merged ?? 0;
-    if (o.ignored) {
-      reasons.set(o.ignored, (reasons.get(o.ignored) ?? 0) + 1);
-    }
-    for (const d of o.dropped ?? []) {
-      reasons.set(d.reason, (reasons.get(d.reason) ?? 0) + 1);
-    }
+/** A minute, to stay clear of drains that are merely busy. */
+const STRANDED_MS = 60_000;
+/** A drain hands over after about 20 seconds; one locked this long has lost its worker. */
+const DEAD_DRAIN_MS = 5 * 60_000;
+
+/**
+ * Queues a drain for every lane holding a delivery left waiting, so nothing waits much longer
+ * than a minute or two for one. Queuing a lane's drain can lose a race with that drain starting
+ * (Graphile Worker checks the job, then updates it, in two statements), and a worker can die
+ * mid-drain, holding its lane until its drain is unlocked here to run again.
+ */
+export async function drainStranded(ctx: AppContext) {
+  await unlockStaleJobs(ctx.db, {
+    task: "ingest:lane",
+    olderThanMs: DEAD_DRAIN_MS,
+  });
+  const lanes = await listStrandedLanes(ctx.db, {
+    olderThanMs: STRANDED_MS,
+    limit: 1000,
+  });
+  for (const { connectionId, lane } of lanes) {
+    await enqueueDrain(ctx, connectionId, lane);
   }
-  const statuses: Record<string, number> = Object.fromEntries(
-    byStatus.map((s) => [s.status, s.n])
-  );
+  return lanes.length;
+}
+
+function drainJob(
+  connectionId: string,
+  lane: number,
+  runAt?: Date,
+  why: "retry" | "stuck" = "retry"
+) {
+  // Each reason its own job: one can't move another's time.
+  const key = `${runAt ? why : "lane"}:${connectionId}:${lane}`;
   return {
-    days,
-    lastEventAt: conn.lastEventAt?.toISOString() ?? null,
-    deliveries: statuses,
-    activities: { kept, merged },
-    /** Low isn't bad: it means noise was filtered. */
-    signalRate: recent.length ? (kept + merged) / recent.length : null,
-    topSkipReasons: [...reasons.entries()]
-      .toSorted((a, b) => b[1] - a[1])
-      .slice(0, 10)
-      .map(([reason, n]) => ({ reason, count: n })),
-    unlinkedIdentities: unlinked,
-    recentFailures: failures.map((f) => ({
-      at: f.at.toISOString(),
-      eventType: f.eventType,
-      error: f.error,
-    })),
+    ...newJob(
+      "ingest:lane",
+      { connectionId, lane },
+      { queue: laneQueue(connectionId, lane), key, runAt }
+    ),
+    key,
   };
 }
