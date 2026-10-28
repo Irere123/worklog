@@ -117,8 +117,8 @@ Every connector emits `WorklogEvent`s (`apps/api/src/connectors/types.ts`). The 
 - **Merged into one activity:** commits per branch per person (60 min), and comments per thread per person (30 min).
 - **Effects:**
   - review requests reach the reviewer; submitting the review resolves the request and tells the author;
-  - a closed PR resolves outstanding review requests, even when a bot closed it: a bot's event isn't recorded, but what it changes (a resolved request, a closed card) still applies;
-  - issues become cards in Maybe? when the connection has a `boardId` (one that isn't the workspace's is refused; one deleted later costs only the card).
+  - a closed PR resolves outstanding review requests, even when a bot closed it: a bot's event isn't recorded, but what it changes (a resolved request, a closed card) still applies, once;
+  - issues become cards in Maybe? when the connection has a `boardId` (it must be one of the workspace's boards in use; once archived it takes no more cards).
 - **@mentions by login** reach the account last seen with that login, as well as one linked by login.
 
 **Slack:**
@@ -127,10 +127,10 @@ Every connector emits `WorklogEvent`s (`apps/api/src/connectors/types.ts`). The 
 - Messages count as work only in opted-in `channels`, and only with substance. "ok", "thanks 🙏" and emoji-only messages are dropped; short news like "deployed v2.3" or "blocked on keys" is kept.
 - Thread replies merge per person per thread.
 - @mentions always reach people, at normal priority, wherever the bot can see them.
-- Edits and deletions are applied, to the attention items they raised too; an edit or deletion inside a burst takes the burst's text, which can't say which line was whose. Private channels stay private.
-- `@worklog …` in a channel is answered to the person who asked alone (the answer can hold what's private to them), and isn't recorded as a post.
+- Edits and deletions are applied, to the attention items they raised too; an edit or deletion inside a burst takes the burst's text, which can't say which line was whose. A change that leaves the text as it was (a link preview arriving) changes nothing. Private channels stay private.
+- `@worklog …` in a channel is answered to the person who asked alone (the answer can hold what's private to them), and isn't recorded as a post; anyone else it mentions still hears of it.
 
-**Discord:** with the server's app, messages come over the Gateway, a socket one worker process keeps open (whichever takes its lock; another takes over if it goes). A dropped socket resumes from the last message stored, so nothing sent meanwhile is lost. The same rules as Slack apply: work updates only from the chosen channels and only with substance, mentions everywhere the bot reads, replies to one message merged per person, edits and deletions applied, bots and webhooks dropped, and a channel hidden from @everyone private to the author. The bot needs the **Message Content** intent (Bot → Privileged Gateway Intents); without it the Gateway refuses, and the worker logs why. The bot leaving a server revokes its connection at once; the daily catch-up also asks which servers it's still in, as it asks GitHub which installations still exist.
+**Discord:** with the server's app, messages come over the Gateway, a socket one worker process keeps open (whichever takes its lock; another takes over if it goes). A dropped socket resumes from the last message stored, so nothing sent meanwhile is lost. The same rules as Slack apply: work updates only from the chosen channels and only with substance, mentions everywhere the bot reads, replies to one message merged per person, edits and deletions applied, bots and webhooks dropped, and a channel hidden from @everyone private to the author (unless every channel is, as on a server that lets people in by a role). The bot needs the **Message Content** intent (Bot → Privileged Gateway Intents); without it the Gateway refuses, and the worker logs why. The bot leaving a server revokes its connection at once; the daily catch-up also asks which servers it's still in, as it asks GitHub which installations still exist.
 
 **Backfill and catch-up:**
 
