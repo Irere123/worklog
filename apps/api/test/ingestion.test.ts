@@ -1,5 +1,6 @@
 import { beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { createHmac } from "node:crypto";
+import { readFileSync } from "node:fs";
 
 import { sql } from "drizzle-orm";
 
@@ -959,6 +960,32 @@ describe("custom integrations", () => {
     }
   });
 
+  test("one that took a namespace before it was reserved can still change everything else", async () => {
+    const owner = await env.workspace();
+    const conn = (
+      await env.call("POST", "/v1/connections", {
+        token: owner.token,
+        body: {
+          provider: "custom",
+          settings: { identityNamespace: "jira:acme" },
+        },
+      })
+    ).body;
+    await env.ctx.db.execute(sql`
+      update connections set settings = jsonb_set(settings, '{identityNamespace}', '"gitea:git.example.com"')
+      where id = ${conn.id}`);
+    const renamed = await env.call("PATCH", `/v1/connections/${conn.id}`, {
+      token: owner.token,
+      body: { name: "Jira (old)" },
+    });
+    expect(renamed.status).toBe(200);
+    const moved = await env.call("PATCH", `/v1/connections/${conn.id}`, {
+      token: owner.token,
+      body: { settings: { identityNamespace: "slack" } },
+    });
+    expect(moved.status).toBe(400);
+  });
+
   test("Standard Webhooks signatures are verified with a replay window", () => {
     const secret = `whsec_${Buffer.from("supersecretkey").toString("base64")}`;
     const body = JSON.stringify({ type: "deploy.finished" });
@@ -1133,6 +1160,56 @@ describe("connections that choose their own event ids", () => {
       "Closed PAY-12 in billing",
       "Closed PAY-12 in payroll",
     ]);
+  });
+});
+
+describe("upgrading to ids counted within the connection", () => {
+  test("what a generic connection recorded before still matches its redeliveries", async () => {
+    const owner = await env.workspace();
+    const conn = (
+      await env.call("POST", "/v1/connections", {
+        token: owner.token,
+        body: {
+          provider: "custom",
+          name: "Jira",
+          settings: { identityNamespace: "jira:old" },
+        },
+      })
+    ).body;
+    const event = {
+      id: "PAY-12:closed",
+      kind: "ticket.closed",
+      occurredAt: new Date().toISOString(),
+      actor: null,
+      title: "Closed PAY-12",
+    };
+    const push = async () => {
+      await env.call("POST", `/v1/connections/${conn.id}/events`, {
+        token: owner.token,
+        body: { events: [event] },
+      });
+      await env.drain();
+    };
+    await push();
+    // As it was recorded before ids were scoped to their connection.
+    await env.ctx.db.execute(sql`
+      update activities set external_id = 'PAY-12:closed' where connection_id = ${conn.id}`);
+    await env.ctx.db.execute(sql`
+      update ingested_events set external_id = 'PAY-12:closed' where connection_id = ${conn.id}`);
+    const migration = readFileSync(
+      new URL("../drizzle/0015_generic_ids.sql", import.meta.url),
+      "utf-8"
+    );
+    for (const statement of migration.split("--> statement-breakpoint")) {
+      await env.ctx.db.execute(sql.raw(statement));
+    }
+    await push();
+    const closed = (
+      await env.call("GET", "/v1/activities?kind=ticket.closed", {
+        token: owner.token,
+      })
+    ).body;
+    expect(closed).toHaveLength(1);
   });
 });
 

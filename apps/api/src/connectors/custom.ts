@@ -61,7 +61,7 @@ export const customConnector: Connector = {
     {
       key: "identityNamespace",
       description:
-        'Where your actor ids live, e.g. "jira:acme" or "github" to match GitHub ids (default: this connection)',
+        'Where your actor ids live, e.g. "jira:acme" (default: this connection). A built-in connector\'s, like "github", is its own',
     },
     { key: "bots", description: '"quiet" (default), "drop" or "keep"' },
   ],
