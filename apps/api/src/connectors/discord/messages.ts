@@ -86,7 +86,12 @@ function revision(
       title: "deleted",
     };
   }
-  if (eventType === "MESSAGE_UPDATE" && m.content !== undefined) {
+  // Only an edit has an edit time; Discord also updates a message when it adds an embed.
+  if (
+    eventType === "MESSAGE_UPDATE" &&
+    m.content !== undefined &&
+    m.edited_timestamp
+  ) {
     const text = plain(m, settings);
     return {
       id,
