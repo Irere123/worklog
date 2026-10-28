@@ -417,10 +417,49 @@ describe("ingestion pipeline", () => {
       where workspace_id = ${owner.workspace.id} and external_id like 'handle:%'`);
     expect(placeholders.rows[0]?.n).toBe(0);
     // Being mentioned isn't being seen: Sam's account keeps its login as written, and its count.
+    // (The same goes for a placeholder: see below.)
     const account = await env.ctx.db.execute<{ handle: string; n: number }>(sql`
       select external_handle as handle, event_count as n from identities
       where workspace_id = ${owner.workspace.id} and external_id = '202'`);
     expect(account.rows).toEqual([{ handle: "Sam-GH", n: 1 }]);
+  });
+
+  test("a mention of a login placeholder isn't a sighting of it", async () => {
+    const { owner, send } = await github();
+    const sam = await env.teammate(owner.token, "Sam");
+    // Linked by login, before the account was ever seen.
+    await env.call("POST", `/v1/members/${sam.member.id}/identities`, {
+      token: sam.token,
+      body: { provider: "github", handle: "Sam-GH" },
+    });
+    await send("issue_comment", {
+      action: "created",
+      sender: emma,
+      issue: {
+        number: 5,
+        title: "Backoff",
+        html_url: "https://github.com/acme/api/issues/5",
+        user: emma,
+        pull_request: {},
+      },
+      comment: {
+        id: 51,
+        body: "@sam-gh can you look at the backoff?",
+        html_url: "c",
+        user: emma,
+        created_at: new Date().toISOString(),
+      },
+    });
+    const items = (await env.call("GET", "/v1/attention", { token: sam.token }))
+      .body;
+    expect(items.map((i: any) => i.kind)).toEqual(["mention"]);
+    const placeholder = await env.ctx.db.execute<{
+      handle: string;
+      n: number;
+    }>(sql`
+      select external_handle as handle, event_count as n from identities
+      where workspace_id = ${owner.workspace.id} and external_id = 'handle:sam-gh'`);
+    expect(placeholder.rows).toEqual([{ handle: "Sam-GH", n: 0 }]);
   });
 
   test("bursts read back newest first stay apart by days, and together within minutes", async () => {

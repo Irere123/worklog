@@ -62,7 +62,8 @@ async function memberFor(
     scope.workspaceId,
     scope.namespace,
     who,
-    at
+    at,
+    { acted: false }
   );
   if (!memberId) {
     return null;
