@@ -103,6 +103,8 @@ export const ConnectionHealth = z
     days: z.number().int(),
     status: z.enum(CONNECTION_STATUSES),
     statusReason: z.string().nullable(),
+    /** Whose accounts its events name: what identities resolve in. */
+    identityNamespace: z.string().nullable(),
     lastEventAt: z.string().nullable(),
     deliveries: z.record(z.string(), z.number()),
     activities: z.object({

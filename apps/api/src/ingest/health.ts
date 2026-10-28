@@ -49,6 +49,10 @@ export async function connectionHealth(
     days,
     status: conn.status,
     statusReason: conn.statusReason,
+    // As used, which isn't always what settings say (a reserved one held from before isn't).
+    identityNamespace: connector
+      ? connector.identityNamespace(viewOf(ctx, conn))
+      : null,
     lastEventAt: conn.lastEventAt?.toISOString() ?? null,
     deliveries: statuses,
     activities: { kept, merged, duplicates },
