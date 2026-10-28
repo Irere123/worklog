@@ -76,12 +76,16 @@ function changes(current: Identity, next: Details): Partial<Details> | null {
   return Object.keys(set).length > 0 ? set : null;
 }
 
-/** `acted`: seen doing something, not only named; only that counts as a sighting. */
+/**
+ * `acted`: seen doing something, not only named; only that counts as a sighting. `at` is when
+ * last, `since` when first, when the sighting stands for several actions.
+ */
 export type Sighting = {
   actor: ExternalActor;
   at: Date;
   n: number;
   acted?: boolean;
+  since?: Date;
 };
 export type Resolved = {
   identityId: string;
@@ -248,7 +252,8 @@ async function sighted(
     await updateIdentityDetails(ctx.db, { id: identity.id, set });
   }
   if (seen) {
-    ctx.tally.sighted(identity.id, at, n);
+    ctx.tally.sighted(identity.id, sighting.since ?? at, n);
+    ctx.tally.sighted(identity.id, at, 0);
   }
   return {
     identityId: identity.id,
@@ -275,7 +280,7 @@ async function recordIdentities(
     );
     const rows = await insertIdentitiesIfNew(
       tx.db,
-      ordered.map(({ actor, at }) => ({
+      ordered.map(({ actor, at, since }) => ({
         id: newId("idn"),
         workspaceId,
         provider: namespace,
@@ -283,7 +288,7 @@ async function recordIdentities(
         externalHandle: actor.handle ?? null,
         displayName: actor.name ?? null,
         isBot: actor.bot ?? false,
-        firstSeenAt: at,
+        firstSeenAt: since ?? at,
         createdAt: tx.now(),
       }))
     );
