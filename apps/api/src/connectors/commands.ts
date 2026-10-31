@@ -66,7 +66,11 @@ export async function runCommand(
         return "What would you like to ask? e.g. `ask @sam where is the retry logic for payments?`";
       }
       const agent = await resolveAgent(ctx, cmd.target ?? author);
-      const { reply } = await ask(ctx, author, { agent, message: cmd.text });
+      const { reply } = await ask(ctx, author, {
+        agent,
+        message: cmd.text,
+        channel: platform,
+      });
       return reply;
     }
     case "brief": {

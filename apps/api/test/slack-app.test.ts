@@ -5,7 +5,7 @@ import { sql } from "drizzle-orm";
 
 import { hmacHex } from "#lib/crypto";
 
-import { routedFetch, testEnv } from "./harness";
+import { routedFetch, scriptedModel, testEnv } from "./harness";
 import type { TestEnv } from "./harness";
 
 let env: TestEnv;
@@ -281,6 +281,35 @@ describe("Slack app", () => {
       body: { ids: ["C0SECRET"] },
     });
     expect(bad.status).toBe(400);
+  });
+
+  test("a question asked by mentioning the bot tells the assistant it came through Slack", async () => {
+    const { owner, conn, post, event } = await installed();
+    await env.call("PUT", `/v1/connections/${conn.id}/sources`, {
+      token: owner.token,
+      body: { ids: ["C0STANDUP"] },
+    });
+    await env.drain();
+    await env.call("POST", "/v1/members/me/identities", {
+      token: owner.token,
+      body: { provider: "slack", externalId: "U0EMMA" },
+    });
+    const { model, prompts } = scriptedModel([{ text: "You're on #1." }]);
+    env.ctx.models = { main: model, fast: model };
+    await post(
+      "events",
+      event("Ev-question", {
+        type: "app_mention",
+        user: "U0EMMA",
+        text: "<@UBOT> what am I on?",
+        channel: "C0STANDUP",
+        ts: "1793000000.000200",
+      })
+    );
+    await env.drain();
+    const asked = JSON.stringify(prompts[0].prompt.at(-1));
+    expect(asked).toContain("via Slack");
+    expect(asked).toContain("what am I on?");
   });
 
   test("events route by team; a mention is answered once, however often Slack retries it", async () => {

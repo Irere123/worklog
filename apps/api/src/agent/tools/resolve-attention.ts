@@ -19,16 +19,22 @@ export function resolveAttentionTool({ ctx, owner }: Scope) {
         .max(24 * 14)
         .optional(),
     }),
-    execute: safe(async ({ id, state, snoozeHours }) => {
-      const until =
-        state === "snoozed"
-          ? new Date(ctx.now().getTime() + (snoozeHours ?? 24) * 3_600_000)
-          : null;
-      const row = await updateAttention(ctx, owner.id, id, {
-        state,
-        snoozedUntil: until,
-      });
-      return { ok: true, id: row.id, state: row.state };
-    }),
+    execute: safe(
+      async ({ id, state, snoozeHours }) => {
+        const until =
+          state === "snoozed"
+            ? new Date(ctx.now().getTime() + (snoozeHours ?? 24) * 3_600_000)
+            : null;
+        const row = await updateAttention(ctx, owner.id, id, {
+          state,
+          snoozedUntil: until,
+        });
+        return { ok: true, id: row.id, state: row.state };
+      },
+      {
+        notFound:
+          "Use my_attention to see the open items and their ids, then try again.",
+      }
+    ),
   });
 }

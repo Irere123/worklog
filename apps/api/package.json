@@ -15,6 +15,7 @@
     "db:generate": "drizzle-kit generate",
     "openapi": "bun scripts/openapi.ts",
     "secrets:reseal": "bun scripts/reseal-secrets.ts",
+    "ratings:replay": "bun scripts/replay-ratings.ts",
     "typecheck": "tsc --noEmit",
     "test": "bun test --timeout 60000"
   },

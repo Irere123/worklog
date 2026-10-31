@@ -39,6 +39,7 @@ export async function listMemories(
     now: Date;
     kinds?: MemoryKind[];
     since?: string;
+    createdAfter?: Date;
     q?: string;
     limit?: number;
   }
@@ -48,6 +49,9 @@ export async function listMemories(
     eq(memories.status, "active"),
     current(params.now),
   ];
+  if (params.createdAfter) {
+    where.push(gt(memories.createdAt, params.createdAfter));
+  }
   if (!params.includePrivate) {
     where.push(eq(memories.visibility, "team"));
   }
@@ -121,6 +125,33 @@ export async function findDigest(
     .orderBy(desc(memories.createdAt))
     .limit(1);
   return row;
+}
+
+// Lines forgotten since then with nothing to replace them; a replaced line's successor is active.
+export async function listForgottenSince(
+  db: DbOrTx,
+  params: {
+    memberId: string;
+    includePrivate: boolean;
+    since: Date;
+    limit: number;
+  }
+) {
+  return await db
+    .select()
+    .from(memories)
+    .where(
+      and(
+        eq(memories.memberId, params.memberId),
+        eq(memories.status, "superseded"),
+        isNull(memories.supersededBy),
+        inArray(memories.kind, ["profile", "fact"]),
+        gt(memories.updatedAt, params.since),
+        params.includePrivate ? undefined : eq(memories.visibility, "team")
+      )
+    )
+    .orderBy(desc(memories.updatedAt))
+    .limit(params.limit);
 }
 
 // Exactly one visibility, so tidying team memory never reads private lines.

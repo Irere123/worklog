@@ -37,11 +37,9 @@ beforeEach(() => {
   env.reset();
 });
 
-// What a custom automation answers when it has something to say.
+// What a routine does when it has something to say: send it, which ends the run.
 function notify(message: string) {
-  return {
-    text: JSON.stringify({ decision: "notify", message, summary: "sent" }),
-  };
+  return { tool: "send_message", input: { message, summary: "sent" } };
 }
 
 describe("schedules follow each person's local clock", () => {
@@ -172,17 +170,35 @@ describe("automations", () => {
     expect(thread.messages.at(-1).text).toContain("Call with finance");
   });
 
+  test("a scheduled brief with nothing in it stays quiet; run by hand it still comes", async () => {
+    const { token } = await env.workspace();
+    const autos = (await env.call("GET", "/v1/automations", { token })).body;
+    const morning = autos.find((a: any) => a.kind === "brief.daily");
+    const loaded = await findAutomationById(env.ctx.db, { id: morning.id });
+    const sent = (env.ctx.mailer as ConsoleMailer).sent.length;
+
+    const scheduled = await runAutomation(env.ctx, loaded!);
+    expect(scheduled).toMatchObject({ status: "quiet" });
+    expect((env.ctx.mailer as ConsoleMailer).sent).toHaveLength(sent);
+
+    const byHand = (
+      await env.call("POST", `/v1/automations/${morning.id}/run`, { token })
+    ).body;
+    expect(byHand.status).toBe("delivered");
+
+    await env.call("POST", "/v1/logs", {
+      token,
+      body: { text: "Call with finance about budget" },
+    });
+    const withNews = await runAutomation(env.ctx, loaded!);
+    expect(withNews).toMatchObject({ status: "delivered" });
+  });
+
   test("briefs and custom automations start from the assistant's constitution", async () => {
     const { token } = await env.workspace();
     const { model, prompts } = scriptedModel([
       { text: "## You\n- A quiet day." },
-      {
-        text: JSON.stringify({
-          decision: "notify",
-          message: "Nothing to rank; here is what moved.",
-          summary: "sent",
-        }),
-      },
+      notify("Nothing to rank; here is what moved."),
     ]);
     env.ctx.models = { main: model, fast: model };
     const autos = (await env.call("GET", "/v1/automations", { token })).body;
@@ -204,7 +220,7 @@ describe("automations", () => {
     expect(systems).toHaveLength(2);
     expect(systems.every((s) => s.startsWith(CONSTITUTION))).toBe(true);
     expect(systems[0]).toContain("# This brief");
-    expect(systems[1]).toContain("# This automation");
+    expect(systems[1]).toContain("# This routine");
   });
 
   test("private work only reaches private targets; a team channel gets the brief the team could see", async () => {
@@ -337,6 +353,54 @@ describe("automations", () => {
     expect(full).toContain("salary bands");
   });
 
+  test("a routine looks up what it needs, speaks only through send_message, and otherwise stays quiet", async () => {
+    const { token } = await env.workspace();
+    const channel = (
+      await env.call("POST", "/v1/delivery-targets", {
+        token,
+        body: { kind: "webhook", address: "https://hooks.test/eng" },
+      })
+    ).body;
+    const custom = (
+      await env.call("POST", "/v1/automations", {
+        token,
+        body: {
+          name: "Retry watch",
+          schedule: { type: "daily", at: "09:00" },
+          instructions: "Tell me if anything about retries moved",
+          targetIds: [channel.id],
+        },
+      })
+    ).body;
+    const run = async () =>
+      (await env.call("POST", `/v1/automations/${custom.id}/run`, { token }))
+        .body;
+
+    const quiet = scriptedModel([
+      { tool: "search_activity", input: { query: "retries" } },
+      { text: "Nothing moved on retries." },
+    ]);
+    env.ctx.models = { main: quiet.model, fast: quiet.model };
+    const calm = await run();
+    expect(calm).toMatchObject({ status: "quiet" });
+    expect(calm.summary).toContain("Nothing moved");
+
+    const { model, prompts } = scriptedModel([
+      { tool: "search_cards", input: { query: "retry" } },
+      notify("Retries: nothing new, but #3 is close to drifting"),
+      notify("Team version"),
+    ]);
+    env.ctx.models = { main: model, fast: model };
+    expect((await run()).status).toBe("delivered");
+    const tools = (i: number) =>
+      (prompts[i].tools ?? []).map((t: any) => t.name).toSorted();
+    expect(tools(0)).toContain("my_attention");
+    expect(tools(0)).toContain("send_message");
+    expect(tools(0)).not.toContain("move_card");
+    expect(tools(2)).not.toContain("my_attention");
+    expect(JSON.stringify(prompts[1].prompt.at(-1))).toContain("tool-result");
+  });
+
   test("a custom automation writes its team copy without private memory or its last result", async () => {
     const { token } = await env.workspace();
     await env.call("POST", "/v1/memories", {
@@ -426,6 +490,10 @@ describe("automations", () => {
 
   test("the scheduler runs whatever is due", async () => {
     const { token, workspace } = await env.workspace();
+    await env.call("POST", "/v1/logs", {
+      token,
+      body: { text: "Call with finance about budget" },
+    });
     const autos = (await env.call("GET", "/v1/automations", { token })).body;
     const morning = autos.find((a: any) => a.kind === "brief.daily");
     await onlyDue(workspace.id);

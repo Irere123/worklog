@@ -1,5 +1,6 @@
 import { runConsolidate } from "#agent/memory/consolidate";
 import type { AppContext } from "#context";
+import { findNextFollowUpAt } from "#db/queries/attention";
 import {
   claimDueAutomations,
   findAutomationById,
@@ -128,7 +129,26 @@ export async function runAutomation(
           },
         }
       : automation.state;
+  // A check never sleeps past the next follow-up, so it comes back when it was asked for.
+  const wake =
+    automation.kind === "check"
+      ? await findNextFollowUpAt(ctx.db, {
+          memberId: member.id,
+          now: ctx.now(),
+        })
+      : undefined;
   await transact(ctx, async (tx) => {
+    let { nextRunAt } = automation;
+    if (opts.manual !== true) {
+      const scheduled = nextRun(
+        automation.schedule,
+        tz,
+        tx.now(),
+        member.settings,
+        jitterFor(automation.id)
+      );
+      nextRunAt = wake && wake < scheduled ? wake : scheduled;
+    }
     await updateAutomationById(tx.db, {
       id: automation.id,
       set: {
@@ -140,16 +160,7 @@ export async function runAutomation(
         // while it ran.
         ...(failureCount >= FAILURE_DISABLE_AT ? { enabled: false } : {}),
         ...(opts.manual === true ? {} : { claimedAt: null }),
-        nextRunAt:
-          opts.manual === true
-            ? automation.nextRunAt
-            : nextRun(
-                automation.schedule,
-                tz,
-                tx.now(),
-                member.settings,
-                jitterFor(automation.id)
-              ),
+        nextRunAt,
       },
     });
     await insertAutomationRun(tx.db, {
@@ -202,7 +213,7 @@ async function execute(
   switch (automation.kind) {
     case "brief.daily":
     case "brief.weekly": {
-      return await runBrief(ctx, automation, member);
+      return await runBrief(ctx, automation, member, manual);
     }
     case "digest": {
       return await runDigest(ctx, automation, member);

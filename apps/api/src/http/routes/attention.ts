@@ -1,5 +1,6 @@
 import { createRoute, z } from "@hono/zod-openapi";
 
+import { answerAttention } from "#agent/approvals";
 import { body, errors, Id, json, respond, router } from "#http/router";
 import {
   ActionParams,
@@ -17,7 +18,6 @@ import {
   listAttention,
   updateAttention,
 } from "#work/attention";
-import { performAttentionAction } from "#work/drift";
 
 export const attentionRoutes = router()
   .openapi(
@@ -95,7 +95,7 @@ export const attentionRoutes = router()
       operationId: "attention.act",
       tags: ["Attention"],
       summary:
-        "Answer an item's one-click question (e.g. a drifting card: keep / not now / done)",
+        "Answer an item's one-click question (a drifting card: keep / not now / done; your assistant asking to do something: allow / deny)",
       request: { params: ActionParams },
       responses: { 200: json(Attention), ...errors },
     }),
@@ -104,12 +104,7 @@ export const attentionRoutes = router()
       return respond(
         c,
         Attention,
-        await performAttentionAction(
-          c.get("ctx"),
-          c.get("member"),
-          id,
-          actionId
-        ),
+        await answerAttention(c.get("ctx"), c.get("member"), id, actionId),
         200
       );
     }

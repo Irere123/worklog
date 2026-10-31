@@ -3,24 +3,44 @@ import type { ModelMessage } from "ai";
 import type { AppContext } from "#context";
 import {
   findConversationById,
+  findFirstUnlearnedAt,
   findInboxConversation,
+  findMessageByClientId,
+  findMessageById,
   insertConversation,
   insertMessages,
+  listConversationRatings,
+  listMessages,
   listMessagesAfter,
   lockConversation,
   measureReplay,
   nextMessageSeq,
   updateConversationById,
+  upsertReplyRating,
 } from "#db/queries/conversations";
-import type { ConversationRow, MessageRow } from "#db/queries/conversations";
+import type {
+  ConversationRow,
+  MessageRow,
+  ReplyRatingRow,
+} from "#db/queries/conversations";
 import { getPersonalAgent } from "#db/queries/members";
 import type { Member } from "#db/queries/members";
+import type { TurnUsage } from "#db/schema";
 import { transact } from "#db/transact";
 import { enqueue } from "#jobs/queue";
 import { forbidden, notFound } from "#lib/errors";
 import { generateId } from "#lib/ids";
 
-import { needsCompaction } from "./compaction";
+import { mustCompactNow } from "./compaction";
+
+/**
+ * How long a conversation stays quiet before the assistant learns from it and compacts it: long
+ * enough that the person has likely stepped away, so neither runs while they wait on a reply or
+ * changes the prompt's cached prefix between their turns.
+ */
+const SETTLE_AFTER_MS = 10 * 60_000;
+/** A conversation that never goes quiet for that long still settles this often. */
+const SETTLE_AT_MOST_MS = 60 * 60_000;
 
 export async function createConversation(
   ctx: AppContext,
@@ -38,6 +58,13 @@ export async function createConversation(
     title: opts.title ?? null,
     recap: null,
     recapThroughSeq: 0,
+    learnedThroughSeq: 0,
+    turnUntil: null,
+    turnStopUntil: null,
+    warmedAt: null,
+    turnQueue: [],
+    memoryPage: null,
+    memorySeenAt: null,
     createdAt: ctx.now(),
     updatedAt: ctx.now(),
   };
@@ -76,7 +103,7 @@ export async function loadHistory(
   return rows.map((row) => row.content).filter(isModelMessage);
 }
 
-function isModelMessage(value: unknown): value is ModelMessage {
+export function isModelMessage(value: unknown): value is ModelMessage {
   return (
     typeof value === "object" &&
     value !== null &&
@@ -86,13 +113,20 @@ function isModelMessage(value: unknown): value is ModelMessage {
 }
 
 // Append-only: history is replayed verbatim every turn until it outgrows its budget, then a job
-// folds the older part into a recap. The conversation row is locked while sequence numbers are
-// assigned, so a brief landing mid-turn (or two concurrent turns) can't collide after the model
-// call was already paid for.
+// folds the older part into a recap once the conversation goes quiet. The conversation row is
+// locked while sequence numbers are assigned, so a brief landing mid-turn can't collide with a turn
+// after the model call was already paid for.
 export async function appendMessages(
   ctx: AppContext,
   conversation: ConversationRow,
-  items: ModelMessage[]
+  items: ModelMessage[],
+  opts: {
+    clientId?: string;
+    said?: string;
+    /** What the turn told the model about memory, so the next turn starts from there. */
+    memory?: { page?: string; seenAt: Date };
+    usage?: TurnUsage;
+  } = {}
 ) {
   if (!items.length) {
     return [];
@@ -114,29 +148,52 @@ export async function appendMessages(
         seq: next + i,
         role: m.role,
         content: m,
-        text: displayText(m),
+        // What the person typed, without what Worklog added around it for the model (the time,
+        // the open loops, which quote titles other people wrote): it's what clients show, and
+        // all that memory may take as their words.
+        text:
+          leads(i, m) && opts.said !== undefined ? opts.said : displayText(m),
+        // The id names what the client sent, which leads the turn.
+        clientId: leads(i, m) ? (opts.clientId ?? null) : null,
+        usage: i === items.length - 1 ? (opts.usage ?? null) : null,
         createdAt: tx.now(),
       };
     });
     await insertMessages(tx.db, inserted);
     await updateConversationById(tx.db, {
       id: conversation.id,
-      set: { updatedAt: tx.now() },
+      set: {
+        updatedAt: tx.now(),
+        ...(opts.memory
+          ? {
+              memorySeenAt: opts.memory.seenAt,
+              ...(opts.memory.page === undefined
+                ? {}
+                : { memoryPage: opts.memory.page }),
+            }
+          : {}),
+      },
     });
+    const job = {
+      workspaceId: conversation.workspaceId,
+      conversationId: conversation.id,
+    };
+    const waiting = await findFirstUnlearnedAt(tx.db, {
+      conversationId: conversation.id,
+    });
+    const overdue =
+      waiting !== undefined &&
+      tx.now().getTime() - waiting.getTime() > SETTLE_AT_MOST_MS;
+    await settleLater(tx, conversation, overdue ? 0 : SETTLE_AFTER_MS);
     if (
-      needsCompaction(
+      mustCompactNow(
         await measureReplay(tx.db, { conversationId: conversation.id })
       )
     ) {
-      await enqueue(
-        tx,
-        "conversation:compact",
-        {
-          workspaceId: conversation.workspaceId,
-          conversationId: conversation.id,
-        },
-        { key: `compact:${conversation.id}`, maxAttempts: 3 }
-      );
+      await enqueue(tx, "conversation:compact", job, {
+        key: `compact:${conversation.id}`,
+        maxAttempts: 3,
+      });
     }
     return inserted;
   });
@@ -154,6 +211,114 @@ export async function appendMessages(
     });
   }
   return rows;
+}
+
+// Every append or rating puts it off again, so it runs once, after the last of them.
+async function settleLater(
+  ctx: AppContext,
+  conversation: ConversationRow,
+  delayMs = SETTLE_AFTER_MS
+) {
+  await enqueue(
+    ctx,
+    "conversation:settle",
+    { workspaceId: conversation.workspaceId, conversationId: conversation.id },
+    { key: `settle:${conversation.id}`, delayMs, maxAttempts: 3 }
+  );
+}
+
+/** A conversation as its asker reads it: the readable turns, each with how they rated it. */
+export async function conversationDetail(
+  ctx: AppContext,
+  viewer: Member,
+  id: string
+) {
+  const conversation = await getConversation(ctx, viewer, id);
+  const [rows, ratings] = await Promise.all([
+    listMessages(ctx.db, { conversationId: conversation.id }),
+    listConversationRatings(ctx.db, {
+      conversationId: conversation.id,
+      memberId: viewer.id,
+    }),
+  ]);
+  const rated = new Map(ratings.map((r) => [r.messageId, r.rating]));
+  return {
+    ...conversation,
+    messages: rows.map((m) => ({ ...m, rating: rated.get(m.id) ?? null })),
+  };
+}
+
+/**
+ * Whoever is in the conversation rates one of the assistant's replies, and can say why. Rating it
+ * again replaces the rating. In an owner's own conversation it's learned from when the
+ * conversation settles; every rating is also kept as a case to check changes against.
+ */
+export async function rateReply(
+  ctx: AppContext,
+  viewer: Member,
+  conversationId: string,
+  messageId: string,
+  input: { rating: ReplyRatingRow["rating"]; note?: string | null }
+) {
+  const conversation = await getConversation(ctx, viewer, conversationId);
+  const message = await findMessageById(ctx.db, {
+    id: messageId,
+    conversationId: conversation.id,
+  });
+  if (message?.role !== "assistant" || !message.text) {
+    throw notFound("Reply");
+  }
+  const note = input.note?.trim();
+  return await transact(ctx, async (tx) => {
+    const row = await upsertReplyRating(tx.db, {
+      id: generateId(),
+      workspaceId: conversation.workspaceId,
+      conversationId: conversation.id,
+      messageId: message.id,
+      memberId: viewer.id,
+      rating: input.rating,
+      note: note === undefined || note === "" ? null : note,
+      learnedAt: null,
+      createdAt: tx.now(),
+      updatedAt: tx.now(),
+    });
+    if (conversation.mode === "owner") {
+      await settleLater(tx, conversation);
+    }
+    return row;
+  });
+}
+
+/**
+ * The answer a message got the first time it was sent, for a client sending it again (its
+ * connection dropped before the reply arrived): null if it never was, "" if its turn ended without
+ * a readable reply.
+ */
+export async function answeredBefore(
+  ctx: AppContext,
+  conversation: ConversationRow,
+  clientId: string
+) {
+  const sent = await findMessageByClientId(ctx.db, {
+    conversationId: conversation.id,
+    clientId,
+  });
+  if (!sent) {
+    return null;
+  }
+  const after = await listMessagesAfter(ctx.db, {
+    conversationId: conversation.id,
+    afterSeq: sent.seq,
+  });
+  const next = after.findIndex((m) => m.role === "user");
+  const turn = next === -1 ? after : after.slice(0, next);
+  return (
+    turn.findLast((m) => m.role === "assistant" && m.text !== null)?.text ?? ""
+  );
+}
+
+function leads(index: number, m: ModelMessage) {
+  return index === 0 && m.role === "user";
 }
 
 function displayText(m: ModelMessage): string | null {

@@ -15,6 +15,8 @@ import { prompt, UNTRUSTED_NOTE } from "./prompts";
 const CHARS_PER_TOKEN = 4;
 // Well inside the main model's window, and early enough that replaying stays cheap.
 const COMPACT_AT_TOKENS = 64_000;
+// Waiting for a quiet moment stops here: much more and the replay crowds out the model's window.
+const COMPACT_NOW_TOKENS = 2 * COMPACT_AT_TOKENS;
 const KEEP_TOKENS = 16_000;
 const MAX_LINE_CHARS = 4000;
 
@@ -38,6 +40,10 @@ const Recap = z.object({
 
 export function needsCompaction(replayChars: number) {
   return replayChars / CHARS_PER_TOKEN > COMPACT_AT_TOKENS;
+}
+
+export function mustCompactNow(replayChars: number) {
+  return replayChars / CHARS_PER_TOKEN > COMPACT_NOW_TOKENS;
 }
 
 /**

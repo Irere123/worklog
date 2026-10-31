@@ -113,6 +113,27 @@
       "when": 1793173905671,
       "tag": "0015_generic_ids",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1793488107571,
+      "tag": "0016_always_on_assistant",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1793488109145,
+      "tag": "0017_learned_history",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1793488111223,
+      "tag": "0018_message_client_index",
+      "breakpoints": true
     }
   ]
 }

@@ -3,6 +3,7 @@ import type { TaskList } from "graphile-worker";
 import { z } from "zod";
 
 import { compactConversation } from "#agent/compaction";
+import { settleConversation } from "#agent/settle";
 import { queueDueAutomations, runQueuedAutomation } from "#automations/run";
 import type { AppContext } from "#context";
 import { countRunnableJobs } from "#db/queries/jobs";
@@ -101,6 +102,13 @@ const TASKS: Record<
   },
   "conversation:compact": async (ctx, payload) => {
     await compactConversation(
+      ctx,
+      String(payload.workspaceId),
+      String(payload.conversationId)
+    );
+  },
+  "conversation:settle": async (ctx, payload) => {
+    await settleConversation(
       ctx,
       String(payload.workspaceId),
       String(payload.conversationId)

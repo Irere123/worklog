@@ -10,6 +10,8 @@ export type NewJob = {
   key: string | null;
   priority: number;
   runAt: Date | null;
+  /** Due this long from now on the database's clock, the one Graphile Worker schedules by. */
+  delayMs: number | null;
 };
 
 // Graphile Worker's own SQL API, so a job added inside a transaction commits with it.
@@ -24,11 +26,17 @@ export function addJobCall(job: NewJob) {
     ${JSON.stringify(job.payload)}::json,
     queue_name => ${job.queue}::text,
     max_attempts => ${job.maxAttempts}::int,
-    run_at => ${job.runAt}::timestamptz,
+    run_at => ${runAt(job)},
     job_key => ${job.key}::text,
     priority => ${job.priority}::int,
-    job_key_mode => ${job.runAt ? "replace" : "preserve_run_at"}::text
+    job_key_mode => ${job.runAt || job.delayMs !== null ? "replace" : "preserve_run_at"}::text
   )`;
+}
+
+function runAt(job: NewJob) {
+  return job.delayMs === null
+    ? sql`${job.runAt}::timestamptz`
+    : sql`now() + make_interval(secs => ${job.delayMs / 1000})`;
 }
 
 // Jobs that could run now: not running, due, with attempts left.

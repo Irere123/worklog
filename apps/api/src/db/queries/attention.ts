@@ -1,8 +1,10 @@
 import {
   and,
+  asc,
   count,
   desc,
   eq,
+  gt,
   gte,
   inArray,
   isNull,
@@ -202,6 +204,71 @@ export async function updateAttentionById(
   return row;
 }
 
+// The kinds of item a member acted on since then, pushed or not: in Worklog, or by closing it at
+// its source (reviewing the PR on GitHub marks the request done).
+export async function listActedKinds(
+  db: DbOrTx,
+  params: { memberId: string; since: Date }
+) {
+  const rows = await db
+    .selectDistinct({ kind: attentionItems.kind })
+    .from(attentionItems)
+    .where(
+      and(
+        eq(attentionItems.memberId, params.memberId),
+        or(
+          gte(attentionItems.actedAt, params.since),
+          and(
+            eq(attentionItems.state, "done"),
+            gte(attentionItems.resolvedAt, params.since)
+          )
+        )
+      )
+    );
+  return rows.map((r) => r.kind);
+}
+
+// When the next of a member's follow-ups wakes, if one is still waiting.
+export async function findNextFollowUpAt(
+  db: DbOrTx,
+  params: { memberId: string; now: Date }
+) {
+  const [row] = await db
+    .select({ at: attentionItems.snoozedUntil })
+    .from(attentionItems)
+    .where(
+      and(
+        eq(attentionItems.memberId, params.memberId),
+        eq(attentionItems.kind, "follow_up"),
+        eq(attentionItems.state, "snoozed"),
+        gt(attentionItems.snoozedUntil, params.now)
+      )
+    )
+    .orderBy(asc(attentionItems.snoozedUntil))
+    .limit(1);
+  return row?.at ?? undefined;
+}
+
+// Follow-ups still waiting for the time their member asked for, soonest first.
+export async function listPendingFollowUps(
+  db: DbOrTx,
+  params: { memberId: string; now: Date }
+) {
+  return await db
+    .select()
+    .from(attentionItems)
+    .where(
+      and(
+        eq(attentionItems.memberId, params.memberId),
+        eq(attentionItems.kind, "follow_up"),
+        eq(attentionItems.state, "snoozed"),
+        gt(attentionItems.snoozedUntil, params.now)
+      )
+    )
+    .orderBy(asc(attentionItems.snoozedUntil))
+    .limit(50);
+}
+
 export async function listUnconsideredAttention(
   db: DbOrTx,
   params: { memberId: string; now: Date }
@@ -266,8 +333,10 @@ export async function listPushedAttention(
 ) {
   return await db
     .select({
+      kind: attentionItems.kind,
       state: attentionItems.state,
       actedAt: attentionItems.actedAt,
+      pushedAt: attentionItems.pushedAt,
     })
     .from(attentionItems)
     .where(

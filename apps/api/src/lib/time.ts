@@ -143,6 +143,28 @@ export function startOfLocalDate(
       );
 }
 
+// A local date and time given as YYYY-MM-DDTHH:MM, or undefined if it isn't one.
+export function startOfLocalMinute(
+  value: string,
+  timeZone: string
+): Date | undefined {
+  const m = /^(?<day>\d{4}-\d{2}-\d{2})[T ](?<time>\d{2}:\d{2})$/u.exec(
+    value.trim()
+  );
+  const midnight = m?.groups?.day
+    ? startOfLocalDate(m.groups.day, timeZone)
+    : undefined;
+  if (!midnight || !m?.groups?.time) {
+    return undefined;
+  }
+  const { hour, minute } = parseHHMM(m.groups.time);
+  if (hour > 23 || minute > 59) {
+    return undefined;
+  }
+  const p = localParts(midnight, timeZone);
+  return zonedToUtc(p.year, p.month, p.day, hour, minute, timeZone);
+}
+
 // Formatted YYYY-MM-DD.
 export function localDate(date: Date, timeZone: string): string {
   const p = localParts(date, timeZone);

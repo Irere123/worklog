@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX CONCURRENTLY "messages_client_uq" ON "messages" USING btree ("conversation_id","client_id") WHERE "messages"."client_id" is not null;

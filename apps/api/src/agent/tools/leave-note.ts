@@ -20,26 +20,32 @@ export function leaveNoteTool({ ctx, owner, asker, conversationId }: Scope) {
       urgent: z.boolean().describe("True only if it blocks work today"),
       cardNumber: z.number().int().optional(),
     }),
-    execute: safe(async ({ note, urgent, cardNumber }) => {
-      const card =
-        cardNumber === undefined
-          ? null
-          : await getCardByNumber(ctx.db, {
-              workspaceId: owner.workspaceId,
-              number: cardNumber,
-            });
-      await raiseAttention(ctx, {
-        workspaceId: owner.workspaceId,
-        memberId: owner.id,
-        kind: "assistant.note",
-        title: `${asker.name} asked your assistant: ${note.slice(0, 120)}`,
-        body: note,
-        cardId: card?.id ?? null,
-        fromId: asker.id,
-        priority: urgent ? "high" : "normal",
-        dedupeKey: `note:${conversationId}`,
-      });
-      return { ok: true, message: `Left a note for ${owner.name}.` };
-    }),
+    execute: safe(
+      async ({ note, urgent, cardNumber }) => {
+        const card =
+          cardNumber === undefined
+            ? null
+            : await getCardByNumber(ctx.db, {
+                workspaceId: owner.workspaceId,
+                number: cardNumber,
+              });
+        await raiseAttention(ctx, {
+          workspaceId: owner.workspaceId,
+          memberId: owner.id,
+          kind: "assistant.note",
+          title: `${asker.name} asked your assistant: ${note.slice(0, 120)}`,
+          body: note,
+          cardId: card?.id ?? null,
+          fromId: asker.id,
+          priority: urgent ? "high" : "normal",
+          dedupeKey: `note:${conversationId}`,
+        });
+        return { ok: true, message: `Left a note for ${owner.name}.` };
+      },
+      {
+        notFound:
+          "Leave the note without a card number, or use search_cards to find the card.",
+      }
+    ),
   });
 }

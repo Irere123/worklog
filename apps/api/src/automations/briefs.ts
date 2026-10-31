@@ -305,6 +305,18 @@ export function templateBrief(data: BriefData): string {
   return out.join("\n");
 }
 
+/** Nothing anyone did and nothing waiting: a brief would only say so, so a scheduled one stays quiet. */
+export function isEmptyWindow(data: BriefData) {
+  return (
+    data.you.did.length === 0 &&
+    data.needsAttention.length === 0 &&
+    data.team.length === 0 &&
+    data.driftingSoon.length === 0 &&
+    data.board.newInMaybe === 0 &&
+    data.board.closed === 0
+  );
+}
+
 export async function generateBrief(
   ctx: AppContext,
   member: Member,
@@ -312,6 +324,17 @@ export async function generateBrief(
   extraInstructions?: string | null
 ) {
   const { _key, ...data } = await gatherBriefData(ctx, member, period);
+  return await saveBrief(ctx, member, _key, data, extraInstructions);
+}
+
+export async function saveBrief(
+  ctx: AppContext,
+  member: Member,
+  key: Date,
+  data: BriefData,
+  extraInstructions?: string | null
+) {
+  const { period } = data;
   const { title, body, composedBy } = await composeBrief(
     ctx,
     member,
@@ -323,7 +346,7 @@ export async function generateBrief(
     workspaceId: member.workspaceId,
     memberId: member.id,
     period,
-    periodStart: _key,
+    periodStart: key,
     periodEnd: new Date(data.range.end),
     title,
     body,

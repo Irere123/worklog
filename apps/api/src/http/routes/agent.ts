@@ -1,24 +1,51 @@
 import { createRoute, z } from "@hono/zod-openapi";
 
-import { createConversation, getConversation } from "#agent/conversations";
-import { ask, askStream, resolveAgent } from "#agent/loop";
+import {
+  conversationDetail,
+  createConversation,
+  rateReply,
+} from "#agent/conversations";
+import {
+  ask,
+  askStream,
+  resolveAgent,
+  stopTurn,
+  warmConversation,
+} from "#agent/loop";
+import { replayRating } from "#agent/replay";
 import { setVoice } from "#agent/voice";
-import { listConversations, listMessages } from "#db/queries/conversations";
+import {
+  listConversations,
+  listReplyRatings,
+  sumTurnUsage,
+} from "#db/queries/conversations";
 import { findVoice, listVoices } from "#db/queries/voices";
 import { body, errors, Id, json, respond, router } from "#http/router";
 import {
   AgentReply,
+  AssistantUsage,
   ChatRequest,
+  chatClientId,
   chatText,
   Conversation,
   ConversationDetailResponse,
   CreateConversationRequest,
+  ListRatingsQuery,
+  MessageParams,
+  RatedReply,
+  Replay,
+  RateReplyRequest,
+  ReplyRating,
   SendMessageRequest,
+  StopResult,
+  UsageQuery,
+  WarmResult,
   SetVoiceRequest,
   Voice,
   VoiceResponse,
 } from "#http/schemas/agent";
 import { ErrorSchema } from "#http/schemas/common";
+import { DAY_MS } from "#lib/time";
 import { resolveMember } from "#work/members";
 
 export const agentRoutes = router()
@@ -67,7 +94,8 @@ export const agentRoutes = router()
       },
     }),
     async (c) => {
-      const message = chatText(c.req.valid("json").message);
+      const sent = c.req.valid("json").message;
+      const message = chatText(sent);
       if (!message) {
         return respond(
           c,
@@ -84,6 +112,8 @@ export const agentRoutes = router()
       return await askStream(c.get("ctx"), c.get("member"), {
         conversationId: c.req.valid("param").id,
         message,
+        clientId: chatClientId(sent),
+        interrupt: c.req.valid("json").interrupt,
       });
     }
   )
@@ -105,6 +135,8 @@ export const agentRoutes = router()
         await ask(c.get("ctx"), c.get("member"), {
           conversationId: c.req.valid("param").id,
           message: c.req.valid("json").message,
+          clientId: c.req.valid("json").clientMessageId,
+          interrupt: c.req.valid("json").interrupt,
         }),
         200
       )
@@ -133,22 +165,159 @@ export const agentRoutes = router()
       request: { params: Id },
       responses: { 200: json(ConversationDetailResponse), ...errors },
     }),
+    async (c) =>
+      respond(
+        c,
+        ConversationDetailResponse,
+        await conversationDetail(
+          c.get("ctx"),
+          c.get("member"),
+          c.req.valid("param").id
+        ),
+        200
+      )
+  )
+  .openapi(
+    createRoute({
+      method: "post",
+      path: "/v1/conversations/{id}/warm",
+      operationId: "conversation.warm",
+      tags: ["Assistant"],
+      summary: "Get the assistant ready for a message that's about to come",
+      description:
+        "Call it when someone opens a conversation or starts typing: the next answer starts sooner and costs less, since the provider already has the prompt's start cached. Does nothing if called again within a few minutes.",
+      request: { params: Id },
+      responses: { 200: json(WarmResult), ...errors },
+    }),
+    async (c) =>
+      respond(
+        c,
+        WarmResult,
+        await warmConversation(
+          c.get("ctx"),
+          c.get("member"),
+          c.req.valid("param").id
+        ),
+        200
+      )
+  )
+  .openapi(
+    createRoute({
+      method: "get",
+      path: "/v1/assistant/usage",
+      operationId: "assistant.usage",
+      tags: ["Assistant"],
+      summary:
+        "What your conversations with assistants cost, and how much the prompt cache saved",
+      request: { query: UsageQuery },
+      responses: { 200: json(AssistantUsage), ...errors },
+    }),
     async (c) => {
       const ctx = c.get("ctx");
-      const conversation = await getConversation(
-        ctx,
-        c.get("member"),
-        c.req.valid("param").id
-      );
-      const messages = await listMessages(ctx.db, {
-        conversationId: conversation.id,
+      const { days } = c.req.valid("query");
+      const usage = await sumTurnUsage(ctx.db, {
+        askerId: c.get("member").id,
+        since: new Date(ctx.now().getTime() - days * DAY_MS),
       });
       return respond(
         c,
-        ConversationDetailResponse,
-        { ...conversation, messages },
+        AssistantUsage,
+        {
+          days,
+          ...usage,
+          cacheHitRate: usage.inputTokens
+            ? usage.cachedInputTokens / usage.inputTokens
+            : null,
+        },
         200
       );
+    }
+  )
+  .openapi(
+    createRoute({
+      method: "post",
+      path: "/v1/conversations/{id}/stop",
+      operationId: "conversation.stop",
+      tags: ["Assistant"],
+      summary: "Stop the answer the assistant is still writing",
+      description:
+        "Takes effect within about a second, wherever the turn is running. The conversation records that it stopped.",
+      request: { params: Id },
+      responses: { 200: json(StopResult), ...errors },
+    }),
+    async (c) =>
+      respond(
+        c,
+        StopResult,
+        await stopTurn(c.get("ctx"), c.get("member"), c.req.valid("param").id),
+        200
+      )
+  )
+  .openapi(
+    createRoute({
+      method: "put",
+      path: "/v1/conversations/{id}/messages/{messageId}/rating",
+      operationId: "conversation.rate",
+      tags: ["Assistant"],
+      summary: "Say whether a reply helped, and why",
+      description:
+        "Rating a reply again replaces the rating. In a conversation with your own assistant, it learns from your rating and note once the conversation goes quiet (as a line in your private memory you can read and correct). Every rating is also kept as a case to check prompt and model changes against.",
+      request: { params: MessageParams, ...body(RateReplyRequest) },
+      responses: { 200: json(ReplyRating), ...errors },
+    }),
+    async (c) => {
+      const { id, messageId } = c.req.valid("param");
+      const row = await rateReply(
+        c.get("ctx"),
+        c.get("member"),
+        id,
+        messageId,
+        c.req.valid("json")
+      );
+      return respond(c, ReplyRating, row, 200);
+    }
+  )
+  .openapi(
+    createRoute({
+      method: "post",
+      path: "/v1/ratings/{id}/replay",
+      operationId: "rating.replay",
+      tags: ["Assistant"],
+      summary: "Ask a rated reply again, to see what the assistant answers now",
+      description:
+        "Re-asks the question from the same point in its conversation with today's prompts, memory and model, and returns both answers. Lookups only: nothing is changed, stored or sent.",
+      request: { params: Id },
+      responses: { 200: json(Replay), ...errors },
+    }),
+    async (c) =>
+      respond(
+        c,
+        Replay,
+        await replayRating(
+          c.get("ctx"),
+          c.get("member"),
+          c.req.valid("param").id
+        ),
+        200
+      )
+  )
+  .openapi(
+    createRoute({
+      method: "get",
+      path: "/v1/ratings",
+      operationId: "rating.list",
+      tags: ["Assistant"],
+      summary: "Replies you rated, newest first, with what they answered",
+      request: { query: ListRatingsQuery },
+      responses: { 200: json(z.array(RatedReply)), ...errors },
+    }),
+    async (c) => {
+      const rows = await listReplyRatings(c.get("ctx").db, {
+        memberId: c.get("member").id,
+        rating: c.req.valid("query").rating,
+        limit: 200,
+      });
+      return respond(c, z.array(RatedReply), rows, 200);
     }
   )
   .openapi(

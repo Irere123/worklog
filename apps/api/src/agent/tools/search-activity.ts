@@ -35,27 +35,33 @@ export function searchActivityTool(scope: Scope) {
         .describe("Look back this many days (default 14)"),
       limit: z.number().int().min(1).max(100).optional(),
     }),
-    execute: safe(async ({ query, person, source, kind, days, limit }) => {
-      const who = person ? await resolveMember(ctx, owner, person) : null;
-      const rows = await listActivities(ctx.db, {
-        workspaceId: owner.workspaceId,
-        privateFor: privateFor(scope),
-        q: query,
-        actorIds: who ? [who.id] : undefined,
-        source,
-        kinds: kind ? [kind] : undefined,
-        since: new Date(ctx.now().getTime() - (days ?? 14) * DAY_MS),
-        limit: limit ?? 30,
-      });
-      return rows.map((a) => ({
-        at: a.occurredAt.toISOString(),
-        actorId: a.actorId,
-        kind: a.kind,
-        source: a.source,
-        title: a.title,
-        detail: a.body?.slice(0, 400) ?? null,
-        url: a.url,
-      }));
-    }),
+    execute: safe(
+      async ({ query, person, source, kind, days, limit }) => {
+        const who = person ? await resolveMember(ctx, owner, person) : null;
+        const rows = await listActivities(ctx.db, {
+          workspaceId: owner.workspaceId,
+          privateFor: privateFor(scope),
+          q: query,
+          actorIds: who ? [who.id] : undefined,
+          source,
+          kinds: kind ? [kind] : undefined,
+          since: new Date(ctx.now().getTime() - (days ?? 14) * DAY_MS),
+          limit: limit ?? 30,
+        });
+        return rows.map((a) => ({
+          at: a.occurredAt.toISOString(),
+          actorId: a.actorId,
+          kind: a.kind,
+          source: a.source,
+          title: a.title,
+          detail: a.body?.slice(0, 400) ?? null,
+          url: a.url,
+        }));
+      },
+      {
+        notFound:
+          "Use team_directory to find the person's handle, then try again.",
+      }
+    ),
   });
 }

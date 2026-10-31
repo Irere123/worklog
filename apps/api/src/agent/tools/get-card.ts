@@ -13,28 +13,33 @@ export function getCardTool(scope: Scope) {
     description:
       "Full detail for one card: description, comments and its recent activity.",
     inputSchema: z.object({ number: z.number().int() }),
-    execute: safe(async ({ number }) => {
-      const card = await getCardDetail(ctx, owner.workspaceId, number);
-      const history = await listActivities(ctx.db, {
-        workspaceId: owner.workspaceId,
-        privateFor: privateFor(scope),
-        cardId: card.id,
-        limit: 20,
-      });
-      return {
-        ...card,
-        comments: card.comments.map((c) => ({
-          authorId: c.authorId,
-          body: c.body,
-          at: c.createdAt.toISOString(),
-        })),
-        history: history.map((a) => ({
-          at: a.occurredAt.toISOString(),
-          kind: a.kind,
-          title: a.title,
-          detail: a.body,
-        })),
-      };
-    }),
+    execute: safe(
+      async ({ number }) => {
+        const card = await getCardDetail(ctx, owner.workspaceId, number);
+        const history = await listActivities(ctx.db, {
+          workspaceId: owner.workspaceId,
+          privateFor: privateFor(scope),
+          cardId: card.id,
+          limit: 20,
+        });
+        return {
+          ...card,
+          comments: card.comments.map((c) => ({
+            authorId: c.authorId,
+            body: c.body,
+            at: c.createdAt.toISOString(),
+          })),
+          history: history.map((a) => ({
+            at: a.occurredAt.toISOString(),
+            kind: a.kind,
+            title: a.title,
+            detail: a.body,
+          })),
+        };
+      },
+      {
+        notFound: "Use search_cards to find the card's number, then try again.",
+      }
+    ),
   });
 }

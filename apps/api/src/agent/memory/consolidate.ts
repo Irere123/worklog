@@ -3,6 +3,7 @@ import { z } from "zod";
 import { complete, structured } from "#agent/generate";
 import {
   addMemory,
+  loadMemory,
   renderMemory,
   retireMemories,
   writeDigest,
@@ -181,13 +182,9 @@ async function consolidatePart(
     );
     return `${visibility} journal (${items.length} items)`;
   }
-  // The team pass never sees private memory either, so nothing private can leak into its outputs.
-  const memory = await renderMemory(
-    ctx,
-    member.id,
-    visibility === "private",
-    3
-  );
+  // The team pass never sees private memory either, so nothing private can leak into its outputs,
+  // and it can only replace lines it was shown.
+  const memory = await loadMemory(ctx, member.id, visibility === "private", 3);
   const spoken = said.length
     ? `\n\nWhat ${member.name} told their assistant on ${day}:\n${JSON.stringify(
         said.map((m) => ({
@@ -202,7 +199,7 @@ async function consolidatePart(
       prompt("consolidate", { name: member.name }),
       UNTRUSTED_NOTE,
     ],
-    prompt: `Current memory:\n${memory}\n\nActivity on ${day}:\n${JSON.stringify(
+    prompt: `Current memory:\n${memory.text}\n\nActivity on ${day}:\n${JSON.stringify(
       items.map((a) => ({
         at: a.occurredAt.toISOString(),
         kind: a.kind,
@@ -240,7 +237,7 @@ async function consolidatePart(
       content: p.content,
       aliases: p.aliases,
       expiresAt: expiry(p.expiresOn, tz),
-      supersedes: p.supersedes,
+      supersedes: p.supersedes.filter((id) => memory.shown.has(id)),
     });
   }
   return `${visibility}: journal +${output.facts.length} fact(s) +${output.profile.length} profile`;

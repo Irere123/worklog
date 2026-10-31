@@ -1,15 +1,13 @@
 import { tool } from "ai";
 import { z } from "zod";
 
-import { getBoardWithColumns, listBoards } from "#db/queries/boards";
-import { createCard } from "#work/board";
+import { reviewed } from "#agent/review";
 
 import { safe } from "./scope";
 import type { Scope } from "./scope";
 
-// Board changes are attributed to the assistant, so the team can see which moves an agent made.
-export function createCardTool({ ctx, agent, owner }: Scope) {
-  const ws = owner.workspaceId;
+// The team sees the card, so it's made only once the review finds the owner asked for it.
+export function createCardTool(scope: Scope) {
   return tool({
     description:
       "Create a card. Without a column it lands in Maybe? for triage.",
@@ -26,36 +24,6 @@ export function createCardTool({ ctx, agent, owner }: Scope) {
         .describe("Column name to put it straight into"),
       assignToOwner: z.boolean().optional(),
     }),
-    execute: safe(
-      async ({ title, body, board: boardRef, column, assignToOwner }) => {
-        const boards = await listBoards(ctx.db, { workspaceId: ws });
-        const target =
-          boards.find(
-            (b) =>
-              b.id === boardRef ||
-              b.name.toLowerCase() === boardRef?.toLowerCase()
-          ) ?? boards[0];
-        if (!target) {
-          return { error: "There are no boards yet" };
-        }
-        const detail = await getBoardWithColumns(ctx.db, {
-          workspaceId: ws,
-          id: target.id,
-        });
-        const col = column
-          ? detail.columns.find(
-              (c) => c.name.toLowerCase() === column.toLowerCase()
-            )
-          : undefined;
-        const card = await createCard(ctx, agent, ws, {
-          boardId: target.id,
-          title,
-          body,
-          columnId: col?.id,
-          assigneeIds: assignToOwner === true ? [owner.id] : [],
-        });
-        return { ok: true, number: card.number, stage: card.stage };
-      }
-    ),
+    execute: safe(async (input) => await reviewed(scope, "create_card", input)),
   });
 }

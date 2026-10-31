@@ -23,8 +23,9 @@ export async function installQueue(db: Db) {
 /**
  * Inside `transact`, the job commits with the transaction. Jobs in the same `queue` run one at a
  * time, but a failed job retries after the ones behind it. A job added with the `key` of one still
- * waiting replaces it instead of queuing a second. Lower `priority` runs first; within a queue it
- * lets a live event overtake history waiting to be processed.
+ * waiting replaces it instead of queuing a second; with a `runAt` or `delayMs` it also moves the
+ * waiting one's time, so adding it again and again puts it off until things go quiet. Lower
+ * `priority` runs first; within a queue it lets a live event overtake history waiting to be processed.
  */
 export async function enqueue(
   ctx: AppContext,
@@ -41,6 +42,7 @@ type JobOptions = {
   key?: string;
   priority?: number;
   runAt?: Date;
+  delayMs?: number;
 };
 
 /** A job as `enqueue` adds it, for a query that adds it in the same statement as its write. */
@@ -57,6 +59,7 @@ export function newJob(
     key: opts.key ?? null,
     priority: opts.priority ?? 0,
     runAt: opts.runAt ?? null,
+    delayMs: opts.delayMs ?? null,
   };
 }
 

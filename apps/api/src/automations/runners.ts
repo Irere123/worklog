@@ -3,15 +3,9 @@ import { z } from "zod";
 import { postToInbox } from "#agent/conversations";
 import { structured } from "#agent/generate";
 import { renderMemory } from "#agent/memory";
-import type { Models } from "#agent/models";
-import {
-  audienceNote,
-  CONSTITUTION,
-  prompt,
-  UNTRUSTED_NOTE,
-} from "#agent/prompts";
+import { prompt, UNTRUSTED_NOTE } from "#agent/prompts";
+import { runRoutine } from "#agent/routine";
 import type { AppContext } from "#context";
-import { listActivities } from "#db/queries/activities";
 import {
   listDigestableAttention,
   listOpenAttention,
@@ -20,8 +14,7 @@ import {
 import type { AttentionItem } from "#db/queries/attention";
 import type { Automation, AutomationRun } from "#db/queries/automations";
 import type { Member } from "#db/queries/members";
-import type { Visibility } from "#db/schema";
-import { DAY_MS, startOfLocalDay } from "#lib/time";
+import { startOfLocalDay } from "#lib/time";
 import {
   markConsidered,
   markDigested,
@@ -30,9 +23,13 @@ import {
   recordNotification,
   teamVisibleAttention,
 } from "#work/attention";
-import { workSnapshot } from "#work/snapshot";
 
-import { composeTeamBrief, generateBrief } from "./briefs";
+import {
+  composeTeamBrief,
+  gatherBriefData,
+  isEmptyWindow,
+  saveBrief,
+} from "./briefs";
 import { deliver, splitTargets } from "./delivery";
 import { sanitizeMarkdown, urlsIn } from "./sanitize";
 import { isActiveNow } from "./schedule";
@@ -125,16 +122,26 @@ function outgoing(
   };
 }
 
+// Quiet is allowed: a scheduled brief with nothing in it isn't sent. Run by hand, it always is.
 export async function runBrief(
   ctx: AppContext,
   automation: Automation,
-  member: Member
+  member: Member,
+  manual: boolean
 ): Promise<RunOutcome> {
   const period = automation.kind === "brief.weekly" ? "weekly" : "daily";
-  const brief = await generateBrief(
+  const { _key, ...data } = await gatherBriefData(ctx, member, period);
+  if (!manual && isEmptyWindow(data)) {
+    return {
+      status: "quiet",
+      summary: "Nothing moved and nothing is waiting on you, so no brief",
+    };
+  }
+  const brief = await saveBrief(
     ctx,
     member,
-    period,
+    _key,
+    data,
     automation.instructions
   );
   const { delivered, failed } = await send(
@@ -252,6 +259,9 @@ type Decision = {
   reason: string;
 };
 
+/** Kinds that only the member themselves raise, for themselves, at a time they chose. */
+const ASKED_FOR = new Set(["follow_up"]);
+
 export async function runCheck(
   ctx: AppContext,
   automation: Automation,
@@ -273,9 +283,17 @@ export async function runCheck(
   const limits = { ...DEFAULT_LIMITS, ...member.settings.notify };
   const now = ctx.now().getTime();
   const muted = await mutedKinds(ctx, member.id);
-  const decisions: Decision[] = [];
+  // What they asked to have brought back comes back when they asked: it's their own request, not
+  // an interruption, so neither the budget nor the model holds it.
+  const decisions: Decision[] = pending
+    .filter((item) => ASKED_FOR.has(item.kind))
+    .map((item) => ({
+      id: item.id,
+      disposition: "push",
+      reason: defaultReason(item),
+    }));
   let candidates: AttentionItem[] = [];
-  for (const item of pending) {
+  for (const item of pending.filter((i) => !ASKED_FOR.has(i.kind))) {
     const reason = digestReason(item, muted, limits, now);
     if (reason === null) {
       candidates.push(item);
@@ -286,13 +304,17 @@ export async function runCheck(
 
   if (candidates.length) {
     const budget = await pingBudget(ctx, member.id, tz, limits, now);
-    if (budget === "hold") {
+    if (budget === "hold" && !decisions.some((d) => d.disposition === "push")) {
       // Leave them unconsidered so the next check (after the gap) decides.
       await markConsidered(ctx, decisions);
       return {
         status: "quiet",
         summary: `Holding ${candidates.length} urgent item(s) until the ${limits.minGapMinutes}-minute gap passes`,
       };
+    }
+    if (budget === "hold") {
+      // Left unconsidered, as above; what they asked for goes out on its own.
+      candidates = [];
     }
     if (budget === "spent") {
       for (const c of candidates) {
@@ -315,12 +337,13 @@ type Limits = typeof DEFAULT_LIMITS;
 
 function digestReason(
   item: AttentionItem,
-  muted: Set<string>,
+  muted: Map<string, string>,
   limits: Limits,
   now: number
 ): string | null {
-  if (muted.has(item.kind)) {
-    return "You marked pings like this as not useful — kept for your digest";
+  const why = muted.get(item.kind);
+  if (why !== undefined) {
+    return why;
   }
   if (item.priority !== "high") {
     return "Not urgent — it'll be in your next digest";
@@ -489,17 +512,14 @@ function defaultReason(item: AttentionItem) {
     case "pr.review": {
       return "Changes were requested on your PR";
     }
+    case "follow_up": {
+      return "You asked me to bring this back now";
+    }
     default: {
       return "Marked high priority";
     }
   }
 }
-
-const CustomResult = z.object({
-  decision: z.enum(["notify", "quiet"]),
-  message: z.string(),
-  summary: z.string(),
-});
 
 export async function runCustom(
   ctx: AppContext,
@@ -513,86 +533,29 @@ export async function runCustom(
       summary: "Custom automations need AI (OPENROUTER_API_KEY)",
     };
   }
-  const own = await composeCustom(ctx, models, automation, member, "private");
+  const own = await runRoutine(ctx, models, automation, member, "private");
   if (!own.message) {
     return { status: "quiet", summary: own.summary };
   }
-  await send(ctx, automation, member, own.message, async () => {
-    const team = await composeCustom(ctx, models, automation, member, "team");
-    return team.message;
-  });
+  await send(
+    ctx,
+    automation,
+    member,
+    routineMessage(automation, own.message, own.sources),
+    async () => {
+      const team = await runRoutine(ctx, models, automation, member, "team");
+      return team.message
+        ? routineMessage(automation, team.message, team.sources)
+        : null;
+    }
+  );
   return { status: "delivered", summary: own.summary };
 }
 
-// The team version sees team-visible data only, and not the last result either: that summary was
-// written from everything.
-async function composeCustom(
-  ctx: AppContext,
-  models: Models,
+function routineMessage(
   automation: Automation,
-  member: Member,
-  visibility: Visibility
-): Promise<{ message: Message | null; summary: string }> {
-  const everything = visibility === "private";
-  const [snapshot, attention, team, memory] = await Promise.all([
-    workSnapshot(ctx, member, { includePrivate: everything, days: 7 }),
-    listOpenAttention(ctx.db, {
-      memberId: member.id,
-      now: ctx.now(),
-      limit: 30,
-    }).then(async (items) =>
-      everything ? items : await teamVisibleAttention(ctx, items)
-    ),
-    listActivities(ctx.db, {
-      workspaceId: member.workspaceId,
-      privateFor: [],
-      since: new Date(ctx.now().getTime() - 7 * DAY_MS),
-      limit: 200,
-    }),
-    renderMemory(ctx, member.id, everything, 1),
-  ]);
-  const data = {
-    work: snapshot,
-    attention: attention.map((a) => ({
-      kind: a.kind,
-      title: a.title,
-      priority: a.priority,
-      url: a.url,
-    })),
-    team: team.map((a) => ({
-      at: a.occurredAt.toISOString(),
-      actorId: a.actorId,
-      kind: a.kind,
-      title: a.title,
-      url: a.url,
-    })),
-  };
-  const last = everything
-    ? `Last result: ${JSON.stringify(automation.state.lastResult ?? null)}\n\n`
-    : "";
-  const output = await structured(models, {
-    model: "main",
-    instructions: [
-      CONSTITUTION,
-      prompt("custom", {
-        name: member.name,
-        audience: audienceNote(visibility, member.name),
-      }),
-    ],
-    prompt: `Automation "${automation.name}" instructions:\n${automation.instructions}\n\n${last}What you know about them:\n${memory}\n\nData:\n${JSON.stringify(data)}`,
-    schema: CustomResult,
-    timeout: "background",
-  });
-  const quiet = output.decision === "quiet" || !output.message.trim();
-  return {
-    message: quiet
-      ? null
-      : {
-          subject: automation.name,
-          markdown: output.message,
-          sources: data,
-          kind: "custom",
-        },
-    summary: output.summary,
-  };
+  markdown: string,
+  sources: unknown
+): Message {
+  return { subject: automation.name, markdown, sources, kind: "custom" };
 }

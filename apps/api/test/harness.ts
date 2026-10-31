@@ -100,7 +100,15 @@ export async function testEnv() {
     return { token: res.body.token.token as string, member: res.body.member };
   }
 
-  const drain = async () => {
+  // `later` also runs what that workspace has waiting for a quiet moment, as if it had come. Only
+  // that workspace's: other tests' would spend this test's scripted model replies.
+  const drain = async (opts: { later?: string } = {}) => {
+    if (opts.later !== undefined) {
+      await ctx.pool.query(
+        "update graphile_worker._private_jobs set run_at = now() where run_at > now() and locked_at is null and payload->>'workspaceId' = $1",
+        [opts.later]
+      );
+    }
     await runJobsOnce(ctx);
     await ctx.tally.flush();
   };
@@ -216,7 +224,11 @@ const usage = {
   outputTokens: { total: 10, text: 10, reasoning: undefined },
 };
 
-type Step = { text: string } | { tool: string; input: unknown };
+// `until` holds a step's reply back until it settles, to catch a turn while it's still running;
+// `cacheRead` is how many input tokens the provider says came from its prompt cache.
+type Step =
+  | { text: string; until?: Promise<unknown>; cacheRead?: number }
+  | { tool: string; input: unknown };
 
 export function scriptedModel(steps: Step[]) {
   const prompts: any[] = [];
@@ -228,9 +240,21 @@ export function scriptedModel(steps: Step[]) {
     return step;
   };
   const model = new MockLanguageModelV4({
-    // oxlint-disable-next-line require-await -- fulfils the async LanguageModel contract; scripted steps are synchronous
     doGenerate: async (options) => {
       const step = nextStep(options);
+      if ("until" in step && step.until) {
+        const held = { settled: false };
+        void step.until.then(() => {
+          held.settled = true;
+          return held;
+        });
+        while (!held.settled) {
+          if (options.abortSignal?.aborted === true) {
+            throw new DOMException("The turn was stopped", "AbortError");
+          }
+          await Bun.sleep(5);
+        }
+      }
       if ("tool" in step) {
         return {
           content: [
@@ -249,7 +273,16 @@ export function scriptedModel(steps: Step[]) {
       return {
         content: [{ type: "text", text: step.text }],
         finishReason: { unified: "stop", raw: undefined },
-        usage,
+        usage:
+          step.cacheRead === undefined
+            ? usage
+            : {
+                ...usage,
+                inputTokens: {
+                  ...usage.inputTokens,
+                  cacheRead: step.cacheRead,
+                },
+              },
         warnings: [],
       };
     },

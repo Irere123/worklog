@@ -1,6 +1,9 @@
 import { beforeAll, beforeEach, describe, expect, test } from "bun:test";
 
-import { testEnv } from "./harness";
+import { runAutomation } from "#automations/run";
+import { findAutomationById } from "#db/queries/automations";
+
+import { scriptedModel, testEnv } from "./harness";
 import type { TestEnv } from "./harness";
 
 let env: TestEnv;
@@ -10,6 +13,17 @@ beforeAll(async () => {
 beforeEach(() => {
   env.reset();
 });
+
+// YYYY-MM-DDTHH:MM on the harness's default workspace clock.
+function kigaliMinute(date: Date) {
+  return new Intl.DateTimeFormat("sv-SE", {
+    timeZone: "Africa/Kigali",
+    dateStyle: "short",
+    timeStyle: "short",
+  })
+    .format(date)
+    .replace(" ", "T");
+}
 
 async function team() {
   const owner = await env.workspace();
@@ -158,5 +172,204 @@ describe("feedback and digests", () => {
       mutedKinds: ["mention"],
       feedback: { less_like_this: 1 },
     });
+  });
+});
+
+describe("learning from what people do", () => {
+  test("pings dismissed again and again without acting are held for the digest; acting on one undoes it", async () => {
+    const { owner, sam, runCheck, mentionSam } = await team();
+    await env.call("PATCH", "/v1/me", {
+      token: sam.token,
+      body: {
+        settings: {
+          activeHours: { start: "00:00", end: "23:59" },
+          notify: { dailyPushCap: 20, minGapMinutes: 0 },
+        },
+      },
+    });
+    // A different sender each time: one sender's third urgent item in a day isn't urgent any more.
+    let n = 0;
+    const mentionFromSomeone = async () => {
+      n += 1;
+      const sender = await env.teammate(owner.token, `Sender ${n}`);
+      await mentionSam(sender.token);
+    };
+    const resolveNewest = async (state: string) => {
+      const [item] = (
+        await env.call("GET", "/v1/attention", { token: sam.token })
+      ).body;
+      await env.call("PATCH", `/v1/attention/${item.id}`, {
+        token: sam.token,
+        body: { state },
+      });
+    };
+    for (let i = 0; i < 3; i += 1) {
+      await mentionFromSomeone();
+      expect((await runCheck()).status).toBe("delivered");
+      await resolveNewest("dismissed");
+    }
+
+    await mentionFromSomeone();
+    expect((await runCheck()).status).toBe("quiet");
+    const [held] = (
+      await env.call("GET", "/v1/attention", { token: sam.token })
+    ).body;
+    expect(held).toMatchObject({ disposition: "digest" });
+    expect(held.reason).toContain("dismissed");
+
+    await resolveNewest("done");
+    await mentionFromSomeone();
+    expect((await runCheck()).status).toBe("delivered");
+  });
+});
+
+describe("follow-ups", () => {
+  test("a follow-up the owner asked for stays out of sight, then comes back when they asked, even past the day's budget", async () => {
+    const { sam, runCheck, mentionSam } = await team();
+    await env.call("PATCH", "/v1/me", {
+      token: sam.token,
+      body: {
+        settings: {
+          activeHours: { start: "00:00", end: "23:59" },
+          notify: { dailyPushCap: 1, minGapMinutes: 0 },
+        },
+      },
+    });
+    const now = Date.now();
+    env.ctx.now = () => new Date(now);
+    const when = new Date(now + 10 * 60_000);
+    const wakes = Math.floor(when.getTime() / 60_000) * 60_000;
+    const { model } = scriptedModel([
+      {
+        tool: "follow_up",
+        input: {
+          what: "Check whether the retry fix shipped",
+          at: kigaliMinute(when),
+        },
+      },
+      { text: "I'll bring it back at that time." },
+    ]);
+    env.ctx.models = { main: model, fast: model };
+    await env.call("POST", "/v1/conversations", {
+      token: sam.token,
+      body: { message: "Remind me in ten minutes to check the retry fix" },
+    });
+    env.ctx.models = null;
+
+    const autos = (
+      await env.call("GET", "/v1/automations", { token: sam.token })
+    ).body;
+    const check = autos.find((a: any) => a.kind === "check");
+    expect(new Date(check.nextRunAt).getTime()).toBeLessThanOrEqual(wakes);
+    const open = (await env.call("GET", "/v1/attention", { token: sam.token }))
+      .body;
+    expect(open.some((i: any) => i.kind === "follow_up")).toBe(false);
+    const glance = scriptedModel([{ text: "Morning." }]);
+    env.ctx.models = { main: glance.model, fast: glance.model };
+    await env.call("POST", "/v1/conversations", {
+      token: sam.token,
+      body: { message: "Morning" },
+    });
+    env.ctx.models = null;
+    expect(JSON.stringify(glance.prompts[0].prompt.at(-1))).toContain(
+      "follow-ups you'll bring back: Check whether the retry fix shipped"
+    );
+
+    await mentionSam();
+    expect((await runCheck()).status).toBe("delivered");
+    // A scheduled check before then still comes back at that minute, not half an hour on.
+    await runAutomation(
+      env.ctx,
+      (await findAutomationById(env.ctx.db, { id: check.id }))!
+    );
+    const next = (
+      await env.call("GET", "/v1/automations", { token: sam.token })
+    ).body.find((a: any) => a.id === check.id);
+    expect(new Date(next.nextRunAt).getTime()).toBe(wakes);
+
+    env.ctx.now = () => new Date(when.getTime() + 60_000);
+    const back = await runCheck();
+    expect(back).toMatchObject({ status: "delivered" });
+    const inbox = (
+      await env.call("GET", "/v1/conversations", { token: sam.token })
+    ).body.find((c: any) => c.inbox);
+    const thread = (
+      await env.call("GET", `/v1/conversations/${inbox.id}`, {
+        token: sam.token,
+      })
+    ).body;
+    const last = thread.messages.at(-1).text;
+    expect(last).toContain("Follow up: Check whether the retry fix shipped");
+    expect(last).toContain("You asked me to bring this back now");
+  });
+
+  test("a follow-up still comes when the gap after the last ping holds everything else back, and a snoozed one comes back again", async () => {
+    const { owner, sam, runCheck, mentionSam } = await team();
+    await env.call("PATCH", "/v1/me", {
+      token: sam.token,
+      body: {
+        settings: {
+          activeHours: { start: "00:00", end: "23:59" },
+          notify: { minGapMinutes: 90 },
+        },
+      },
+    });
+    const now = Date.now();
+    env.ctx.now = () => new Date(now);
+    const { model } = scriptedModel([
+      {
+        tool: "follow_up",
+        input: {
+          what: "Send the retry design doc",
+          at: kigaliMinute(new Date(now + 10 * 60_000)),
+        },
+      },
+      { text: "Will do." },
+    ]);
+    env.ctx.models = { main: model, fast: model };
+    await env.call("POST", "/v1/conversations", {
+      token: sam.token,
+      body: { message: "Remind me in ten minutes to send the doc" },
+    });
+    env.ctx.models = null;
+    await mentionSam();
+    expect((await runCheck()).status).toBe("delivered");
+
+    env.ctx.now = () => new Date(now + 11 * 60_000);
+    const ana = await env.teammate(owner.token, "Ana");
+    await mentionSam(ana.token);
+    const run = await runCheck();
+    expect(run).toMatchObject({ status: "delivered" });
+    expect(run.summary).toContain("Pushed 1");
+    const items = (await env.call("GET", "/v1/attention", { token: sam.token }))
+      .body;
+    const followUp = items.find((i: any) => i.kind === "follow_up");
+    expect(followUp.disposition).toBe("push");
+    // Held for the next check after the gap, not decided.
+    expect(
+      items.filter((i: any) => i.kind !== "follow_up" && i.disposition === null)
+    ).toHaveLength(1);
+
+    await env.call("PATCH", `/v1/attention/${followUp.id}`, {
+      token: sam.token,
+      body: {
+        state: "snoozed",
+        snoozedUntil: new Date(now + 3 * 3_600_000).toISOString(),
+      },
+    });
+    env.ctx.now = () => new Date(now + 3 * 3_600_000 + 60_000);
+    const again = await runCheck();
+    expect(again).toMatchObject({ status: "delivered" });
+    const inbox = (
+      await env.call("GET", "/v1/conversations", { token: sam.token })
+    ).body.find((c: any) => c.inbox);
+    const thread = (
+      await env.call("GET", `/v1/conversations/${inbox.id}`, {
+        token: sam.token,
+      })
+    ).body;
+    expect(thread.messages.at(-1).text).toContain(
+      "Follow up: Send the retry design doc"
+    );
   });
 });

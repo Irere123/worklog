@@ -21,12 +21,18 @@ export function workSnapshotTool(scope: Scope) {
         .optional()
         .describe("How far back to look for activity (default 7)"),
     }),
-    execute: safe(async ({ person, days }) => {
-      const m = await resolveMember(ctx, owner, person);
-      return await workSnapshot(ctx, m, {
-        includePrivate: includesPrivate(scope, m),
-        days,
-      });
-    }),
+    execute: safe(
+      async ({ person, days }) => {
+        const m = await resolveMember(ctx, owner, person);
+        return await workSnapshot(ctx, m, {
+          includePrivate: includesPrivate(scope, m),
+          days,
+        });
+      },
+      {
+        notFound:
+          "Use team_directory to find the person's handle, then try again.",
+      }
+    ),
   });
 }

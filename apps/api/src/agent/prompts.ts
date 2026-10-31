@@ -7,10 +7,13 @@ import consolidate from "./prompts/consolidate.md" with { type: "text" };
 import constitution from "./prompts/constitution.md" with { type: "text" };
 import conversation from "./prompts/conversation.md" with { type: "text" };
 import custom from "./prompts/custom.md" with { type: "text" };
+import helper from "./prompts/helper.md" with { type: "text" };
+import learn from "./prompts/learn.md" with { type: "text" };
 import log from "./prompts/log.md" with { type: "text" };
 import memoryPage from "./prompts/memory-page.md" with { type: "text" };
 import owner from "./prompts/owner.md" with { type: "text" };
 import reconcile from "./prompts/reconcile.md" with { type: "text" };
+import review from "./prompts/review.md" with { type: "text" };
 import teammate from "./prompts/teammate.md" with { type: "text" };
 import untrusted from "./prompts/untrusted.md" with { type: "text" };
 
@@ -24,10 +27,13 @@ const PROMPTS = {
   consolidate,
   conversation,
   custom,
+  helper,
+  learn,
   log,
   "memory-page": memoryPage,
   owner,
   reconcile,
+  review,
   teammate,
 } as const;
 

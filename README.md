@@ -13,7 +13,7 @@ Work is scattered across GitHub, Slack, Discord and calls, and agents now do a g
 - **One activity stream.** GitHub, Gitea, Slack, Discord, any webhook, manual logs and agents become one feed, deduplicated, credited to the right person and filtered for noise. GitHub and Slack install with one click and bring their recent history with them.
 - **A board that stays honest.** [Fizzy](https://fizzy.do)-style cards with golden tickets instead of priorities. Untouched cards drift away.
 - **Attention that respects your time.** Pings only for what's blocked on you, within a daily budget. Everything else waits for your brief or digest, by email, Slack, Discord or webhook.
-- **An assistant that knows your work.** Teammates can ask it about your work while you're away. Private things stay private. It follows a [constitution](apps/api/src/agent/prompts/constitution.md) and the instructions you write for it.
+- **An assistant that knows your work.** Teammates can ask it about your work while you're away. Private things stay private. It learns from what you tell it the same day, comes back when you ask it to ("remind me Thursday"), and stays quiet when there's nothing to say. It follows a [constitution](apps/api/src/agent/prompts/constitution.md) and the instructions you write for it.
 - **Agents as teammates.** Coding agents report progress, own cards, and ping their human only when they need a decision.
 - **Open by design.** One OpenAPI contract and a resumable event stream serve any client.
 

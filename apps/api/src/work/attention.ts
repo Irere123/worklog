@@ -8,6 +8,7 @@ import {
   getAttentionById,
   insertFeedback,
   insertNotification,
+  listActedKinds,
   listAttentionByState,
   listOpenAttention,
   listPushedAttention,
@@ -48,7 +49,44 @@ export type AttentionInput = {
   replace?: boolean;
   /** When what raised it happened at its source, for a later resolve to compare with. */
   sourceAt?: Date | null;
+  /** Out of sight until then, like a snoozed item: a follow-up its owner asked for at that time. */
+  wakeAt?: Date | null;
 };
+
+/** Further out than this belongs on the board, not in someone's queue. */
+const FOLLOW_UP_MAX_DAYS = 90;
+
+/**
+ * Something a member asked to have brought back to them at a time they chose. It waits out of
+ * sight until then, and the attention check delivers it when it wakes, whatever the day's budget:
+ * the member asked for it. Only ever raised for the member who asked, never for anyone else.
+ */
+export async function scheduleFollowUp(
+  ctx: AppContext,
+  member: { id: string; workspaceId: string },
+  input: { what: string; at: Date; cardId?: string | null }
+) {
+  const now = ctx.now();
+  if (input.at <= now) {
+    throw badRequest("That time has already passed");
+  }
+  if (input.at.getTime() - now.getTime() > FOLLOW_UP_MAX_DAYS * DAY_MS) {
+    throw badRequest(
+      `A follow-up can be at most ${FOLLOW_UP_MAX_DAYS} days ahead`
+    );
+  }
+  return await raiseAttention(ctx, {
+    workspaceId: member.workspaceId,
+    memberId: member.id,
+    kind: "follow_up",
+    title: `Follow up: ${input.what.slice(0, 120)}`,
+    body: input.what,
+    cardId: input.cardId ?? null,
+    priority: "high",
+    dedupeKey: `follow_up:${generateId()}`,
+    wakeAt: input.at,
+  });
+}
 
 /** How many high-priority items one sender may raise for one person per day; the rest become normal. */
 const SENDER_HIGH_QUOTA = { human: 2, agent: 1 } as const;
@@ -79,6 +117,9 @@ export async function raiseAttention(
         actions: input.actions ?? null,
         meta: input.meta ?? null,
         sourceAt: input.sourceAt ?? null,
+        ...(input.wakeAt
+          ? { state: "snoozed" as const, snoozedUntil: input.wakeAt }
+          : {}),
         createdAt: now,
         updatedAt: now,
       },
@@ -92,7 +133,7 @@ export async function raiseAttention(
     if (row.priority === "high") {
       await setCheckDueBy(tx.db, {
         memberId: input.memberId,
-        at: new Date(now.getTime() + URGENT_DEBOUNCE_MS),
+        at: input.wakeAt ?? new Date(now.getTime() + URGENT_DEBOUNCE_MS),
       });
     }
     await tx.bus.publish({
@@ -156,6 +197,10 @@ export async function updateAttention(
         patch.state === "snoozed" ? (patch.snoozedUntil ?? null) : null,
       resolvedAt: resolved ? ctx.now() : null,
       ...(patch.state === "done" ? { actedAt: ctx.now() } : {}),
+      // Snoozing asks for it back later: when it wakes, the check decides afresh whether to push it.
+      ...(patch.state === "snoozed"
+        ? { consideredAt: null, disposition: null, reason: null }
+        : {}),
       updatedAt: ctx.now(),
     },
   });
@@ -270,25 +315,62 @@ export async function giveFeedback(
   return { kind: item.kind, muted: muted.has(item.kind) };
 }
 
+/** The last this many pings of one kind all dismissed, none acted on, say the same as "not useful". */
+const DISMISSED_TO_MUTE = 3;
+
+/**
+ * The kinds of ping a member doesn't want pushed, with why, from the last two weeks: what they said
+ * ("less like this", or "not useful" three times), and what they did (dismissed the last few
+ * without acting on any). It only ever holds pings for the digest, never drops them, and one ping
+ * marked useful or acted on undoes it.
+ */
 export async function mutedKinds(
   ctx: AppContext,
   memberId: string
-): Promise<Set<string>> {
-  const rows = await countFeedbackByKind(ctx.db, {
-    memberId,
-    since: new Date(ctx.now().getTime() - 14 * DAY_MS),
-  });
+): Promise<Map<string, string>> {
+  const since = new Date(ctx.now().getTime() - 14 * DAY_MS);
+  const [rows, pushed, acted] = await Promise.all([
+    countFeedbackByKind(ctx.db, { memberId, since }),
+    listPushedAttention(ctx.db, { memberId, since }),
+    listActedKinds(ctx.db, { memberId, since }),
+  ]);
+  const actedOn = new Set(acted);
   const byKind = new Map<string, Record<string, number>>();
   for (const r of rows) {
     byKind.set(r.kind, { ...byKind.get(r.kind), [r.signal]: r.n });
   }
-  const muted = new Set<string>();
+  const muted = new Map<string, string>();
   for (const [kind, s] of byKind) {
     if ((s.useful ?? 0) > 0) {
       continue;
     }
     if ((s.less_like_this ?? 0) >= 1 || (s.not_useful ?? 0) >= 3) {
-      muted.add(kind);
+      muted.set(
+        kind,
+        "You marked pings like this as not useful — kept for your digest"
+      );
+    }
+  }
+  const outcomes = new Map<string, typeof pushed>();
+  for (const p of pushed) {
+    outcomes.set(p.kind, [...(outcomes.get(p.kind) ?? []), p]);
+  }
+  for (const [kind, items] of outcomes) {
+    const latest = items
+      .toSorted(
+        (a, b) => (b.pushedAt?.getTime() ?? 0) - (a.pushedAt?.getTime() ?? 0)
+      )
+      .slice(0, DISMISSED_TO_MUTE);
+    const dismissed =
+      latest.length === DISMISSED_TO_MUTE &&
+      latest.every((p) => p.state === "dismissed");
+    const useful = (byKind.get(kind)?.useful ?? 0) > 0;
+    if (!actedOn.has(kind) && !useful && dismissed) {
+      muted.set(
+        kind,
+        muted.get(kind) ??
+          "You dismissed the last pings like this without acting on them — kept for your digest"
+      );
     }
   }
   return muted;
@@ -326,7 +408,7 @@ export async function attentionMetrics(
     dismissalRate: pushedItems.length ? dismissed / pushedItems.length : null,
     feedback: fb,
     precision: rated ? fb.useful / rated : null,
-    mutedKinds: [...muted],
+    mutedKinds: [...muted.keys()],
   };
 }
 

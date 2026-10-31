@@ -931,11 +931,37 @@ export const conversations = pgTable(
     /** Summary of the messages up to `recapThroughSeq`, which are no longer replayed to the model. */
     recap: text("recap"),
     recapThroughSeq: integer("recap_through_seq").notNull().default(0),
+    /** The last message the assistant has learned from, once the conversation went quiet. */
+    learnedThroughSeq: integer("learned_through_seq").notNull().default(0),
+    /**
+     * The memory page the conversation's instructions carry, kept as it was until the next summary
+     * so the prompt's cached start doesn't change under it; null until the first turn takes it.
+     */
+    memoryPage: text("memory_page"),
+    /** How far the conversation has been told about memory changing since its page was taken. */
+    memorySeenAt: ts("memory_seen_at"),
+    /** When a client last had the prompt prepared ahead of a message, to warm the provider's cache. */
+    warmedAt: ts("warmed_at"),
+    /** Set while a turn runs, so turns take their turn; a lease, in case the process dies mid-turn. */
+    turnUntil: ts("turn_until"),
+    /** Set to a running turn's lease to ask it to stop; the turn checks while it waits on the model. */
+    turnStopUntil: ts("turn_stop_until"),
+    /** Who's waiting for a turn, in the order they came: `<ms since epoch>:<id>`. */
+    turnQueue: text("turn_queue")
+      .array()
+      .notNull()
+      .default(sql`'{}'::text[]`),
     createdAt: createdAt(),
     updatedAt: ts("updated_at").notNull().defaultNow(),
   },
   (t) => [index("conversations_asker_idx").on(t.askerId, t.updatedAt)]
 );
+
+export type TurnUsage = {
+  inputTokens: number;
+  cachedInputTokens: number;
+  outputTokens: number;
+};
 
 export const messages = pgTable(
   "messages",
@@ -950,7 +976,53 @@ export const messages = pgTable(
     content: jsonb("content").$type<unknown>().notNull(),
     /** Null for tool messages. */
     text: text("text"),
+    /** The id the client gave the message it sent, so sending it again gets the same answer. */
+    clientId: text("client_id"),
+    /** On the last message of a turn: what the turn cost, and how much of it the cache served. */
+    usage: jsonb("usage").$type<TurnUsage>(),
     createdAt: createdAt(),
   },
-  (t) => [uniqueIndex("messages_seq_uq").on(t.conversationId, t.seq)]
+  (t) => [
+    uniqueIndex("messages_seq_uq").on(t.conversationId, t.seq),
+    uniqueIndex("messages_client_uq")
+      .on(t.conversationId, t.clientId)
+      .concurrently()
+      .where(sql`${t.clientId} is not null`),
+  ]
+);
+
+export const REPLY_RATINGS = ["helpful", "unhelpful"] as const;
+
+/**
+ * What the person in a conversation thought of one of the assistant's replies. In their own
+ * conversations, owners' ratings are learned from like anything else they say; every rating is
+ * also a case to check prompt and model changes against.
+ */
+export const replyRatings = pgTable(
+  "reply_ratings",
+  {
+    id: text("id").primaryKey(),
+    workspaceId: text("workspace_id")
+      .notNull()
+      .references(() => workspaces.id),
+    conversationId: text("conversation_id")
+      .notNull()
+      .references(() => conversations.id, { onDelete: "cascade" }),
+    messageId: text("message_id")
+      .notNull()
+      .references(() => messages.id, { onDelete: "cascade" }),
+    memberId: text("member_id")
+      .notNull()
+      .references(() => members.id),
+    rating: text("rating", { enum: REPLY_RATINGS }).notNull(),
+    note: text("note"),
+    /** When the memory pass read it; a changed rating is read again. */
+    learnedAt: ts("learned_at"),
+    createdAt: createdAt(),
+    updatedAt: ts("updated_at").notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("reply_ratings_message_uq").on(t.messageId, t.memberId),
+    index("reply_ratings_member_idx").on(t.memberId, t.createdAt),
+  ]
 );
