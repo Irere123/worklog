@@ -1,7 +1,8 @@
-// The built-in connectors' identity namespaces ("github", "gitea:<host>", "slack", "discord"):
+// The built-in connectors' identity namespaces ("github", "gitea:<host>", "gitlab:<host>", "slack",
+// "discord"):
 // theirs alone, so a generic connection can't act as their users. A new built-in connector adds
 // its id here (a test checks every registered one is).
-const BUILT_IN = new Set(["github", "gitea", "slack", "discord"]);
+const BUILT_IN = new Set(["github", "gitea", "gitlab", "slack", "discord"]);
 
 // A generic connection's own namespace, used when it names none ("custom:<id>", "webhook:<id>"):
 // another connection taking it would act as its users. Others under those prefixes are free.

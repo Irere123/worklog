@@ -96,6 +96,7 @@ export const connectionRoutes = router()
         "Pick a connector from `GET /v1/connectors`. Secrets are encrypted at rest and never returned; the response includes the webhook URL(s) to paste into the tool.",
         "- **github**: secrets `webhookSecret`; settings `boardId` (issues become cards), `repos`, `bots`, `ignoreKinds`.",
         "- **gitea** (self-hosted Gitea/Forgejo): same as GitHub plus `baseUrl`.",
+        "- **gitlab** (GitLab.com or self-managed): secrets `webhookSecret`, or a `token` and Worklog creates the webhooks; settings `baseUrl` (default gitlab.com), `boardId`, `repos` (projects), `bots`, `ignoreKinds`.",
         "- **slack**: secrets `signingSecret`, `botToken`; settings `channels` (work-update channels), `channelNames`, `teamUrl`.",
         "- **discord**: secrets `publicKey`, `applicationId`, `botToken`; then `POST /v1/connections/{id}/discord/commands`.",
         "- **webhook**: any tool — map its webhooks with rules in `settings` (no code).",

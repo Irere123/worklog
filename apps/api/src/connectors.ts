@@ -1,6 +1,7 @@
 import { customConnector } from "./connectors/custom";
 import { discordConnector } from "./connectors/discord";
 import { giteaConnector, githubConnector } from "./connectors/github";
+import { gitlabConnector } from "./connectors/gitlab";
 import { slackConnector } from "./connectors/slack";
 import type { Connector } from "./connectors/types";
 import { webhookConnector } from "./connectors/webhook";
@@ -17,6 +18,7 @@ export function registerConnector(connector: Connector) {
 for (const c of [
   githubConnector,
   giteaConnector,
+  gitlabConnector,
   slackConnector,
   discordConnector,
   webhookConnector,

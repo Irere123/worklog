@@ -59,7 +59,7 @@ export const identityRoutes = router()
       summary:
         "Link an account in a connected tool to this member; its past activity is re-attributed",
       description:
-        "Signing in with GitHub, Slack or Discord links those accounts automatically. Use this for other tools (self-hosted forges, custom connections) or before someone signs in. `provider` is the identity namespace (`github`, `slack`, `discord`, `gitea:git.example.com`…).",
+        "Signing in with GitHub, Slack or Discord links those accounts automatically. Use this for other tools (self-hosted forges, custom connections) or before someone signs in. `provider` is the identity namespace (`github`, `slack`, `discord`, `gitea:git.example.com`, `gitlab:gitlab.com`…).",
       request: { params: MemberRef, ...body(LinkIdentityRequest) },
       responses: { 201: json(IdentityLinkedResponse, "Linked"), ...errors },
     }),

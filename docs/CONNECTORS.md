@@ -10,7 +10,8 @@ Everything Worklog does depends on the activity stream: the board, briefs, "what
 | **Slack** | Work updates from the channels you choose, @mentions, edits and deletes; `/log`, `/worklog`, and `@worklog` in any thread. People are linked by their Slack email. | The server's Slack app (one click), or your own app's secrets |
 | **Discord** | Work updates from the channels you choose and @mentions (through the server's app); `/log`, `/now`, `/ask`, `/brief`; delivery of briefs to a channel. | The server's Discord app (one click), or your own app's secrets (commands only) |
 | **Gitea / Forgejo** | Same as GitHub, for self-hosted forges. Recent history and a daily catch-up with a token. | A bot user's token: Worklog creates the webhooks. Or a webhook + secret |
-| **Anything with webhooks** | Map payloads to events with rules: GitLab, Sentry, CI, deploy bots. | `webhook` connector, no code |
+| **GitLab** | GitLab.com or self-managed: merge requests, review requests and approvals, issues, comments, pushes and releases. Review requests reach the reviewer; issues can become cards. Recent history and a daily catch-up with a token. | An access token: Worklog creates the webhooks. Or a webhook + secret token |
+| **Anything with webhooks** | Map payloads to events with rules: Sentry, CI, deploy bots. | `webhook` connector, no code |
 | **Your own code** | Push events from scripts and sync jobs. | `custom` connector + an `ingest` key |
 | **Agents** | Progress reports with _working / needs you / finished / failed_. | `POST /v1/activities` |
 
@@ -36,9 +37,11 @@ A provider app has one webhook URL, so each Worklog server registers its own, on
 - Uninstalling on the provider's side revokes the connection, drops its tokens and tells whoever installed it. Its activity stays.
 - On a server with several workspaces, registering an app also takes the setup secret.
 
-## Managed webhooks (Gitea, Forgejo)
+## Managed webhooks (Gitea, Forgejo, GitLab)
 
-Forges have no apps. Give the connection a `token` for a bot user who administers the chosen `repos`, and leave out `webhookSecret`. Worklog creates each repo's webhook itself, with a secret of its own, and the daily catch-up recreates one that's gone and turns one the forge disabled back on. How each hook stands shows in health, as `hook:<repo>`. Gitea and Forgejo refuse to deliver to private addresses by default: a Worklog on the same network needs the forge's `webhook.ALLOWED_HOST_LIST` set.
+These forges have no apps Worklog installs. Give the connection a `token` for a bot user who administers the chosen `repos` (on GitLab, an access token with `api` scope from a maintainer of the projects: a personal, project or group access token), and leave out `webhookSecret`. Worklog creates each repo's webhook itself, with a secret of its own, and the daily catch-up recreates one that's gone and turns one the forge disabled back on. How each hook stands shows in health, as `hook:<repo>`. Gitea and Forgejo refuse to deliver to private addresses by default: a Worklog on the same network needs the forge's `webhook.ALLOWED_HOST_LIST` set; self-managed GitLab needs "Allow requests to the local network from webhooks" (Admin → Settings → Network → Outbound requests). On GitLab, `GET /v1/connections/{id}/sources` lists the projects the token maintains.
+
+**GitLab** (`provider: "gitlab"`): set `baseUrl` for self-managed (it defaults to `https://gitlab.com` and namespaces identities as `gitlab:<host>`). Without a token, add a project webhook pointing at the connection's URL with its `webhookSecret` as the secret token, and tick push, merge request, comment, issue and release events. Merge requests key as `group/project!5` and issues as `group/project#5`, because GitLab numbers them separately.
 
 ## The pipeline
 
@@ -121,6 +124,13 @@ Every connector emits `WorklogEvent`s (`apps/api/src/connectors/types.ts`). The 
   - issues become cards in Maybe? when the connection has a `boardId` (it must be one of the workspace's boards in use; once archived it takes no more cards).
 - **@mentions by login** reach the account last seen with that login, as well as one linked by login.
 
+**GitLab:** the same effects as GitHub, under GitLab's names:
+
+- **Dropped:** draft merge requests, edits, labels and other updates; system notes, internal notes and confidential issues (their visibility is narrower than the project's); comments on commits and snippets; tag pushes and branch deletions; merge commits on the default branch; pipelines.
+- **Approvals** count as reviews: they resolve the approver's review request and tell the author. One approval GitLab reports twice ("approval", then "approved" once the rules are met) is one event.
+- **Reviewers and assignees added** in an update become review requests and assignments; reviewers removed resolve their requests. A draft marked ready counts as the merge request being opened.
+- **Bots:** project and group access tokens (`project_<id>_bot…`, `group_<id>_bot…`) and usernames ending in `-bot` or `_bot`.
+
 **Slack:**
 
 - DMs are never ingested.
@@ -136,6 +146,7 @@ Every connector emits `WorklogEvent`s (`apps/api/src/connectors/types.ts`). The 
 
 - **GitHub** (an app installation, or a connection's `token`): PRs, reviews and their inline comments, issue and PR comments, issues, releases, and pushes (the 100 most recent per repo per run, from the repository's activity, each with its commits).
 - **Gitea and Forgejo** (a connection's `token`, for a bot user who administers `repos`): issues, PRs, comments, releases, and pushes from the repository's activity feed (Gitea and Forgejo 1.21 and later). Their review webhooks are mapped live; the API's reviews aren't read back.
+- **GitLab** (a connection's `token`): merge requests (opened, merged, closed), issues, releases, and pushes from each project's events. Comments and approvals come from webhooks only: GitLab lists comments per merge request or issue, which would cost a request for each.
 - **Slack:** the chosen channels' messages, the replies in threads they started, and new replies in the 200 most recent threads it has seen with replies, however old their first message.
 - **From webhooks only:** replies in a Slack thread the sync never saw with replies.
 
@@ -155,7 +166,7 @@ Every connector emits `WorklogEvent`s (`apps/api/src/connectors/types.ts`). The 
 
 ### 1. No code: the `webhook` connector
 
-For any tool that sends webhooks (self-hosted GitLab, Sentry, Jenkins, a deploy bot):
+For any tool that sends webhooks (Sentry, Jenkins, a deploy bot). The example maps a GitLab event by hand to show how rules read; GitLab itself has a connector of its own.
 
 ```jsonc
 POST /v1/connections
@@ -167,7 +178,7 @@ POST /v1/connections
     "verify": { "type": "token", "header": "X-Gitlab-Token" },  // or hmac-sha256 | standard-webhooks
     "eventType": { "header": "X-Gitlab-Event" },
     "deliveryId": { "header": "X-Gitlab-Event-UUID" },
-    "identityNamespace": "gitlab:git.example.com",
+    "identityNamespace": "forge:git.example.com", // built-in namespaces (github, gitlab:…) are reserved
     "rules": [{
       "when": { "eventType": "Merge Request Hook", "equals": { "object_attributes.action": "merge" } },
       "emit": {

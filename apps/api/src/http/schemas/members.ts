@@ -216,7 +216,7 @@ export const Identity = z
     }),
     provider: z.string().openapi({
       description:
-        'Identity namespace, e.g. "github", "slack", "gitea:git.example.com"',
+        'Identity namespace, e.g. "github", "slack", "gitea:git.example.com", "gitlab:gitlab.com"',
     }),
     externalId: z.string(),
     externalHandle: z.string().nullable(),

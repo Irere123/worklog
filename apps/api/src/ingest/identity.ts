@@ -523,11 +523,11 @@ export async function linkByHandle(
     handle?: string | null;
   }
 ) {
-  // A GitHub-style login passed as the id (non-numeric) is really a handle.
+  // A forge login passed as the id (non-numeric) is really a handle.
   const link =
     input.externalId &&
     !input.handle &&
-    /^(?:github|gitea)/u.test(input.provider) &&
+    /^(?:github|gitea|gitlab)/u.test(input.provider) &&
     !/^\d+$/u.test(input.externalId)
       ? { ...input, handle: input.externalId, externalId: null }
       : input;

@@ -971,14 +971,15 @@ describe("ingestion pipeline", () => {
 });
 
 describe("custom integrations", () => {
-  test("a no-code webhook connection maps a self-hosted GitLab merge into the stream", async () => {
+  test("a no-code webhook connection maps a forge it has no connector for into the stream", async () => {
     const owner = await env.workspace();
     const sam = await env.teammate(owner.token, "Sam");
     const settings = {
       verify: { type: "token", header: "X-Gitlab-Token" },
       eventType: { header: "X-Gitlab-Event" },
       deliveryId: { header: "X-Gitlab-Event-UUID" },
-      identityNamespace: "gitlab:git.example.com",
+      // GitLab has its own connector, whose namespace is reserved: a hand-mapped forge takes its own.
+      identityNamespace: "forge:git.example.com",
       rules: [
         {
           when: {
@@ -1016,7 +1017,7 @@ describe("custom integrations", () => {
     ).body;
     await env.call("POST", `/v1/members/${sam.member.id}/identities`, {
       token: sam.token,
-      body: { provider: "gitlab:git.example.com", handle: "sam" },
+      body: { provider: "forge:git.example.com", handle: "sam" },
     });
     const body = JSON.stringify({
       object_kind: "merge_request",

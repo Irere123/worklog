@@ -10,7 +10,7 @@ See what everyone is working on · know what needs _you_ · ask anyone's assista
 
 Work is scattered across GitHub, Slack, Discord and calls, and agents now do a growing share of it. Worklog pulls the signal into one place, keeps a living board, tells you only what's blocked on you, and gives everyone an assistant that knows their work.
 
-- **One activity stream.** GitHub, Gitea, Slack, Discord, any webhook, manual logs and agents become one feed, deduplicated, credited to the right person and filtered for noise. GitHub and Slack install with one click and bring their recent history with them.
+- **One activity stream.** GitHub, GitLab, Gitea, Slack, Discord, any webhook, manual logs and agents become one feed, deduplicated, credited to the right person and filtered for noise. GitHub and Slack install with one click and bring their recent history with them.
 - **A board that stays honest.** [Fizzy](https://fizzy.do)-style cards with golden tickets instead of priorities. Untouched cards drift away.
 - **Attention that respects your time.** Pings only for what's blocked on you, within a daily budget. Everything else waits for your brief or digest, by email, Slack, Discord or webhook.
 - **An assistant that knows your work.** Teammates can ask it about your work while you're away. Private things stay private. It learns from what you tell it the same day, comes back when you ask it to ("remind me Thursday"), and stays quiet when there's nothing to say. It follows a [constitution](apps/api/src/agent/prompts/constitution.md) and the instructions you write for it.
@@ -59,6 +59,6 @@ AI is optional. Set `OPENROUTER_API_KEY` for the assistant and model-written bri
 - [ ] Web app: board, inbox and chat
 - [ ] Mobile app (Expo) with push notifications
 - [ ] MCP server, so coding agents can read the board and log work natively
-- [ ] GitLab connector, voice logs, generated TypeScript SDK
+- [ ] Voice logs, generated TypeScript SDK
 
 Inspired by [Fizzy](https://fizzy.do), [OpenCode](https://github.com/anomalyco/opencode), [OpenClaw](https://github.com/openclaw/openclaw) and [Cursor](https://cursor.com).

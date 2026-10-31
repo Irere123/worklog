@@ -320,7 +320,7 @@ export type Connector = {
     generated?: boolean;
   }[];
   settings: { key: string; description: string }[];
-  /** E.g. "github", or "gitea:git.example.com" for self-hosted. */
+  /** E.g. "github", or "gitea:git.example.com" / "gitlab:gitlab.com" for a forge with many hosts. */
   identityNamespace: (conn: ConnectionView) => string;
   /**
    * Whoever sets the connection up chooses its identity namespace and its event ids (the webhook

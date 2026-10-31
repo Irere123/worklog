@@ -9,7 +9,7 @@
  │ http/hooks.ts /hooks/apps/{provider} (an app's) · /hooks/{connection} (pasted)│
  │ http/oauth.ts install and app-creation redirects; http/auth.ts keys, sessions │
  │                                                                               │
- │ connectors/   GitHub · Gitea · Slack · Discord · webhook (no-code) · custom:  │
+ │ connectors/   GitHub · GitLab · Gitea · Slack · Discord · webhook · custom:   │
  │               receive · normalize · app install · sync · sources · directory  │
  │ ingest/       inbox → lanes → ledger → identity · gates · merge · effects;    │
  │               apps · installs · lifecycle · sync · health · token errors      │
