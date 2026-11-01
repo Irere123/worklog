@@ -203,10 +203,14 @@ export const boardRoutes = router()
       const assignee = q.assignee
         ? await resolveMember(ctx, c.get("member"), q.assignee)
         : null;
+      const addedBy = q.addedBy
+        ? await resolveMember(ctx, c.get("member"), q.addedBy)
+        : null;
       const rows = await board.listCards(ctx, ws(c), {
         boardId: q.board,
         stage: q.stage,
         assigneeId: assignee?.id,
+        createdById: addedBy?.id,
         golden: q.golden === undefined ? undefined : q.golden === "true",
         tag: q.tag,
         q: q.q,

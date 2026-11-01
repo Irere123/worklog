@@ -10,8 +10,9 @@ export const CardNumber = z.object({
   number: z.coerce.number().int().positive().openapi({ example: 42 }),
 });
 
+// One literal per value: the generator publishes a multi-value literal as an enum of its first.
 const Entropy = z
-  .literal([...ENTROPY_DAYS])
+  .union(ENTROPY_DAYS.map((days) => z.literal(days)))
   .nullable()
   .openapi({
     description:
@@ -123,6 +124,10 @@ export const ListCardsQuery = z.object({
     .string()
     .optional()
     .openapi({ description: 'Member id, handle or "me"' }),
+  addedBy: z
+    .string()
+    .optional()
+    .openapi({ description: 'Who added the card: member id, handle or "me"' }),
   golden: z.enum(["true", "false"]).optional(),
   tag: z.string().optional(),
   q: z.string().optional(),

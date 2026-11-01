@@ -40,6 +40,44 @@ describe("board (Fizzy rules)", () => {
     expect(b.body.number).toBe(2);
   });
 
+  test("cards can be listed by who added them and who they're assigned to", async () => {
+    const { token, board, member } = await boardSetup();
+    const sam = await env.teammate(token, "Sam");
+    await env.call("POST", "/v1/cards", {
+      token,
+      body: { boardId: board.id, title: "Mine" },
+    });
+    await env.call("POST", "/v1/cards", {
+      token: sam.token,
+      body: { boardId: board.id, title: "Sam's", assigneeIds: [member.id] },
+    });
+    const titles = async (query: string) =>
+      (await env.call("GET", `/v1/cards?${query}`, { token })).body.map(
+        (c: { title: string }) => c.title
+      );
+
+    expect(await titles("addedBy=me")).toEqual(["Mine"]);
+    expect(await titles(`addedBy=${sam.member.handle}`)).toEqual(["Sam's"]);
+    expect(await titles("assignee=me")).toEqual(["Sam's"]);
+  });
+
+  test("pins live in a person's settings, so they follow them to every device", async () => {
+    const { token } = await boardSetup();
+    const saved = await env.call("PATCH", "/v1/me", {
+      token,
+      body: { settings: { pins: [3, 1] } },
+    });
+    expect(saved.status).toBe(200);
+    const me = await env.call("GET", "/v1/me", { token });
+    expect(me.body.member.settings.pins).toEqual([3, 1]);
+
+    const tooMany = await env.call("PATCH", "/v1/me", {
+      token,
+      body: { settings: { pins: Array.from({ length: 51 }, (_, i) => i + 1) } },
+    });
+    expect(tooMany.status).toBe(400);
+  });
+
   test("a card moves through triage → column → not now → back → done → reopen", async () => {
     const { token, board } = await boardSetup();
     const doing = board.columns.find((c: any) => c.name === "Doing");
