@@ -12,6 +12,7 @@ import type { Member } from "#db/queries/members";
 import { getWorkspaceById } from "#db/queries/workspaces";
 import type { Visibility } from "#db/schema";
 import { generateId } from "#lib/ids";
+import { plural } from "#lib/text";
 import { localParts, startOfLocalDay, timezoneOf } from "#lib/time";
 import { teamVisibleAttention } from "#work/attention";
 import { listCards } from "#work/board";
@@ -262,10 +263,8 @@ export function templateBrief(data: BriefData): string {
   }
   out.push("## You");
   if (data.you.did.length) {
-    for (const d of data.you.did.slice(0, 12)) {
-      out.push(
-        `- ${d.title}${d.detail && d.detail !== d.title ? ` — ${d.detail}` : ""}`
-      );
+    for (const line of collapse(data.you.did).slice(0, 12)) {
+      out.push(`- ${line}`);
     }
   } else {
     out.push(
@@ -287,7 +286,7 @@ export function templateBrief(data: BriefData): string {
     out.push("## Team");
     for (const p of data.team) {
       out.push(
-        `- **${p.name}**${p.kind === "agent" ? " (agent)" : ""}: ${p.did.map((d) => d.title).join("; ")}`
+        `- **${p.name}**${p.kind === "agent" ? " (agent)" : ""}: ${[...new Set(p.did.map((d) => d.title))].join("; ")}`
       );
     }
   }
@@ -299,10 +298,27 @@ export function templateBrief(data: BriefData): string {
       );
     }
     if (data.board.newInMaybe) {
-      out.push(`- ${data.board.newInMaybe} new card(s) waiting in Maybe?`);
+      out.push(
+        `- ${plural(data.board.newInMaybe, "new card")} waiting in Maybe?`
+      );
     }
   }
   return out.join("\n");
+}
+
+// A card touched three times is one line with three changes, not three lines with one title.
+function collapse(did: { title: string; detail: string | null }[]) {
+  const byTitle = new Map<string, string[]>();
+  for (const d of did) {
+    const details = byTitle.get(d.title) ?? [];
+    if (d.detail && d.detail !== d.title && !details.includes(d.detail)) {
+      details.push(d.detail);
+    }
+    byTitle.set(d.title, details);
+  }
+  return [...byTitle].map(([title, details]) =>
+    details.length ? `${title} — ${details.join(" · ")}` : title
+  );
 }
 
 /** Nothing anyone did and nothing waiting: a brief would only say so, so a scheduled one stays quiet. */

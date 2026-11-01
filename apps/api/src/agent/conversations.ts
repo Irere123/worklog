@@ -116,6 +116,19 @@ export function isModelMessage(value: unknown): value is ModelMessage {
 // folds the older part into a recap once the conversation goes quiet. The conversation row is
 // locked while sequence numbers are assigned, so a brief landing mid-turn can't collide with a turn
 // after the model call was already paid for.
+const TITLE_MAX = 60;
+
+/** What the person first asked, flattened and cut at a word, as the conversation's name. */
+export function titleFrom(text: string) {
+  const flat = text.replaceAll(/\s+/gu, " ").trim();
+  if (flat.length <= TITLE_MAX) {
+    return flat;
+  }
+  const cut = flat.slice(0, TITLE_MAX);
+  const space = cut.lastIndexOf(" ");
+  return `${(space > TITLE_MAX / 2 ? cut.slice(0, space) : cut).trimEnd()}…`;
+}
+
 export async function appendMessages(
   ctx: AppContext,
   conversation: ConversationRow,
@@ -160,10 +173,16 @@ export async function appendMessages(
       };
     });
     await insertMessages(tx.db, inserted);
+    const opening = inserted.find((m) => m.role === "user")?.text;
     await updateConversationById(tx.db, {
       id: conversation.id,
       set: {
         updatedAt: tx.now(),
+        // Named once, after what the person first asked, so a list of conversations can be told
+        // apart; later turns never rename it.
+        ...(next === 1 && conversation.title === null && opening
+          ? { title: titleFrom(opening) }
+          : {}),
         ...(opts.memory
           ? {
               memorySeenAt: opts.memory.seenAt,

@@ -14,6 +14,7 @@ import {
 import type { AttentionItem } from "#db/queries/attention";
 import type { Automation, AutomationRun } from "#db/queries/automations";
 import type { Member } from "#db/queries/members";
+import { plural } from "#lib/text";
 import { startOfLocalDay } from "#lib/time";
 import {
   markConsidered,
@@ -181,7 +182,7 @@ export async function runBrief(
   );
   return {
     status: "delivered",
-    summary: `${brief.title} → inbox + ${delivered.length} target(s)${failed.length ? `, ${failed.length} failed` : ""}`,
+    summary: `${brief.title} → inbox + ${plural(delivered.length, "target")}${failed.length ? `, ${failed.length} failed` : ""}`,
   };
 }
 
@@ -205,14 +206,14 @@ export async function runDigest(
     ctx,
     items.map((i) => i.id)
   );
-  return { status: "delivered", summary: `${items.length} item(s)` };
+  return { status: "delivered", summary: plural(items.length, "item") };
 }
 
 function digest(shown: AttentionItem[]): Message {
   return {
     subject: "Your Worklog digest",
     markdown: [
-      `${shown.length} thing(s) since your last update:`,
+      `${plural(shown.length, "thing")} since your last update:`,
       ...shown.slice(0, 20).map(digestLine),
       shown.length > 20 ? `…and ${shown.length - 20} more in Worklog.` : "",
     ]
@@ -309,7 +310,7 @@ export async function runCheck(
       await markConsidered(ctx, decisions);
       return {
         status: "quiet",
-        summary: `Holding ${candidates.length} urgent item(s) until the ${limits.minGapMinutes}-minute gap passes`,
+        summary: `Holding ${plural(candidates.length, "urgent item")} until the ${limits.minGapMinutes}-minute gap passes`,
       };
     }
     if (budget === "hold") {
@@ -445,7 +446,7 @@ async function pushDecided(
   if (!first) {
     return {
       status: "quiet",
-      summary: `Considered ${decisions.length} item(s); nothing worth interrupting for`,
+      summary: `Considered ${plural(decisions.length, "item")}; nothing worth interrupting for`,
     };
   }
   await send(ctx, automation, member, ping(rows), async () => {

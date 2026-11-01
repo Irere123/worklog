@@ -41,6 +41,7 @@ import {
   createConversation,
   getConversation,
   loadHistory,
+  titleFrom,
 } from "./conversations";
 import {
   assistantInstructions,
@@ -103,7 +104,7 @@ async function openConversation(
   }
   if (input.agent) {
     return await createConversation(ctx, input.agent, asker, {
-      title: input.message.slice(0, 80),
+      title: titleFrom(input.message),
     });
   }
   throw badRequest("Say which conversation or agent this is for");

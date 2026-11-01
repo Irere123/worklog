@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import type { Connector, WorklogEvent } from "#connectors/types";
+import { plural } from "#lib/text";
 
 import { chosenNamespace } from "./namespaces";
 
@@ -115,7 +116,7 @@ export const customConnector: Connector = {
     return {
       events,
       ignored: invalid.length
-        ? `${invalid.length} invalid event(s): ${invalid[0]}`
+        ? `${plural(invalid.length, "invalid event")}: ${invalid[0]}`
         : undefined,
     };
   },

@@ -45,6 +45,26 @@ describe("assistant", () => {
     expect(res.body.reply).toContain("OPENROUTER_API_KEY");
   });
 
+  test("a conversation is named after the first thing asked in it, once", async () => {
+    const { token } = await env.workspace();
+    const opened = await env.call("POST", "/v1/conversations", {
+      token,
+      body: {
+        message:
+          "What did the team ship   this week, and is anything blocked on the referral rollout?",
+      },
+    });
+    const { id } = opened.body.conversation;
+    await env.call("POST", `/v1/conversations/${id}/messages`, {
+      token,
+      body: { message: "And last week?" },
+    });
+    const res = await env.call("GET", `/v1/conversations/${id}`, { token });
+    expect(res.body.title).toBe(
+      "What did the team ship this week, and is anything blocked…"
+    );
+  });
+
   test("owner mode: looks things up with tools, answers, and keeps an append-only history", async () => {
     const owner = await env.workspace();
     const { model, prompts } = scriptedModel([

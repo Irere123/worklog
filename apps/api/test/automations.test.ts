@@ -194,6 +194,40 @@ describe("automations", () => {
     expect(withNews).toMatchObject({ status: "delivered" });
   });
 
+  test("a card touched several times is one line in the brief, with each change", async () => {
+    const { token, member } = await env.workspace();
+    const board = (
+      await env.call("POST", "/v1/boards", {
+        token,
+        body: { name: "Ops", columns: ["Doing"] },
+      })
+    ).body;
+    const card = (
+      await env.call("POST", "/v1/cards", {
+        token,
+        body: { boardId: board.id, title: "Rotate the keys" },
+      })
+    ).body;
+    await env.call("POST", `/v1/cards/${card.number}/triage`, {
+      token,
+      body: { columnId: board.columns[0].id },
+    });
+    await env.call("POST", `/v1/cards/${card.number}/assignments`, {
+      token,
+      body: { memberId: member.id },
+    });
+    await env.call("POST", `/v1/cards/${card.number}/closure`, { token });
+
+    const brief = (
+      await env.call("POST", "/v1/briefs", { token, body: { period: "daily" } })
+    ).body;
+    const lines = brief.body
+      .split("\n")
+      .filter((l: string) => l.includes(`#${card.number} Rotate the keys`));
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toContain(" · ");
+  });
+
   test("briefs and custom automations start from the assistant's constitution", async () => {
     const { token } = await env.workspace();
     const { model, prompts } = scriptedModel([
@@ -338,7 +372,7 @@ describe("automations", () => {
     expect(run.body.status).toBe("delivered");
 
     const shared: string = (env.ctx.fetch as any).calls.at(-1).body.markdown;
-    expect(shared).toContain("1 thing(s)");
+    expect(shared).toContain("1 thing since");
     expect(shared).toContain("Sam mentioned you on #1 Retry queue");
     expect(shared).not.toContain("salary bands");
     const inbox = (
@@ -349,7 +383,7 @@ describe("automations", () => {
         token: owner.token,
       })
     ).body.messages.at(-1).text;
-    expect(full).toContain("2 thing(s)");
+    expect(full).toContain("2 things since");
     expect(full).toContain("salary bands");
   });
 
@@ -482,8 +516,21 @@ describe("automations", () => {
       token: owner.token,
       body: { body: `@${sam.member.handle} need your call on this` },
     });
-    const pinged = await run();
+    const seen: { type: string; data: Record<string, unknown> }[] = [];
+    const unsubscribe = env.ctx.bus.subscribe((e) => {
+      if (e.audienceId === sam.member.id) {
+        seen.push(e);
+      }
+    });
+    const pinged = await run().finally(unsubscribe);
     expect(pinged.status).toBe("delivered");
+    // An open tab hears about the ping itself, so it can show it as the one interruption.
+    const sent = seen.find((e) => e.type === "notification.sent");
+    expect(sent?.data).toMatchObject({
+      kind: "push",
+      subject: expect.stringMatching(/^Needs you: /u),
+    });
+    expect(sent?.data.itemIds).toHaveLength(1);
 
     expect((await run()).status).toBe("skipped");
   });
