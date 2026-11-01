@@ -25,7 +25,11 @@ import {
   requestTurnStop,
 } from "#db/queries/conversations";
 import type { ConversationRow } from "#db/queries/conversations";
-import { findMemberById, getPersonalAgent } from "#db/queries/members";
+import {
+  findMemberById,
+  getPersonalAgent,
+  listMembers,
+} from "#db/queries/members";
 import type { Member } from "#db/queries/members";
 import { findVoice } from "#db/queries/voices";
 import { getWorkspaceById } from "#db/queries/workspaces";
@@ -418,12 +422,49 @@ async function openLoops(
 async function offlineReply(
   ctx: AppContext,
   conversation: ConversationRow,
-  owner: Member
+  owner: Member,
+  question: string
 ) {
-  const snapshot = await workSnapshot(ctx, owner, {
-    includePrivate: conversation.mode === "owner",
+  const person = (await namedTeammate(ctx, owner, question)) ?? owner;
+  const snapshot = await workSnapshot(ctx, person, {
+    // Someone else's snapshot is the team's view of them, whoever's assistant is asking.
+    includePrivate: person.id === owner.id && conversation.mode === "owner",
   });
-  return `AI isn't configured on this server yet (set OPENROUTER_API_KEY), so here is ${owner.name}'s current snapshot:\n\n${renderSnapshot(snapshot)}`;
+  return `AI isn't configured on this server yet (set OPENROUTER_API_KEY), so here is ${person.name}'s current snapshot:\n\n${renderSnapshot(snapshot)}`;
+}
+
+/** Without a model, the one thing to read from "What is Jean working on?" is who it's about. */
+async function namedTeammate(ctx: AppContext, owner: Member, question: string) {
+  const text = question.toLowerCase();
+  const everyone = await listMembers(ctx.db, {
+    workspaceId: owner.workspaceId,
+  });
+  return (
+    everyone
+      .filter((m) => m.id !== owner.id)
+      // People before agents: "Jean" means Jean, not "Jean Habimana's assistant".
+      .toSorted(
+        (a, b) => Number(a.kind === "agent") - Number(b.kind === "agent")
+      )
+      .find((m) => namesOf(m).some((name) => mentions(text, name)))
+  );
+}
+
+function namesOf(member: Member) {
+  return [
+    member.name.toLowerCase(),
+    member.name.split(" ")[0]?.toLowerCase() ?? "",
+    `@${member.handle}`,
+  ];
+}
+
+function mentions(text: string, name: string) {
+  return (
+    name.length > 1 &&
+    new RegExp(`(?:^|[^\\p{L}@])${RegExp.escape(name)}(?![\\p{L}])`, "u").test(
+      text
+    )
+  );
 }
 
 // Step limit hit mid-tool-call: record it so the transcript matches what the user saw.
@@ -456,7 +497,7 @@ export async function ask(
       await prepareTurn(ctx, asker, opened, input.message, input.channel);
     const sent = { clientId: input.clientId, said: input.message, memory };
     if (!ctx.models) {
-      const reply = await offlineReply(ctx, conversation, owner);
+      const reply = await offlineReply(ctx, conversation, owner, input.message);
       await appendMessages(
         ctx,
         conversation,
@@ -556,7 +597,7 @@ export async function askStream(
   if (!ctx.models) {
     let reply: string;
     try {
-      reply = await offlineReply(ctx, conversation, owner);
+      reply = await offlineReply(ctx, conversation, owner, input.message);
       await appendMessages(
         ctx,
         conversation,

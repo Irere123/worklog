@@ -101,7 +101,7 @@ export function MyCards({ tab }: { tab: MineTab }) {
           <EmptyState icon={<CardsIcon size={20} />} title="Nothing open">
             {tab === "assigned"
               ? "Cards assigned to you show up here. Press M on a card to take it."
-              : "Cards you add show up here until they're done. Press C to add one."}
+              : "Cards you add show up here until they’re done. Press C to add one."}
           </EmptyState>
         )}
         {groups.map((group) => (

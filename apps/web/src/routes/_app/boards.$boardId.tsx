@@ -5,6 +5,7 @@ import {
   ListBulletsIcon,
   MagnifyingGlassIcon,
   PencilSimpleIcon,
+  TextAlignLeftIcon,
   PlusIcon,
   TimerIcon,
 } from "@phosphor-icons/react";
@@ -105,11 +106,13 @@ function BoardPage() {
               options={[
                 {
                   value: "board",
-                  label: <KanbanIcon size={13} aria-label="Board" />,
+                  label: <KanbanIcon size={13} aria-hidden />,
+                  name: "Board",
                 },
                 {
                   value: "list",
-                  label: <ListBulletsIcon size={13} aria-label="List" />,
+                  label: <ListBulletsIcon size={13} aria-hidden />,
+                  name: "List",
                 },
               ]}
             />
@@ -202,7 +205,7 @@ function BoardMenu({ boardId }: { boardId: string }) {
           Rename…
         </MenuItem>
         <MenuItem
-          icon={<PencilSimpleIcon size={14} />}
+          icon={<TextAlignLeftIcon size={14} />}
           onClick={() => setEditing("description")}
         >
           Edit description…

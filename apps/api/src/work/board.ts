@@ -380,14 +380,13 @@ export async function updateCard(
     if (tagNames) {
       await setTags(tx, actor.workspaceId, card.id, tagNames);
     }
-    const changed = Object.keys(patch).join(", ");
     await recordActivity(tx, {
       workspaceId: actor.workspaceId,
       actorId: actor.id,
       source: "worklog",
       kind: "card.updated",
       title: `#${card.number} ${patch.title ?? card.title}`,
-      body: `Changed ${changed}`,
+      body: describeEdit(patch),
       cardId: card.id,
     });
     return await getCard(tx, actor.workspaceId, number);
@@ -746,4 +745,41 @@ async function setTags(
   await transact(ctx, async (tx) => {
     await setCardTags(tx.db, { workspaceId, cardId, names: clean });
   });
+}
+
+const dueDay = new Intl.DateTimeFormat("en-GB", {
+  day: "numeric",
+  month: "short",
+  timeZone: "UTC",
+});
+
+/** The edit as the log line says it: what a person would write, not the fields that changed. */
+function describeEdit(patch: Parameters<typeof updateCard>[3]) {
+  const said: string[] = [];
+  if (patch.title !== undefined) {
+    said.push("Renamed it");
+  }
+  if (patch.body !== undefined) {
+    said.push(
+      patch.body ? "Edited the description" : "Cleared the description"
+    );
+  }
+  if (patch.tags !== undefined) {
+    said.push(
+      patch.tags.length > 0
+        ? `Tagged ${patch.tags.map((t) => `#${t}`).join(" ")}`
+        : "Removed its tags"
+    );
+  }
+  if (patch.dueOn !== undefined) {
+    said.push(
+      patch.dueOn
+        ? `Set it due ${dueDay.format(new Date(`${patch.dueOn}T00:00:00Z`))}`
+        : "Cleared the due date"
+    );
+  }
+  if (patch.boardId !== undefined) {
+    said.push("Moved it to another board");
+  }
+  return said.join(" · ");
 }

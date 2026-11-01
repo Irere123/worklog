@@ -179,7 +179,7 @@ const STATE: Record<string, { label: string; tone: Tone }> = {
   working: { label: "Working", tone: "blue" },
   needs_you: { label: "Needs you", tone: "amber" },
   finished: { label: "Finished", tone: "green" },
-  failed: { label: "Couldn't finish", tone: "red" },
+  failed: { label: "Couldn’t finish", tone: "red" },
 };
 
 // What happened to a card when the event says nothing more than the card's own title.

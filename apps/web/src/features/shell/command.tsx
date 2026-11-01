@@ -22,7 +22,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { Command } from "cmdk";
 import type { ReactNode } from "react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { q } from "#api/queries";
 import { signOut } from "#features/auth/session";
@@ -71,6 +71,33 @@ export function CommandPalette({
     enabled: open && !searching,
   });
   const cards = searching ? found : recent;
+  // A number opens that card at once: any page can show a card over itself, so there's
+  // nothing to wait for, and Enter can't fall through to "Ask" while the search loads.
+  const typed = cardNumberIn(search);
+  const { numbered, listed } = splitOut(cards.data, typed);
+  // When results arrive, light the row shown first. cmdk keeps the old highlight while the list
+  // re-sorts under it, so Enter would open whatever was picked from the instant list. A frame
+  // later the DOM is in cmdk's sorted order.
+  const [selected, setSelected] = useState("");
+  const loadedAt = found.dataUpdatedAt;
+  useEffect(() => {
+    let frame: number | undefined;
+    if (open && loadedAt > 0) {
+      frame = requestAnimationFrame(() => {
+        const first = document.querySelector<HTMLElement>(
+          "[cmdk-list] [cmdk-item]"
+        );
+        if (first?.dataset.value !== undefined) {
+          setSelected(first.dataset.value);
+        }
+      });
+    }
+    return () => {
+      if (frame !== undefined) {
+        cancelAnimationFrame(frame);
+      }
+    };
+  }, [open, loadedAt]);
 
   const close = () => {
     setSearch("");
@@ -92,6 +119,8 @@ export function CommandPalette({
         }
       }}
       label="Command menu"
+      value={selected}
+      onValueChange={setSelected}
       loop
       overlayClassName={stylex.props(styles.overlay).className}
       contentClassName={stylex.props(styles.content).className}
@@ -107,34 +136,37 @@ export function CommandPalette({
           Nothing matches. Press ↵ to ask your assistant.
         </Command.Empty>
 
-        {search.trim().length > 0 && (
-          <Command.Group heading="Assistant" {...stylex.props(styles.group)}>
+        {typed !== undefined && (
+          <Command.Group heading="Cards" {...stylex.props(styles.group)}>
             <Item
-              value={`ask ${search}`}
-              icon={<ChatsCircleIcon size={15} />}
+              value={cardValue(typed)}
+              icon={<span {...stylex.props(styles.number)}>#{typed}</span>}
               onSelect={run(
                 async () =>
                   await navigate({
-                    to: "/assistant",
-                    search: { ask: search.trim() },
+                    to: ".",
+                    search: (prev: Record<string, unknown>) => ({
+                      ...prev,
+                      card: typed,
+                    }),
                   })
               )}
               hint={<ArrowElbowDownLeftIcon size={13} />}
             >
-              Ask: <span {...stylex.props(styles.quote)}>{search.trim()}</span>
+              {numbered?.title ?? `Open card #${typed}`}
             </Item>
           </Command.Group>
         )}
 
-        {(cards.data?.length ?? 0) > 0 && (
+        {listed.length > 0 && (
           <Command.Group
             heading={searching ? "Cards" : "Recently active"}
             {...stylex.props(styles.group)}
           >
-            {cards.data?.map((card) => (
+            {listed.map((card) => (
               <Item
                 key={card.id}
-                value={`card ${card.number} ${card.title}`}
+                value={cardValue(card.number, card.title)}
                 icon={
                   <span {...stylex.props(styles.number)}>#{card.number}</span>
                 }
@@ -171,7 +203,7 @@ export function CommandPalette({
           <Item
             icon={<CardsIcon size={15} />}
             onSelect={go("/mine")}
-            hint={<Kbd>2</Kbd>}
+            hint={<Kbd>G M</Kbd>}
           >
             My cards
           </Item>
@@ -290,7 +322,37 @@ export function CommandPalette({
             Sign out
           </Item>
         </Command.Group>
+
+        {search.trim().length > 0 && (
+          <Command.Group heading="Assistant" {...stylex.props(styles.group)}>
+            <Item
+              value={`ask ${search}`}
+              icon={<ChatsCircleIcon size={15} />}
+              onSelect={run(
+                async () =>
+                  await navigate({
+                    to: "/assistant",
+                    search: { ask: search.trim() },
+                  })
+              )}
+              hint={<ArrowElbowDownLeftIcon size={13} />}
+            >
+              Ask: <span {...stylex.props(styles.quote)}>{search.trim()}</span>
+            </Item>
+          </Command.Group>
+        )}
       </Command.List>
+      <footer {...stylex.props(styles.footer)}>
+        <span {...stylex.props(styles.footerKey)}>
+          <Kbd>↑ ↓</Kbd> move
+        </span>
+        <span {...stylex.props(styles.footerKey)}>
+          <Kbd>↵</Kbd> open
+        </span>
+        <span {...stylex.props(styles.footerKey)}>
+          <Kbd>Esc</Kbd> close
+        </span>
+      </footer>
     </Command.Dialog>
   );
 }
@@ -319,6 +381,23 @@ function Item({
       {hint !== undefined && <span {...stylex.props(styles.hint)}>{hint}</span>}
     </Command.Item>
   );
+}
+
+function cardNumberIn(search: string) {
+  const digits = /^#?(?<n>\d{1,9})$/u.exec(search.trim())?.groups?.n;
+  return digits === undefined ? undefined : Number(digits);
+}
+
+function cardValue(number: number, title = "open") {
+  return `card ${number} ${title}`;
+}
+
+function splitOut<T extends { number: number }>(
+  cards: T[] | undefined,
+  number: number | undefined
+) {
+  const numbered = cards?.find((c) => c.number === number);
+  return { numbered, listed: (cards ?? []).filter((c) => c !== numbered) };
 }
 
 const styles = stylex.create({
@@ -360,6 +439,22 @@ const styles = stylex.create({
     padding: space.sm,
     scrollPaddingBlock: space.sm,
   },
+  footer: {
+    display: {
+      default: "flex",
+      "@media (hover: none) and (pointer: coarse)": "none",
+    },
+    gap: space.lg,
+    paddingBlock: space.sm,
+    paddingInline: space.lg,
+    borderTopWidth: 1,
+    borderTopStyle: "solid",
+    borderTopColor: color.line,
+    backgroundColor: color.surface,
+    fontSize: text.meta,
+    color: color.fgFaint,
+  },
+  footerKey: { display: "inline-flex", alignItems: "center", gap: space.xs },
   empty: {
     paddingBlock: space.x3,
     textAlign: "center",

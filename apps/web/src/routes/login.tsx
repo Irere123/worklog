@@ -86,71 +86,84 @@ function Login() {
       title="Sign in to Worklog"
       subtitle="Your team’s logbook. The tools write it, so nobody has to report status."
       footer={
-        <>
-          New server?{" "}
-          <Link to="/setup" {...stylex.props(authStyles.link)}>
-            Set up a workspace
-          </Link>
-        </>
+        config.data?.setupOpen === true ? (
+          <>
+            New server?{" "}
+            <Link to="/setup" {...stylex.props(authStyles.link)}>
+              Set up a workspace
+            </Link>
+          </>
+        ) : undefined
       }
     >
-      <form
-        onSubmit={(event) => {
-          void send(event);
-        }}
-        {...stylex.props(authStyles.form)}
-      >
-        <Field label="Email">
-          {(id) => (
-            <Input
-              id={id}
-              type="email"
-              required
-              autoComplete="email"
-              placeholder="you@team.org"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              autoFocus
-            />
-          )}
-        </Field>
-        {error !== null && <ErrorNote error={error} />}
-        <Button
-          type="submit"
-          variant="primary"
-          busy={busy}
-          icon={<EnvelopeSimpleIcon size={14} />}
-        >
-          Email me a sign-in link
-        </Button>
-      </form>
-      {(config.data?.socialProviders.length ?? 0) > 0 && (
-        <>
-          <div {...stylex.props(authStyles.divider)}>or</div>
-          <div {...stylex.props(authStyles.form)}>
-            {config.data?.socialProviders.map((provider) => (
-              <Button
-                key={provider}
-                onClick={() => {
-                  socialSignIn(provider, next).catch(setError);
-                }}
-              >
-                Continue with {PROVIDERS[provider] ?? provider}
-              </Button>
-            ))}
-          </div>
-        </>
-      )}
       {showKey ? (
-        <ApiKeyForm next={next} />
+        <>
+          <ApiKeyForm next={next} />
+          <button
+            type="button"
+            onClick={() => setShowKey(false)}
+            {...stylex.props(authStyles.note, authStyles.link)}
+          >
+            Email me a sign-in link instead
+          </button>
+        </>
       ) : (
-        <button
-          type="button"
-          onClick={() => setShowKey(true)}
-          {...stylex.props(authStyles.note, authStyles.link)}
-        >
-          Use an API key instead
-        </button>
+        <>
+          <form
+            onSubmit={(event) => {
+              void send(event);
+            }}
+            {...stylex.props(authStyles.form)}
+          >
+            <Field label="Email">
+              {(id) => (
+                <Input
+                  id={id}
+                  type="email"
+                  required
+                  autoComplete="email"
+                  placeholder="you@team.org"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  autoFocus
+                />
+              )}
+            </Field>
+            {error !== null && <ErrorNote error={error} />}
+            <Button
+              type="submit"
+              variant="primary"
+              busy={busy}
+              icon={<EnvelopeSimpleIcon size={14} />}
+            >
+              Email me a sign-in link
+            </Button>
+          </form>
+          {(config.data?.socialProviders.length ?? 0) > 0 && (
+            <>
+              <div {...stylex.props(authStyles.divider)}>or</div>
+              <div {...stylex.props(authStyles.form)}>
+                {config.data?.socialProviders.map((provider) => (
+                  <Button
+                    key={provider}
+                    onClick={() => {
+                      socialSignIn(provider, next).catch(setError);
+                    }}
+                  >
+                    Continue with {PROVIDERS[provider] ?? provider}
+                  </Button>
+                ))}
+              </div>
+            </>
+          )}
+          <button
+            type="button"
+            onClick={() => setShowKey(true)}
+            {...stylex.props(authStyles.note, authStyles.link)}
+          >
+            Use an API key instead
+          </button>
+        </>
       )}
     </AuthFrame>
   );
@@ -176,7 +189,7 @@ function ApiKeyForm({ next }: { next: string }) {
       auth.setKey(null);
       setError(
         error_ instanceof ApiError && error_.status === 401
-          ? new Error("That key isn't valid on this server.")
+          ? new Error("That key isn’t valid on this server.")
           : error_
       );
     }
@@ -204,11 +217,12 @@ function ApiKeyForm({ next }: { next: string }) {
             value={key}
             onChange={(e) => setKey(e.target.value)}
             leading={<KeyIcon size={14} />}
+            autoFocus
           />
         )}
       </Field>
       {error !== null && <ErrorNote error={error} />}
-      <Button type="submit" busy={busy}>
+      <Button type="submit" variant="primary" busy={busy}>
         Sign in with key
       </Button>
     </form>

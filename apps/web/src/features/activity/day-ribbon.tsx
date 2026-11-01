@@ -155,8 +155,8 @@ function hourMarks(end: number) {
   first.setMinutes(0, 0, 0);
   first.setHours(Math.ceil(first.getHours() / 6) * 6);
   const marks: { at: number; x: number; label: string }[] = [];
-  // Three hours clear of the right edge, so the last label never runs into "now" on a phone.
-  for (let t = first.getTime(); t < end - 3 * HOUR; t += 6 * HOUR) {
+  // Five hours clear of the right edge: on a phone's 230px track, three left "18:00now".
+  for (let t = first.getTime(); t < end - 5 * HOUR; t += 6 * HOUR) {
     if (t > start + HOUR) {
       marks.push({
         at: t,

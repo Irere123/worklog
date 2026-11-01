@@ -1,4 +1,4 @@
-import { TicketIcon } from "@phosphor-icons/react";
+import { KanbanIcon, TicketIcon } from "@phosphor-icons/react";
 import * as stylex from "@stylexjs/stylex";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMatch, useNavigate } from "@tanstack/react-router";
@@ -141,19 +141,18 @@ export function NewCardDialog({
         />
         <div {...stylex.props(styles.row)}>
           <Select
-            aria-label="Board"
+            label="Board"
             value={boardId}
-            onChange={(e) => setPicked(e.target.value)}
+            onValueChange={setPicked}
             sx={styles.board}
-          >
-            {boards.data
-              ?.filter((b) => !b.archived)
-              .map((b) => (
-                <option key={b.id} value={b.id}>
-                  {b.name}
-                </option>
-              ))}
-          </Select>
+            options={(boards.data ?? [])
+              .filter((b) => !b.archived)
+              .map((b) => ({
+                value: b.id,
+                label: b.name,
+                icon: <KanbanIcon size={14} />,
+              }))}
+          />
           {/* oxlint-disable-next-line jsx-a11y/label-has-associated-control -- Switch renders Base UI's hidden checkbox inside this label, which the rule can't see */}
           <label {...stylex.props(styles.golden)}>
             <TicketIcon size={14} />

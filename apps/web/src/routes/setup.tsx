@@ -2,7 +2,12 @@ import { CopyIcon } from "@phosphor-icons/react";
 import * as stylex from "@stylexjs/stylex";
 import { useForm } from "@tanstack/react-form";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link, createFileRoute, useNavigate } from "@tanstack/react-router";
+import {
+  Link,
+  Navigate,
+  createFileRoute,
+  useNavigate,
+} from "@tanstack/react-router";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -27,7 +32,9 @@ const zone = () => Intl.DateTimeFormat().resolvedOptions().timeZone;
  */
 function Setup() {
   const session = useQuery({ ...q.session(), retry: false });
+  const config = useQuery(q.authConfig());
   const signedIn = Boolean(session.data?.user);
+  const inWorkspace = (session.data?.memberships.length ?? 0) > 0;
   const [token, setToken] = useState<string | null>(null);
   const [error, setError] = useState<unknown>(null);
   const client = useQueryClient();
@@ -77,7 +84,7 @@ function Setup() {
     return (
       <AuthFrame
         title="Your workspace is ready"
-        subtitle="This is your API key. Keep it somewhere safe: it won't be shown again. Agents and scripts use keys like it to log work."
+        subtitle="This is your API key. Keep it somewhere safe: it won’t be shown again. Agents and scripts use keys like it to log work."
       >
         <Input
           readOnly
@@ -106,13 +113,35 @@ function Setup() {
     );
   }
 
+  if (inWorkspace) {
+    return <Navigate to="/home" />;
+  }
+  // Ask before the form: filling it in only to hear "setup is closed" wastes the visit.
+  if (!signedIn && config.data?.setupOpen === false) {
+    return (
+      <AuthFrame
+        title="This server is already set up"
+        subtitle="Sign in to join your team’s workspace. If you don’t have an account yet, ask its owner to invite you."
+      >
+        <Button
+          variant="primary"
+          onClick={() => {
+            void navigate({ to: "/login" });
+          }}
+        >
+          Go to sign in
+        </Button>
+      </AuthFrame>
+    );
+  }
+
   return (
     <AuthFrame
       title={signedIn ? "Create a workspace" : "Set up Worklog"}
       subtitle={
         signedIn
-          ? "You're signed in but don't belong to a workspace yet. Start one, or ask a teammate to invite you."
-          : "Create the first workspace on this server. You'll be its owner."
+          ? "You’re signed in but don’t belong to a workspace yet. Start one, or ask a teammate to invite you."
+          : "Create the first workspace on this server. You’ll be its owner."
       }
       footer={
         <>
@@ -193,7 +222,7 @@ function Setup() {
               {(field) => (
                 <Field
                   label="Email"
-                  hint="For sign-in links. Optional if you'll use the API key."
+                  hint="For sign-in links. Optional if you’ll use the API key."
                 >
                   {(id) => (
                     <Input

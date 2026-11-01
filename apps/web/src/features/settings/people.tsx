@@ -12,7 +12,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import type { Schemas } from "#api/client";
-import { api, unwrap } from "#api/client";
+import { api, auth, unwrap } from "#api/client";
 import { q } from "#api/queries";
 import { useMe } from "#features/auth/session";
 import { providerName, useMembers } from "#features/cards/card-bits";
@@ -21,7 +21,7 @@ import { Avatar } from "#ui/avatar";
 import { Button } from "#ui/button";
 import { Badge } from "#ui/chip";
 import { EmptyState, Skeleton } from "#ui/feedback";
-import { Field, Input, Select } from "#ui/field";
+import { Checkbox, Field, Input, Select } from "#ui/field";
 import { Dialog, Tooltip } from "#ui/overlay";
 import { color, radius, space, text } from "#ui/tokens.stylex";
 
@@ -34,7 +34,14 @@ export function ApiKeys() {
   const handle = me?.member.handle ?? "me";
   const tokens = useQuery({ ...q.tokens(handle), enabled: me !== undefined });
   const [creating, setCreating] = useState(false);
+  const [revoking, setRevoking] = useState<{
+    id: string;
+    name: string;
+    prefix: string;
+  } | null>(null);
   const client = useQueryClient();
+  // Browsers usually sign in with a cookie; when it's a key, revoking it here signs this tab out.
+  const inUse = auth.key();
   const revoke = useMutation({
     mutationFn: async (id: string) =>
       await unwrap(api.DELETE("/v1/tokens/{id}", { params: { path: { id } } })),
@@ -73,7 +80,14 @@ export function ApiKeys() {
             <li key={t.id} {...stylex.props(settingsStyles.listRow)}>
               <KeyIcon size={15} {...stylex.props(styles.icon)} />
               <div {...stylex.props(settingsStyles.main)}>
-                <p {...stylex.props(settingsStyles.strong)}>{t.name}</p>
+                <p {...stylex.props(settingsStyles.strong)}>
+                  {t.name}
+                  {inUse?.startsWith(t.prefix) === true && (
+                    <Badge tone="accent" sx={styles.here}>
+                      This browser
+                    </Badge>
+                  )}
+                </p>
                 <p {...stylex.props(settingsStyles.sub)}>
                   <span {...stylex.props(settingsStyles.mono)}>
                     {t.prefix}…
@@ -94,13 +108,50 @@ export function ApiKeys() {
                   variant="ghost"
                   aria-label={`Revoke ${t.name}`}
                   icon={<TrashIcon size={14} />}
-                  onClick={() => revoke.mutate(t.id)}
+                  onClick={() => setRevoking(t)}
                 />
               </Tooltip>
             </li>
           ))}
         </ul>
       </Card>
+      <Dialog
+        open={revoking !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setRevoking(null);
+          }
+        }}
+        size="sm"
+        title={`Revoke “${revoking?.name ?? ""}”?`}
+        description={
+          inUse !== null &&
+          revoking !== null &&
+          inUse.startsWith(revoking.prefix)
+            ? "This browser signs in with this key, so you’ll be signed out. Anything else using it stops working too, and a revoked key can’t be restored."
+            : "Anything using it stops working straight away, and a revoked key can’t be restored."
+        }
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setRevoking(null)}>
+              Keep it
+            </Button>
+            <Button
+              variant="danger"
+              busy={revoke.isPending}
+              onClick={() => {
+                if (revoking) {
+                  revoke.mutate(revoking.id, {
+                    onSettled: () => setRevoking(null),
+                  });
+                }
+              }}
+            >
+              Revoke key
+            </Button>
+          </>
+        }
+      />
       <NewKey
         open={creating}
         onClose={() => setCreating(false)}
@@ -158,7 +209,7 @@ function NewKey({
       title={secret ? "Copy your key now" : "New API key"}
       description={
         secret
-          ? "It won't be shown again. Store it where your script or agent reads secrets."
+          ? "It won’t be shown again. Store it where your script or agent reads secrets."
           : undefined
       }
       footer={
@@ -190,7 +241,7 @@ function NewKey({
           <>
             <Field
               label="Name"
-              hint="Where it's used, so you know what breaks if you revoke it."
+              hint="Where it’s used, so you know what breaks if you revoke it."
             >
               {(id) => (
                 <Input
@@ -218,12 +269,11 @@ function NewKey({
                 ] as [Scope, string][]
               ).map(([scope, label]) => (
                 <label key={scope} {...stylex.props(styles.scope)}>
-                  <input
-                    type="checkbox"
+                  <Checkbox
                     checked={scopes.includes(scope)}
-                    onChange={(e) =>
+                    onCheckedChange={(on) =>
                       setScopes(
-                        e.target.checked
+                        on
                           ? [...scopes, scope]
                           : scopes.filter((s) => s !== scope)
                       )
@@ -239,13 +289,14 @@ function NewKey({
                 <Select
                   id={id}
                   value={days}
-                  onChange={(e) => setDays(e.target.value)}
-                >
-                  <option value="30">In 30 days</option>
-                  <option value="90">In 90 days</option>
-                  <option value="365">In a year</option>
-                  <option value="">Never</option>
-                </Select>
+                  onValueChange={setDays}
+                  options={[
+                    { value: "30", label: "In 30 days" },
+                    { value: "90", label: "In 90 days" },
+                    { value: "365", label: "In a year" },
+                    { value: "", label: "Never" },
+                  ]}
+                />
               )}
             </Field>
           </>
@@ -348,7 +399,7 @@ function MemberRows({
       {members.map((m) => {
         const owner = m.ownerId ? byId.get(m.ownerId) : undefined;
         const self = m.id === me?.member.id;
-        // "Ada's assistant" already says whom it works for.
+        // "Ada’s assistant" already says whom it works for.
         const namedForOwner =
           owner !== undefined && m.name.startsWith(owner.name);
         return (
@@ -401,11 +452,11 @@ function KeyButton({ open, name }: { open?: () => void; name: string }) {
 const ADD_COPY = {
   human: {
     title: "Invite a teammate",
-    description: "They'll get a sign-in link by email.",
+    description: "They’ll get a sign-in link by email.",
   },
   agent: {
     title: "Add an agent",
-    description: "You'll be the person it works for.",
+    description: "You’ll be the person it works for.",
   },
 };
 
@@ -476,7 +527,7 @@ function AddMember({
       }
       description={
         token
-          ? "It won't be shown again. The agent sends it as a Bearer token to log work and report progress."
+          ? "It won’t be shown again. The agent sends it as a Bearer token to log work and report progress."
           : ADD_COPY[kind ?? "human"].description
       }
       footer={
@@ -577,6 +628,7 @@ function AddMember({
 
 const styles = stylex.create({
   icon: { color: color.fgMuted, flexShrink: 0 },
+  here: { marginInlineStart: space.sm, verticalAlign: "1px" },
   body: {
     display: "flex",
     flexDirection: "column",

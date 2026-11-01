@@ -2,7 +2,7 @@ import * as stylex from "@stylexjs/stylex";
 
 import { Kbd } from "#ui/chip";
 import { Dialog } from "#ui/overlay";
-import { color, space, text } from "#ui/tokens.stylex";
+import { color, leading, space, text } from "#ui/tokens.stylex";
 
 const GROUPS: { title: string; keys: [string, string][] }[] = [
   {
@@ -27,6 +27,7 @@ const GROUPS: { title: string; keys: [string, string][] }[] = [
       ["3", "Added by me"],
       ["G H", "Home"],
       ["G I", "Inbox"],
+      ["G M", "My cards"],
       ["G A", "Activity"],
       ["G B", "Boards"],
       ["G C", "Assistant"],
@@ -98,10 +99,15 @@ export function Shortcuts({
             <h3 {...stylex.props(styles.title)}>{group.title}</h3>
             <dl>
               {group.keys.map(([keys, label]) => (
-                <div key={label} {...stylex.props(styles.row)}>
+                <div key={`${keys} ${label}`} {...stylex.props(styles.row)}>
                   <dt {...stylex.props(styles.label)}>{label}</dt>
-                  <dd>
-                    <Kbd>{keys}</Kbd>
+                  <dd {...stylex.props(styles.keys)}>
+                    {keys.split(" or ").map((alternative, i) => (
+                      <span key={alternative} {...stylex.props(styles.keys)}>
+                        {i > 0 && <span {...stylex.props(styles.or)}>or</span>}
+                        <Kbd>{alternative}</Kbd>
+                      </span>
+                    ))}
                   </dd>
                 </div>
               ))}
@@ -129,7 +135,15 @@ const styles = stylex.create({
     alignItems: "center",
     justifyContent: "space-between",
     gap: space.md,
-    height: 28,
+    minHeight: 28,
+    paddingBlock: 2,
   },
-  label: { fontSize: text.label, color: color.fg },
+  label: { fontSize: text.label, lineHeight: leading.label, color: color.fg },
+  keys: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: space.xs,
+    flexShrink: 0,
+  },
+  or: { fontSize: text.meta, color: color.fgFaint },
 });

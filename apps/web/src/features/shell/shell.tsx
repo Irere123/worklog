@@ -110,6 +110,9 @@ export function Shell() {
   useHotkey(["G", "B"], go("/boards"), {
     meta: { name: "Go to Boards", group: "Navigate" },
   });
+  useHotkey(["G", "M"], go("/mine"), {
+    meta: { name: "Go to My cards", group: "Navigate" },
+  });
   useHotkey(["G", "C"], go("/assistant"), {
     meta: { name: "Go to Assistant", group: "Navigate" },
   });

@@ -8,10 +8,11 @@ import {
   ClockIcon,
   DotsThreeIcon,
   EyeIcon,
-  EyeSlashIcon,
+  HashIcon,
   HourglassMediumIcon,
   LinkSimpleIcon,
   PencilSimpleIcon,
+  PlusIcon,
   PushPinIcon,
   TicketIcon,
   UserPlusIcon,
@@ -34,11 +35,19 @@ import { ago, exactTime, fromNow } from "#lib/time";
 import { Avatar } from "#ui/avatar";
 import { Button } from "#ui/button";
 import { Badge, Kbd, MOD } from "#ui/chip";
+import { DatePicker } from "#ui/date-picker";
 import { ErrorNote, Skeleton } from "#ui/feedback";
-import { Input, Textarea } from "#ui/field";
+import { Textarea } from "#ui/field";
 import { layout } from "#ui/layout";
 import { Markdown } from "#ui/markdown";
-import { Menu, MenuItem, MenuLabel, MenuSeparator, Tooltip } from "#ui/overlay";
+import {
+  Menu,
+  MenuCheckboxItem,
+  MenuItem,
+  MenuLabel,
+  MenuSeparator,
+  Tooltip,
+} from "#ui/overlay";
 import {
   color,
   font,
@@ -131,7 +140,8 @@ function CardBody({ card }: { card: CardDetail }) {
     (board.data?.columns ?? []).slice(0, DIGITS.length).map((c, i) => ({
       hotkey: DIGITS[i] ?? "1",
       callback: () => act({ type: "move", columnId: c.id }),
-      options: { enabled: card.stage === "triage" },
+      // The shell's 1–3 stand down while a card is open, so sharing the keys is on purpose.
+      options: { enabled: card.stage === "triage", conflictBehavior: "allow" },
     }))
   );
   useHotkey("M", () => {
@@ -347,10 +357,11 @@ function CardHeader({ card, act }: { card: CardDetail; act: Act }) {
 function CardFields({ card, act }: { card: CardDetail; act: Act }) {
   const me = useMe();
   const { byId, list: members } = useMembers();
+  const assignees = useRef<HTMLElement>(null);
   return (
     <dl {...stylex.props(styles.fields)}>
       <dt {...stylex.props(styles.fieldLabel)}>Assignees</dt>
-      <dd {...stylex.props(styles.fieldValue)}>
+      <dd ref={assignees} {...stylex.props(styles.fieldValue)}>
         {card.assigneeIds.map((id) => {
           const m = byId.get(id);
           return (
@@ -380,29 +391,41 @@ function CardFields({ card, act }: { card: CardDetail; act: Act }) {
               {card.assigneeIds.length === 0 ? "Assign" : ""}
             </button>
           }
+          anchor={assignees}
+          search="Assign someone…"
+          empty="No one on the team by that name."
         >
-          {me && !card.assigneeIds.includes(me.member.id) && (
-            <MenuItem
+          {me && (
+            <MenuCheckboxItem
               icon={<Avatar person={me.member} size={16} />}
+              label={`Me ${me.member.name}`}
               shortcut="M"
-              onClick={() => act({ type: "assign", memberId: me.member.id })}
+              checked={card.assigneeIds.includes(me.member.id)}
+              onCheckedChange={(on) =>
+                act({
+                  type: on ? "assign" : "unassign",
+                  memberId: me.member.id,
+                })
+              }
             >
               Me
-            </MenuItem>
+            </MenuCheckboxItem>
           )}
           {members
-            .filter(
-              (m) => !card.assigneeIds.includes(m.id) && m.id !== me?.member.id
-            )
+            .filter((m) => m.id !== me?.member.id)
             .map((m) => (
-              <MenuItem
+              <MenuCheckboxItem
                 key={m.id}
                 icon={<Avatar person={m} size={16} />}
-                onClick={() => act({ type: "assign", memberId: m.id })}
+                label={m.kind === "agent" ? `${m.name} agent` : m.name}
+                checked={card.assigneeIds.includes(m.id)}
+                onCheckedChange={(on) =>
+                  act({ type: on ? "assign" : "unassign", memberId: m.id })
+                }
               >
                 {m.name}
                 {m.kind === "agent" ? " · agent" : ""}
-              </MenuItem>
+              </MenuCheckboxItem>
             ))}
         </Menu>
       </dd>
@@ -451,12 +474,15 @@ function CardFields({ card, act }: { card: CardDetail; act: Act }) {
           <dd
             {...stylex.props(
               styles.fieldValue,
+              styles.sentence,
               card.entropy.postponingSoon ? styles.warn : layout.muted
             )}
           >
-            <ArchiveIcon size={13} />
-            Moves to Not now {fromNow(card.entropy.autoPostponeAt)} unless
-            there’s activity
+            <ArchiveIcon size={13} {...stylex.props(styles.sentenceIcon)} />
+            <span>
+              Moves to Not now {fromNow(card.entropy.autoPostponeAt)} unless
+              there’s activity
+            </span>
           </dd>
         </>
       )}
@@ -623,58 +649,70 @@ function TagEditor({
   tags: string[];
   onSave: (tags: string[]) => void;
 }) {
-  const [draft, setDraft] = useState<string | null>(null);
-  if (draft === null) {
-    return (
-      <button
-        type="button"
-        data-card-edit="tags"
-        onClick={() => setDraft(tags.join(", "))}
-        {...stylex.props(styles.tagButton)}
-      >
-        {tags.length > 0 ? (
-          tags.map((t) => <span key={t}>#{t}</span>)
-        ) : (
-          <span {...stylex.props(layout.faint)}>Add tags</span>
-        )}
-        <PencilSimpleIcon size={11} {...stylex.props(styles.pencil)} />
-      </button>
-    );
-  }
-  const save = () => {
-    const next = [
-      ...new Set(
-        draft
-          .split(/[,\s]+/u)
-          .map((t) => t.replace(/^#/u, "").trim().toLowerCase())
-          .filter(Boolean)
-      ),
-    ];
-    if (next.join(",") !== tags.join(",")) {
-      onSave(next);
-    }
-    setDraft(null);
-  };
+  const known = useKnownTags();
+  const row = useRef<HTMLSpanElement>(null);
+  const [query, setQuery] = useState("");
+  const typed = query.trim().replace(/^#/u, "").replaceAll(/\s+/gu, "-");
+  const fresh = typed.toLowerCase();
+  const options = [...new Set([...tags, ...known])];
   return (
-    <Input
-      autoFocus
-      aria-label="Tags, separated by commas"
-      value={draft}
-      placeholder="bug, design"
-      onChange={(e) => setDraft(e.target.value)}
-      onBlur={save}
-      onKeyDown={(e) => {
-        if (e.key === "Enter") {
-          save();
+    <span ref={row} {...stylex.props(styles.tagRow)}>
+      <Menu
+        anchor={row}
+        search="Find or create a tag…"
+        empty="No tags yet. Type one to create it."
+        onSearchChange={setQuery}
+        trigger={
+          <button
+            type="button"
+            data-card-edit="tags"
+            {...stylex.props(styles.tagButton)}
+          >
+            {tags.length > 0 ? (
+              tags.map((t) => <span key={t}>#{t}</span>)
+            ) : (
+              <span {...stylex.props(layout.faint)}>Add tags</span>
+            )}
+            <PencilSimpleIcon size={11} {...stylex.props(styles.pencil)} />
+          </button>
         }
-        if (e.key === "Escape") {
-          e.stopPropagation();
-          setDraft(null);
-        }
-      }}
-      sx={styles.tagInput}
-    />
+      >
+        {options.map((t) => (
+          <MenuCheckboxItem
+            key={t}
+            icon={<HashIcon size={13} />}
+            checked={tags.includes(t)}
+            onCheckedChange={(on) =>
+              onSave(on ? [...tags, t] : tags.filter((x) => x !== t))
+            }
+          >
+            {t}
+          </MenuCheckboxItem>
+        ))}
+        {fresh !== "" && !options.includes(fresh) && (
+          <MenuItem
+            icon={<PlusIcon size={13} />}
+            label={fresh}
+            onClick={() => onSave([...tags, fresh])}
+          >
+            Create #{fresh}
+          </MenuItem>
+        )}
+      </Menu>
+    </span>
   );
+}
+
+/** The team's tags, most used first, from recent cards: there's no list of tags to ask for. */
+function useKnownTags() {
+  const recent = useQuery(q.cards({ limit: 100 }));
+  const counts = new Map<string, number>();
+  for (const card of recent.data ?? []) {
+    for (const tag of card.tags) {
+      counts.set(tag, (counts.get(tag) ?? 0) + 1);
+    }
+  }
+  return [...counts].toSorted((a, b) => b[1] - a[1]).map(([tag]) => tag);
 }
 
 function Description({
@@ -937,7 +975,7 @@ function PinButton({ number }: { number: number }) {
         aria-pressed={pinned}
         icon={<PushPinIcon size={15} weight={pinned ? "fill" : "regular"} />}
         onClick={() => pins.toggle(number)}
-        sx={pinned ? styles.pinOn : undefined}
+        sx={pinned ? styles.toggleOn : undefined}
       />
     </Tooltip>
   );
@@ -955,7 +993,9 @@ function WatchButton({ card, act }: { card: CardDetail; act: Act }) {
         variant="ghost"
         size="sm"
         aria-label={watching ? "Stop watching" : "Watch"}
-        icon={watching ? <EyeSlashIcon size={15} /> : <EyeIcon size={15} />}
+        aria-pressed={watching}
+        icon={<EyeIcon size={15} weight={watching ? "fill" : "regular"} />}
+        sx={watching ? styles.toggleOn : undefined}
         onClick={() => act({ type: watching ? "unwatch" : "watch" })}
       />
     </Tooltip>
@@ -971,10 +1011,6 @@ function pressCardControl(name: "title" | "tags" | "assign") {
   }
 }
 
-/**
- * The browser's own date picker behind a plain button: an empty native input shows "mm/dd/yyyy",
- * which reads as a half-filled form rather than "no due date".
- */
 function DueField({
   card,
   onChange,
@@ -982,34 +1018,33 @@ function DueField({
   card: CardDetail;
   onChange: (dueOn: string | null) => void;
 }) {
-  const input = useRef<HTMLInputElement>(null);
-  const openPicker = () => {
-    try {
-      input.current?.showPicker();
-    } catch {
-      input.current?.focus();
-    }
-  };
   return (
     <span {...stylex.props(styles.dateWrap)}>
-      <button
-        type="button"
-        onClick={openPicker}
-        aria-label={card.dueOn ? `Due ${card.dueOn}. Change` : "Set a due date"}
-        {...stylex.props(styles.dateButton)}
-      >
-        {card.dueOn ? (
-          <DueChip
-            on={card.dueOn}
-            done={card.stage === "done" || card.stage === "not_now"}
-          />
-        ) : (
-          <>
-            <CalendarBlankIcon size={13} />
-            Set a due date
-          </>
-        )}
-      </button>
+      <DatePicker
+        value={card.dueOn}
+        onChange={onChange}
+        trigger={
+          <button
+            type="button"
+            aria-label={
+              card.dueOn ? `Due ${card.dueOn}. Change` : "Set a due date"
+            }
+            {...stylex.props(styles.dateButton)}
+          >
+            {card.dueOn ? (
+              <DueChip
+                on={card.dueOn}
+                done={card.stage === "done" || card.stage === "not_now"}
+              />
+            ) : (
+              <>
+                <CalendarBlankIcon size={13} />
+                Set a due date
+              </>
+            )}
+          </button>
+        }
+      />
       {card.dueOn && (
         <button
           type="button"
@@ -1020,15 +1055,6 @@ function DueField({
           <XIcon size={12} />
         </button>
       )}
-      <input
-        ref={input}
-        type="date"
-        tabIndex={-1}
-        aria-hidden
-        value={card.dueOn ?? ""}
-        onChange={(e) => onChange(e.target.value || null)}
-        {...stylex.props(styles.dateInput)}
-      />
     </span>
   );
 }
@@ -1097,7 +1123,7 @@ const styles = stylex.create({
   },
   crumb: { fontSize: text.label, color: color.fgMuted },
   grow: { flexGrow: 1 },
-  pinOn: { color: color.accentFg },
+  toggleOn: { color: color.accentFg },
   // Above the composer: it sits at the foot of the panel, so a list below would be cut off.
   refsAbove: {
     position: "absolute",
@@ -1193,7 +1219,8 @@ const styles = stylex.create({
     gridTemplateColumns: "96px 1fr",
     columnGap: space.lg,
     rowGap: space.sm,
-    alignItems: "center",
+    // Top, not centre: a value that wraps (two assignees, the drift note) keeps its label on line one.
+    alignItems: "start",
     fontSize: text.label,
   },
   fieldLabel: {
@@ -1209,6 +1236,9 @@ const styles = stylex.create({
     gap: space.sm,
     minHeight: 28,
   },
+  // A sentence that may wrap keeps its icon on the first line instead of alone above it.
+  sentence: { flexWrap: "nowrap", alignItems: "flex-start", paddingTop: 4 },
+  sentenceIcon: { flexShrink: 0, marginTop: 3 },
   warn: { color: color.amberFg },
   person: {
     display: "inline-flex",
@@ -1257,7 +1287,6 @@ const styles = stylex.create({
     fontSize: text.meta,
   },
   dateWrap: {
-    position: "relative",
     display: "inline-flex",
     alignItems: "center",
     gap: space.xs,
@@ -1282,17 +1311,8 @@ const styles = stylex.create({
     },
     outline: { default: "none", ":focus-visible": `2px solid ${color.focus}` },
   },
-  // Kept in the layout under the button so the browser anchors its picker there.
-  dateInput: {
-    position: "absolute",
-    insetInlineStart: 0,
-    bottom: 0,
-    width: 1,
-    height: 1,
-    opacity: 0,
-    pointerEvents: "none",
-  },
   // Fill-less controls among plain values: pull the padding back so the ink keeps the column's edge.
+  tagRow: { display: "flex", flexGrow: 1 },
   tagButton: {
     marginInlineStart: `calc(-1 * ${space.xs})`,
     display: "inline-flex",
@@ -1309,7 +1329,6 @@ const styles = stylex.create({
     },
   },
   pencil: { opacity: 0.5 },
-  tagInput: { maxWidth: 280, height: 28 },
   desc: {
     position: "relative",
     paddingBlock: space.sm,

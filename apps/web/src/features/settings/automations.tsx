@@ -23,7 +23,16 @@ import { Button } from "#ui/button";
 import { Badge } from "#ui/chip";
 import type { Tone } from "#ui/chip";
 import { EmptyState, Skeleton } from "#ui/feedback";
-import { Field, Input, Select, Switch, Textarea } from "#ui/field";
+import {
+  Checkbox,
+  Field,
+  Input,
+  Select,
+  Stepper,
+  Switch,
+  Textarea,
+  TimeSelect,
+} from "#ui/field";
 import { Dialog, Menu, MenuItem, Tooltip } from "#ui/overlay";
 import { color, media, radius, space, text } from "#ui/tokens.stylex";
 
@@ -338,19 +347,11 @@ function AutomationDialog({
                 <Select
                   id={id}
                   value={kind}
-                  onChange={(e) => {
-                    const next = e.target.value;
-                    if (isKind(next)) {
-                      setKind(next);
-                    }
-                  }}
-                >
-                  {Object.entries(KINDS).map(([k, label]) => (
-                    <option key={k} value={k}>
-                      {label}
-                    </option>
-                  ))}
-                </Select>
+                  onValueChange={setKind}
+                  options={Object.keys(KINDS)
+                    .filter(isKind)
+                    .map((k) => ({ value: k, label: KINDS[k] }))}
+                />
               )}
             </Field>
           )}
@@ -359,7 +360,7 @@ function AutomationDialog({
         {(kind === "custom" || kind === "check" || instructions) && (
           <Field
             label="What should it do?"
-            hint="Plain words. It can read the board and activity, and sends one message when there's something worth saying."
+            hint="Plain words. It can read the board and activity, and sends one message when there’s something worth saying."
           >
             {(id) => (
               <Textarea
@@ -397,14 +398,11 @@ function DeliverTo({
       )}
       {targets.data?.map((t) => (
         <label key={t.id} {...stylex.props(styles.target)}>
-          <input
-            type="checkbox"
+          <Checkbox
             checked={value.includes(t.id)}
-            onChange={(e) =>
+            onCheckedChange={(on) =>
               onChange(
-                e.target.checked
-                  ? [...value, t.id]
-                  : value.filter((id) => id !== t.id)
+                on ? [...value, t.id] : value.filter((id) => id !== t.id)
               )
             }
           />
@@ -458,14 +456,13 @@ function ScheduleEditor({
           <Select
             id={id}
             value={value.type}
-            onChange={(e) => {
-              onChange(defaultSchedule(e.target.value));
-            }}
-          >
-            <option value="daily">Daily</option>
-            <option value="weekly">Weekly</option>
-            <option value="interval">Every few hours</option>
-          </Select>
+            onValueChange={(next) => onChange(defaultSchedule(next))}
+            options={[
+              { value: "daily", label: "Daily" },
+              { value: "weekly", label: "Weekly" },
+              { value: "interval", label: "Every few hours" },
+            ]}
+          />
         )}
       </Field>
       {value.type === "weekly" && (
@@ -473,45 +470,34 @@ function ScheduleEditor({
           {(id) => (
             <Select
               id={id}
-              value={value.weekday}
-              onChange={(e) =>
-                onChange({ ...value, weekday: Number(e.target.value) })
+              value={String(value.weekday)}
+              onValueChange={(next) =>
+                onChange({ ...value, weekday: Number(next) })
               }
-            >
-              {DAYS.map((d, i) => (
-                <option key={d} value={i}>
-                  {d}
-                </option>
-              ))}
-            </Select>
+              options={DAYS.map((d, i) => ({ value: String(i), label: d }))}
+            />
           )}
         </Field>
       )}
       {value.type === "interval" ? (
         <Field label="Every (minutes)">
           {(id) => (
-            <Input
+            <Stepper
               id={id}
-              type="number"
               min={5}
+              step={5}
               value={value.minutes}
-              onChange={(e) =>
-                onChange({
-                  ...value,
-                  minutes: Math.max(5, Number(e.target.value)),
-                })
-              }
+              onValueChange={(minutes) => onChange({ ...value, minutes })}
             />
           )}
         </Field>
       ) : (
         <Field label="Time">
           {(id) => (
-            <Input
+            <TimeSelect
               id={id}
-              type="time"
               value={value.at}
-              onChange={(e) => onChange({ ...value, at: e.target.value })}
+              onValueChange={(at) => onChange({ ...value, at })}
             />
           )}
         </Field>
@@ -578,7 +564,7 @@ export function Delivery() {
     onSuccess: (r) =>
       r.delivered
         ? toast.success("Test message delivered")
-        : toast.error(r.error ?? "Couldn't deliver"),
+        : toast.error(r.error ?? "Couldn’t deliver"),
     onError: (error) => toast.error(error.message),
   });
   const remove = useMutation({
@@ -787,15 +773,12 @@ function AddTarget({
               <Select
                 id={id}
                 value={connectionId}
-                onChange={(e) => setConnectionId(e.target.value)}
-              >
-                <option value="">Choose…</option>
-                {usable.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </Select>
+                onValueChange={setConnectionId}
+                options={[
+                  { value: "", label: "Choose a connection" },
+                  ...usable.map((c) => ({ value: c.id, label: c.name })),
+                ]}
+              />
             )}
           </Field>
         )}
@@ -807,16 +790,12 @@ function AddTarget({
             <Select
               id={id}
               value={visibility}
-              onChange={(e) => {
-                const next = e.target.value;
-                if (next === "private" || next === "team") {
-                  setVisibility(next);
-                }
-              }}
-            >
-              <option value="private">Just me</option>
-              <option value="team">The team</option>
-            </Select>
+              onValueChange={setVisibility}
+              options={[
+                { value: "private", label: "Just me" },
+                { value: "team", label: "The team" },
+              ]}
+            />
           )}
         </Field>
       </div>
@@ -873,16 +852,19 @@ const styles = stylex.create({
     fontSize: text.meta,
     fontWeight: 500,
     color: color.fgMuted,
+    boxShadow: `inset 0 0 0 1px ${color.lineUi}`,
     backgroundColor: {
-      default: color.ui,
+      default: "transparent",
       ":hover": { default: null, [media.hover]: color.uiHover },
     },
   },
+  // A tint, not a solid fill: five days on in a row is the usual answer and shouldn't shout.
   dayOn: {
-    color: color.fgOnSolid,
+    color: color.accentFg,
+    boxShadow: `inset 0 0 0 1px color-mix(in oklch, ${color.accent} 40%, transparent)`,
     backgroundColor: {
-      default: color.accent,
-      ":hover": { default: null, [media.hover]: color.accentHover },
+      default: color.accentSubtle,
+      ":hover": { default: null, [media.hover]: color.accentSubtle },
     },
   },
   targets: {

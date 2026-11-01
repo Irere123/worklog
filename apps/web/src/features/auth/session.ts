@@ -36,7 +36,7 @@ export async function requestMagicLink(email: string, next: string) {
     }),
   });
   if (!res.ok) {
-    throw new Error("Couldn't send the link. Check the address and try again.");
+    throw new Error("Couldn’t send the link. Check the address and try again.");
   }
 }
 
@@ -52,7 +52,7 @@ export async function socialSignIn(provider: string, next: string) {
   });
   const url = redirectUrl(await res.json().catch(() => null));
   if (!url) {
-    throw new Error(`Couldn't start ${provider} sign-in.`);
+    throw new Error(`Couldn’t start ${provider} sign-in.`);
   }
   location.assign(url);
 }

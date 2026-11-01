@@ -207,6 +207,9 @@ export const AuthConfigResponse = z.object({
   magicLink: z.boolean(),
   socialProviders: z.array(z.enum(["github", "discord", "slack"])),
   authBasePath: z.string(),
+  setupOpen: z.boolean().openapi({
+    description: "No workspace exists yet, so `POST /v1/setup` is open",
+  }),
 });
 
 const Membership = z.object({ workspace: Workspace, member: MemberResponse });

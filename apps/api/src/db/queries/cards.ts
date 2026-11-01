@@ -126,10 +126,13 @@ export async function listCardRows(
     where.push(eq(cards.createdById, params.createdById));
   }
   if (params.q) {
+    // "14" or "#14" is how people name a card, so a number finds that card as well as text.
+    const number = /^#?(?<n>\d{1,9})$/u.exec(params.q.trim())?.groups?.n;
     where.push(
       or(
         ilike(cards.title, `%${params.q}%`),
-        ilike(cards.body, `%${params.q}%`)
+        ilike(cards.body, `%${params.q}%`),
+        number === undefined ? undefined : eq(cards.number, Number(number))
       )
     );
   }

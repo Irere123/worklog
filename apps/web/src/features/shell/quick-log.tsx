@@ -18,7 +18,7 @@ type Kind = "entry" | "decision" | "blocker" | "win";
 const PROMPTS: Record<Kind, string> = {
   entry: "What did you work on?",
   decision: "What was decided, and why?",
-  blocker: "What's in your way? Mention @someone and it lands in their inbox.",
+  blocker: "What’s in your way? Mention @someone and it lands in their inbox.",
   win: "What shipped or went well?",
 };
 

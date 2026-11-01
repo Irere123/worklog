@@ -1,4 +1,9 @@
-import { MagnifyingGlassIcon, PulseIcon } from "@phosphor-icons/react";
+import {
+  MagnifyingGlassIcon,
+  PulseIcon,
+  StackIcon,
+  UsersThreeIcon,
+} from "@phosphor-icons/react";
 import * as stylex from "@stylexjs/stylex";
 import { useDebouncedValue } from "@tanstack/react-pacer";
 import { useQuery } from "@tanstack/react-query";
@@ -6,9 +11,11 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 
 import { q } from "#api/queries";
-import { sourceLabel } from "#features/activity/activity-line";
+import { SourceGlyph, sourceLabel } from "#features/activity/activity-line";
 import { DayRibbon } from "#features/activity/day-ribbon";
 import { Feed } from "#features/activity/feed";
+import { Logo } from "#features/shell/logo";
+import { Avatar } from "#ui/avatar";
 import { Input, Select } from "#ui/field";
 import { PageHeader } from "#ui/layout";
 
@@ -61,32 +68,46 @@ function ActivityPage() {
               sx={styles.search}
             />
             <Select
-              aria-label="Person"
+              label="Person"
               value={actor ?? ""}
-              onChange={(e) => set({ actor: e.target.value || undefined })}
+              onValueChange={(next) => set({ actor: next || undefined })}
+              options={[
+                {
+                  value: "",
+                  label: "Everyone",
+                  icon: <UsersThreeIcon size={14} />,
+                },
+                ...(members.data ?? []).map((m) => ({
+                  value: m.handle,
+                  label: m.kind === "agent" ? `${m.name} · agent` : m.name,
+                  icon: <Avatar person={m} size={16} />,
+                })),
+              ]}
               sx={styles.select}
-            >
-              <option value="">Everyone</option>
-              {members.data?.map((m) => (
-                <option key={m.id} value={m.handle}>
-                  {m.name}
-                  {m.kind === "agent" ? " (agent)" : ""}
-                </option>
-              ))}
-            </Select>
+            />
             <Select
-              aria-label="Source"
+              label="Source"
               value={source ?? ""}
-              onChange={(e) => set({ source: e.target.value || undefined })}
+              onValueChange={(next) => set({ source: next || undefined })}
+              options={[
+                {
+                  value: "",
+                  label: "All sources",
+                  icon: <StackIcon size={14} />,
+                },
+                ...SOURCES.map((s) => ({
+                  value: s,
+                  label: sourceLabel(s),
+                  icon:
+                    s === "worklog" ? (
+                      <Logo size={14} />
+                    ) : (
+                      <SourceGlyph source={s} size={14} />
+                    ),
+                })),
+              ]}
               sx={styles.select}
-            >
-              <option value="">All sources</option>
-              {SOURCES.map((s) => (
-                <option key={s} value={s}>
-                  {sourceLabel(s)}
-                </option>
-              ))}
-            </Select>
+            />
           </>
         }
       />

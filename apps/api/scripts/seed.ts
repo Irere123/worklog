@@ -117,7 +117,7 @@ const platform = await call<Board>(ada, "POST", "/v1/boards", {
   columns: ["Doing", "Verifying"],
 });
 const COLORS: Record<string, string> = {
-  Investigating: "violet",
+  Investigating: "teal",
   "In progress": "blue",
   Review: "amber",
   "On hold": "gray",

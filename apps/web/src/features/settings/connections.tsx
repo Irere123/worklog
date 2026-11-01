@@ -23,7 +23,7 @@ import { Button } from "#ui/button";
 import { Badge, Dot } from "#ui/chip";
 import type { Tone } from "#ui/chip";
 import { ErrorNote, Skeleton } from "#ui/feedback";
-import { Field, Input } from "#ui/field";
+import { Checkbox, Field, Input } from "#ui/field";
 import { Dialog, Tooltip } from "#ui/overlay";
 import { color, font, media, radius, space, text } from "#ui/tokens.stylex";
 
@@ -354,7 +354,7 @@ export function ConnectionDetail({ id }: { id: string }) {
     return <Skeleton lines={6} />;
   }
   if (!connection) {
-    return <ErrorNote error={new Error("That connection doesn't exist.")} />;
+    return <ErrorNote error={new Error("That connection doesn’t exist.")} />;
   }
   const h = health.data;
 
@@ -539,7 +539,7 @@ function WebhookUrls({ urls }: { urls: Record<string, string> }) {
   return (
     <Card
       title="Webhook URLs"
-      description="Paste into the provider's webhook settings, with the same secret."
+      description="Paste into the provider’s webhook settings, with the same secret."
     >
       {Object.entries(urls).map(([label, url]) => (
         <Row
@@ -664,14 +664,11 @@ function Sources({ id, selected }: { id: string; selected: string[] }) {
         {sources.data?.map((s) => (
           <li key={s.id}>
             <label {...stylex.props(styles.source)}>
-              <input
-                type="checkbox"
+              <Checkbox
                 checked={current.includes(s.id)}
-                onChange={(e) =>
+                onCheckedChange={(on) =>
                   setPicked(
-                    e.target.checked
-                      ? [...current, s.id]
-                      : current.filter((x) => x !== s.id)
+                    on ? [...current, s.id] : current.filter((x) => x !== s.id)
                   )
                 }
               />

@@ -46,7 +46,7 @@ const OWNER_PROMPTS = [
   "What needs me today?",
   "What did the team ship this week?",
   "Remind me Thursday to check the Postgres upgrade",
-  "Draft my standup from yesterday's work",
+  "Draft my standup from yesterday’s work",
 ];
 
 function toUi(messages: Stored[]): UIMessage[] {
@@ -107,7 +107,7 @@ export function Chat({
       void client.invalidateQueries({ queryKey: ["conversations"] });
     },
     onError: (error) => {
-      toast.error(error.message || "The assistant couldn't answer");
+      toast.error(error.message || "The assistant couldn’t answer");
     },
   });
   const busy = chat.status === "submitted" || chat.status === "streaming";
@@ -289,7 +289,7 @@ function Welcome({
       <h2 {...stylex.props(styles.welcomeTitle)}>{name}</h2>
       <p {...stylex.props(styles.welcomeText)}>
         {teammate
-          ? `Ask about ${owner ?? "their"} work while they're away.`
+          ? `Ask about ${owner ?? "their"} work while they’re away.`
           : "It knows your work, learns from what you tell it, and comes back when you ask it to."}
       </p>
       <div {...stylex.props(styles.prompts)}>
@@ -392,7 +392,7 @@ const TOOL_NAMES: Record<string, [string, string]> = {
   search_activity: ["Searching activity", "Searched activity"],
   search_cards: ["Searching the board", "Searched the board"],
   get_card: ["Reading a card", "Read a card"],
-  work_snapshot: ["Checking what they're on", "Checked what they're on"],
+  work_snapshot: ["Checking what they’re on", "Checked what they’re on"],
   team_directory: ["Looking up the team", "Looked up the team"],
   my_attention: ["Checking your inbox", "Checked your inbox"],
   recall: ["Remembering", "Remembered"],

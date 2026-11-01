@@ -2,10 +2,10 @@ import { Dialog as BaseDialog } from "@base-ui/react/dialog";
 import { Menu as BaseMenu } from "@base-ui/react/menu";
 import { Popover as BasePopover } from "@base-ui/react/popover";
 import { Tooltip as BaseTooltip } from "@base-ui/react/tooltip";
-import { CheckIcon, XIcon } from "@phosphor-icons/react";
+import { CheckIcon, MagnifyingGlassIcon, XIcon } from "@phosphor-icons/react";
 import * as stylex from "@stylexjs/stylex";
 import type { StyleXStyles } from "@stylexjs/stylex";
-import type { ReactElement, ReactNode } from "react";
+import type { ReactElement, ReactNode, RefObject } from "react";
 
 import { isShown } from "#lib/node";
 
@@ -20,6 +20,10 @@ import {
   space,
   text,
 } from "./tokens.stylex";
+
+// Base UI's 5px default lets a menu opened by the window's edge sit flush against it.
+const EDGE = 8;
+const TOUCH = "@media (hover: none) and (pointer: coarse)";
 
 /* Tooltip ---------------------------------------------------------------- */
 
@@ -40,7 +44,11 @@ export function Tooltip({
     <BaseTooltip.Root>
       <BaseTooltip.Trigger render={children} />
       <BaseTooltip.Portal>
-        <BaseTooltip.Positioner side={side} sideOffset={6}>
+        <BaseTooltip.Positioner
+          side={side}
+          sideOffset={6}
+          collisionPadding={EDGE}
+        >
           <BaseTooltip.Popup {...stylex.props(styles.tooltip)}>
             {label}
             {shortcut && <Kbd sx={styles.tooltipKbd}>{shortcut}</Kbd>}
@@ -53,20 +61,33 @@ export function Tooltip({
 
 /* Menu ------------------------------------------------------------------- */
 
+/**
+ * A menu of actions. With `search`, it opens with a filter field on top, for lists that grow
+ * with the team (people, boards) where scanning stops working.
+ */
 export function Menu({
   trigger,
   children,
   align = "start",
   side = "bottom",
   width,
+  search,
+  empty = "Nothing matches that.",
+  anchor,
+  onSearchChange,
 }: {
   trigger: ReactElement;
   children: ReactNode;
   align?: "start" | "center" | "end";
   side?: "top" | "bottom" | "left" | "right";
   width?: number;
+  search?: string;
+  empty?: ReactNode;
+  // A trigger that moves while the menu is open (a chip added beside it) would drag the menu along.
+  anchor?: RefObject<Element | null>;
+  onSearchChange?: (query: string) => void;
 }) {
-  return (
+  const menu = (
     <BaseMenu.Root>
       <BaseMenu.Trigger render={trigger} />
       <BaseMenu.Portal>
@@ -74,27 +95,58 @@ export function Menu({
           align={align}
           side={side}
           sideOffset={4}
+          collisionPadding={EDGE}
+          anchor={anchor}
           {...stylex.props(styles.positioner)}
         >
           <BaseMenu.Popup
             {...stylex.props(
-              styles.popup,
+              surface.popup,
               styles.menu,
+              search === undefined ? styles.menuScroll : styles.searchable,
               width !== undefined && styles.width(width)
             )}
           >
-            {children}
+            {search === undefined ? (
+              children
+            ) : (
+              <>
+                <div {...stylex.props(styles.search)}>
+                  <MagnifyingGlassIcon size={14} />
+                  <BaseMenu.Input
+                    aria-label={search}
+                    placeholder={search}
+                    {...stylex.props(styles.searchInput)}
+                  />
+                </div>
+                <BaseMenu.Empty {...stylex.props(styles.empty)}>
+                  {empty}
+                </BaseMenu.Empty>
+                <BaseMenu.List {...stylex.props(styles.list)}>
+                  {children}
+                </BaseMenu.List>
+              </>
+            )}
           </BaseMenu.Popup>
         </BaseMenu.Positioner>
       </BaseMenu.Portal>
     </BaseMenu.Root>
+  );
+  return search === undefined ? (
+    menu
+  ) : (
+    <BaseMenu.FilterProvider autoHighlight onValueChange={onSearchChange}>
+      {menu}
+    </BaseMenu.FilterProvider>
   );
 }
 
 export function MenuItem({
   icon,
   children,
+  label,
   shortcut,
+  detail,
   onClick,
   danger = false,
   disabled = false,
@@ -102,7 +154,9 @@ export function MenuItem({
 }: {
   icon?: ReactNode;
   children: ReactNode;
+  label?: string;
   shortcut?: string;
+  detail?: string;
   onClick?: () => void;
   danger?: boolean;
   disabled?: boolean;
@@ -112,14 +166,99 @@ export function MenuItem({
     <BaseMenu.Item
       onClick={onClick}
       disabled={disabled}
-      {...stylex.props(styles.item, danger && styles.danger)}
+      label={label ?? textOf(children)}
+      {...stylex.props(surface.item, danger && surface.danger)}
     >
-      <span {...stylex.props(styles.itemIcon)}>
-        {checked === undefined ? icon : checked && <CheckIcon size={14} />}
-      </span>
-      <span {...stylex.props(styles.itemLabel)}>{children}</span>
+      {(icon !== undefined || checked !== undefined) && (
+        <span {...stylex.props(surface.itemIcon)}>
+          {checked === undefined ? icon : checked && <CheckIcon size={14} />}
+        </span>
+      )}
+      <span {...stylex.props(surface.itemLabel)}>{children}</span>
+      {detail !== undefined && (
+        <span {...stylex.props(styles.detail)}>{detail}</span>
+      )}
       {shortcut && <Kbd>{shortcut}</Kbd>}
     </BaseMenu.Item>
+  );
+}
+
+/**
+ * A toggle that keeps the menu open, so several can be flipped in one visit: assigning three
+ * people shouldn't take three trips.
+ */
+export function MenuCheckboxItem({
+  icon,
+  children,
+  label,
+  shortcut,
+  checked,
+  onCheckedChange,
+}: {
+  icon?: ReactNode;
+  children: ReactNode;
+  label?: string;
+  shortcut?: string;
+  checked: boolean;
+  onCheckedChange: (checked: boolean) => void;
+}) {
+  return (
+    <BaseMenu.CheckboxItem
+      checked={checked}
+      onCheckedChange={(next) => onCheckedChange(next)}
+      label={label ?? textOf(children)}
+      {...stylex.props(surface.item)}
+    >
+      <span {...stylex.props(surface.itemIcon)}>{icon}</span>
+      <span {...stylex.props(surface.itemLabel)}>{children}</span>
+      {shortcut && <Kbd>{shortcut}</Kbd>}
+      <BaseMenu.CheckboxItemIndicator
+        keepMounted
+        {...stylex.props(surface.indicator)}
+      >
+        <CheckIcon size={14} />
+      </BaseMenu.CheckboxItemIndicator>
+    </BaseMenu.CheckboxItem>
+  );
+}
+
+/** Colours as a grid of swatches: fourteen named rows would outgrow the menu they sit in. */
+export function MenuSwatches({
+  label,
+  options,
+  value,
+  onValueChange,
+}: {
+  label: string;
+  options: { value: string; label: string; color: string }[];
+  value: string;
+  onValueChange: (value: string) => void;
+}) {
+  return (
+    <BaseMenu.RadioGroup
+      aria-label={label}
+      value={value}
+      onValueChange={(next: string) => onValueChange(next)}
+      {...stylex.props(styles.swatches)}
+    >
+      {options.map((o) => (
+        <BaseMenu.RadioItem
+          key={o.value}
+          value={o.value}
+          label={o.label}
+          aria-label={o.label}
+          title={o.label}
+          closeOnClick
+          {...stylex.props(styles.swatch)}
+        >
+          <span {...stylex.props(styles.swatchFill(o.color))}>
+            <BaseMenu.RadioItemIndicator {...stylex.props(styles.swatchTick)}>
+              <CheckIcon size={11} weight="bold" />
+            </BaseMenu.RadioItemIndicator>
+          </span>
+        </BaseMenu.RadioItem>
+      ))}
+    </BaseMenu.RadioGroup>
   );
 }
 
@@ -136,16 +275,22 @@ export function MenuSeparator() {
 export function Popover({
   trigger,
   children,
+  title,
+  description,
   align = "start",
   side = "bottom",
+  width,
   open,
   onOpenChange,
   sx,
 }: {
   trigger: ReactElement;
   children: ReactNode;
+  title?: ReactNode;
+  description?: ReactNode;
   align?: "start" | "center" | "end";
   side?: "top" | "bottom" | "left" | "right";
+  width?: number;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
   sx?: StyleXStyles;
@@ -158,17 +303,39 @@ export function Popover({
           align={align}
           side={side}
           sideOffset={6}
+          collisionPadding={EDGE}
           {...stylex.props(styles.positioner)}
         >
           <BasePopover.Popup
-            {...stylex.props(styles.popup, styles.popover, sx)}
+            {...stylex.props(
+              surface.popup,
+              styles.popover,
+              width !== undefined && styles.width(width),
+              sx
+            )}
           >
+            {isShown(title) && (
+              <BasePopover.Title {...stylex.props(styles.popoverTitle)}>
+                {title}
+              </BasePopover.Title>
+            )}
+            {isShown(description) && (
+              <BasePopover.Description
+                {...stylex.props(styles.popoverDescription)}
+              >
+                {description}
+              </BasePopover.Description>
+            )}
             {children}
           </BasePopover.Popup>
         </BasePopover.Positioner>
       </BasePopover.Portal>
     </BasePopover.Root>
   );
+}
+
+function textOf(children: ReactNode) {
+  return typeof children === "string" ? children : undefined;
 }
 
 /* Dialog ----------------------------------------------------------------- */
@@ -231,70 +398,111 @@ export function Dialog({
 
 const styles = stylex.create({
   positioner: { zIndex: 50, outline: "none" },
-  popup: {
-    transformOrigin: "var(--transform-origin)",
-    backgroundColor: color.raised,
-    boxShadow: shadow.float,
-    outline: "none",
-    transitionProperty: "opacity, transform",
-    transitionDuration: motion.base,
-    transitionTimingFunction: motion.out,
-    opacity: {
-      default: 1,
-      ":is([data-starting-style])": 0,
-      ":is([data-ending-style])": 0,
-    },
-    transform: {
-      default: "scale(1)",
-      ":is([data-starting-style])": "scale(0.96)",
-      ":is([data-ending-style])": "scale(0.96)",
-    },
-  },
   width: (width: number) => ({ width }),
   menu: {
+    display: "flex",
+    flexDirection: "column",
     minWidth: 200,
-    padding: space.xs,
+    maxWidth: "var(--available-width)",
+    maxHeight: "min(420px, var(--available-height))",
     borderRadius: radius.md,
-    maxHeight: "var(--available-height)",
+  },
+  menuScroll: { padding: space.xs, overflowY: "auto" },
+  // The list scrolls under a fixed filter field, so the field never scrolls out of reach.
+  searchable: { minWidth: 240, overflow: "hidden" },
+  search: {
+    display: "flex",
+    alignItems: "center",
+    gap: space.sm,
+    flexShrink: 0,
+    height: 38,
+    paddingInline: space.md,
+    color: color.fgFaint,
+    borderBottomWidth: 1,
+    borderBottomStyle: "solid",
+    borderBottomColor: color.line,
+  },
+  searchInput: {
+    flexGrow: 1,
+    minWidth: 0,
+    height: "100%",
+    borderWidth: 0,
+    backgroundColor: "transparent",
+    outline: "none",
+    color: color.fg,
+    // Under 16px, iOS zooms the page to focus the field.
+    fontSize: { default: text.label, [TOUCH]: 16 },
+    "::placeholder": { color: color.fgFaint },
+  },
+  list: {
+    flexGrow: 1,
+    minHeight: 0,
+    padding: space.xs,
     overflowY: "auto",
+    overscrollBehavior: "contain",
+  },
+  empty: {
+    paddingInline: space.md,
+    paddingBlock: space.lg,
+    fontSize: text.label,
+    color: color.fgMuted,
   },
   popover: {
     borderRadius: radius.md,
     padding: space.lg,
     maxWidth: "min(360px, var(--available-width))",
+    maxHeight: "var(--available-height)",
+    overflowY: "auto",
   },
-  item: {
-    display: "flex",
-    alignItems: "center",
-    gap: space.md,
-    height: 30,
-    paddingInline: space.md,
-    borderRadius: radius.xs,
+  popoverTitle: {
     fontSize: text.label,
+    lineHeight: leading.label,
+    fontWeight: 600,
     color: color.fg,
-    cursor: "default",
-    userSelect: "none",
+  },
+  popoverDescription: {
+    marginTop: space.xxs,
+    marginBottom: space.md,
+    fontSize: text.label,
+    lineHeight: leading.label,
+    color: color.fgMuted,
+  },
+  detail: {
+    flexShrink: 0,
+    marginInlineStart: space.lg,
+    fontSize: text.meta,
+    color: color.fgFaint,
+    fontVariantNumeric: "tabular-nums",
+  },
+  swatches: {
+    display: "grid",
+    gridTemplateColumns: "repeat(7, 28px)",
+    gap: space.xxs,
+    paddingInline: space.sm,
+    paddingBottom: space.sm,
+  },
+  swatch: {
+    display: "grid",
+    placeItems: "center",
+    width: 28,
+    height: 28,
+    borderRadius: radius.sm,
     outline: "none",
+    cursor: "default",
     backgroundColor: {
       default: "transparent",
       ":is([data-highlighted])": color.uiHover,
     },
-    opacity: { default: 1, ":is([data-disabled])": 0.45 },
   },
-  danger: { color: color.redFg },
-  itemIcon: {
-    display: "inline-grid",
+  swatchFill: (fill: string) => ({
+    display: "grid",
     placeItems: "center",
-    width: 16,
-    color: color.fgMuted,
-    flexShrink: 0,
-  },
-  itemLabel: {
-    flexGrow: 1,
-    overflow: "hidden",
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-  },
+    width: 18,
+    height: 18,
+    borderRadius: "50%",
+    backgroundColor: fill,
+  }),
+  swatchTick: { display: "grid", color: "oklch(1 0 0)" },
   menuLabel: {
     paddingInline: space.md,
     paddingBlock: space.sm,
@@ -440,4 +648,73 @@ const dialogSizes = stylex.create({
   sm: { width: 400 },
   md: { width: 520 },
   lg: { width: 720 },
+});
+
+/** The floating surface and rows every menu, popover and select share. */
+export const surface = stylex.create({
+  popup: {
+    transformOrigin: "var(--transform-origin)",
+    backgroundColor: color.raised,
+    boxShadow: shadow.float,
+    outline: "none",
+    transitionProperty: "opacity, transform",
+    // Leaving is quicker than arriving: once dismissed, the popup shouldn't hold the eye.
+    transitionDuration: {
+      default: motion.base,
+      ":is([data-ending-style])": motion.fast,
+      ":is([data-instant])": "0ms",
+    },
+    transitionTimingFunction: motion.out,
+    opacity: {
+      default: 1,
+      ":is([data-starting-style])": 0,
+      ":is([data-ending-style])": 0,
+    },
+    transform: {
+      default: "scale(1)",
+      ":is([data-starting-style])": "scale(0.96)",
+      ":is([data-ending-style])": "scale(0.98)",
+    },
+  },
+  item: {
+    display: "flex",
+    alignItems: "center",
+    gap: space.md,
+    // A finger needs the taller row; a pointer gets the denser list.
+    height: { default: 30, [TOUCH]: 40 },
+    paddingInline: space.md,
+    borderRadius: radius.xs,
+    fontSize: text.label,
+    color: color.fg,
+    cursor: "default",
+    userSelect: "none",
+    outline: "none",
+    backgroundColor: {
+      default: "transparent",
+      ":is([data-highlighted])": color.uiHover,
+    },
+    opacity: { default: 1, ":is([data-disabled])": 0.45 },
+  },
+  danger: { color: color.redFg },
+  itemIcon: {
+    display: "inline-grid",
+    placeItems: "center",
+    width: 16,
+    color: color.fgMuted,
+    flexShrink: 0,
+  },
+  itemLabel: {
+    flexGrow: 1,
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+  },
+  indicator: {
+    display: "inline-grid",
+    placeItems: "center",
+    width: 16,
+    flexShrink: 0,
+    color: color.fg,
+    visibility: { default: "hidden", ":is([data-checked])": "visible" },
+  },
 });

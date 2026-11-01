@@ -2268,6 +2268,8 @@ export interface operations {
                         magicLink: boolean;
                         socialProviders: ("github" | "discord" | "slack")[];
                         authBasePath: string;
+                        /** @description No workspace exists yet, so `POST /v1/setup` is open */
+                        setupOpen: boolean;
                     };
                 };
             };

@@ -12,12 +12,13 @@ import {
   useTable,
 } from "@tanstack/react-table";
 import type { SortingState } from "@tanstack/react-table";
-import { useMemo, useState } from "react";
+import { createContext, useContext, useMemo, useState } from "react";
 
 import type { Schemas } from "#api/client";
 import { q } from "#api/queries";
 import {
   DueChip,
+  hueOfColor,
   STAGE_TONE,
   stageLabel,
   useMembers,
@@ -57,11 +58,13 @@ const STAGE_ORDER: Record<Card["stage"], number> = {
 // A phone has room for the number, the title and where it sits; the rest needs a wide screen.
 const WIDE_ONLY = new Set(["assignees", "dueOn", "lastActiveAt"]);
 
+const ColumnColors = createContext(new Map<string, string>());
+
 const columns = helper.columns([
   helper.accessor("number", {
     header: "#",
     cell: (info) => (
-      <span {...stylex.props(styles.number)}>{info.getValue()}</span>
+      <span {...stylex.props(styles.number)}>#{info.getValue()}</span>
     ),
   }),
   helper.accessor("title", {
@@ -110,13 +113,35 @@ function TitleCell({ card }: { card: Card }) {
       })}
       {...stylex.props(styles.title)}
     >
-      {card.golden && <TicketIcon size={13} {...stylex.props(styles.gold)} />}
       {card.title}
+      {card.golden && (
+        <TicketIcon
+          size={13}
+          aria-label="Golden ticket"
+          {...stylex.props(styles.gold)}
+        />
+      )}
     </Link>
   );
 }
 
 function WhereCell({ card }: { card: Card }) {
+  const colors = useContext(ColumnColors);
+  const columnColor = card.columnId ? colors.get(card.columnId) : undefined;
+  // A column reads as it does on the board, its dot and name, so it keeps its colour in both views.
+  if (card.stage === "active" && columnColor !== undefined) {
+    return (
+      <Badge
+        icon={
+          <span
+            {...stylex.props(styles.dot, styles.hue(hueOfColor(columnColor)))}
+          />
+        }
+      >
+        {card.columnName ?? "Active"}
+      </Badge>
+    );
+  }
   return (
     <Badge tone={STAGE_TONE[card.stage]}>
       {card.stage === "active"
@@ -192,6 +217,10 @@ export function BoardList({
       );
   }, [active, triage, later, done, filter]);
 
+  const colors = useMemo(
+    () => new Map(board.columns.map((c) => [c.id, c.color])),
+    [board.columns]
+  );
   const table = useTable({
     features,
     columns,
@@ -216,77 +245,82 @@ export function BoardList({
   }
 
   return (
-    <div {...stylex.props(styles.wrap)}>
-      <table {...stylex.props(styles.table)}>
-        <thead>
-          {table.getHeaderGroups().map((group) => (
-            <tr key={group.id}>
-              {group.headers.map((header) => {
-                const sorted = header.column.getIsSorted();
-                return (
-                  <th
-                    key={header.id}
-                    scope="col"
-                    aria-sort={ariaSort(sorted)}
+    <ColumnColors value={colors}>
+      <div {...stylex.props(styles.wrap)}>
+        <table {...stylex.props(styles.table)}>
+          <thead>
+            {table.getHeaderGroups().map((group) => (
+              <tr key={group.id}>
+                {group.headers.map((header) => {
+                  const sorted = header.column.getIsSorted();
+                  return (
+                    <th
+                      key={header.id}
+                      scope="col"
+                      aria-sort={ariaSort(sorted)}
+                      {...stylex.props(
+                        styles.th,
+                        header.column.id === "title" && styles.thGrow,
+                        WIDE_ONLY.has(header.column.id) && styles.wideOnly
+                      )}
+                    >
+                      <button
+                        type="button"
+                        onClick={header.column.getToggleSortingHandler()}
+                        {...stylex.props(styles.sort)}
+                      >
+                        <table.FlexRender header={header} />
+                        {/* The slot stays when unsorted, so sorting doesn't shift the columns. */}
+                        <span {...stylex.props(styles.arrow)}>
+                          {sorted === "asc" && <ArrowUpIcon size={12} />}
+                          {sorted === "desc" && <ArrowDownIcon size={12} />}
+                        </span>
+                      </button>
+                    </th>
+                  );
+                })}
+              </tr>
+            ))}
+          </thead>
+          <tbody>
+            {table.getRowModel().rows.map((row) => (
+              <tr
+                key={row.id}
+                onClick={(event) => {
+                  // The title link already navigated; the row is the larger pointer target.
+                  if (
+                    event.target instanceof Element &&
+                    event.target.closest("a")
+                  ) {
+                    return;
+                  }
+                  void navigate({
+                    to: ".",
+                    search: (prev: Record<string, unknown>) => ({
+                      ...prev,
+                      card: row.original.number,
+                    }),
+                  });
+                }}
+                {...stylex.props(styles.tr)}
+              >
+                {row.getAllCells().map((cell) => (
+                  <td
+                    key={cell.id}
                     {...stylex.props(
-                      styles.th,
-                      header.column.id === "title" && styles.thGrow,
-                      WIDE_ONLY.has(header.column.id) && styles.wideOnly
+                      styles.td,
+                      WIDE_ONLY.has(cell.column.id) && styles.wideOnly
                     )}
                   >
-                    <button
-                      type="button"
-                      onClick={header.column.getToggleSortingHandler()}
-                      {...stylex.props(styles.sort)}
-                    >
-                      <table.FlexRender header={header} />
-                      {sorted === "asc" && <ArrowUpIcon size={12} />}
-                      {sorted === "desc" && <ArrowDownIcon size={12} />}
-                    </button>
-                  </th>
-                );
-              })}
-            </tr>
-          ))}
-        </thead>
-        <tbody>
-          {table.getRowModel().rows.map((row) => (
-            <tr
-              key={row.id}
-              onClick={(event) => {
-                // The title link already navigated; the row is the larger pointer target.
-                if (
-                  event.target instanceof Element &&
-                  event.target.closest("a")
-                ) {
-                  return;
-                }
-                void navigate({
-                  to: ".",
-                  search: (prev: Record<string, unknown>) => ({
-                    ...prev,
-                    card: row.original.number,
-                  }),
-                });
-              }}
-              {...stylex.props(styles.tr)}
-            >
-              {row.getAllCells().map((cell) => (
-                <td
-                  key={cell.id}
-                  {...stylex.props(
-                    styles.td,
-                    WIDE_ONLY.has(cell.column.id) && styles.wideOnly
-                  )}
-                >
-                  <table.FlexRender cell={cell} />
-                </td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+                    <table.FlexRender cell={cell} />
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </ColumnColors>
   );
 }
 
@@ -325,6 +359,7 @@ const styles = stylex.create({
   },
   thGrow: { width: "100%" },
   wideOnly: { display: { default: null, "@media (max-width: 640px)": "none" } },
+  arrow: { display: "inline-grid", width: 12, flexShrink: 0 },
   sort: {
     display: "inline-flex",
     alignItems: "center",
@@ -354,6 +389,10 @@ const styles = stylex.create({
     verticalAlign: "middle",
   },
   number: { fontFamily: font.mono, fontSize: 11.5, color: color.fgFaint },
+  dot: { width: 7, height: 7, borderRadius: "50%" },
+  hue: (hue: number) => ({
+    backgroundColor: hue < 0 ? color.fgFaint : `oklch(0.66 0.15 ${hue})`,
+  }),
   title: {
     display: "inline-flex",
     alignItems: "center",

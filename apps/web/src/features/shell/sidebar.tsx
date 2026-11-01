@@ -307,6 +307,8 @@ function WorkspaceMenu({
   );
 }
 
+const TOUCH = "@media (hover: none) and (pointer: coarse)";
+
 const styles = stylex.create({
   sidebar: {
     display: "flex",
@@ -364,7 +366,7 @@ const styles = stylex.create({
     alignItems: "center",
     gap: space.md,
     flexGrow: 1,
-    height: 30,
+    height: { default: 30, [TOUCH]: 40 },
     paddingInline: space.md,
     borderRadius: radius.sm,
     fontSize: text.label,
@@ -379,8 +381,8 @@ const styles = stylex.create({
   square: {
     display: "grid",
     placeItems: "center",
-    width: 30,
-    height: 30,
+    width: { default: 30, [TOUCH]: 40 },
+    height: { default: 30, [TOUCH]: 40 },
     flexShrink: 0,
     borderRadius: radius.sm,
     color: {
@@ -409,8 +411,8 @@ const styles = stylex.create({
   groupAction: {
     display: "grid",
     placeItems: "center",
-    width: 22,
-    height: 22,
+    width: { default: 22, [TOUCH]: 36 },
+    height: { default: 22, [TOUCH]: 36 },
     borderRadius: radius.xs,
     color: {
       default: color.fgFaint,
@@ -425,7 +427,8 @@ const styles = stylex.create({
     display: "flex",
     alignItems: "center",
     gap: space.md,
-    height: 28,
+    // The sidebar is a drawer on phones, where a 28px row is a near miss for a thumb.
+    height: { default: 28, [TOUCH]: 40 },
     paddingInline: space.md,
     borderRadius: radius.sm,
     fontSize: text.label,

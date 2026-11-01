@@ -55,7 +55,7 @@ export function Instructions() {
   return (
     <SettingsPage
       title="Instructions"
-      description="Tell your assistant how to work for you. It follows these after Worklog's constitution, and it can never change them itself."
+      description="Tell your assistant how to work for you. It follows these after Worklog’s constitution, and it can never change them itself."
     >
       <Card
         footer={
@@ -369,42 +369,34 @@ function AddMemory({ open, onClose }: { open: boolean; onClose: () => void }) {
         <Textarea
           autoFocus
           aria-label="Memory"
-          placeholder="I'm in clinic every Tuesday morning; don't expect replies."
+          placeholder="I’m in clinic every Tuesday morning; don’t expect replies."
           value={content}
           onChange={(e) => setContent(e.target.value)}
         />
         <Row label="Kind">
           <Select
-            aria-label="Kind"
+            label="Kind"
             value={kind}
-            onChange={(e) => {
-              const next = oneOf(MEMORY_KINDS, e.target.value);
-              if (next) {
-                setKind(next);
-              }
-            }}
-          >
-            <option value="fact">Fact</option>
-            <option value="profile">About me</option>
-          </Select>
+            onValueChange={setKind}
+            options={[
+              { value: "fact", label: "Fact" },
+              { value: "profile", label: "About me" },
+            ]}
+          />
         </Row>
         <Row
           label="Teammates"
           description="Whether your assistant may use this when teammates ask it things."
         >
           <Select
-            aria-label="Visibility"
+            label="Visibility"
             value={visibility}
-            onChange={(e) => {
-              const next = oneOf(VISIBILITIES, e.target.value);
-              if (next) {
-                setVisibility(next);
-              }
-            }}
-          >
-            <option value="private">Only for me</option>
-            <option value="team">Can use it</option>
-          </Select>
+            onValueChange={setVisibility}
+            options={[
+              { value: "private", label: "Only for me" },
+              { value: "team", label: "Can use it" },
+            ]}
+          />
         </Row>
       </div>
     </Dialog>
@@ -427,13 +419,6 @@ async function exportMemories() {
 
 const MEMORY_KINDS = ["fact", "profile"] as const;
 const VISIBILITIES = ["private", "team"] as const;
-
-function oneOf<T extends string>(
-  values: readonly T[],
-  value: string
-): T | undefined {
-  return values.find((v) => v === value);
-}
 
 const styles = stylex.create({
   grow: { flexGrow: 1 },

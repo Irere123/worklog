@@ -66,7 +66,7 @@ const KINDS: Record<string, { label: string; icon: ReactNode; tone: Tone }> = {
     tone: "amber",
   },
   "agent.failed": {
-    label: "Agent couldn't finish",
+    label: "Agent couldn’t finish",
     icon: <RobotIcon size={13} />,
     tone: "red",
   },
@@ -131,11 +131,34 @@ const SNOOZES: { label: string; at: () => Date }[] = [
     label: "Next week",
     at: () => {
       const d = tomorrowMorning();
-      d.setDate(d.getDate() + ((8 - d.getDay()) % 7));
+      // On a Sunday, the coming Monday is tomorrow: a week later is what "next week" means.
+      d.setDate(d.getDate() + ((8 - d.getDay()) % 7 || 7));
       return d;
     },
   },
 ];
+
+/** When a snooze ends, so the choice isn't a guess: "21:40", "Mon 09:00", "Mon 9 Nov". */
+function wakeLabel(at: Date) {
+  const days = Math.round((at.getTime() - Date.now()) / 86_400_000);
+  if (at.toDateString() === new Date().toDateString()) {
+    return clock.format(at);
+  }
+  return days < 6
+    ? `${weekdayShort.format(at)} ${clock.format(at)}`
+    : dayMonth.format(at);
+}
+
+const clock = new Intl.DateTimeFormat("en-GB", {
+  hour: "2-digit",
+  minute: "2-digit",
+});
+const weekdayShort = new Intl.DateTimeFormat("en-GB", { weekday: "short" });
+const dayMonth = new Intl.DateTimeFormat("en-GB", {
+  weekday: "short",
+  day: "numeric",
+  month: "short",
+});
 
 export function Inbox({
   state,
@@ -392,7 +415,13 @@ function Budget() {
   if (!today.data) {
     return "Only what’s waiting on you.";
   }
-  return `Only what’s waiting on you · ${Math.min(today.data.pushes, cap)} of ${cap} pings used today`;
+  const sent = today.data.pushes;
+  if (sent >= cap) {
+    return `Only what’s waiting on you · ${cap} pings sent today, so the rest waits for your brief`;
+  }
+  return sent === 0
+    ? `Only what’s waiting on you · no pings yet today, ${cap} at most`
+    : `Only what’s waiting on you · pinged you ${sent} of ${cap} times today`;
 }
 
 function Row({
@@ -415,12 +444,6 @@ function Row({
         onClick={onSelect}
         {...stylex.props(styles.row, selected && styles.rowSelected)}
       >
-        <span
-          {...stylex.props(
-            styles.priority,
-            item.priority === "high" && styles.priorityHigh
-          )}
-        />
         <span {...stylex.props(styles.rowAvatar)}>
           {from ? (
             <Avatar person={from} size={28} />
@@ -442,6 +465,12 @@ function Row({
           title={exactTime(item.updatedAt)}
           {...stylex.props(styles.rowTime)}
         >
+          {item.priority === "high" && (
+            <span
+              aria-label="High priority"
+              {...stylex.props(styles.priority)}
+            />
+          )}
           {ago(item.updatedAt)}
         </time>
       </button>
@@ -590,6 +619,7 @@ function Detail({
           {SNOOZES.map((s) => (
             <MenuItem
               key={s.label}
+              detail={wakeLabel(s.at())}
               onClick={() => {
                 actions.update(item, "snoozed", s.at());
                 onDone();
@@ -765,7 +795,7 @@ function Empty({ state }: { state: AttentionState }) {
   return <EmptyState title={`Nothing ${state}`} />;
 }
 
-type Undo = { item: Item; from: AttentionState };
+type Undo = { item: Item; from: AttentionState; toast?: string | number };
 
 /** Inbox writes are optimistic and the last one can be undone with Z. */
 function useInboxActions(state: AttentionState) {
@@ -776,6 +806,13 @@ function useInboxActions(state: AttentionState) {
   const remove = (item: Item) => {
     client.setQueryData<Item[]>(key, (list) =>
       list?.filter((i) => i.id !== item.id)
+    );
+  };
+  const restore = (item: Item) => {
+    client.setQueryData<Item[]>(key, (list) =>
+      list?.some((i) => i.id === item.id) === true
+        ? list
+        : [...(list ?? []), item]
     );
   };
   const refresh = () => {
@@ -798,8 +835,12 @@ function useInboxActions(state: AttentionState) {
           body: { state: next, snoozedUntil: until?.toISOString() },
         })
       ),
+    // Undo puts the row back before the server answers: the live feed then sees an item it
+    // already holds, instead of announcing it as a new ping.
     onMutate: ({ item, next }) => {
-      if (next !== state) {
+      if (next === state) {
+        restore(item);
+      } else {
         remove(item);
       }
     },
@@ -846,18 +887,22 @@ function useInboxActions(state: AttentionState) {
       return;
     }
     last.current = null;
+    toast.dismiss(previous.toast);
     updateMutation.mutate({ item: previous.item, next: previous.from });
   };
 
   return {
     update(item: Item, next: AttentionState, until?: Date) {
-      last.current = { item, from: item.state };
       updateMutation.mutate({ item, next, until });
-      toast(MESSAGES[next], {
-        duration: UNDO_MS,
-        description: item.title,
-        action: { label: "Undo", onClick: undo },
-      });
+      last.current = {
+        item,
+        from: item.state,
+        toast: toast(MESSAGES[next], {
+          duration: UNDO_MS,
+          description: item.title,
+          action: { label: "Undo", onClick: undo },
+        }),
+      };
     },
     act(item: Item, actionId: string, label: string) {
       last.current = null;
@@ -915,16 +960,10 @@ const styles = stylex.create({
     },
   },
   priority: {
-    position: "absolute",
-    left: 4,
-    top: 18,
-    width: 4,
-    height: 4,
+    width: 6,
+    height: 6,
     borderRadius: "50%",
-  },
-  priorityHigh: {
     backgroundColor: color.amber,
-    boxShadow: `0 0 0 3px ${color.amberSubtle}`,
   },
   rowAvatar: { paddingTop: 2 },
   systemIcon: {
@@ -954,6 +993,10 @@ const styles = stylex.create({
     color: color.fgFaint,
   },
   rowTime: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: space.sm,
+    flexShrink: 0,
     fontSize: text.meta,
     color: color.fgFaint,
     fontVariantNumeric: "tabular-nums",

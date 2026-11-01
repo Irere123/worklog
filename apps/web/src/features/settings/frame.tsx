@@ -2,12 +2,12 @@ import {
   BellIcon,
   BrainIcon,
   CalendarDotsIcon,
-  FingerprintIcon,
   GearIcon,
+  IdentificationBadgeIcon,
   KeyIcon,
   PaperPlaneRightIcon,
-  PencilLineIcon,
   PlugIcon,
+  ScrollIcon,
   ThumbsUpIcon,
   UserIcon,
   UsersIcon,
@@ -55,7 +55,7 @@ const GROUPS: {
       {
         to: "/settings/assistant",
         label: "Instructions",
-        icon: <PencilLineIcon size={15} />,
+        icon: <ScrollIcon size={15} />,
       },
       {
         to: "/settings/memory",
@@ -85,7 +85,7 @@ const GROUPS: {
       {
         to: "/settings/identities",
         label: "People in your tools",
-        icon: <FingerprintIcon size={15} />,
+        icon: <IdentificationBadgeIcon size={15} />,
       },
       {
         to: "/settings/connections",

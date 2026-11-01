@@ -66,17 +66,20 @@ export const authConfigRoutes = router().openapi(
     security: [],
     responses: { 200: json(AuthConfigResponse) },
   }),
-  (c) =>
-    respond(
+  async (c) => {
+    const ctx = c.get("ctx");
+    return respond(
       c,
       AuthConfigResponse,
       {
         magicLink: true,
-        socialProviders: enabledSocialProviders(c.get("ctx").config),
+        socialProviders: enabledSocialProviders(ctx.config),
         authBasePath: "/api/auth",
+        setupOpen: (await countWorkspaces(ctx.db)) === 0,
       },
       200
-    )
+    );
+  }
 );
 
 export const sessionRoutes = router()

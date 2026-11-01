@@ -61,6 +61,26 @@ describe("board (Fizzy rules)", () => {
     expect(await titles("assignee=me")).toEqual(["Sam's"]);
   });
 
+  test("searching a card's number finds it, with or without the #", async () => {
+    const { token, board } = await boardSetup();
+    for (const title of ["Ship the export", "Fix 2FA", "Review the copy"]) {
+      await env.call("POST", "/v1/cards", {
+        token,
+        body: { boardId: board.id, title },
+      });
+    }
+    const titles = async (q: string) =>
+      (
+        await env.call("GET", `/v1/cards?q=${encodeURIComponent(q)}`, {
+          token,
+        })
+      ).body.map((c: { title: string }) => c.title);
+
+    expect(await titles("3")).toEqual(["Review the copy"]);
+    expect(await titles("#3")).toEqual(["Review the copy"]);
+    expect(await titles("2")).toEqual(["Fix 2FA"]);
+  });
+
   test("pins live in a person's settings, so they follow them to every device", async () => {
     const { token } = await boardSetup();
     const saved = await env.call("PATCH", "/v1/me", {
@@ -120,6 +140,30 @@ describe("board (Fizzy rules)", () => {
         "card.reopened",
       ])
     );
+  });
+
+  test("an edit's log line says what changed in words, not field names", async () => {
+    const { token, board } = await boardSetup();
+    const { body: card } = await env.call("POST", "/v1/cards", {
+      token,
+      body: { boardId: board.id, title: "Ship it" },
+    });
+    const edit = async (body: Record<string, unknown>) => {
+      await env.call("PATCH", `/v1/cards/${card.number}`, { token, body });
+      const history = await env.call(
+        "GET",
+        `/v1/activities?card=${card.number}&kind=card.updated`,
+        { token }
+      );
+      return history.body[0].body;
+    };
+
+    expect(await edit({ body: "Context" })).toBe("Edited the description");
+    expect(await edit({ tags: ["ops", "urgent"] })).toBe("Tagged #ops #urgent");
+    expect(await edit({ dueOn: "2026-11-02", title: "Ship it now" })).toBe(
+      "Renamed it · Set it due 2 Nov"
+    );
+    expect(await edit({ dueOn: null })).toBe("Cleared the due date");
   });
 
   test("golden tickets sort first; otherwise most recently active first", async () => {

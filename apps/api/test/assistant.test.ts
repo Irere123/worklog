@@ -45,6 +45,47 @@ describe("assistant", () => {
     expect(res.body.reply).toContain("OPENROUTER_API_KEY");
   });
 
+  test("without AI, a question about a teammate gets that teammate's snapshot", async () => {
+    const { token, member } = await env.workspace();
+    const sam = await env.teammate(token, "Sam Okello");
+    const ask = async (message: string) =>
+      (
+        await env.call("POST", "/v1/conversations", {
+          token,
+          body: { message },
+        })
+      ).body.reply;
+
+    expect(await ask("What is Sam working on?")).toContain(
+      `*${sam.member.name}* (@${sam.member.handle})`
+    );
+    expect(await ask("What am I working on?")).toContain(
+      `*${member.name}* (@${member.handle})`
+    );
+  });
+
+  test("the fallback snapshot names each card once, with what happened to it", async () => {
+    const { token } = await env.workspace();
+    const board = await env.call("POST", "/v1/boards", {
+      token,
+      body: { name: "Ops", columns: ["Doing"] },
+    });
+    const { body: card } = await env.call("POST", "/v1/cards", {
+      token,
+      body: { boardId: board.body.id, title: "Rotate keys" },
+    });
+    await env.call("POST", `/v1/cards/${card.number}/closure`, { token });
+
+    const res = await env.call("POST", "/v1/conversations", {
+      token,
+      body: { message: "What am I working on?" },
+    });
+    const lines = res.body.reply
+      .split("\n")
+      .filter((l: string) => l.includes("Rotate keys"));
+    expect(lines).toEqual([`• #${card.number} Rotate keys — Marked done`]);
+  });
+
   test("a conversation is named after the first thing asked in it, once", async () => {
     const { token } = await env.workspace();
     const opened = await env.call("POST", "/v1/conversations", {

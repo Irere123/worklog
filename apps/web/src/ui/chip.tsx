@@ -138,6 +138,7 @@ const styles = stylex.create({
     fontSize: 11,
     fontWeight: 500,
     lineHeight: 1,
+    whiteSpace: "nowrap",
     color: color.fgMuted,
     backgroundColor: color.ui,
     boxShadow: `inset 0 -1px 0 ${color.lineUi}, 0 0 0 1px ${color.line}`,

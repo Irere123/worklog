@@ -1,5 +1,4 @@
 import {
-  ArrowRightIcon,
   ArrowsClockwiseIcon,
   CalendarBlankIcon,
   TicketIcon,
@@ -15,6 +14,7 @@ import { q } from "#api/queries";
 import { ago, shortDay } from "#lib/time";
 import { Avatar, AvatarStack } from "#ui/avatar";
 import type { Tone } from "#ui/chip";
+import { addDays, localDay } from "#ui/date-picker";
 import {
   color,
   font,
@@ -138,7 +138,7 @@ export function CardTile({
     >
       <div {...stylex.props(styles.top)}>
         <span {...stylex.props(styles.tag, styles.tagTint(hue))}>
-          <span {...stylex.props(styles.number)}>{card.number}</span>
+          <span {...stylex.props(styles.number)}>#{card.number}</span>
           {showBoard === true &&
             (boardName ?? card.columnName ?? stageLabel(card.stage))}
         </span>
@@ -159,33 +159,46 @@ export function CardTile({
           ))}
         </div>
       )}
-      <div {...stylex.props(styles.meta)}>
-        {creator && <Avatar person={creator} size={16} labelled />}
-        <span title="Added">{ago(card.createdAt)}</span>
-        {/* Untouched since it was added, the second time would only repeat the first. */}
-        {ago(card.lastActiveAt) !== ago(card.createdAt) && (
-          <>
-            <span {...stylex.props(styles.sep)} />
-            <ArrowsClockwiseIcon size={10} aria-hidden />
-            <span title="Last activity">{ago(card.lastActiveAt)}</span>
-          </>
-        )}
-        {assignees.length > 0 && (
-          <>
-            <ArrowRightIcon
-              size={11}
-              aria-hidden
-              {...stylex.props(styles.arrow)}
-            />
-            <AvatarStack people={assignees} size={18} />
-          </>
-        )}
-      </div>
+      <TileMeta card={card} creator={creator} assignees={assignees} />
       {drifting && card.entropy && (
         <DriftBubble at={card.entropy.autoPostponeAt} />
       )}
       {closed && <Stamp card={card} />}
     </Link>
+  );
+}
+
+function TileMeta({
+  card,
+  creator,
+  assignees,
+}: {
+  card: Card;
+  creator: Member | undefined;
+  assignees: Member[];
+}) {
+  const closed = card.stage === "done" || card.stage === "not_now";
+  return (
+    <div {...stylex.props(styles.meta, closed && styles.stampedMeta)}>
+      {creator && <Avatar person={creator} size={16} labelled />}
+      <span title="Added">{ago(card.createdAt)}</span>
+      {/* Untouched since it was added, the second time would only repeat the first. */}
+      {ago(card.lastActiveAt) !== ago(card.createdAt) && (
+        <>
+          <span {...stylex.props(styles.sep)} />
+          <ArrowsClockwiseIcon size={10} aria-hidden />
+          <span title="Last activity">{ago(card.lastActiveAt)}</span>
+        </>
+      )}
+      {assignees.length > 0 && (
+        <span
+          title={`Assigned to ${assignees.map((m) => m.name).join(", ")}`}
+          {...stylex.props(styles.assignees)}
+        >
+          <AvatarStack people={assignees} size={18} />
+        </span>
+      )}
+    </div>
   );
 }
 
@@ -196,7 +209,7 @@ const dueFormat = new Intl.DateTimeFormat("en-GB", {
 
 /** Due dates are plain calendar days; overdue only matters while the card is still open. */
 export function DueChip({ on, done }: { on: string; done: boolean }) {
-  const today = new Date(useHourlyNow()).toISOString().slice(0, 10);
+  const today = localDay(new Date(useHourlyNow()));
   const overdue = !done && on < today;
   const soon = !done && !overdue && on <= addDays(today, 2);
   return (
@@ -212,12 +225,6 @@ export function DueChip({ on, done }: { on: string; done: boolean }) {
       {on === today ? "Today" : dueFormat.format(new Date(`${on}T00:00:00`))}
     </span>
   );
-}
-
-function addDays(day: string, n: number) {
-  const date = new Date(`${day}T00:00:00Z`);
-  date.setUTCDate(date.getUTCDate() + n);
-  return date.toISOString().slice(0, 10);
 }
 
 /** One color per stage wherever a card's place is shown as a badge. */
@@ -360,6 +367,9 @@ const styles = stylex.create({
   closed: {
     opacity: { default: 0.62, ":hover": { default: null, [media.hover]: 0.9 } },
   },
+  // The stamp is taller than the footer it sits beside; on a card with no tags it would reach up
+  // over the title, so the footer grows to hold it.
+  stampedMeta: { minHeight: 40 },
   top: { display: "flex", alignItems: "center", gap: space.sm, minWidth: 0 },
   tag: {
     display: "inline-flex",
@@ -424,7 +434,7 @@ const styles = stylex.create({
     fontVariantNumeric: "tabular-nums",
   },
   sep: { width: 2 },
-  arrow: { marginInlineStart: "auto", marginInlineEnd: 2 },
+  assignees: { display: "inline-flex", marginInlineStart: "auto" },
   bubble: {
     position: "absolute",
     top: -10,

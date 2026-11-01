@@ -99,10 +99,12 @@ export const radius = stylex.defineVars({
 
 export const shadow = stylex.defineVars({
   // Two layers plus a hairline: the hairline carries the edge in dark mode, where shadows vanish.
+  // light-dark() takes colours only, so each layer picks its own; wrapped around a whole shadow
+  // list it's invalid and the browser draws no shadow at all.
   float:
-    "light-dark(0 0 0 1px oklch(0.2 0.01 80 / 0.07), 0 2px 4px oklch(0.2 0.01 80 / 0.05), 0 8px 24px oklch(0.2 0.01 80 / 0.1), 0 0 0 1px oklch(1 0 0 / 0.08), 0 2px 4px oklch(0 0 0 / 0.3), 0 8px 24px oklch(0 0 0 / 0.45))",
-  card: "light-dark(0 0 0 1px oklch(0.2 0.01 80 / 0.07), 0 1px 2px oklch(0.2 0.01 80 / 0.05), 0 0 0 1px oklch(1 0 0 / 0.07), 0 1px 2px oklch(0 0 0 / 0.3))",
-  lift: "light-dark(0 0 0 1px oklch(0.2 0.01 80 / 0.08), 0 4px 8px oklch(0.2 0.01 80 / 0.08), 0 16px 32px oklch(0.2 0.01 80 / 0.12), 0 0 0 1px oklch(1 0 0 / 0.1), 0 4px 8px oklch(0 0 0 / 0.35), 0 16px 32px oklch(0 0 0 / 0.5))",
+    "0 0 0 1px light-dark(oklch(0.2 0.01 80 / 0.07), oklch(1 0 0 / 0.08)), 0 2px 4px light-dark(oklch(0.2 0.01 80 / 0.05), oklch(0 0 0 / 0.3)), 0 8px 24px light-dark(oklch(0.2 0.01 80 / 0.1), oklch(0 0 0 / 0.45))",
+  card: "0 0 0 1px light-dark(oklch(0.2 0.01 80 / 0.07), oklch(1 0 0 / 0.07)), 0 1px 2px light-dark(oklch(0.2 0.01 80 / 0.05), oklch(0 0 0 / 0.3))",
+  lift: "0 0 0 1px light-dark(oklch(0.2 0.01 80 / 0.08), oklch(1 0 0 / 0.1)), 0 4px 8px light-dark(oklch(0.2 0.01 80 / 0.08), oklch(0 0 0 / 0.35)), 0 16px 32px light-dark(oklch(0.2 0.01 80 / 0.12), oklch(0 0 0 / 0.5))",
 });
 
 export const motion = stylex.defineVars({

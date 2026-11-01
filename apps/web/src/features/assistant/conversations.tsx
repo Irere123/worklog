@@ -1,8 +1,8 @@
 import {
   BrainIcon,
   ChatsCircleIcon,
-  NotePencilIcon,
-  PencilLineIcon,
+  PlusIcon,
+  ScrollIcon,
 } from "@phosphor-icons/react";
 import * as stylex from "@stylexjs/stylex";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -28,7 +28,7 @@ import { Chat } from "./chat";
 /** First questions worth asking, offered wherever the assistant waits for one. */
 export const STARTERS = [
   "What changed while I was away?",
-  "What's blocked right now?",
+  "What’s blocked right now?",
   "Draft my standup",
 ];
 
@@ -48,7 +48,7 @@ export function Conversations({ children }: { children: ReactNode }) {
               aria-label="New conversation"
               {...stylex.props(styles.new)}
             >
-              <NotePencilIcon size={15} />
+              <PlusIcon size={15} />
             </Link>
           </Tooltip>
         </div>
@@ -90,7 +90,7 @@ export function Conversations({ children }: { children: ReactNode }) {
         </nav>
         <div {...stylex.props(styles.sideFoot)}>
           <Link to="/settings/assistant" {...stylex.props(styles.footLink)}>
-            <PencilLineIcon size={14} /> Instructions
+            <ScrollIcon size={14} /> Instructions
           </Link>
           <Link to="/settings/memory" {...stylex.props(styles.footLink)}>
             <BrainIcon size={14} /> What it remembers
@@ -153,7 +153,7 @@ export function NewChat({ ask }: { ask?: string }) {
       </p>
       <Button
         variant="primary"
-        icon={<NotePencilIcon size={14} />}
+        icon={<PlusIcon size={14} />}
         busy={open.isPending}
         onClick={() => open.mutate()}
       >
@@ -219,7 +219,7 @@ export function ConversationView({ id, ask }: { id: string; ask?: string }) {
       <PageHeader
         title={
           meta.title ??
-          (meta.mode === "teammate" ? "Teammate's assistant" : "Conversation")
+          (meta.mode === "teammate" ? "Teammate’s assistant" : "Conversation")
         }
       />
       <Chat conversation={meta} stored={messages} firstMessage={question} />

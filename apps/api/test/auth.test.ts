@@ -38,12 +38,14 @@ async function signIn(email: string) {
 }
 
 describe("signing in", () => {
-  test("advertises how to sign in", async () => {
+  test("advertises how to sign in, and that setup is closed once a workspace exists", async () => {
+    await env.workspace();
     const res = await env.call("GET", "/v1/auth/config");
     expect(res.body).toEqual({
       magicLink: true,
       socialProviders: [],
       authBasePath: "/api/auth",
+      setupOpen: false,
     });
   });
 

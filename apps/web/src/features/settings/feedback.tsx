@@ -39,7 +39,7 @@ export function Feedback() {
   return (
     <SettingsPage
       title="Reply feedback"
-      description="Your 👍 and 👎 on the assistant’s replies. Replay one to check whether a change to your instructions or memory fixed it."
+      description="How you rated the assistant’s replies. Replay one to check whether a change to your instructions or memory fixed it."
       actions={
         <Segmented
           label="Show"
@@ -57,7 +57,8 @@ export function Feedback() {
       {ratings.isSuccess && list.length === 0 && (
         <Card>
           <EmptyState title="Nothing rated yet">
-            Rate a reply with 👍 or 👎 in a conversation, and it lands here.
+            Rate a reply in a conversation, thumbs up or down, and it lands
+            here.
           </EmptyState>
         </Card>
       )}

@@ -71,9 +71,29 @@ export function renderSnapshot(s: WorkSnapshot): string {
   }
   if (s.recent.length) {
     lines.push("Recently:");
-    for (const a of s.recent.slice(0, 6)) {
-      lines.push(`• ${a.at.slice(0, 10)} ${a.title}`);
+    for (const run of foldRuns(s.recent).slice(0, 6)) {
+      lines.push(
+        `• ${run.title}${run.details.length ? ` — ${run.details.join(" · ")}` : ""}`
+      );
     }
   }
   return lines.join("\n");
+}
+
+/** One line per card, as the app shows it: "Added this card · Marked done", not two entries. */
+function foldRuns(recent: WorkSnapshot["recent"]) {
+  const runs: { title: string; details: string[] }[] = [];
+  for (const a of recent) {
+    const detail = a.detail?.split("\n")[0]?.trim();
+    const run = runs.find((r) => r.title === a.title);
+    if (run) {
+      // Newest first, so an earlier step goes in front of what followed it.
+      if (detail && !run.details.includes(detail)) {
+        run.details.unshift(detail);
+      }
+    } else {
+      runs.push({ title: a.title, details: detail ? [detail] : [] });
+    }
+  }
+  return runs;
 }

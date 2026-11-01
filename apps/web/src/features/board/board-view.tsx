@@ -8,7 +8,9 @@ import {
   CheckIcon,
   DotsThreeIcon,
   HourglassMediumIcon,
+  PencilSimpleIcon,
   PlusIcon,
+  TrashIcon,
 } from "@phosphor-icons/react";
 import * as stylex from "@stylexjs/stylex";
 import { useHotkey } from "@tanstack/react-hotkeys";
@@ -27,7 +29,13 @@ import type { Card } from "#features/cards/card-bits";
 import { Button } from "#ui/button";
 import { SkeletonBlock } from "#ui/feedback";
 import { Input } from "#ui/field";
-import { Menu, MenuItem, MenuLabel, MenuSeparator } from "#ui/overlay";
+import {
+  Menu,
+  MenuItem,
+  MenuLabel,
+  MenuSeparator,
+  MenuSwatches,
+} from "#ui/overlay";
 import {
   color,
   leading,
@@ -145,6 +153,10 @@ export function BoardView({
     [cards, actions]
   );
 
+  // A filtered-out column isn't empty: saying "Drop a card here" would hide that cards exist.
+  const narrowed = filter.mine || filter.text.trim() !== "";
+  const noMatch = filter.mine ? "None of yours here." : "No cards match here.";
+
   if (active.isPending || triage.isPending) {
     return (
       <div {...stylex.props(styles.board)}>
@@ -178,7 +190,7 @@ export function BoardView({
       >
         <CardList
           cards={grouped.get("triage") ?? []}
-          empty="Nothing waiting for a decision."
+          empty={narrowed ? noMatch : "Nothing waiting for a decision."}
         />
       </ColumnShell>
       {board.columns.map((column) => (
@@ -193,7 +205,7 @@ export function BoardView({
           <CardList
             cards={grouped.get(column.id) ?? []}
             columnColor={column.color}
-            empty="Drop a card here."
+            empty={narrowed ? noMatch : "Drop a card here."}
           />
         </ColumnShell>
       ))}
@@ -574,28 +586,30 @@ function ColumnMenu({ column, boardId }: { column: Column; boardId: string }) {
           />
         }
       >
-        <MenuItem onClick={() => setRenaming(true)}>Rename…</MenuItem>
+        <MenuItem
+          icon={<PencilSimpleIcon size={14} />}
+          onClick={() => setRenaming(true)}
+        >
+          Rename…
+        </MenuItem>
         <MenuSeparator />
         <MenuLabel>Colour</MenuLabel>
-        {COLUMN_COLORS.map((name) => (
-          <MenuItem
-            key={name}
-            checked={column.color === name}
-            onClick={() => update.mutate({ color: name })}
-          >
-            <span {...stylex.props(styles.swatchRow)}>
-              <span
-                {...stylex.props(
-                  styles.columnDot,
-                  styles.hue(hueOfColor(name))
-                )}
-              />
-              {name}
-            </span>
-          </MenuItem>
-        ))}
+        <MenuSwatches
+          label="Colour"
+          value={column.color}
+          onValueChange={(next) => update.mutate({ color: next })}
+          options={COLUMN_COLORS.map((name) => ({
+            value: name,
+            label: name.charAt(0).toUpperCase() + name.slice(1),
+            color: swatchColor(hueOfColor(name)),
+          }))}
+        />
         <MenuSeparator />
-        <MenuItem danger onClick={() => remove.mutate()}>
+        <MenuItem
+          icon={<TrashIcon size={14} />}
+          danger
+          onClick={() => remove.mutate()}
+        >
           Delete column
         </MenuItem>
       </Menu>
@@ -663,6 +677,10 @@ function AddColumn({ boardId }: { boardId: string }) {
   );
 }
 
+function swatchColor(hue: number) {
+  return hue < 0 ? color.fgFaint : `oklch(0.66 0.15 ${hue})`;
+}
+
 const styles = stylex.create({
   board: {
     flexGrow: 1,
@@ -711,6 +729,7 @@ const styles = stylex.create({
     paddingInline: space.xs,
   },
   columnDot: { width: 8, height: 8, borderRadius: "50%", flexShrink: 0 },
+  // Inline, not swatchColor(): StyleX compiles dynamic styles apart from this module's functions.
   hue: (hue: number) => ({
     backgroundColor: hue < 0 ? color.fgFaint : `oklch(0.66 0.15 ${hue})`,
   }),
@@ -819,10 +838,4 @@ const styles = stylex.create({
     borderColor: color.lineUi,
   },
   addColumnForm: { width: 220, flexShrink: 0 },
-  swatchRow: {
-    display: "inline-flex",
-    alignItems: "center",
-    gap: space.md,
-    textTransform: "capitalize",
-  },
 });

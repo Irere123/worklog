@@ -16,7 +16,7 @@ import { Avatar } from "#ui/avatar";
 import { Button } from "#ui/button";
 import { Badge } from "#ui/chip";
 import { Skeleton } from "#ui/feedback";
-import { Field, Input, Select, Switch } from "#ui/field";
+import { Field, Input, Select, Stepper, Switch, TimeSelect } from "#ui/field";
 import { color, media, radius, space, text } from "#ui/tokens.stylex";
 
 import { Card, Row, SettingsPage, settingsStyles } from "./frame";
@@ -186,14 +186,12 @@ export function Profile() {
                     <Select
                       id={id}
                       value={field.state.value}
-                      onChange={(e) => field.handleChange(e.target.value)}
-                    >
-                      {ZONES.map((z) => (
-                        <option key={z} value={z}>
-                          {z.replaceAll("_", " ")}
-                        </option>
-                      ))}
-                    </Select>
+                      onValueChange={field.handleChange}
+                      options={ZONES.map((z) => ({
+                        value: z,
+                        label: z.replaceAll("_", " "),
+                      }))}
+                    />
                   )}
                 </Field>
               )}
@@ -204,7 +202,7 @@ export function Profile() {
 
       <Card
         title="Working hours"
-        description="Worklog holds pings outside these hours and sends them when you're back."
+        description="Worklog holds pings outside these hours and sends them when you’re back."
       >
         <Row label="Workdays">
           <fieldset {...stylex.props(styles.days)} aria-label="Workdays">
@@ -234,38 +232,24 @@ export function Profile() {
           </fieldset>
         </Row>
         <Row label="Active hours" description="In your time zone.">
-          <Input
-            type="time"
-            aria-label="Start"
-            defaultValue={hours.start}
-            onBlur={(e) => {
-              if (e.target.value !== hours.start) {
-                update.mutate({
-                  settings: {
-                    ...settings,
-                    activeHours: { ...hours, start: e.target.value },
-                  },
-                });
-              }
-            }}
-            sx={styles.time}
+          <TimeSelect
+            label="Start"
+            value={hours.start}
+            onValueChange={(start) =>
+              update.mutate({
+                settings: { ...settings, activeHours: { ...hours, start } },
+              })
+            }
           />
           <span {...stylex.props(styles.to)}>to</span>
-          <Input
-            type="time"
-            aria-label="End"
-            defaultValue={hours.end}
-            onBlur={(e) => {
-              if (e.target.value !== hours.end) {
-                update.mutate({
-                  settings: {
-                    ...settings,
-                    activeHours: { ...hours, end: e.target.value },
-                  },
-                });
-              }
-            }}
-            sx={styles.time}
+          <TimeSelect
+            label="End"
+            value={hours.end}
+            onValueChange={(end) =>
+              update.mutate({
+                settings: { ...settings, activeHours: { ...hours, end } },
+              })
+            }
           />
         </Row>
       </Card>
@@ -291,7 +275,7 @@ export function Notifications() {
   return (
     <SettingsPage
       title="Notifications"
-      description="Worklog interrupts you only for what's blocked on you, within a budget. Everything else waits for your brief."
+      description="Worklog interrupts you only for what’s blocked on you, within a budget. Everything else waits for your brief."
     >
       <Card title="Interruption budget">
         <Row
@@ -329,8 +313,8 @@ export function Notifications() {
       <DeviceAlerts />
 
       <Card
-        title="How well it's working"
-        description="The last 14 days. Your 👍 and 👎 in the inbox tune what gets through."
+        title="How well it’s working"
+        description="The last 14 days. How you rate pings in the inbox tunes what gets through."
       >
         {metrics.isPending ? (
           <div {...stylex.props(settingsStyles.pad)}>
@@ -347,7 +331,7 @@ export function Notifications() {
             {(m?.mutedKinds.length ?? 0) > 0 && (
               <Row
                 label="Held for your digest"
-                description="Kinds you've dismissed or marked less useful."
+                description="Kinds you’ve dismissed or marked less useful."
               >
                 {m?.mutedKinds.map((k) => (
                   <Badge key={k}>{k.replaceAll(/[._]/gu, " ")}</Badge>
@@ -365,7 +349,7 @@ const DEVICE_NOTE = {
   unsupported:
     "This browser only shows notifications from an installed app. Pings still reach your inbox and your channels.",
   denied:
-    "Notifications are blocked for this site. Allow them in the browser's site settings, then come back.",
+    "Notifications are blocked for this site. Allow them in the browser’s site settings, then come back.",
   off: "When Worklog is open in a background tab, pings and briefs appear as system notifications, within the same budget.",
   on: "Pings and briefs appear as system notifications while Worklog is in a background tab, within the same budget.",
 };
@@ -408,18 +392,15 @@ function NumberInput({
   onCommit: (value: number) => void;
 }) {
   return (
-    <Input
-      type="number"
+    <Stepper
+      value={value}
       min={min}
       max={max}
-      defaultValue={value}
-      onBlur={(e) => {
-        const next = Math.min(max, Math.max(min, Number(e.target.value)));
-        if (Number.isFinite(next) && next !== value) {
+      onValueCommit={(next) => {
+        if (next !== value) {
           onCommit(next);
         }
       }}
-      sx={styles.number}
     />
   );
 }
@@ -456,21 +437,22 @@ const styles = stylex.create({
     fontSize: text.meta,
     fontWeight: 500,
     color: color.fgMuted,
+    boxShadow: `inset 0 0 0 1px ${color.lineUi}`,
     backgroundColor: {
-      default: color.ui,
+      default: "transparent",
       ":hover": { default: null, [media.hover]: color.uiHover },
     },
   },
+  // A tint, not a solid fill: five days on in a row is the usual answer and shouldn't shout.
   dayOn: {
-    color: color.fgOnSolid,
+    color: color.accentFg,
+    boxShadow: `inset 0 0 0 1px color-mix(in oklch, ${color.accent} 40%, transparent)`,
     backgroundColor: {
-      default: color.accent,
-      ":hover": { default: null, [media.hover]: color.accentHover },
+      default: color.accentSubtle,
+      ":hover": { default: null, [media.hover]: color.accentSubtle },
     },
   },
-  time: { width: 110 },
   to: { fontSize: text.meta, color: color.fgMuted },
-  number: { width: 88, textAlign: "right" },
   stats: {
     display: "grid",
     gridTemplateColumns: "repeat(4, 1fr)",

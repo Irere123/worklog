@@ -239,14 +239,8 @@ function NeedsYou() {
   const list = items.data ?? [];
   return (
     <Section
-      title={
-        <span {...stylex.props(layout.rowTight)}>
-          Needs you{" "}
-          {list.length > 0 && (
-            <span {...stylex.props(styles.count)}>{list.length}</span>
-          )}
-        </span>
-      }
+      // The inbox badge carries the count; a second number here would make it louder, not clearer.
+      title="Needs you"
       aside={
         <Link to="/inbox" {...stylex.props(styles.more)}>
           Inbox <ArrowRightIcon size={12} />
@@ -387,7 +381,9 @@ function MyAgents({ ownerId }: { ownerId: string }) {
                 <div {...stylex.props(layout.grow)}>
                   <div {...stylex.props(layout.row)}>
                     <span {...stylex.props(styles.agentName)}>
-                      {agent.name}
+                      {agent.agentProvider === "worklog"
+                        ? "Your assistant"
+                        : agent.name}
                     </span>
                     {state && <Badge tone={state.tone}>{state.label}</Badge>}
                   </div>
@@ -653,18 +649,6 @@ const styles = stylex.create({
     flexDirection: "column",
     gap: space.x4,
     minWidth: 0,
-  },
-  count: {
-    minWidth: 18,
-    height: 18,
-    paddingInline: 5,
-    display: "inline-grid",
-    placeItems: "center",
-    borderRadius: radius.full,
-    fontSize: 11,
-    fontWeight: 600,
-    color: color.fgOnSolid,
-    backgroundColor: color.accent,
   },
   more: {
     display: "inline-flex",

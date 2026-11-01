@@ -100,14 +100,9 @@ function PromptForm({
               id={fieldId}
               autoFocus
               value={value}
-              onChange={(e) => setValue(e.target.value)}
-            >
-              {options.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </Select>
+              onValueChange={setValue}
+              options={options}
+            />
           ) : (
             <Input
               id={fieldId}

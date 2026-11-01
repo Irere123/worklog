@@ -1,7 +1,7 @@
 import {
   CaretDownIcon,
   NewspaperIcon,
-  NotePencilIcon,
+  PlusIcon,
   RobotIcon,
 } from "@phosphor-icons/react";
 import * as stylex from "@stylexjs/stylex";
@@ -58,7 +58,7 @@ export function Briefs({ selectedId }: { selectedId?: string }) {
               <Button
                 size="sm"
                 variant="primary"
-                icon={<NotePencilIcon size={14} />}
+                icon={<PlusIcon size={14} />}
                 trailing={<CaretDownIcon size={13} />}
                 busy={make.isPending}
               >

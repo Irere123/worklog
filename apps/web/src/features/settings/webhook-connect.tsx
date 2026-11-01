@@ -150,20 +150,14 @@ export function WebhookConnectDialog({ onClose }: { onClose: () => void }) {
               <Select
                 id={id}
                 value={verify}
-                onChange={(e) => {
-                  const next = VERIFY.find((v) => v.value === e.target.value);
-                  if (next) {
-                    setVerify(next.value);
-                    setHeader(next.header);
-                  }
+                onValueChange={(next) => {
+                  setVerify(next);
+                  setHeader(
+                    VERIFY.find((v) => v.value === next)?.header ?? header
+                  );
                 }}
-              >
-                {VERIFY.map((v) => (
-                  <option key={v.value} value={v.value}>
-                    {v.label}
-                  </option>
-                ))}
-              </Select>
+                options={VERIFY}
+              />
             )}
           </Field>
           {verify !== "standard-webhooks" && (

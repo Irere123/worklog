@@ -1,4 +1,4 @@
-import { FingerprintIcon, RobotIcon } from "@phosphor-icons/react";
+import { IdentificationBadgeIcon, RobotIcon } from "@phosphor-icons/react";
 import * as stylex from "@stylexjs/stylex";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
@@ -54,7 +54,7 @@ export function Identities() {
         )}
         {identities.isSuccess && list.length === 0 && (
           <EmptyState
-            icon={<FingerprintIcon size={20} />}
+            icon={<IdentificationBadgeIcon size={20} />}
             title={
               show === "unlinked" ? "Everyone is linked" : "No accounts yet"
             }
@@ -77,7 +77,6 @@ export function Identities() {
 function IdentityRow({ identity }: { identity: Identity }) {
   const { list: members, byId } = useMembers();
   const client = useQueryClient();
-  const owner = identity.memberId ? byId.get(identity.memberId) : undefined;
   const assign = useMutation({
     mutationFn: async (member: string | null) =>
       await unwrap(
@@ -126,22 +125,21 @@ function IdentityRow({ identity }: { identity: Identity }) {
             : ""}
         </p>
       </div>
-      {owner && <Avatar person={owner} size={22} />}
       <Select
-        aria-label={`Who is ${name}?`}
+        label={`Who is ${name}?`}
         value={identity.memberId ?? ""}
         disabled={assign.isPending}
-        onChange={(e) => assign.mutate(e.target.value || null)}
+        onValueChange={(next) => assign.mutate(next || null)}
+        options={[
+          { value: "", label: "Not linked" },
+          ...members.map((m) => ({
+            value: m.id,
+            label: m.kind === "agent" ? `${m.name} · agent` : m.name,
+            icon: <Avatar person={m} size={16} />,
+          })),
+        ]}
         sx={styles.select}
-      >
-        <option value="">Not linked</option>
-        {members.map((m) => (
-          <option key={m.id} value={m.id}>
-            {m.name}
-            {m.kind === "agent" ? " (agent)" : ""}
-          </option>
-        ))}
-      </Select>
+      />
     </li>
   );
 }
