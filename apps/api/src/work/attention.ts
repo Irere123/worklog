@@ -262,13 +262,27 @@ export async function recordNotification(
     deliveredTo: string[];
   }
 ) {
+  const id = generateId();
   await insertNotification(ctx.db, {
-    id: generateId(),
+    id,
     automationId: null,
     teamBody: null,
     reason: null,
     ...input,
     createdAt: ctx.now(),
+  });
+  // An open tab is one more place the message lands, so it gets only what was actually sent:
+  // the ping budget has already been applied.
+  await ctx.bus.publish({
+    workspaceId: input.workspaceId,
+    audienceId: input.memberId,
+    type: "notification.sent",
+    data: {
+      id,
+      kind: input.kind,
+      subject: input.subject,
+      itemIds: input.itemIds,
+    },
   });
 }
 

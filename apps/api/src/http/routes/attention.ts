@@ -5,6 +5,7 @@ import { body, errors, Id, json, respond, router } from "#http/router";
 import {
   ActionParams,
   Attention,
+  AttentionListItem,
   AttentionMetrics,
   FeedbackRequest,
   FeedbackResponse,
@@ -28,7 +29,7 @@ export const attentionRoutes = router()
       tags: ["Attention"],
       summary: "What needs you — highest priority first",
       request: { query: ListAttentionQuery },
-      responses: { 200: json(z.array(Attention)), ...errors },
+      responses: { 200: json(z.array(AttentionListItem)), ...errors },
     }),
     async (c) => {
       const rows = await listAttention(
@@ -36,7 +37,7 @@ export const attentionRoutes = router()
         c.get("member").id,
         c.req.valid("query").state
       );
-      return respond(c, z.array(Attention), rows, 200);
+      return respond(c, z.array(AttentionListItem), rows, 200);
     }
   )
   .openapi(

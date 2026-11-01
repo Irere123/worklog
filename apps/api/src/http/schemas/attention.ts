@@ -39,6 +39,12 @@ export const Attention = z
   })
   .openapi("AttentionItem");
 
+export const AttentionListItem = Attention.extend({
+  cardNumber: z.number().int().nullable().openapi({
+    description: "The linked card's number, to open or fetch it",
+  }),
+}).openapi("AttentionListItem");
+
 export const ListAttentionQuery = z.object({
   state: z.enum(ATTENTION_STATES).optional(),
 });

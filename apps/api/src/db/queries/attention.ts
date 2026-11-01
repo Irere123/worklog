@@ -4,6 +4,7 @@ import {
   count,
   desc,
   eq,
+  getTableColumns,
   gt,
   gte,
   inArray,
@@ -22,12 +23,19 @@ import {
   attentionFeedback,
   attentionItems,
   attentionResolutions,
+  cards,
   notifications,
 } from "#db/schema";
 import type { Priority } from "#db/schema";
 import { notFound } from "#lib/errors";
 
 export type AttentionItem = typeof attentionItems.$inferSelect;
+
+// Lists carry the card's number: it's what a client links and fetches by, and the id alone isn't.
+const withCardNumber = {
+  ...getTableColumns(attentionItems),
+  cardNumber: cards.number,
+};
 
 // `onlyIfNew` and `replace` mean what they do on `AttentionInput` in attention/service.ts.
 export async function upsertAttention(
@@ -122,8 +130,9 @@ export async function listOpenAttention(
   params: { memberId: string; now: Date; limit?: number }
 ) {
   return await db
-    .select()
+    .select(withCardNumber)
     .from(attentionItems)
+    .leftJoin(cards, eq(cards.id, attentionItems.cardId))
     .where(
       and(eq(attentionItems.memberId, params.memberId), openOrWoken(params.now))
     )
@@ -136,8 +145,9 @@ export async function listAttentionByState(
   params: { memberId: string; state: AttentionItem["state"] }
 ) {
   return await db
-    .select()
+    .select(withCardNumber)
     .from(attentionItems)
+    .leftJoin(cards, eq(cards.id, attentionItems.cardId))
     .where(
       and(
         eq(attentionItems.memberId, params.memberId),
