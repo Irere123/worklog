@@ -1,0 +1,253 @@
+import * as stylex from "@stylexjs/stylex";
+import { useHotkey } from "@tanstack/react-hotkeys";
+import { useQueryClient } from "@tanstack/react-query";
+import {
+  Outlet,
+  useNavigate,
+  useRouter,
+  useSearch,
+} from "@tanstack/react-router";
+import { useEffect, useState } from "react";
+import { toast } from "sonner";
+
+import { useLiveEvents } from "#api/live";
+import type { SentNews } from "#api/live";
+import { CardPanel } from "#features/cards/card-panel";
+import { NewCardDialog } from "#features/cards/new-card";
+import { kindOf } from "#features/inbox/inbox";
+import { showDesktopAlert } from "#lib/desktop-alerts";
+import { color } from "#ui/tokens.stylex";
+
+import { CommandPalette } from "./command";
+import { MobileBar } from "./mobile-bar";
+import { QuickLog } from "./quick-log";
+import { Shortcuts } from "./shortcuts";
+import { Sidebar } from "./sidebar";
+
+export type ShellDialog = "palette" | "shortcuts" | "log" | "card" | null;
+
+const SENT_BODY: Record<string, string> = {
+  push: "Blocked on you",
+  brief: "Ready to read",
+  digest: "What waited for you",
+};
+
+function destinationOf(news: SentNews) {
+  const [only] = news.itemIds;
+  if (news.kind === "push" && only !== undefined && news.itemIds.length === 1) {
+    return { to: "/inbox", search: { item: only } } as const;
+  }
+  if (news.kind === "brief") {
+    return { to: "/briefs" } as const;
+  }
+  return news.kind === "custom"
+    ? ({ to: "/assistant" } as const)
+    : ({ to: "/inbox" } as const);
+}
+
+export function Shell() {
+  const client = useQueryClient();
+  const navigate = useNavigate();
+  // While the app is open, something new that needs you shows up where you are; low-priority
+  // items wait quietly in the inbox, as they would for a push.
+  const live = useLiveEvents(client, true, {
+    attention: (news) => {
+      if (news.priority === "low") {
+        return;
+      }
+      toast(news.title, {
+        description: kindOf(news.kind).label,
+        action: {
+          label: "Open",
+          onClick: () => {
+            void navigate({ to: "/inbox", search: { item: news.id } });
+          },
+        },
+      });
+    },
+    sent: (news) => {
+      showDesktopAlert({
+        title: news.subject,
+        body: SENT_BODY[news.kind],
+        tag: news.id,
+        onOpen: () => {
+          void navigate(destinationOf(news));
+        },
+      });
+    },
+  });
+  const [dialog, setDialog] = useState<ShellDialog>(null);
+  const [drawer, setDrawer] = useState(false);
+  const router = useRouter();
+  // Any navigation, from a link in the drawer or anywhere else, puts the drawer away.
+  useEffect(
+    () => router.subscribe("onBeforeNavigate", () => setDrawer(false)),
+    [router]
+  );
+  const search = useSearch({ from: "/_app" });
+  const open = (d: ShellDialog) => () => setDialog(d);
+
+  useHotkey("Mod+K", open("palette"), {
+    meta: { name: "Command menu", group: "General" },
+  });
+  useHotkey("Shift+?", open("shortcuts"), {
+    meta: { name: "Keyboard shortcuts", group: "General" },
+  });
+  useHotkey("L", open("log"), { meta: { name: "Log work", group: "Create" } });
+  useHotkey("C", open("card"), { meta: { name: "New card", group: "Create" } });
+  const go = (to: string) => () => {
+    void navigate({ to });
+  };
+  useHotkey(["G", "H"], go("/home"), {
+    meta: { name: "Go to Home", group: "Navigate" },
+  });
+  useHotkey(["G", "I"], go("/inbox"), {
+    meta: { name: "Go to Inbox", group: "Navigate" },
+  });
+  useHotkey(["G", "A"], go("/activity"), {
+    meta: { name: "Go to Activity", group: "Navigate" },
+  });
+  useHotkey(["G", "B"], go("/boards"), {
+    meta: { name: "Go to Boards", group: "Navigate" },
+  });
+  useHotkey(["G", "C"], go("/assistant"), {
+    meta: { name: "Go to Assistant", group: "Navigate" },
+  });
+  useHotkey(["G", "P"], go("/people"), {
+    meta: { name: "Go to People", group: "Navigate" },
+  });
+  useHotkey(["G", "R"], go("/briefs"), {
+    meta: { name: "Go to Briefs", group: "Navigate" },
+  });
+  useHotkey(["G", "S"], go("/settings"), {
+    meta: { name: "Go to Settings", group: "Navigate" },
+  });
+  // Fizzy's number keys. They pause while a card is open, where digits sort a Maybe? card.
+  const cardOpen = search.card !== undefined;
+  const mine = (tab: "assigned" | "added") => () => {
+    void navigate({ to: "/mine", search: { tab } });
+  };
+  useHotkey("1", go("/home"), {
+    enabled: !cardOpen,
+    meta: { name: "Home", group: "Navigate" },
+  });
+  useHotkey("2", mine("assigned"), {
+    enabled: !cardOpen,
+    meta: { name: "Assigned to me", group: "Navigate" },
+  });
+  useHotkey("3", mine("added"), {
+    enabled: !cardOpen,
+    meta: { name: "Added by me", group: "Navigate" },
+  });
+  useHotkey("B", go("/boards/new"), {
+    enabled: !cardOpen,
+    meta: { name: "New board", group: "Create" },
+  });
+
+  return (
+    <div {...stylex.props(styles.shell)}>
+      <a href="#main" {...stylex.props(styles.skip)}>
+        Skip to content
+      </a>
+      <Sidebar
+        live={live}
+        drawer={drawer}
+        onOpen={(d) => {
+          setDrawer(false);
+          setDialog(d);
+        }}
+      />
+      {drawer && (
+        <button
+          type="button"
+          aria-label="Close menu"
+          onClick={() => setDrawer(false)}
+          {...stylex.props(styles.scrim)}
+        />
+      )}
+      <div {...stylex.props(styles.column)}>
+        <MobileBar
+          onMenu={() => setDrawer(true)}
+          onSearch={() => setDialog("palette")}
+        />
+        <main id="main" tabIndex={-1} {...stylex.props(styles.main)}>
+          <Outlet />
+        </main>
+      </div>
+      <CommandPalette
+        open={dialog === "palette"}
+        onClose={() => setDialog(null)}
+        onOpen={setDialog}
+      />
+      <Shortcuts
+        open={dialog === "shortcuts"}
+        onClose={() => setDialog(null)}
+      />
+      <QuickLog open={dialog === "log"} onClose={() => setDialog(null)} />
+      <NewCardDialog open={dialog === "card"} onClose={() => setDialog(null)} />
+      {search.card !== undefined && <CardPanel number={search.card} />}
+    </div>
+  );
+}
+
+const styles = stylex.create({
+  shell: {
+    display: "grid",
+    gridTemplateColumns: {
+      default: "232px minmax(0, 1fr)",
+      "@media (max-width: 860px)": "minmax(0, 1fr)",
+    },
+    height: "100dvh",
+    overflow: "hidden",
+    backgroundColor: color.sidebar,
+  },
+  skip: {
+    position: "fixed",
+    top: 8,
+    left: 8,
+    zIndex: 100,
+    paddingBlock: 8,
+    paddingInline: 12,
+    borderRadius: 6,
+    fontWeight: 600,
+    color: color.fgOnSolid,
+    backgroundColor: color.accent,
+    transform: {
+      default: "translateY(-200%)",
+      ":focus-visible": "translateY(0)",
+    },
+    outline: "none",
+  },
+  column: {
+    display: "flex",
+    flexDirection: "column",
+    minWidth: 0,
+    minHeight: 0,
+  },
+  main: {
+    flexGrow: 1,
+    display: "flex",
+    flexDirection: "column",
+    minWidth: 0,
+    minHeight: 0,
+    margin: { default: 6, "@media (max-width: 860px)": 0 },
+    marginLeft: 0,
+    borderRadius: { default: 10, "@media (max-width: 860px)": 0 },
+    backgroundColor: color.bg,
+    boxShadow: {
+      default: `0 0 0 1px ${color.line}`,
+      "@media (max-width: 860px)": "none",
+    },
+    overflow: "hidden",
+    position: "relative",
+    outline: "none",
+  },
+  scrim: {
+    display: { default: "none", "@media (max-width: 860px)": "block" },
+    position: "fixed",
+    inset: 0,
+    zIndex: 44,
+    backgroundColor: color.scrim,
+    cursor: "default",
+  },
+});

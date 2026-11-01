@@ -8,10 +8,13 @@
   ],
   "type": "module",
   "scripts": {
-    "dev": "bun run --filter @worklog/api dev",
+    "dev": "bun run --filter '*' dev",
+    "dev:api": "bun run --filter @worklog/api dev",
+    "dev:web": "bun run --filter @worklog/web dev",
+    "seed": "bun run --filter @worklog/api seed",
     "test": "bun run --filter '*' test",
     "typecheck": "bun run --filter '*' typecheck",
-    "lint": "bun --bun oxlint",
+    "lint": "bun --bun oxlint && bun run --filter @worklog/web design",
     "lint:fix": "bun --bun oxlint --fix",
     "format": "bun --bun oxfmt",
     "format:check": "bun --bun oxfmt --check"

@@ -1,7 +1,7 @@
 # Worklog architecture
 
 ```
- clients: web · Expo · Slack · Discord · CLI/agents · custom integrations
+ clients: web (apps/web) · Expo · Slack · Discord · CLI/agents · custom integrations
         │  REST (OpenAPI 3.1)      │ SSE /v1/events         │ signed webhooks /hooks/*
         ▼                          ▼                        ▼
  ┌──────────────────────────── apps/api (Bun + Hono) ────────────────────────────┐
@@ -172,6 +172,30 @@ The team version is only composed when there are team targets, and nothing is se
 - **Quiet is allowed.** A scheduled brief whose window has nothing in it (nothing anyone did, nothing waiting, nothing drifting, no new or closed cards) records a quiet run instead of sending "nothing happened". A digest with nothing new is skipped, and the check and custom automations can decide there is nothing worth saying. Run by hand, a brief always comes.
 - **Failure handling:** an attention item after 3 consecutive failures; the automation is disabled after 10.
 - **Deployment:** run it in the API process (`RUN_SCHEDULER=true`) or as a separate worker (`bun run worker`).
+
+## The web app
+
+`apps/web` is a client of the public API like any other: it has no server code of its own. The research behind its design is in [research/web-app-design.md](research/web-app-design.md), and its point of view, voice and editor's checklist are in [DESIGN.md](DESIGN.md).
+
+- **Stack.** TanStack Start in SPA mode, because every page sits behind sign-in and the server has nothing to render. TanStack Router, Query, Form, Hotkeys, Virtual and Pacer. StyleX for styles, Base UI for headless primitives, cmdk for ⌘K, sonner for toasts, Pragmatic drag and drop for the board, and Phosphor for icons, including the marks of the tools activity comes from.
+- **One contract.** `bun run api:generate` writes `src/api/schema.d.ts` from the API's OpenAPI spec, and `openapi-fetch` calls the API through it. A renamed field fails the web app's typecheck, not a user's click. Query keys are rooted at the resource (`["cards", filter]`) in `src/api/queries.ts`.
+- **Sign-in.**
+  - People sign in with Better Auth's magic link or a social provider and get a session cookie.
+  - An API key (from setup or Settings) is the fallback for servers without email, and for trying the app as an agent.
+  - In development Vite proxies `/v1` and `/api/auth` to the API, so the cookie and the event stream are same-origin.
+- **Live.** The shell opens `/v1/events` once and invalidates query families as events arrive, settling bursts for 250ms. EventSource resends `Last-Event-ID` on reconnect, so missed events are replayed.
+- **Notifications.** A new open attention item that isn't low priority shows as a toast in an open tab. Every ping, brief or digest the server sends also publishes a `notification.sent` event to that member. If they turned on desktop notifications for the device (Settings → Notifications), a background tab shows it as a system notification. Because the event follows a send, it is already within the ping budget. Phones need an installed app with web push for this, which isn't built yet.
+- **Optimistic writes.** Card moves, inbox triage and toggles update the cache at once and roll back if the server refuses. Changes people regret (done, not now, golden ticket, inbox actions) offer Undo instead of asking first.
+- **State in the URL.** The open card (`?card=12`, over any page), a board's list view (`?view=list`, a sortable TanStack Table), the inbox tab, activity filters and the brief being read are search params, so links and Back work.
+- **Fizzy's reach.** Pinned cards sit in a stack at the foot of the sidebar on every page, piled and fanned out on hover the way Sonner stacks toasts; the card numbers live in the member's `settings.pins`, so the stack is the same on a phone and a desktop. Typing `#` in a comment or description picks a card. My cards (`/mine`, keys `2` and `3`) lists open cards assigned to or added by you across boards, through `GET /v1/cards?assignee=me` and `?addedBy=me`. Single-key shortcuts follow Fizzy's, and pause while a card panel is open so the page underneath doesn't act on the same key.
+- **Cards are one click away.** `#8` in a brief, an assistant reply or a card description opens that card over the page (not `PR #31`: that number is the source's). Inbox items carry `cardNumber`, so an agent's question shows the card it's about and its latest history.
+- **People have faces.** An avatar shows the member's picture (set in their profile, or filled from their sign-in provider or a linked account), falls back to initials if the picture fails to load, and keeps its shape rule: people are circles, agents rounded squares.
+- **Touch.** Hover styles sit behind `media.hover` (`@media (hover: hover) and (pointer: fine)`) so a tap never leaves one stuck; presses answer with `:active` instead. The tap highlight is off, controls skip the double-tap wait, and `theme-color` follows the mobile bar in each scheme.
+- **Theme.** Every colour token is an OKLCH `light-dark()` pair, so `color-scheme` on `<html>` alone switches light, dark and system. A script in `<head>` sets it before first paint.
+- **Reading the record.** Runs of events by one person on one card within an hour fold into one line, in the feed and in a card's history. Activity opens with a ribbon of the last 24 hours, one lane per person or agent, built from `GET /v1/activities?since=`; a lane filters the feed. Home's first line is written from the open inbox and the activity since yesterday, not by a model, and the favicon carries the inbox count.
+- **Design rules in code.** `bun run lint` also runs `apps/web/scripts/design-check.ts`, which fails on the rules in DESIGN.md that a pattern can catch.
+- **Deploy.** `bun run build` in `apps/web` writes a static app to `dist/client`, with `_shell.html` for every route. Set `WEB_DIST` to that folder and the API serves it from its own origin: any path the API doesn't own gets the shell. Otherwise host it anywhere that rewrites unknown paths to `_shell.html` and proxies `/v1` and `/api/auth`, and list its origin in `WEB_ORIGINS`.
+- **The assistant** streams through `useChat` against `POST /v1/conversations/{id}/chat`, sending only the newest message. Sending while a reply is being written steers it (`interrupt`). Stop (Esc) aborts the stream and calls `/stop`. Tool calls render as one quiet line each.
 
 ## Configuration
 

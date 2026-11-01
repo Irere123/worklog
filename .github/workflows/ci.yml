@@ -7,7 +7,7 @@ on:
 
 jobs:
   check:
-    name: Format, lint, typecheck & test
+    name: Format, lint, typecheck, test & build
     runs-on: ubuntu-latest
     timeout-minutes: 15
     services:
@@ -36,3 +36,7 @@ jobs:
       - run: bun run lint
       - run: bun run typecheck
       - run: bun run test
+      - name: Colours meet contrast targets
+        run: bun run --filter @worklog/web contrast
+      - name: Web app builds
+        run: bun run --filter @worklog/web build

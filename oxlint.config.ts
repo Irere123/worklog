@@ -1,15 +1,20 @@
 import { defineConfig } from "oxlint";
 import core from "ultracite/oxlint/core";
+import react from "ultracite/oxlint/react";
+import tanstack from "ultracite/oxlint/tanstack";
 
 // Ultracite's core preset (https://www.ultracite.ai) with a few deliberate
 // departures. Each one says why; add to this list only with a reason.
 export default defineConfig({
-  extends: [core],
+  extends: [core, react, tanstack],
   ignorePatterns: [
     ...core.ignorePatterns,
     // Generated: drizzle-kit migrations and better-auth's tables.
     "apps/api/drizzle/**",
     "apps/api/src/db/auth-schema.ts",
+    // Generated: the API types (openapi-typescript) and the route tree (TanStack Router).
+    "apps/web/src/api/schema.d.ts",
+    "apps/web/src/routeTree.gen.ts",
   ],
   options: { typeAware: true },
   overrides: [
@@ -51,6 +56,25 @@ export default defineConfig({
     {
       files: ["apps/api/src/db/**"],
       rules: { "no-restricted-imports": "off" },
+    },
+    {
+      files: ["apps/web/**"],
+      rules: {
+        // StyleX convention: each file's \`stylex.create\` sits below its components, which
+        // read the styles only when they render, long after the module has loaded.
+        "no-use-before-define": [
+          "error",
+          { functions: false, classes: true, variables: false },
+        ],
+        // \`onClick={() => setOpen(true)}\` is the React idiom; braces on every one-line
+        // handler add noise without catching anything.
+        "typescript/no-confusing-void-expression": [
+          "error",
+          { ignoreArrowShorthand: true },
+        ],
+        // Components follow the repo-wide func-style rule: top-level declarations.
+        "react/function-component-definition": "off",
+      },
     },
   ],
   rules: {

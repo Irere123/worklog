@@ -29,12 +29,19 @@ Then:
 
 ```bash
 bun install
-cd apps/api
-cp .env.example .env     # everything is optional for local dev
-bun run dev              # → http://localhost:4000/docs
+cp apps/api/.env.example apps/api/.env   # everything is optional for local dev
+bun run dev              # API → http://localhost:4000/docs · web app → http://localhost:3000
 ```
 
-Create a workspace and log some work:
+Open http://localhost:3000 and choose **Set up a workspace**, or fill an empty server with a demo team (people, agents, boards, an inbox and a brief) and sign in with the key it prints:
+
+```bash
+bun run seed
+```
+
+The demo people's portraits are [Notionists](https://heyzoish.gumroad.com/l/notionists) by Zoish (CC0), rendered with DiceBear and served from `apps/web/public/avatars`.
+
+Or create a workspace and log some work from the shell:
 
 ```bash
 curl -X POST localhost:4000/v1/setup -H 'content-type: application/json' \
@@ -45,18 +52,20 @@ curl -X POST localhost:4000/v1/logs -H "$WL" -H 'content-type: application/json'
   -d '{"text":"Agreed on FHIR R4 for referrals","kind":"decision"}'
 ```
 
+To run both from one server, build the web app (`cd apps/web && bun run build`) and set `WEB_DIST=../web/dist/client` in `apps/api/.env`: the API then serves it at http://localhost:4000.
+
 AI is optional. Set `OPENROUTER_API_KEY` for the assistant and model-written briefs. Without it, Worklog uses templates and rules.
 
 ## Docs
 
 - [Connectors](docs/CONNECTORS.md): supported tools, noise rules, adding your own.
-- [Architecture](docs/ARCHITECTURE.md): how the server fits together.
+- [Architecture](docs/ARCHITECTURE.md): how the server and the web app fit together.
 - [Contributing](CONTRIBUTING.md) and [AGENTS.md](AGENTS.md): setup, conventions, and rules for AI agents.
 - [Research notes](docs/research/) behind the design.
 
 ## Roadmap
 
-- [ ] Web app: board, inbox and chat
+- [x] Web app: home, inbox, board, activity, assistant, briefs, people and settings ([design brief](docs/research/web-app-design.md))
 - [ ] Mobile app (Expo) with push notifications
 - [ ] MCP server, so coding agents can read the board and log work natively
 - [ ] Voice logs, generated TypeScript SDK

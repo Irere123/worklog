@@ -1,0 +1,98 @@
+const MINUTE = 60_000;
+const HOUR = 60 * MINUTE;
+const DAY = 24 * HOUR;
+
+const relative = new Intl.RelativeTimeFormat("en", { numeric: "auto" });
+const exact = new Intl.DateTimeFormat("en-GB", {
+  dateStyle: "medium",
+  timeStyle: "short",
+});
+const dayFormat = new Intl.DateTimeFormat("en-GB", {
+  weekday: "long",
+  day: "numeric",
+  month: "long",
+});
+const shortDate = new Intl.DateTimeFormat("en-GB", {
+  day: "numeric",
+  month: "short",
+});
+const clock = new Intl.DateTimeFormat("en-GB", { timeStyle: "short" });
+
+/** "now", "5m", "3h", "2d", then a date: compact enough for a meta line. */
+export function ago(iso: string, now = Date.now()) {
+  const ms = now - Date.parse(iso);
+  if (ms < MINUTE) {
+    return "now";
+  }
+  if (ms < HOUR) {
+    return `${Math.floor(ms / MINUTE)}m`;
+  }
+  if (ms < DAY) {
+    return `${Math.floor(ms / HOUR)}h`;
+  }
+  if (ms < 7 * DAY) {
+    return `${Math.floor(ms / DAY)}d`;
+  }
+  return shortDate.format(new Date(iso));
+}
+
+/** "just now" or "5m ago": `ago` inside a sentence. */
+export function agoPhrase(iso: string, now = Date.now()) {
+  const short = ago(iso, now);
+  return short === "now" ? "just now" : `${short} ago`;
+}
+
+/** "in 3 hours", "yesterday": for sentences rather than meta lines. */
+export function fromNow(iso: string, now = Date.now()) {
+  const ms = Date.parse(iso) - now;
+  const abs = Math.abs(ms);
+  // The past truncates like `ago`, so a card's "5 hours ago" and its history's "4h" agree.
+  const count = ms < 0 ? Math.trunc : Math.round;
+  if (abs < HOUR) {
+    return relative.format(count(ms / MINUTE), "minute");
+  }
+  if (abs < DAY) {
+    return relative.format(count(ms / HOUR), "hour");
+  }
+  return relative.format(count(ms / DAY), "day");
+}
+
+export const exactTime = (iso: string) => exact.format(new Date(iso));
+export const clockTime = (iso: string) => clock.format(new Date(iso));
+export const shortDay = (iso: string) => shortDate.format(new Date(iso));
+
+/** "Today", "Yesterday", or "Monday 27 October": headings for day-grouped feeds. */
+export function dayLabel(iso: string, now = new Date()) {
+  const date = new Date(iso);
+  const days = Math.round((startOfDay(now) - startOfDay(date)) / DAY);
+  if (days === 0) {
+    return "Today";
+  }
+  if (days === 1) {
+    return "Yesterday";
+  }
+  return dayFormat.format(date);
+}
+
+function startOfDay(d: Date) {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+}
+
+export function dayKey(iso: string) {
+  const d = new Date(iso);
+  return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+}
+
+export function greeting(now = new Date()) {
+  const hour = now.getHours();
+  if (hour < 5) {
+    return "Working late";
+  }
+  if (hour < 12) {
+    return "Good morning";
+  }
+  if (hour < 18) {
+    return "Good afternoon";
+  }
+  return "Good evening";
+}
