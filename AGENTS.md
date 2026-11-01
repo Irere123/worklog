@@ -2,7 +2,7 @@
 
 Rules for AI agents and humans working on Worklog. `CLAUDE.md` imports this file.
 
-Worklog is an API-first work-visibility server. Connectors turn GitHub, Gitea, Slack, Discord and webhook events into one activity stream, which feeds a board, an attention queue, briefs and a personal assistant for each member. Background: [README.md](README.md) and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+Worklog is an API-first work-visibility server with a web app (`apps/web`) on top. Connectors turn GitHub, Gitea, Slack, Discord and webhook events into one activity stream, which feeds a board, an attention queue, briefs and a personal assistant for each member. Background: [README.md](README.md) and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ## Comments: no narration
 
@@ -31,7 +31,8 @@ Run from the repo root unless noted. Bun only: no npm, yarn, pnpm or other lockf
 
 ```bash
 bun install            # dependencies and git hooks
-bun run dev            # API on :4000; needs Postgres (DATABASE_URL in apps/api/.env)
+bun run dev            # API on :4000 and web app on :3000; needs Postgres (DATABASE_URL in apps/api/.env)
+bun run seed           # fills an empty server with a demo team and prints its API key
 bun run test           # recreates the worklog_test database each run
 bun run typecheck
 bun run lint           # `bun run lint:fix` applies safe fixes
@@ -43,6 +44,11 @@ bun run db:generate               # migration after editing src/db/schema.ts
 bun run db:generate --custom --name=<name>   # empty migration for hand-written SQL
 bun run auth:generate             # regenerates src/db/auth-schema.ts after editing src/lib/auth.ts
 bun run openapi                   # prints the spec
+
+cd apps/web
+bun run api:generate              # src/api/schema.d.ts from the API's spec, after changing a route or schema
+bun run contrast                  # checks the colour tokens meet WCAG contrast in light and dark
+bun run design                    # the design rules in docs/DESIGN.md; part of `bun run lint`
 ```
 
 Work is done when `format:check`, `lint`, `typecheck` and `test` pass. CI runs the same four.
@@ -64,6 +70,13 @@ apps/api/src/
   context.ts     AppContext, built once per process
   config.ts      the only reader of environment variables
 apps/api/test/   harness.ts plus one file per area
+
+apps/web/src/
+  routes/        TanStack file routes, thin: validate search params, render a feature
+  features/      one folder per surface: board, inbox, activity, assistant, briefs, people, settings, shell
+  ui/            primitives (button, overlay, field, chip…) and tokens.stylex.ts, the design tokens
+  api/           openapi-fetch client, generated schema, query factories, the live event stream
+  lib/           theme and time helpers
 ```
 
 ## Where new code goes
@@ -78,6 +91,9 @@ apps/api/test/   harness.ts plus one file per area
 | a connector | `connectors/<name>.ts`, registered in `connectors.ts` |
 | a background task | `jobs/tasks.ts` |
 | an environment variable | `config.ts` and `apps/api/.env.example` |
+| a web page | `apps/web/src/routes/<path>.tsx` rendering a component from `apps/web/src/features/<surface>/` |
+| a web query | a factory in `apps/web/src/api/queries.ts`, keyed by resource |
+| a colour, or a size or duration used in more than one place | a token in `apps/web/src/ui/tokens.stylex.ts` |
 
 ## Rules
 
@@ -92,6 +108,17 @@ apps/api/test/   harness.ts plus one file per area
 - **The assistant never writes its own instructions.** No tool may change `constitution.md` or the owner's voice.
 - **Helpers:** throw `notFound`, `forbidden`, `badRequest` or `conflict` from `lib/errors.ts`; use `returned()` for rows a write must return and `generateId(prefix)` for ids.
 - **Never hand-edit** `drizzle/**` or `db/auth-schema.ts`. A custom migration's SQL is the one exception.
+
+## Web app
+
+Read [docs/DESIGN.md](docs/DESIGN.md) before building a screen: it covers who Worklog is to people, how it sounds, and the editor's pass a screen gets before it's done.
+
+- **Styles are StyleX,** colocated at the bottom of each file and built from the tokens. Colours are `light-dark()` pairs; components never hard-code one.
+- **Hover goes behind `media.hover`** (`":hover": { default: null, [media.hover]: value }`): a tap on a phone otherwise leaves it stuck. Presses get `:active`.
+- **Icons are Phosphor,** imported with the `Icon` suffix (`TrayIcon`). No sparkles or purple to mean AI: show what the feature does.
+- **Data goes through `#api/client` and `#api/queries`,** never a raw `fetch`. Writes are optimistic where a person would notice the wait, and roll back on error.
+- **Shareable state lives in the URL** (the open card, filters, tabs) through `validateSearch`.
+- **Every action has a keyboard path and a pointer path,** and every drag has a menu alternative.
 
 ## Database
 
