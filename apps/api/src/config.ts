@@ -34,6 +34,8 @@ const Env = z.object({
   AUTH_SECRET: z.string().min(32).optional(),
   // Comma-separated.
   WEB_ORIGINS: z.string().optional(),
+  // The built web app (apps/web/dist/client) to serve from this server's own origin.
+  WEB_DIST: z.string().optional(),
   GITHUB_CLIENT_ID: z.string().optional(),
   GITHUB_CLIENT_SECRET: z.string().optional(),
   // The instance's GitHub App, if it isn't created from the API (POST /v1/apps/github/manifest).

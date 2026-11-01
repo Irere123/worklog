@@ -27,6 +27,7 @@ import {
   setupRoutes,
 } from "./http/routes/setup";
 import { workRoutes } from "./http/routes/work";
+import { webAppRoutes } from "./http/web";
 import { webOrigins } from "./lib/auth";
 import { ApiError } from "./lib/errors";
 
@@ -146,6 +147,10 @@ export function createApp(ctx: AppContext) {
     security: [{ bearerAuth: [] }],
   });
   app.get("/docs", Scalar({ url: "/openapi.json", pageTitle: "Worklog API" }));
+
+  if (ctx.config.WEB_DIST) {
+    app.route("/", webAppRoutes(ctx.config.WEB_DIST));
+  }
 
   return app;
 }
