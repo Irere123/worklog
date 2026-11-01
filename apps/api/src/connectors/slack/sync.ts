@@ -67,6 +67,7 @@ const UserInfo = z.object({
         email: z.string().optional(),
         display_name: z.string().optional(),
         real_name: z.string().optional(),
+        image_72: z.string().optional(),
       })
       .optional(),
   }),
@@ -98,6 +99,7 @@ export async function slackAccount(
     name: nonEmpty(user.real_name) ?? nonEmpty(user.profile?.real_name) ?? null,
     handle: nonEmpty(user.profile?.display_name) ?? nonEmpty(user.name) ?? null,
     bot: user.is_bot === true,
+    avatarUrl: nonEmpty(user.profile?.image_72) ?? null,
   };
 }
 

@@ -36,6 +36,25 @@ describe("API basics", () => {
     expect(res.body.assistant.ownerId).toBe(res.body.member.id);
   });
 
+  test("a profile picture is an https address or a path on this site, nothing a browser would run", async () => {
+    const { token } = await env.workspace("Pictures Co");
+    const set = async (avatarUrl: string | null) =>
+      await env.call("PATCH", "/v1/me", { token, body: { avatarUrl } });
+    for (const bad of [
+      // oxlint-disable-next-line eslint/no-script-url -- the address under test is the one a browser would run
+      "javascript:alert(1)",
+      "http://example.org/a.png",
+      "//evil.test/a.png",
+      "data:image/svg+xml,<svg/>",
+    ]) {
+      expect((await set(bad)).status).toBe(400);
+    }
+    expect((await set("/avatars/emma.svg")).body.avatarUrl).toBe(
+      "/avatars/emma.svg"
+    );
+    expect((await set(null)).body.avatarUrl).toBeNull();
+  });
+
   test("the OpenAPI document describes the API with stable operation ids", async () => {
     const res = await env.call("GET", "/openapi.json");
     expect(res.status).toBe(200);

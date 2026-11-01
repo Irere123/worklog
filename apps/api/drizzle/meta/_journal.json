@@ -134,6 +134,13 @@
       "when": 1793488111223,
       "tag": "0018_message_client_index",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1793501271679,
+      "tag": "0019_volatile_maggott",
+      "breakpoints": true
     }
   ]
 }

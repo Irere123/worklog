@@ -10,7 +10,7 @@ import {
 import { listHumansByEmail } from "#db/queries/members";
 
 import { loadApp } from "./apps";
-import { linkIdentityToMember } from "./identity";
+import { adoptAvatar, linkIdentityToMember } from "./identity";
 import { handleProviderError } from "./lifecycle";
 import { viewOf } from "./view";
 
@@ -30,10 +30,12 @@ export async function enrichIdentity(ctx: AppContext, identityId: string) {
     return;
   }
   const email = details.email?.trim().toLowerCase() ?? null;
+  const set = filled(identity, details);
   await updateIdentityDetails(ctx.db, {
     id: identity.id,
-    set: { ...filled(identity, details), email, enrichedAt: ctx.now() },
+    set: { ...set, email, enrichedAt: ctx.now() },
   });
+  await adoptAvatar(ctx, identity.memberId, set.avatarUrl);
   if (!identity.memberId && email && details.bot !== true) {
     await linkByEmail(ctx, identity, email);
   }
@@ -65,6 +67,7 @@ function filled(
     displayName: string | null;
     externalHandle: string | null;
     isBot: boolean;
+    avatarUrl: string | null;
   },
   details: AccountDetails
 ) {
@@ -72,6 +75,7 @@ function filled(
     displayName: identity.displayName ?? details.name ?? null,
     externalHandle: identity.externalHandle ?? details.handle ?? null,
     isBot: details.bot ?? identity.isBot,
+    avatarUrl: identity.avatarUrl ?? details.avatarUrl ?? null,
   };
 }
 

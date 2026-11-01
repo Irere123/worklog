@@ -26,6 +26,7 @@ const UserSchema = z.object({
   id: optional(z.number().nullable()),
   type: optional(z.string()),
   name: optional(z.string()),
+  avatar_url: optional(z.string()),
 });
 const RepoSchema = z.object({
   id: optional(z.number()),
@@ -133,6 +134,7 @@ export const actorFor = (u: User): ExternalActor => ({
   handle: u.login,
   name: u.name ?? null,
   bot: u.type === "Bot" || /\[bot\]$/iu.test(u.login),
+  avatarUrl: u.avatar_url ?? null,
 });
 
 const actorOf = (u?: User | null): ExternalActor | null =>

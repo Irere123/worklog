@@ -14,6 +14,7 @@ import {
   listHandlesLike,
   listMemberships,
   listPendingInvites,
+  fillMemberAvatars,
   setMembersUser,
   updateMemberById,
   WORKLOG_AGENT,
@@ -121,6 +122,7 @@ export type SignedInUser = {
   name: string;
   email: string;
   emailVerified: boolean;
+  image?: string | null;
 };
 
 export async function createWorkspaceForUser(
@@ -138,6 +140,7 @@ export async function createWorkspaceForUser(
       email: user.email,
       timezone: workspace.timezone,
       userId: user.id,
+      avatarUrl: user.image ?? null,
     });
     return { workspace, member: owner };
   });
@@ -160,6 +163,13 @@ export async function claimMemberships(ctx: AppContext, user: SignedInUser) {
     }
   }
   await setMembersUser(ctx.db, { ids, userId: user.id });
+  // A provider's photo (Google, GitHub) is a starting picture wherever they have none yet.
+  if (user.image) {
+    await fillMemberAvatars(ctx.db, {
+      ids: [...memberships.map((m) => m.member.id), ...ids],
+      avatarUrl: user.image,
+    });
+  }
   return ids.length;
 }
 
@@ -175,6 +185,7 @@ export type NewMember = {
   agentProvider?: string | null;
   settings?: MemberSettings;
   userId?: string | null;
+  avatarUrl?: string | null;
 };
 
 export async function createMember(
@@ -196,6 +207,7 @@ export async function createMember(
       email: input.email ?? null,
       title: input.title ?? null,
       timezone: input.timezone ?? null,
+      avatarUrl: input.avatarUrl ?? null,
       ownerId: input.ownerId ?? null,
       agentProvider:
         input.kind === "agent" ? (input.agentProvider ?? "custom") : null,
@@ -261,7 +273,10 @@ export async function updateMember(
   ctx: AppContext,
   member: Member,
   patch: Partial<
-    Pick<Member, "name" | "email" | "title" | "timezone" | "settings">
+    Pick<
+      Member,
+      "name" | "email" | "title" | "timezone" | "settings" | "avatarUrl"
+    >
   >
 ) {
   if (patch.timezone && !isValidTimeZone(patch.timezone)) {

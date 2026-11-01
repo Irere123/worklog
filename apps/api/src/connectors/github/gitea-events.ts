@@ -12,7 +12,11 @@ const VERDICTS = new Map([
   ["pull_request_review_comment", "commented"],
 ]);
 
-const User = z.object({ id: z.number().optional(), login: z.string() });
+const User = z.object({
+  id: z.number().optional(),
+  login: z.string(),
+  avatar_url: z.string().optional(),
+});
 
 const Reviewed = z.object({
   action: z.literal("reviewed"),

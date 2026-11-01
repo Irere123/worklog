@@ -32,7 +32,10 @@ export async function updateMemberById(
   params: {
     id: string;
     set: Partial<
-      Pick<Member, "name" | "email" | "title" | "timezone" | "settings">
+      Pick<
+        Member,
+        "name" | "email" | "title" | "timezone" | "settings" | "avatarUrl"
+      >
     >;
   }
 ) {
@@ -42,6 +45,20 @@ export async function updateMemberById(
     .where(eq(members.id, params.id))
     .returning();
   return returned(rows, "member");
+}
+
+// Fills only an empty picture, so one the person chose, or an earlier account's, stays.
+export async function fillMemberAvatars(
+  db: DbOrTx,
+  params: { ids: string[]; avatarUrl: string }
+) {
+  if (!params.ids.length) {
+    return;
+  }
+  await db
+    .update(members)
+    .set({ avatarUrl: params.avatarUrl })
+    .where(and(inArray(members.id, params.ids), isNull(members.avatarUrl)));
 }
 
 export async function listMembers(

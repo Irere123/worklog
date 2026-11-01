@@ -168,12 +168,24 @@ describe("GitHub normalizer", () => {
     expect(verdict.events[0]!.signals).toEqual([
       {
         type: "review_result",
-        who: { id: "202", handle: "sam-gh", name: null, bot: false },
+        who: {
+          id: "202",
+          handle: "sam-gh",
+          name: null,
+          bot: false,
+          avatarUrl: null,
+        },
         state: "changes_requested",
       },
       {
         type: "resolve",
-        who: { id: "101", handle: "emma-gh", name: null, bot: false },
+        who: {
+          id: "101",
+          handle: "emma-gh",
+          name: null,
+          bot: false,
+          avatarUrl: null,
+        },
         what: "review_requested",
       },
     ]);
@@ -644,6 +656,66 @@ describe("ingestion pipeline", () => {
       })
     ).body;
     expect(after.actorId).toBe(newhire.member.id);
+  });
+
+  test("an account's picture comes with it, and becomes the picture of whoever it's linked to", async () => {
+    const { owner, send } = await github();
+    const picture = "https://avatars.githubusercontent.com/u/998?v=4";
+    await send("pull_request", {
+      action: "opened",
+      sender: { login: "pictured", id: 998, avatar_url: picture },
+      pull_request: {
+        number: 2,
+        title: "With a face",
+        html_url: "u",
+        user: { login: "pictured", id: 998, avatar_url: picture },
+      },
+    });
+    const [identity] = (
+      await env.call("GET", "/v1/identities?unlinked=true", {
+        token: owner.token,
+      })
+    ).body;
+    expect(identity).toMatchObject({ externalId: "998", avatarUrl: picture });
+
+    const hire = await env.teammate(owner.token, "Pictured Hire");
+    await env.call("PATCH", `/v1/identities/${identity.id}`, {
+      token: owner.token,
+      body: { member: hire.member.id },
+    });
+    const me = await env.call("GET", "/v1/me", { token: hire.token });
+    expect(me.body.member.avatarUrl).toBe(picture);
+  });
+
+  test("a picture someone chose isn't replaced by an account linked later", async () => {
+    const { owner, send } = await github();
+    const hire = await env.teammate(owner.token, "Chooses Own");
+    const own = "https://example.org/me.png";
+    await env.call("PATCH", "/v1/me", {
+      token: hire.token,
+      body: { avatarUrl: own },
+    });
+    await send("pull_request", {
+      action: "opened",
+      sender: { login: "chooser", id: 997, avatar_url: "https://x.test/a.png" },
+      pull_request: {
+        number: 3,
+        title: "Mine",
+        html_url: "u",
+        user: { login: "chooser", id: 997 },
+      },
+    });
+    const [identity] = (
+      await env.call("GET", "/v1/identities?unlinked=true", {
+        token: owner.token,
+      })
+    ).body;
+    await env.call("PATCH", `/v1/identities/${identity.id}`, {
+      token: owner.token,
+      body: { member: hire.member.id },
+    });
+    const me = await env.call("GET", "/v1/me", { token: hire.token });
+    expect(me.body.member.avatarUrl).toBe(own);
   });
 
   test("a reused GitHub login doesn't inherit someone else's identity", async () => {
@@ -1705,10 +1777,10 @@ describe("agents as teammates", () => {
         },
       })
     ).body;
-    const report = async (state: string, title: string) =>
+    const report = async (state: string, title: string, body?: string) =>
       await env.call("POST", "/v1/activities", {
         token: agent.token.token,
-        body: { kind: "agent.task", title, thread: "cursor:bc-1", state },
+        body: { kind: "agent.task", title, body, thread: "cursor:bc-1", state },
       });
 
     await report("working", "Fixing the flaky payments test");
@@ -1718,7 +1790,8 @@ describe("agents as teammates", () => {
 
     const needs = await report(
       "needs_you",
-      "Should I also bump the retry limit to 5?"
+      "Should I also bump the retry limit to 5?",
+      "Three of the last ten runs timed out at 3 retries."
     );
     expect(needs.body).toMatchObject({
       onBehalfOfId: owner.member.id,
@@ -1731,6 +1804,7 @@ describe("agents as teammates", () => {
       kind: "agent.needs_you",
       priority: "high",
       title: "Cursor agent needs you: Should I also bump the retry limit to 5?",
+      body: "Three of the last ten runs timed out at 3 retries.",
     });
 
     await report("finished", "Fixed the flaky test (PR #31)");
@@ -1741,6 +1815,51 @@ describe("agents as teammates", () => {
       kind: "agent.finished",
       priority: "low",
       title: "Cursor agent finished: Fixed the flaky test (PR #31)",
+    });
+  });
+
+  test("an agent's question about a card arrives with the card it's about", async () => {
+    const owner = await env.workspace();
+    const agent = (
+      await env.call("POST", "/v1/members", {
+        token: owner.token,
+        body: {
+          kind: "agent",
+          name: "Cursor agent",
+          agentProvider: "cursor",
+          ownerId: owner.member.id,
+          issueToken: true,
+        },
+      })
+    ).body;
+    const board = (
+      await env.call("POST", "/v1/boards", {
+        token: owner.token,
+        body: { name: "Platform" },
+      })
+    ).body;
+    const { body: card } = await env.call("POST", "/v1/cards", {
+      token: owner.token,
+      body: { boardId: board.id, title: "Upgrade Postgres to 18" },
+    });
+
+    await env.call("POST", "/v1/activities", {
+      token: agent.token.token,
+      body: {
+        kind: "agent.task",
+        title: "Plan ready: approve the maintenance window?",
+        thread: "cursor:pg18",
+        state: "needs_you",
+        cardNumber: card.number,
+      },
+    });
+    const [item] = (
+      await env.call("GET", "/v1/attention", { token: owner.token })
+    ).body;
+    expect(item).toMatchObject({
+      kind: "agent.needs_you",
+      cardId: card.id,
+      cardNumber: card.number,
     });
   });
 });

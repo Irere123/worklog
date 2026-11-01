@@ -41,6 +41,10 @@ export const Settings = z
         description:
           "Interruption budget for proactive pings (defaults: 4/day, 90 min apart, 4 h per thread)",
       }),
+    pins: z.array(z.number().int().positive()).max(50).optional().openapi({
+      description:
+        "Card numbers pinned to the person's pin stack, newest first; kept on the account so they follow them between devices",
+    }),
   })
   .openapi("MemberSettings");
 
@@ -54,6 +58,7 @@ export const Member = z
     email: z.string().nullable(),
     title: z.string().nullable(),
     timezone: z.string().nullable(),
+    avatarUrl: z.string().nullable(),
     ownerId: z
       .string()
       .nullable()
@@ -80,6 +85,18 @@ export const ListMembersQuery = z.object({
   kind: z.enum(MEMBER_KINDS).optional(),
 });
 
+// A same-origin path is allowed so a demo workspace can point at pictures the web app serves itself.
+const AvatarUrl = z
+  .string()
+  .max(2048)
+  .refine(
+    (v) => /^https:\/\/[^\s]+$/u.test(v) || /^\/[^/\\\s][^\s]*$/u.test(v),
+    {
+      message: "Use an https:// address or a path on this site",
+    }
+  )
+  .openapi({ example: "https://avatars.githubusercontent.com/u/1" });
+
 export const UpdateMeRequest = Member.pick({
   name: true,
   title: true,
@@ -87,7 +104,10 @@ export const UpdateMeRequest = Member.pick({
   settings: true,
 })
   .partial()
-  .extend({ email: z.email().nullable().optional() });
+  .extend({
+    email: z.email().nullable().optional(),
+    avatarUrl: AvatarUrl.nullable().optional(),
+  });
 
 export const CreateMemberRequest = z.object({
   kind: z.enum(MEMBER_KINDS),
@@ -222,6 +242,7 @@ export const Identity = z
     externalHandle: z.string().nullable(),
     displayName: z.string().nullable(),
     isBot: z.boolean(),
+    avatarUrl: z.string().nullable(),
     eventCount: z.number().int(),
     lastSeenAt: Timestamp.nullable(),
   })

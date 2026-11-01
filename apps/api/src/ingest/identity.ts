@@ -15,7 +15,11 @@ import {
   updateIdentityDetails,
 } from "#db/queries/identities";
 import type { Identity } from "#db/queries/identities";
-import { findMemberBySignIn, listMembersBySignIn } from "#db/queries/members";
+import {
+  fillMemberAvatars,
+  findMemberBySignIn,
+  listMembersBySignIn,
+} from "#db/queries/members";
 import { transact } from "#db/transact";
 import { enqueue } from "#jobs/queue";
 import { returned } from "#lib/assert";
@@ -71,7 +75,7 @@ export async function resolveActor(
 
 type Details = Pick<
   Identity,
-  "memberId" | "externalHandle" | "displayName" | "isBot"
+  "memberId" | "externalHandle" | "displayName" | "isBot" | "avatarUrl"
 >;
 
 // Most sightings change nothing, and a write per sighting would make a busy bot's row the one every
@@ -89,6 +93,9 @@ function changes(current: Identity, next: Details): Partial<Details> | null {
   }
   if (next.isBot !== current.isBot) {
     set.isBot = next.isBot;
+  }
+  if (next.avatarUrl !== current.avatarUrl) {
+    set.avatarUrl = next.avatarUrl;
   }
   return Object.keys(set).length > 0 ? set : null;
 }
@@ -282,7 +289,11 @@ async function sighted(
       ? (actor.name ?? identity.displayName)
       : identity.displayName,
     isBot: seen ? (actor.bot ?? identity.isBot) : identity.isBot,
+    avatarUrl: seen
+      ? (actor.avatarUrl ?? identity.avatarUrl)
+      : identity.avatarUrl,
   });
+  const avatarUrl = set?.avatarUrl ?? identity.avatarUrl;
   if (set?.memberId) {
     // Linked just now (the account signed in): what it did before is theirs too.
     const linked = memberId;
@@ -292,9 +303,13 @@ async function sighted(
         actorIdentityId: identity.id,
         actorId: linked,
       });
+      await adoptAvatar(tx, linked, avatarUrl);
     });
   } else if (set) {
     await updateIdentityDetails(ctx.db, { id: identity.id, set });
+    if (set.avatarUrl) {
+      await adoptAvatar(ctx, memberId, avatarUrl);
+    }
   }
   if (seen) {
     ctx.tally.sighted(identity.id, sighting.since ?? at, n);
@@ -335,6 +350,7 @@ async function recordIdentities(
           externalHandle: actor.handle ?? null,
           displayName: actor.name ?? null,
           isBot: actor.bot ?? false,
+          avatarUrl: actor.avatarUrl ?? null,
           // Being named isn't being seen: its first action dates it.
           firstSeenAt: acted === false ? null : (since ?? at),
           createdAt: tx.now(),
@@ -442,6 +458,7 @@ async function recordIdentity(
       externalHandle: actor.handle ?? null,
       displayName: actor.name ?? null,
       isBot: actor.bot ?? false,
+      avatarUrl: actor.avatarUrl ?? null,
       firstSeenAt: seenAt,
       createdAt: tx.now(),
     });
@@ -509,8 +526,20 @@ export async function linkIdentityToMember(
       actorIdentityId: identityId,
       actorId: memberId,
     });
+    await adoptAvatar(tx, memberId, row.avatarUrl);
     return { identity: row, reattributed };
   });
+}
+
+/** A linked account's picture becomes the person's, unless they already have one. */
+export async function adoptAvatar(
+  ctx: AppContext,
+  memberId: string | null,
+  avatarUrl: string | null
+) {
+  if (memberId && avatarUrl) {
+    await fillMemberAvatars(ctx.db, { ids: [memberId], avatarUrl });
+  }
 }
 
 export async function linkByHandle(

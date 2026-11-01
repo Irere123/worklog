@@ -7,6 +7,7 @@ const Author = z.object({
   id: z.string(),
   username: z.string().optional(),
   global_name: z.string().nullish(),
+  avatar: z.string().nullish(),
   bot: z.boolean().optional(),
 });
 
@@ -160,6 +161,10 @@ export function normalizeDiscordMessage(
       id: author.id,
       handle: author.username ?? null,
       name: author.global_name ?? null,
+      // Discord sends only the image's hash; the CDN path is fixed.
+      avatarUrl: author.avatar
+        ? `https://cdn.discordapp.com/avatars/${author.id}/${author.avatar}.png`
+        : null,
     },
     title: `Posted in #${name}: ${text.slice(0, 90)}`,
     body: text.slice(0, 1000),

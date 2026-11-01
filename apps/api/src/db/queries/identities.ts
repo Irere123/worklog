@@ -201,6 +201,7 @@ export async function updateIdentityDetails(
         | "externalHandle"
         | "displayName"
         | "isBot"
+        | "avatarUrl"
         | "email"
         | "enrichedAt"
       >

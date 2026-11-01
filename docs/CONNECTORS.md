@@ -89,7 +89,7 @@ Every connector emits `WorklogEvent`s (`apps/api/src/connectors/types.ts`). The 
 | --- | --- |
 | `id` | Built from the source's own ids and timestamps, never the delivery id. Redeliveries, replays and duplicate hooks then land on the same row. |
 | `kind` | `noun.verb`: `pr.opened`, `pr.merged`, `review.submitted`, `comment.created`, `issue.closed`, `code.pushed`, `message.posted`, `release.published`, `deploy.finished`, `agent.task`… |
-| `actor` | `{ id, handle?, name?, bot? }`. The `id` is the most stable one the source has: GitHub numeric id, Slack `U…`. |
+| `actor` | `{ id, handle?, name?, bot?, avatarUrl? }`. The `id` is the most stable one the source has: GitHub numeric id, Slack `U…`. `avatarUrl` is the account's picture when the payload carries one (GitHub, Gitea and GitLab users, Discord's avatar hash); Slack's comes from the directory lookup. |
 | `object` / `container` | What it's about (PR, issue, message) and where it happened (repo, channel). |
 | `thread` | Groups related events, e.g. everything on `github:acme/api#7`. It also scopes attention items. |
 | `cardRefs` | `externalKeys` (`github:acme/api#3`) and `numbers` (from `WL-12` in titles, branches and messages). |
@@ -153,6 +153,7 @@ Every connector emits `WorklogEvent`s (`apps/api/src/connectors/types.ts`). The 
 ## Identity: credit goes to the right person
 
 - **Every actor gets an `identities` row,** matched or not. Unknown people are still recorded, and linking them later re-attributes their history.
+- **Pictures fill, never replace.** An account's latest picture is kept on its identity. When it is linked to a member with no picture, that picture becomes theirs; so does a sign-in provider's photo. A picture someone set with `PATCH /v1/me` (an https address, or a path on the same site) is never overwritten.
 - **Matching order:**
   1. the stable id;
   2. a login placeholder created by a manual link (upgraded to the stable id the first time the account is seen);

@@ -50,6 +50,8 @@ export const members = pgTable(
     email: text("email"),
     title: text("title"),
     timezone: text("timezone"),
+    /** Their own picture, or the first one a linked account or sign-in brought; never replaced unasked. */
+    avatarUrl: text("avatar_url"),
     ownerId: text("owner_id"),
     agentProvider: text("agent_provider"),
     /** Null for agents and not-yet-claimed invites. */
@@ -96,6 +98,7 @@ export const identities = pgTable(
     externalHandle: text("external_handle"),
     displayName: text("display_name"),
     isBot: boolean("is_bot").notNull().default(false),
+    avatarUrl: text("avatar_url"),
     /** From the provider's directory (Slack users.info), so a verified address can link it to a member. */
     email: text("email"),
     enrichedAt: ts("enriched_at"),
@@ -677,6 +680,7 @@ export const EVENT_TYPES = [
   "brief.created",
   "message.created",
   "automation.ran",
+  "notification.sent",
 ] as const;
 export type EventType = (typeof EVENT_TYPES)[number];
 

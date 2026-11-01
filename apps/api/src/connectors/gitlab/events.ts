@@ -14,6 +14,7 @@ const UserSchema = z.object({
   id: optional(z.number()),
   username: z.string(),
   name: optional(z.string()),
+  avatar_url: optional(z.string()),
 });
 
 const ProjectSchema = z.object({
@@ -93,6 +94,7 @@ const PayloadSchema = z
     user_id: optional(z.number()),
     user_username: optional(z.string()),
     user_name: optional(z.string()),
+    user_avatar: optional(z.string()),
     total_commits_count: optional(z.number()),
     commits: optional(
       z.array(
@@ -142,6 +144,7 @@ export const actorFor = (u: GitlabUser): ExternalActor => ({
   handle: u.username,
   name: u.name ?? null,
   bot: BOT.test(u.username),
+  avatarUrl: u.avatar_url ?? null,
 });
 
 // Mentions carry no id, so they resolve by username.
@@ -263,7 +266,12 @@ function actorOfPayload(p: GitlabPayload) {
     return actorFor(p.user);
   }
   return p.user_username
-    ? actorFor({ id: p.user_id, username: p.user_username, name: p.user_name })
+    ? actorFor({
+        id: p.user_id,
+        username: p.user_username,
+        name: p.user_name,
+        avatar_url: p.user_avatar,
+      })
     : null;
 }
 

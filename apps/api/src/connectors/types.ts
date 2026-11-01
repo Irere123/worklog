@@ -9,6 +9,7 @@ export type ExternalActor = {
   handle?: string | null;
   name?: string | null;
   bot?: boolean;
+  avatarUrl?: string | null;
 };
 
 export type Signal =
@@ -305,6 +306,7 @@ export type AccountDetails = {
   name?: string | null;
   handle?: string | null;
   bot?: boolean;
+  avatarUrl?: string | null;
 };
 
 // `normalize` is pure (no database, no network) so mappings can be tested against recorded payloads.
