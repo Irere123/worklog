@@ -789,8 +789,10 @@ async function notify(
       onBehalfOfId: links.onBehalfOfId,
       state: event.agent.state,
       title: event.title,
+      body: event.body ?? null,
       url: event.url ?? null,
       activityId: links.activityId,
+      cardId: links.cardId,
       thread: event.thread ?? event.id,
       agentId: member?.id ?? null,
     });

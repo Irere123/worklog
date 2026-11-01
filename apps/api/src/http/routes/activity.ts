@@ -115,8 +115,10 @@ export const activityRoutes = router()
           onBehalfOfId: onBehalfOf?.id ?? null,
           state: input.state,
           title: input.title,
+          body: input.body ?? null,
           url: input.url ?? null,
           activityId: row.id,
+          cardId: row.cardId,
           thread: thread ?? row.id,
           agentId: me.id,
         });

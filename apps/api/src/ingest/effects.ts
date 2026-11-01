@@ -362,6 +362,9 @@ async function resolveItems(
   });
 }
 
+// An inbox item is read at a glance; the full text stays on the activity it links to.
+const AGENT_BODY_MAX = 1000;
+
 // Loud only when the agent is waiting on the human; never notify while it's working.
 export async function applyAgentState(
   ctx: AppContext,
@@ -371,8 +374,12 @@ export async function applyAgentState(
     onBehalfOfId: string | null;
     state: string | null;
     title: string;
+    /** What the agent said beyond its title: the plan to approve, the error it hit. */
+    body?: string | null;
     url: string | null;
     activityId: string | null;
+    /** The card the agent was working on, so the decision is made with the card in view. */
+    cardId: string | null;
     thread: string;
     agentId: string | null;
   }
@@ -402,8 +409,10 @@ export async function applyAgentState(
     memberId: input.onBehalfOfId,
     kind: `agent.${input.state}`,
     title: spec.title,
+    body: input.body?.slice(0, AGENT_BODY_MAX) ?? null,
     url: input.url,
     activityId: input.activityId,
+    cardId: input.cardId,
     fromId: input.agentId,
     priority: spec.priority,
     dedupeKey: `agent:${input.thread}`,
