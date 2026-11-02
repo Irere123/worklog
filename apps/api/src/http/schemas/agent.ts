@@ -5,7 +5,7 @@ import type { MessageRow } from "#db/queries/conversations";
 import type { VoiceRow } from "#db/queries/voices";
 import { REPLY_RATINGS } from "#db/schema";
 
-import { derived, Timestamp } from "./common";
+import { derived, IsoTimestamp, Timestamp } from "./common";
 
 export const Conversation = z
   .object({
@@ -20,12 +20,60 @@ export const Conversation = z
   })
   .openapi("Conversation");
 
+const Found = z
+  .object({
+    title: z.string(),
+    number: z
+      .number()
+      .int()
+      .nullable()
+      .openapi({ description: "Set for a card" }),
+    at: IsoTimestamp.nullable().openapi({
+      description: "When it happened, for activity",
+    }),
+    source: z.string().nullable(),
+    url: z.string().nullable(),
+  })
+  .openapi("StepFound");
+
+// What a lookup returned, as references: enough to show and open each one, never the full text.
+const FOUND_SHOWN = 8;
+
+const MessageStep = z
+  .discriminatedUnion("kind", [
+    z.object({
+      kind: z.literal("thought"),
+      text: z.string().openapi({ description: "The model's reasoning" }),
+    }),
+    z.object({
+      kind: z.literal("tool"),
+      tool: z.string().openapi({ example: "search_activity" }),
+      input: z.unknown().openapi({ description: "What the tool was asked" }),
+      ok: z.boolean().openapi({ description: "False if the tool failed" }),
+      count: z.number().int().nullable().openapi({
+        description: "How many results came back, when the tool returns a list",
+      }),
+      found: z.array(Found).openapi({
+        description: `The first ${FOUND_SHOWN} cards or events a lookup found, so they can be checked`,
+      }),
+      approvalId: z.string().nullable().openapi({
+        description:
+          "Set when a write teammates would see is waiting for your Allow: the attention item to answer",
+      }),
+    }),
+  ])
+  .openapi("MessageStep");
+
 export const Message = z
   .object({
     id: z.string(),
     seq: z.number().int(),
     role: z.enum(["user", "assistant"]),
     text: z.string(),
+    steps: z.array(MessageStep).openapi({
+      description:
+        "What the assistant did before this reply, in order: its reasoning and the tools it called. Empty for your own messages.",
+    }),
     rating: z.enum(REPLY_RATINGS).nullable().openapi({
       description: "How you rated this reply; null if you haven't",
     }),
@@ -37,17 +85,167 @@ type RatedMessageRow = MessageRow & {
   rating: (typeof REPLY_RATINGS)[number] | null;
 };
 
-// Tool calls and results stay server-side; clients see the readable turns.
+type Step = z.input<typeof MessageStep>;
+
+// A turn is stored as the model saw it: tool calls and results in their own rows. Clients get the
+// readable messages, each reply carrying the steps that led to it. Tool results stay server-side:
+// a step says whether the tool worked, how many results it found and what the first few were.
 export const MessagesResponse = derived(
   z.array(Message),
-  (rows: RatedMessageRow[]) =>
-    rows.filter(
-      (
-        r
-      ): r is RatedMessageRow & { role: "user" | "assistant"; text: string } =>
-        r.role !== "tool" && !!r.text
-    )
+  (rows: RatedMessageRow[]) => {
+    const out: z.input<typeof Message>[] = [];
+    // One reply per question, as it streamed: text written before a tool call ("Let me check")
+    // and the answer after it read as one message, named by its last row so ratings still match.
+    let steps: Traced[] = [];
+    let said: string[] = [];
+    let last: RatedMessageRow | null = null;
+    const flush = () => {
+      if (last && said.length > 0) {
+        out.push({
+          ...last,
+          role: "assistant",
+          text: said.join("\n\n"),
+          steps: steps.map(({ callId: _callId, ...step }) => step),
+        });
+      }
+      steps = [];
+      said = [];
+      last = null;
+    };
+    for (const row of rows) {
+      if (row.role === "user") {
+        flush();
+        if (row.text) {
+          out.push({ ...row, role: "user", text: row.text, steps: [] });
+        }
+      } else if (row.role === "tool") {
+        settleTools(steps, row.content);
+      } else {
+        steps.push(...stepsOf(row.content));
+        if (row.text) {
+          said.push(row.text);
+          last = row;
+        }
+      }
+    }
+    flush();
+    return out;
+  }
 );
+
+type Part = {
+  type?: unknown;
+  text?: unknown;
+  toolName?: unknown;
+  toolCallId?: unknown;
+  input?: unknown;
+  output?: { type?: unknown; value?: unknown };
+};
+
+function partsOf(content: unknown): Part[] {
+  const inner =
+    typeof content === "object" && content !== null && "content" in content
+      ? content.content
+      : null;
+  return Array.isArray(inner)
+    ? inner.filter(
+        (part): part is Part => typeof part === "object" && part !== null
+      )
+    : [];
+}
+
+type Traced = Step & { callId?: string };
+
+function stepsOf(content: unknown): Traced[] {
+  return partsOf(content).flatMap((part): Traced[] => {
+    if (
+      part.type === "reasoning" &&
+      typeof part.text === "string" &&
+      part.text.trim()
+    ) {
+      return [{ kind: "thought", text: part.text }];
+    }
+    if (part.type === "tool-call" && typeof part.toolName === "string") {
+      return [
+        {
+          kind: "tool",
+          tool: part.toolName,
+          input: part.input ?? null,
+          ok: true,
+          count: null,
+          found: [],
+          approvalId: null,
+          callId:
+            typeof part.toolCallId === "string" ? part.toolCallId : undefined,
+        },
+      ];
+    }
+    return [];
+  });
+}
+
+function foundIn(value: unknown): z.input<typeof Found>[] {
+  const items = Array.isArray(value) ? value : [value];
+  return items.slice(0, FOUND_SHOWN).flatMap((item: unknown) => {
+    if (typeof item !== "object" || item === null) {
+      return [];
+    }
+    const field = (key: string): unknown =>
+      Object.getOwnPropertyDescriptor(item, key)?.value;
+    const title = field("title");
+    if (typeof title !== "string") {
+      return [];
+    }
+    const text = (key: string) => {
+      const v = field(key);
+      return typeof v === "string" ? v : null;
+    };
+    const number = field("number");
+    return [
+      {
+        title,
+        number: typeof number === "number" ? number : null,
+        at: text("at"),
+        source: text("source"),
+        url: text("url"),
+      },
+    ];
+  });
+}
+
+// A write the review held back returns `{ blocked: true, approvalId }` instead of running.
+// A held write says `blocked`; a proposed routine says `proposed`. Both wait on the same Allow.
+function heldFor(value: unknown) {
+  if (typeof value !== "object" || value === null) {
+    return null;
+  }
+  const waiting =
+    ("blocked" in value && value.blocked === true) ||
+    ("proposed" in value && value.proposed === true);
+  const id = "approvalId" in value ? value.approvalId : null;
+  return waiting && typeof id === "string" ? id : null;
+}
+
+function settleTools(steps: Traced[], content: unknown) {
+  for (const part of partsOf(content)) {
+    const step = steps.find(
+      (s) =>
+        s.kind === "tool" &&
+        s.callId !== undefined &&
+        s.callId === part.toolCallId
+    );
+    if (step?.kind === "tool") {
+      const kind =
+        typeof part.output?.type === "string" ? part.output.type : "";
+      step.ok = !kind.startsWith("error");
+      step.count = Array.isArray(part.output?.value)
+        ? part.output.value.length
+        : null;
+      step.approvalId = heldFor(part.output?.value);
+      step.found = foundIn(part.output?.value);
+    }
+  }
+}
 
 export const MessageParams = z.object({
   id: z.string(),
@@ -234,3 +432,7 @@ export const Replay = z
     }),
   })
   .openapi("Replay");
+
+export const RenameConversationRequest = z.object({
+  title: z.string().trim().min(1).max(120),
+});

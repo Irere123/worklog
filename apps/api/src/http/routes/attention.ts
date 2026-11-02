@@ -1,6 +1,7 @@
 import { createRoute, z } from "@hono/zod-openapi";
 
 import { answerAttention } from "#agent/approvals";
+import { getAttentionById } from "#db/queries/attention";
 import { body, errors, Id, json, respond, router } from "#http/router";
 import {
   ActionParams,
@@ -132,4 +133,25 @@ export const attentionRoutes = router()
         ),
         200
       )
+  )
+  // After /metrics, which it would otherwise capture as an id.
+  .openapi(
+    createRoute({
+      method: "get",
+      path: "/v1/attention/{id}",
+      operationId: "attention.get",
+      tags: ["Attention"],
+      summary: "One of your items, in whatever state it's in",
+      description:
+        "For checking where one request stands, such as an approval a conversation asked for, without paging through a list.",
+      request: { params: Id },
+      responses: { 200: json(Attention), ...errors },
+    }),
+    async (c) => {
+      const row = await getAttentionById(c.get("ctx").db, {
+        id: c.req.valid("param").id,
+        memberId: c.get("member").id,
+      });
+      return respond(c, Attention, row, 200);
+    }
   );

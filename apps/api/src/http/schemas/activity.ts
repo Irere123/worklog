@@ -81,3 +81,16 @@ export const CreateActivityRequest = z.object({
   state: z.enum(["working", "needs_you", "finished", "failed"]).optional(),
   data: z.record(z.string(), z.unknown()).optional(),
 });
+
+export const ActivityCountsQuery = z.object({
+  since: z.iso.datetime(),
+});
+
+export const ActivityCounts = z
+  .array(
+    z.object({
+      kind: z.string().openapi({ example: "card.closed" }),
+      count: z.number().int(),
+    })
+  )
+  .openapi("ActivityCounts");

@@ -1,8 +1,20 @@
-import { and, desc, eq, gte, ilike, inArray, lt, lte, or } from "drizzle-orm";
+import {
+  and,
+  count,
+  desc,
+  eq,
+  gte,
+  ilike,
+  inArray,
+  isNotNull,
+  lt,
+  lte,
+  or,
+} from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
 
 import type { DbOrTx } from "#db";
-import { activities, inboundEvents } from "#db/schema";
+import { activities, cards, inboundEvents } from "#db/schema";
 import { returned } from "#lib/assert";
 
 export type ActivityRow = typeof activities.$inferSelect;
@@ -152,6 +164,95 @@ export async function listActivities(
     .where(and(...where))
     .orderBy(desc(activities.occurredAt), desc(activities.id))
     .limit(Math.min(filters.limit ?? 50, 500));
+}
+
+/**
+ * The latest thing each person or agent did since `since`, in one query. Private entries count
+ * only for the members in `privateFor`, as in `listActivities`.
+ */
+export async function listLatestByActor(
+  db: DbOrTx,
+  params: { workspaceId: string; privateFor: string[]; since: Date }
+) {
+  return await db
+    .selectDistinctOn([activities.actorId], {
+      actorId: activities.actorId,
+      at: activities.occurredAt,
+      kind: activities.kind,
+      source: activities.source,
+      title: activities.title,
+    })
+    .from(activities)
+    .where(
+      and(
+        eq(activities.workspaceId, params.workspaceId),
+        isNotNull(activities.actorId),
+        gte(activities.occurredAt, params.since),
+        params.privateFor.length > 0
+          ? or(
+              eq(activities.visibility, "team"),
+              inArray(activities.actorId, params.privateFor)
+            )
+          : eq(activities.visibility, "team")
+      )
+    )
+    .orderBy(activities.actorId, desc(activities.occurredAt));
+}
+
+/**
+ * How many of each kind of activity happened since `since`, counted in the database so a busy
+ * team's day isn't cut short by a page size. Private entries count only for `privateFor`.
+ */
+export async function countActivitiesByKind(
+  db: DbOrTx,
+  params: { workspaceId: string; privateFor: string[]; since: Date }
+) {
+  return await db
+    .select({ kind: activities.kind, count: count() })
+    .from(activities)
+    .where(
+      and(
+        eq(activities.workspaceId, params.workspaceId),
+        gte(activities.occurredAt, params.since),
+        params.privateFor.length > 0
+          ? or(
+              eq(activities.visibility, "team"),
+              inArray(activities.actorId, params.privateFor)
+            )
+          : eq(activities.visibility, "team")
+      )
+    )
+    .groupBy(activities.kind);
+}
+
+/**
+ * Where each agent's run stands: the latest of its updates that carry a state (working, needs
+ * you, finished, failed) since `since`. Agent updates are team-visible work.
+ */
+export async function listAgentStates(
+  db: DbOrTx,
+  params: { workspaceId: string; since: Date }
+) {
+  return await db
+    .selectDistinctOn([activities.actorId], {
+      actorId: activities.actorId,
+      state: activities.agentState,
+      title: activities.title,
+      at: activities.occurredAt,
+      cardNumber: cards.number,
+    })
+    .from(activities)
+    .leftJoin(cards, eq(cards.id, activities.cardId))
+    .where(
+      and(
+        eq(activities.workspaceId, params.workspaceId),
+        eq(activities.visibility, "team"),
+        isNotNull(activities.actorId),
+        isNotNull(activities.agentState),
+        gte(activities.occurredAt, params.since)
+      )
+    )
+    .orderBy(activities.actorId, desc(activities.occurredAt));
 }
 
 export async function deleteOwnActivity(

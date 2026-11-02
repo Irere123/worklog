@@ -1,5 +1,10 @@
 import type { AppContext } from "#context";
-import { listActivities } from "#db/queries/activities";
+import {
+  listActivities,
+  listAgentStates,
+  listLatestByActor,
+} from "#db/queries/activities";
+import { listCurrentCards } from "#db/queries/cards";
 import type { Member } from "#db/queries/members";
 import { DAY_MS } from "#lib/time";
 
@@ -54,6 +59,68 @@ export async function workSnapshot(
 }
 
 export type WorkSnapshot = Awaited<ReturnType<typeof workSnapshot>>;
+
+/**
+ * Everyone at a glance, as Home and People show them: each member's current card and the latest
+ * thing they did. Built from two queries for the whole workspace. The asker's own private entries
+ * count for them; everyone else's stay out.
+ */
+export async function teamNow(
+  ctx: AppContext,
+  asker: Member,
+  opts: { days?: number } = {}
+) {
+  const days = opts.days ?? 7;
+  const current = await listCurrentCards(ctx.db, {
+    workspaceId: asker.workspaceId,
+  });
+  const latest = await listLatestByActor(ctx.db, {
+    workspaceId: asker.workspaceId,
+    privateFor: [asker.id],
+    since: new Date(ctx.now().getTime() - days * DAY_MS),
+  });
+  const agents = await listAgentStates(ctx.db, {
+    workspaceId: asker.workspaceId,
+    since: new Date(ctx.now().getTime() - days * DAY_MS),
+  });
+  const ids = new Set([
+    ...current.map((c) => c.memberId),
+    ...latest.flatMap((l) => (l.actorId ? [l.actorId] : [])),
+  ]);
+  return [...ids].map((memberId) => {
+    const card = current.find((c) => c.memberId === memberId);
+    const last = latest.find((l) => l.actorId === memberId);
+    const run = agents.find((a) => a.actorId === memberId);
+    return {
+      memberId,
+      current: card
+        ? {
+            number: card.number,
+            title: card.title,
+            column: card.column,
+            golden: card.golden,
+          }
+        : null,
+      latest: last
+        ? {
+            at: last.at.toISOString(),
+            kind: last.kind,
+            source: last.source,
+            title: last.title,
+          }
+        : null,
+      agent: run?.state
+        ? {
+            state: run.state,
+            title: run.title,
+            at: run.at.toISOString(),
+            cardNumber: run.cardNumber,
+          }
+        : null,
+      lastActiveAt: last?.at.toISOString() ?? null,
+    };
+  });
+}
 
 export function renderSnapshot(s: WorkSnapshot): string {
   const lines = [

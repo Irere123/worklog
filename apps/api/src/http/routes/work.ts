@@ -3,10 +3,15 @@ import { createRoute } from "@hono/zod-openapi";
 import { body, errors, json, respond, router } from "#http/router";
 import { Activity } from "#http/schemas/activity";
 import { MemberRef } from "#http/schemas/members";
-import { LogRequest, Snapshot, SnapshotQuery } from "#http/schemas/work";
+import {
+  LogRequest,
+  Snapshot,
+  SnapshotQuery,
+  TeamNow,
+} from "#http/schemas/work";
 import { logWork } from "#work/log";
 import { resolveMember } from "#work/members";
-import { workSnapshot } from "#work/snapshot";
+import { teamNow, workSnapshot } from "#work/snapshot";
 
 export const workRoutes = router()
   .openapi(
@@ -29,6 +34,28 @@ export const workRoutes = router()
       });
       return respond(c, Activity, activity, 201);
     }
+  )
+  .openapi(
+    createRoute({
+      method: "get",
+      path: "/v1/now",
+      operationId: "team.now",
+      tags: ["People"],
+      summary: "What everyone is on right now, in one call",
+      description:
+        "Each member's current card and the latest thing they did in the last `days` (7 by default). Members with neither are left out. Built for pages that list the team; for one person's full picture use `GET /v1/members/{ref}/now`.",
+      request: { query: SnapshotQuery },
+      responses: { 200: json(TeamNow), ...errors },
+    }),
+    async (c) =>
+      respond(
+        c,
+        TeamNow,
+        await teamNow(c.get("ctx"), c.get("member"), {
+          days: c.req.valid("query").days,
+        }),
+        200
+      )
   )
   .openapi(
     createRoute({

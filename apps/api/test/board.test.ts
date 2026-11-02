@@ -301,3 +301,141 @@ describe("drift nudges", () => {
     expect(after.entropy.postponingSoon).toBe(false);
   });
 });
+
+describe("the team at a glance", () => {
+  test("everyone's current card and latest work, private logs only for their author", async () => {
+    const owner = await env.workspace();
+    const ana = await env.teammate(owner.token, "Ana");
+    const board = (
+      await env.call("POST", "/v1/boards", {
+        token: owner.token,
+        body: { name: "B" },
+      })
+    ).body;
+    for (const title of ["Quiet one", "Ship the importer"]) {
+      await env.call("POST", "/v1/cards", {
+        token: owner.token,
+        body: {
+          boardId: board.id,
+          title,
+          columnId: board.columns[0].id,
+          assigneeIds: [ana.member.id],
+        },
+      });
+    }
+    await env.call("POST", "/v1/cards/2/goldness", { token: owner.token });
+    await env.call("POST", "/v1/logs", {
+      token: ana.token,
+      body: { text: "Paired on the importer", visibility: "team" },
+    });
+    await env.call("POST", "/v1/logs", {
+      token: ana.token,
+      body: { text: "Interviewing elsewhere", visibility: "private" },
+    });
+
+    const seenByOwner = await env.call("GET", "/v1/now?days=3", {
+      token: owner.token,
+    });
+    expect(seenByOwner.status).toBe(200);
+    const anaForOwner = seenByOwner.body.find(
+      (row: any) => row.memberId === ana.member.id
+    );
+    expect(anaForOwner.current).toMatchObject({
+      number: 2,
+      title: "Ship the importer",
+      golden: true,
+    });
+    expect(anaForOwner.latest.title).not.toContain("Interviewing");
+
+    // An agent's state comes from its latest update that carried one, not its latest line.
+    const agent = (
+      await env.call("POST", "/v1/members", {
+        token: owner.token,
+        body: {
+          kind: "agent",
+          name: "Atlas",
+          agentProvider: "cursor",
+          ownerId: owner.member.id,
+          issueToken: true,
+        },
+      })
+    ).body;
+    await env.call("POST", "/v1/activities", {
+      token: agent.token.token,
+      body: {
+        kind: "agent.task",
+        title: "Should I take the maintenance window?",
+        thread: "cursor:bc-1",
+        state: "needs_you",
+        cardNumber: 2,
+      },
+    });
+    await env.call("POST", "/v1/activities", {
+      token: agent.token.token,
+      body: { kind: "agent.note", title: "Read the runbook" },
+    });
+    const withAgent = await env.call("GET", "/v1/now", { token: owner.token });
+    const atlas = withAgent.body.find(
+      (row: any) => row.memberId === agent.member.id
+    );
+    expect(atlas.latest.title).toBe("Read the runbook");
+    expect(atlas.agent).toMatchObject({
+      state: "needs_you",
+      title: "Should I take the maintenance window?",
+      cardNumber: 2,
+    });
+    expect(anaForOwner.agent).toBeNull();
+
+    const seenByAna = await env.call("GET", "/v1/now", { token: ana.token });
+    const anaForAna = seenByAna.body.find(
+      (row: any) => row.memberId === ana.member.id
+    );
+    expect(anaForAna.latest.title).toContain("Interviewing");
+  });
+});
+
+describe("counting the day", () => {
+  test("activity counts by kind cover everything since a time, and only the asker's private entries", async () => {
+    const owner = await env.workspace();
+    const ana = await env.teammate(owner.token, "Ana");
+    const since = new Date(Date.now() - 60_000).toISOString();
+    const board = (
+      await env.call("POST", "/v1/boards", {
+        token: owner.token,
+        body: { name: "B" },
+      })
+    ).body;
+    for (const title of ["One", "Two", "Three"]) {
+      await env.call("POST", "/v1/cards", {
+        token: owner.token,
+        body: { boardId: board.id, title },
+      });
+    }
+    await env.call("POST", "/v1/cards/1/closure", { token: owner.token });
+    await env.call("POST", "/v1/logs", {
+      token: ana.token,
+      body: { text: "Interviewing elsewhere", visibility: "private" },
+    });
+
+    const counts = async (token: string) =>
+      Object.fromEntries(
+        (
+          await env.call(
+            "GET",
+            `/v1/activities/counts?since=${encodeURIComponent(since)}`,
+            { token }
+          )
+        ).body.map((row: any) => [row.kind, row.count])
+      );
+    const forOwner = await counts(owner.token);
+    expect(forOwner["card.created"]).toBe(3);
+    expect(forOwner["card.closed"]).toBe(1);
+    expect(Object.keys(forOwner).some((kind) => kind.startsWith("log."))).toBe(
+      false
+    );
+    const forAna = await counts(ana.token);
+    expect(Object.keys(forAna).some((kind) => kind.startsWith("log."))).toBe(
+      true
+    );
+  });
+});

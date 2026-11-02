@@ -38,6 +38,50 @@ export const Snapshot = z
   })
   .openapi("WorkSnapshot");
 
+export const TeamNow = z
+  .array(
+    z.object({
+      memberId: z.string(),
+      current: z
+        .object({
+          number: z.number().int(),
+          title: z.string(),
+          column: z.string().nullable(),
+          golden: z.boolean(),
+        })
+        .nullable()
+        .openapi({
+          description:
+            "The card they're on: golden first, then the most recently active",
+        }),
+      latest: z
+        .object({
+          at: IsoTimestamp,
+          kind: z.string(),
+          source: z.string(),
+          title: z.string(),
+        })
+        .nullable()
+        .openapi({ description: "The latest thing they did in the window" }),
+      agent: z
+        .object({
+          state: z.enum(["working", "needs_you", "finished", "failed"]),
+          title: z.string(),
+          at: IsoTimestamp,
+          cardNumber: z.number().int().nullable().openapi({
+            description: "The card the run is on, if it named one",
+          }),
+        })
+        .nullable()
+        .openapi({
+          description:
+            "For an agent: where its latest run stands, from the last update that said",
+        }),
+      lastActiveAt: IsoTimestamp.nullable(),
+    })
+  )
+  .openapi("TeamNow");
+
 export const SnapshotQuery = z.object({
   days: z.coerce.number().int().min(1).max(90).optional(),
 });

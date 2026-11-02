@@ -77,7 +77,10 @@ export async function updateConversationById(
   params: {
     id: string;
     set: Partial<
-      Pick<ConversationRow, "updatedAt" | "memoryPage" | "memorySeenAt">
+      Pick<
+        ConversationRow,
+        "updatedAt" | "memoryPage" | "memorySeenAt" | "title"
+      >
     >;
   }
 ) {
@@ -85,6 +88,21 @@ export async function updateConversationById(
     .update(conversations)
     .set(params.set)
     .where(eq(conversations.id, params.id));
+}
+
+// Its messages and ratings go with it (foreign keys cascade).
+export async function deleteConversationById(
+  db: DbOrTx,
+  params: { id: string; workspaceId: string }
+) {
+  await db
+    .delete(conversations)
+    .where(
+      and(
+        eq(conversations.id, params.id),
+        eq(conversations.workspaceId, params.workspaceId)
+      )
+    );
 }
 
 // Joins the line for a turn in this conversation.

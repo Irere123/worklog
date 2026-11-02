@@ -416,3 +416,32 @@ export async function countCards(
     )
   );
 }
+
+/**
+ * Each member's current card, the one their snapshot puts first: golden, then the most recently
+ * active. One query for the whole team, so a page of people doesn't ask once per person.
+ */
+export async function listCurrentCards(
+  db: DbOrTx,
+  params: { workspaceId: string }
+) {
+  return await db
+    .selectDistinctOn([cardAssignees.memberId], {
+      memberId: cardAssignees.memberId,
+      number: cards.number,
+      title: cards.title,
+      column: columns.name,
+      golden: cards.golden,
+    })
+    .from(cardAssignees)
+    .innerJoin(cards, eq(cards.id, cardAssignees.cardId))
+    .leftJoin(columns, eq(columns.id, cards.columnId))
+    .where(
+      and(eq(cards.workspaceId, params.workspaceId), eq(cards.stage, "active"))
+    )
+    .orderBy(
+      cardAssignees.memberId,
+      desc(cards.golden),
+      desc(cards.lastActiveAt)
+    );
+}

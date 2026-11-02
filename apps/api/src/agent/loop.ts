@@ -74,6 +74,11 @@ const TURN_POLL_MS = 250;
 const STOP_POLL_MS = 500;
 const STOPPED = "Stopped before finishing.";
 
+function stoppedReply(written: string) {
+  const kept = written.trimEnd();
+  return kept ? `${kept}\n\n_${STOPPED}_` : STOPPED;
+}
+
 export async function resolveAgent(
   ctx: AppContext,
   target: Member
@@ -611,15 +616,27 @@ export async function askStream(
   }
 
   try {
+    // What the person already read stays in the record when they stop the reply.
+    let written = "";
+    // Text before and after a tool call are separate paragraphs, not one run-on sentence.
+    let afterTool = false;
     const result = streamText({
       model: ctx.models.main,
       ...params,
       abortSignal: signal,
+      onChunk: ({ chunk }) => {
+        if (chunk.type === "text-delta") {
+          written += afterTool && written ? `\n\n${chunk.text}` : chunk.text;
+          afterTool = false;
+        } else if (chunk.type.startsWith("tool-")) {
+          afterTool = true;
+        }
+      },
       onAbort: async () => {
         await appendMessages(
           ctx,
           conversation,
-          [userMessage, { role: "assistant", content: STOPPED }],
+          [userMessage, { role: "assistant", content: stoppedReply(written) }],
           sent
         );
       },

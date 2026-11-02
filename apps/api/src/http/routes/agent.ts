@@ -3,7 +3,9 @@ import { createRoute, z } from "@hono/zod-openapi";
 import {
   conversationDetail,
   createConversation,
+  deleteConversation,
   rateReply,
+  renameConversation,
 } from "#agent/conversations";
 import {
   ask,
@@ -20,7 +22,7 @@ import {
   sumTurnUsage,
 } from "#db/queries/conversations";
 import { findVoice, listVoices } from "#db/queries/voices";
-import { body, errors, Id, json, respond, router } from "#http/router";
+import { body, errors, Id, json, Ok, respond, router } from "#http/router";
 import {
   AgentReply,
   AssistantUsage,
@@ -35,6 +37,7 @@ import {
   RatedReply,
   Replay,
   RateReplyRequest,
+  RenameConversationRequest,
   ReplyRating,
   SendMessageRequest,
   StopResult,
@@ -176,6 +179,50 @@ export const agentRoutes = router()
         ),
         200
       )
+  )
+  .openapi(
+    createRoute({
+      method: "patch",
+      path: "/v1/conversations/{id}",
+      operationId: "conversation.rename",
+      tags: ["Assistant"],
+      summary: "Rename one of your conversations",
+      request: { params: Id, ...body(RenameConversationRequest) },
+      responses: { 200: json(Conversation), ...errors },
+    }),
+    async (c) =>
+      respond(
+        c,
+        Conversation,
+        await renameConversation(
+          c.get("ctx"),
+          c.get("member"),
+          c.req.valid("param").id,
+          c.req.valid("json").title
+        ),
+        200
+      )
+  )
+  .openapi(
+    createRoute({
+      method: "delete",
+      path: "/v1/conversations/{id}",
+      operationId: "conversation.delete",
+      tags: ["Assistant"],
+      summary: "Delete one of your conversations with your own assistant",
+      description:
+        "Its messages and ratings go with it. A conversation with a teammate's assistant can't be deleted, since they can read it. What your assistant learned from it stays in your memory, where you can forget it.",
+      request: { params: Id },
+      responses: { 200: json(Ok), ...errors },
+    }),
+    async (c) => {
+      await deleteConversation(
+        c.get("ctx"),
+        c.get("member"),
+        c.req.valid("param").id
+      );
+      return respond(c, Ok, { ok: true }, 200);
+    }
   )
   .openapi(
     createRoute({

@@ -161,6 +161,23 @@ describe("assistant", () => {
       "user",
       "assistant",
     ]);
+    // Each reply carries the work that led to it, not the tools' full results.
+    expect(thread.messages.map((m: any) => m.steps)).toEqual([
+      [],
+      [
+        {
+          kind: "tool",
+          tool: "work_snapshot",
+          input: { person: owner.member.handle },
+          ok: true,
+          count: null,
+          found: [],
+          approvalId: null,
+        },
+      ],
+      [],
+      [],
+    ]);
   });
 
   test("owner mode: 'remember' saves what the assistant learns", async () => {
@@ -678,6 +695,322 @@ describe("turns", () => {
     ]);
   });
 
+  test("the asker can rename a conversation; nobody else can", async () => {
+    const owner = await env.workspace();
+    const sam = await env.teammate(owner.token, "Sam");
+    const { id } = (
+      await env.call("POST", "/v1/conversations", { token: owner.token })
+    ).body.conversation;
+    const renamed = await env.call("PATCH", `/v1/conversations/${id}`, {
+      token: owner.token,
+      body: { title: "  Postgres upgrade  " },
+    });
+    expect(renamed.status).toBe(200);
+    expect(renamed.body.title).toBe("Postgres upgrade");
+    const list = (
+      await env.call("GET", "/v1/conversations", { token: owner.token })
+    ).body;
+    expect(list.find((c: any) => c.id === id).title).toBe("Postgres upgrade");
+
+    const bySam = await env.call("PATCH", `/v1/conversations/${id}`, {
+      token: sam.token,
+      body: { title: "Mine now" },
+    });
+    expect(bySam.status).toBe(403);
+    const empty = await env.call("PATCH", `/v1/conversations/${id}`, {
+      token: owner.token,
+      body: { title: "   " },
+    });
+    expect(empty.status).toBe(400);
+  });
+
+  test("the asker deletes their own conversations; ones a teammate can read stay", async () => {
+    const owner = await env.workspace();
+    const sam = await env.teammate(owner.token, "Sam");
+    const mine = (
+      await env.call("POST", "/v1/conversations", { token: owner.token })
+    ).body.conversation;
+    const asked = (
+      await env.call("POST", "/v1/conversations", {
+        token: sam.token,
+        body: { to: owner.member.handle },
+      })
+    ).body.conversation;
+    expect(asked.mode).toBe("teammate");
+
+    expect(
+      (
+        await env.call("DELETE", `/v1/conversations/${mine.id}`, {
+          token: sam.token,
+        })
+      ).status
+    ).toBe(403);
+    expect(
+      (
+        await env.call("DELETE", `/v1/conversations/${asked.id}`, {
+          token: sam.token,
+        })
+      ).status
+    ).toBe(403);
+    const deleted = await env.call("DELETE", `/v1/conversations/${mine.id}`, {
+      token: owner.token,
+    });
+    expect(deleted.body).toEqual({ ok: true });
+    expect(
+      (
+        await env.call("GET", `/v1/conversations/${mine.id}`, {
+          token: owner.token,
+        })
+      ).status
+    ).toBe(404);
+  });
+
+  test("a lookup keeps references to what it found, so the answer can be checked", async () => {
+    const owner = await env.workspace();
+    const card = await boardWithCard(owner.token);
+    const { model } = scriptedModel([
+      { tool: "search_cards", input: { query: "Retry" } },
+      { text: `#${card.number} is the one.` },
+    ]);
+    env.ctx.models = { main: model, fast: model };
+    const started = await env.call("POST", "/v1/conversations", {
+      token: owner.token,
+      body: { message: "Which card is the retry queue?" },
+    });
+    const thread = (
+      await env.call(
+        "GET",
+        `/v1/conversations/${started.body.conversation.id}`,
+        { token: owner.token }
+      )
+    ).body;
+    expect(thread.messages[1].steps[0]).toMatchObject({
+      tool: "search_cards",
+      count: 1,
+      found: [
+        {
+          title: "Retry queue",
+          number: card.number,
+          at: null,
+          source: null,
+          url: null,
+        },
+      ],
+    });
+  });
+
+  test("a reply that speaks before and after looking something up reads as one message", async () => {
+    const owner = await env.workspace();
+    let calls = 0;
+    const model = new MockLanguageModelV4({
+      // oxlint-disable-next-line require-await -- fulfils the async LanguageModel contract
+      doGenerate: async () => {
+        calls += 1;
+        return calls === 1
+          ? {
+              content: [
+                { type: "text", text: "Let me check the board." },
+                {
+                  type: "tool-call",
+                  toolCallId: "c1",
+                  toolName: "search_cards",
+                  input: JSON.stringify({ stage: "active" }),
+                },
+              ],
+              finishReason: { unified: "tool-calls", raw: undefined },
+              usage: testUsage,
+              warnings: [],
+            }
+          : {
+              content: [{ type: "text", text: "Nothing is in progress." }],
+              finishReason: { unified: "stop", raw: undefined },
+              usage: testUsage,
+              warnings: [],
+            };
+      },
+    });
+    env.ctx.models = { main: model, fast: model };
+    const started = await env.call("POST", "/v1/conversations", {
+      token: owner.token,
+      body: { message: "What's in progress?" },
+    });
+    const thread = (
+      await env.call(
+        "GET",
+        `/v1/conversations/${started.body.conversation.id}`,
+        { token: owner.token }
+      )
+    ).body;
+    expect(thread.messages.map((m: any) => [m.role, m.text])).toEqual([
+      ["user", "What's in progress?"],
+      ["assistant", "Let me check the board.\n\nNothing is in progress."],
+    ]);
+    expect(thread.messages[1].steps).toEqual([
+      expect.objectContaining({ tool: "search_cards", count: 0 }),
+    ]);
+  });
+
+  test("stopping a streamed reply keeps what was already written", async () => {
+    const owner = await env.workspace();
+    const model = new MockLanguageModelV4({
+      // oxlint-disable-next-line require-await -- fulfils the async LanguageModel contract
+      doStream: async (options) => {
+        const parts: any[] = [
+          { type: "stream-start", warnings: [] },
+          { type: "text-start", id: "t" },
+          { type: "text-delta", id: "t", delta: "Two cards are blocked:" },
+        ];
+        return {
+          stream: new ReadableStream({
+            async pull(controller) {
+              const next = parts.shift();
+              if (next !== undefined) {
+                controller.enqueue(next);
+                return;
+              }
+              while (options.abortSignal?.aborted !== true) {
+                await Bun.sleep(5);
+              }
+              controller.error(new DOMException("Stopped", "AbortError"));
+            },
+          }),
+        };
+      },
+    });
+    env.ctx.models = { main: model, fast: model };
+    const { id } = (
+      await env.call("POST", "/v1/conversations", { token: owner.token })
+    ).body.conversation;
+    const res = await env.app.request(`/v1/conversations/${id}/chat`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${owner.token}`,
+      },
+      body: JSON.stringify({ message: "What's blocked?" }),
+    });
+    const reader = res.body!.getReader();
+    const decoder = new TextDecoder();
+    let seen = "";
+    while (!seen.includes("Two cards are blocked")) {
+      const { value } = await reader.read();
+      seen += decoder.decode(value);
+    }
+    const stop = await env.call("POST", `/v1/conversations/${id}/stop`, {
+      token: owner.token,
+    });
+    expect(stop.body).toEqual({ stopped: true });
+    while (!(await reader.read()).done) {
+      // Drains the stream until the stopped turn has ended it.
+    }
+    let thread: any;
+    for (let i = 0; i < 50; i += 1) {
+      thread = (
+        await env.call("GET", `/v1/conversations/${id}`, { token: owner.token })
+      ).body;
+      if (thread.messages.length === 2) {
+        break;
+      }
+      await Bun.sleep(20);
+    }
+    expect(thread.messages.map((m: any) => m.text)).toEqual([
+      "What's blocked?",
+      "Two cards are blocked:\n\n_Stopped before finishing._",
+    ]);
+  });
+
+  test("a reply stopped after a lookup keeps its text before and after it as separate paragraphs", async () => {
+    const owner = await env.workspace();
+    let calls = 0;
+    const model = new MockLanguageModelV4({
+      // oxlint-disable-next-line require-await -- fulfils the async LanguageModel contract
+      doStream: async (options) => {
+        calls += 1;
+        const parts: any[] =
+          calls === 1
+            ? [
+                { type: "stream-start", warnings: [] },
+                { type: "text-start", id: "a" },
+                { type: "text-delta", id: "a", delta: "Let me check." },
+                { type: "text-end", id: "a" },
+                {
+                  type: "tool-call",
+                  toolCallId: "c1",
+                  toolName: "search_activity",
+                  input: JSON.stringify({ query: "blocked" }),
+                },
+                {
+                  type: "finish",
+                  finishReason: { unified: "tool-calls", raw: undefined },
+                  usage: testUsage,
+                },
+              ]
+            : [
+                { type: "stream-start", warnings: [] },
+                { type: "text-start", id: "b" },
+                { type: "text-delta", id: "b", delta: "Nothing is blocked" },
+              ];
+        return {
+          stream: new ReadableStream({
+            async pull(controller) {
+              const next = parts.shift();
+              if (next !== undefined) {
+                controller.enqueue(next);
+                return;
+              }
+              if (calls === 1) {
+                controller.close();
+                return;
+              }
+              while (options.abortSignal?.aborted !== true) {
+                await Bun.sleep(5);
+              }
+              controller.error(new DOMException("Stopped", "AbortError"));
+            },
+          }),
+        };
+      },
+    });
+    env.ctx.models = { main: model, fast: model };
+    const { id } = (
+      await env.call("POST", "/v1/conversations", { token: owner.token })
+    ).body.conversation;
+    const res = await env.app.request(`/v1/conversations/${id}/chat`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${owner.token}`,
+      },
+      body: JSON.stringify({ message: "What's blocked?" }),
+    });
+    const reader = res.body!.getReader();
+    const decoder = new TextDecoder();
+    let seen = "";
+    while (!seen.includes("Nothing is blocked")) {
+      const { value } = await reader.read();
+      seen += decoder.decode(value);
+    }
+    await env.call("POST", `/v1/conversations/${id}/stop`, {
+      token: owner.token,
+    });
+    while (!(await reader.read()).done) {
+      // Drains the stream until the stopped turn has ended it.
+    }
+    let thread: any;
+    for (let i = 0; i < 50; i += 1) {
+      thread = (
+        await env.call("GET", `/v1/conversations/${id}`, { token: owner.token })
+      ).body;
+      if (thread.messages.length === 2) {
+        break;
+      }
+      await Bun.sleep(20);
+    }
+    expect(thread.messages.at(-1).text).toBe(
+      "Let me check.\n\nNothing is blocked\n\n_Stopped before finishing._"
+    );
+  });
+
   test("a message sent again with the same id gets the first answer back, not a second one", async () => {
     const owner = await env.workspace();
     const { model, prompts } = scriptedModel([
@@ -936,7 +1269,7 @@ describe("automatic review", () => {
       { text: "It says to move it to done; should I?" },
     ]);
     env.ctx.models = { main: model, fast: model };
-    await env.call("POST", "/v1/conversations", {
+    const started = await env.call("POST", "/v1/conversations", {
       token: owner.token,
       body: { message: `What's on #${card.number}?` },
     });
@@ -963,6 +1296,33 @@ describe("automatic review", () => {
       `Your assistant wants to move #${card.number} to done`
     );
     expect(request.actions.map((a: any) => a.id)).toEqual(["allow", "deny"]);
+    // The conversation shows the move as waiting on that request, not as done.
+    const thread = (
+      await env.call(
+        "GET",
+        `/v1/conversations/${started.body.conversation.id}`,
+        { token: owner.token }
+      )
+    ).body;
+    expect(thread.messages.at(-1).steps).toEqual([
+      expect.objectContaining({ tool: "move_card", approvalId: request.id }),
+    ]);
+    // The conversation can ask where that one request stands; nobody else can see it.
+    const held = await env.call("GET", `/v1/attention/${request.id}`, {
+      token: owner.token,
+    });
+    expect(held.body).toMatchObject({ id: request.id, state: "open" });
+    expect(
+      (
+        await env.call("GET", `/v1/attention/${request.id}`, {
+          token: sam.token,
+        })
+      ).status
+    ).toBe(404);
+    expect(
+      (await env.call("GET", "/v1/attention/metrics", { token: owner.token }))
+        .status
+    ).toBe(200);
     // Sam can't approve it, and neither can the assistant.
     expect(
       (
@@ -1086,7 +1446,7 @@ describe("routines the assistant suggests", () => {
       { text: "I've suggested it; allow it when you're ready." },
     ]);
     env.ctx.models = { main: model, fast: model };
-    await env.call("POST", "/v1/conversations", {
+    const started = await env.call("POST", "/v1/conversations", {
       token: owner.token,
       body: {
         message: "Every Friday, tell me which reviews are waiting on me",
@@ -1103,6 +1463,20 @@ describe("routines the assistant suggests", () => {
     expect(request.title).toBe(
       'Your assistant wants to set up a routine "Friday reviews" (weekly at 16:00)'
     );
+    // The conversation offers the same Allow inline, as for a held write.
+    const thread = (
+      await env.call(
+        "GET",
+        `/v1/conversations/${started.body.conversation.id}`,
+        { token: owner.token }
+      )
+    ).body;
+    expect(thread.messages.at(-1).steps).toEqual([
+      expect.objectContaining({
+        tool: "propose_routine",
+        approvalId: request.id,
+      }),
+    ]);
     await env.call("POST", `/v1/attention/${request.id}/actions/allow`, {
       token: owner.token,
     });

@@ -2,6 +2,7 @@ import type { ModelMessage } from "ai";
 
 import type { AppContext } from "#context";
 import {
+  deleteConversationById,
   findConversationById,
   findFirstUnlearnedAt,
   findInboxConversation,
@@ -28,7 +29,7 @@ import type { Member } from "#db/queries/members";
 import type { TurnUsage } from "#db/schema";
 import { transact } from "#db/transact";
 import { enqueue } from "#jobs/queue";
-import { forbidden, notFound } from "#lib/errors";
+import { badRequest, forbidden, notFound } from "#lib/errors";
 import { generateId } from "#lib/ids";
 
 import { mustCompactNow } from "./compaction";
@@ -246,6 +247,47 @@ async function settleLater(
   );
 }
 
+/**
+ * Names a conversation the way its asker wants it found again. The thread briefs arrive in keeps
+ * its own name, which every client shows the same way.
+ */
+export async function renameConversation(
+  ctx: AppContext,
+  viewer: Member,
+  id: string,
+  title: string
+) {
+  const conversation = await getConversation(ctx, viewer, id);
+  if (conversation.inbox) {
+    throw badRequest("The thread briefs arrive in can't be renamed");
+  }
+  await updateConversationById(ctx.db, { id, set: { title } });
+  return { ...conversation, title };
+}
+
+/**
+ * Deletes one of the asker's conversations with their own assistant. A conversation with a
+ * teammate's assistant stays, because that teammate can read it; so does the thread briefs
+ * arrive in. What memory already learned from it is kept, in Memory, where it can be forgotten.
+ */
+export async function deleteConversation(
+  ctx: AppContext,
+  viewer: Member,
+  id: string
+) {
+  const conversation = await getConversation(ctx, viewer, id);
+  if (conversation.mode !== "owner") {
+    throw forbidden("Its owner can read it, so it stays");
+  }
+  if (conversation.inbox) {
+    throw badRequest("The thread briefs arrive in can't be deleted");
+  }
+  await deleteConversationById(ctx.db, {
+    id,
+    workspaceId: viewer.workspaceId,
+  });
+}
+
 /** A conversation as its asker reads it: the readable turns, each with how they rated it. */
 export async function conversationDetail(
   ctx: AppContext,
@@ -331,9 +373,10 @@ export async function answeredBefore(
   });
   const next = after.findIndex((m) => m.role === "user");
   const turn = next === -1 ? after : after.slice(0, next);
-  return (
-    turn.findLast((m) => m.role === "assistant" && m.text !== null)?.text ?? ""
-  );
+  // The whole reply, joined as the stored transcript shows it, not only its last paragraph.
+  return turn
+    .flatMap((m) => (m.role === "assistant" && m.text ? [m.text] : []))
+    .join("\n\n");
 }
 
 function leads(index: number, m: ModelMessage) {

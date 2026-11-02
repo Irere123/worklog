@@ -1,12 +1,18 @@
 import { createRoute, z } from "@hono/zod-openapi";
 
 import type { AppContext } from "#context";
-import { deleteOwnActivity, listActivities } from "#db/queries/activities";
+import {
+  countActivitiesByKind,
+  deleteOwnActivity,
+  listActivities,
+} from "#db/queries/activities";
 import { getCardByNumber } from "#db/queries/cards";
 import type { Member } from "#db/queries/members";
 import { body, errors, Id, json, Ok, respond, router } from "#http/router";
 import {
   Activity,
+  ActivityCounts,
+  ActivityCountsQuery,
   CreateActivityRequest,
   ListActivitiesQuery,
 } from "#http/schemas/activity";
@@ -53,6 +59,28 @@ export const activityRoutes = router()
         limit: q.limit,
       });
       return respond(c, z.array(Activity), rows, 200);
+    }
+  )
+  .openapi(
+    createRoute({
+      method: "get",
+      path: "/v1/activities/counts",
+      operationId: "activity.counts",
+      tags: ["Work"],
+      summary: "How much of each kind of work happened since a time",
+      description:
+        "Counts by `kind` (`card.closed`, `card.created`, a source's merged pull requests…) for a summary line, without paging through the stream. Your own private entries are counted; others' aren't.",
+      request: { query: ActivityCountsQuery },
+      responses: { 200: json(ActivityCounts), ...errors },
+    }),
+    async (c) => {
+      const me = c.get("member");
+      const rows = await countActivitiesByKind(c.get("ctx").db, {
+        workspaceId: me.workspaceId,
+        privateFor: [me.id],
+        since: new Date(c.req.valid("query").since),
+      });
+      return respond(c, ActivityCounts, rows, 200);
     }
   )
   .openapi(
