@@ -1,5 +1,6 @@
 import { Scalar } from "@scalar/hono-api-reference";
 import type { ErrorHandler } from "hono";
+import { compress } from "hono/compress";
 import { cors } from "hono/cors";
 import { HTTPException } from "hono/http-exception";
 
@@ -94,6 +95,8 @@ export function createApp(ctx: AppContext) {
     "/api/auth/*",
     async (c) => await ctx.auth.handler(c.req.raw)
   );
+  // JSON only: event streams and the chat's stream must reach the client as they're written.
+  app.use("/v1/*", compress({ contentTypeFilter: /^application\/json/u }));
   app.use("/v1/*", authMiddleware(ctx));
 
   app.onError(handleError);

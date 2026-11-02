@@ -52,7 +52,7 @@ curl -X POST localhost:4000/v1/logs -H "$WL" -H 'content-type: application/json'
   -d '{"text":"Agreed on FHIR R4 for referrals","kind":"decision"}'
 ```
 
-To run both from one server, build the web app (`cd apps/web && bun run build`) and set `WEB_DIST=../web/dist/client` in `apps/api/.env`: the API then serves it at http://localhost:4000.
+To run both from one server, build the web app (`cd apps/web && bun run build`) and set `WEB_DIST=../web/dist/client` in `apps/api/.env`: the API then serves it at http://localhost:4000, compressed, with its hashed files cached for good.
 
 AI is optional. Set `OPENROUTER_API_KEY` for the assistant and model-written briefs. Without it, Worklog uses templates and rules.
 
@@ -68,6 +68,6 @@ AI is optional. Set `OPENROUTER_API_KEY` for the assistant and model-written bri
 - [x] Web app: home, inbox, board, activity, assistant, briefs, people and settings ([design brief](docs/research/web-app-design.md))
 - [ ] Mobile app (Expo) with push notifications
 - [ ] MCP server, so coding agents can read the board and log work natively
-- [ ] Voice logs, generated TypeScript SDK
+- [ ] Voice logs in the mobile app (the web app already dictates logs and questions where the browser can), generated TypeScript SDK
 
 Inspired by [Fizzy](https://fizzy.do), [OpenCode](https://github.com/anomalyco/opencode), [OpenClaw](https://github.com/openclaw/openclaw) and [Cursor](https://cursor.com).
