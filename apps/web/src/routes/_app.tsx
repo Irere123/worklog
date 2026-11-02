@@ -1,6 +1,7 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
 
 import { ApiError } from "#api/client";
+import { preloadShell } from "#api/preload";
 import { q } from "#api/queries";
 import { Shell } from "#features/shell/shell";
 
@@ -15,11 +16,11 @@ export const Route = createFileRoute("/_app")({
   },
   beforeLoad: async ({ context, location }) => {
     try {
-      const session = await context.queryClient.query({
-        ...q.session(),
-        staleTime: "static",
-      });
-      await context.queryClient.query({ ...q.me(), staleTime: "static" });
+      const [session] = await Promise.all([
+        context.queryClient.query({ ...q.session(), staleTime: "static" }),
+        context.queryClient.query({ ...q.me(), staleTime: "static" }),
+      ]);
+      preloadShell(context.queryClient);
       return { session };
     } catch (error) {
       if (error instanceof ApiError && error.status === 401) {

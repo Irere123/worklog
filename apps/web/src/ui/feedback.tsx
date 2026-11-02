@@ -106,7 +106,8 @@ export function VisuallyHidden({ children }: { children: ReactNode }) {
   return <span {...stylex.props(a11y.srOnly)}>{children}</span>;
 }
 
-function useDelayed(ms: number) {
+/** False for the first `ms`, so a fast answer never flashes a loading state. */
+export function useDelayed(ms: number) {
   const [shown, setShown] = useState(ms === 0);
   useEffect(() => {
     const timer = setTimeout(() => setShown(true), ms);

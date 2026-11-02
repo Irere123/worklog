@@ -18,6 +18,21 @@ type Step = {
 
 const DISMISSED = "worklog.setup.dismissed";
 
+const setupQueries = () =>
+  [q.connections(), q.boards(), q.members(), q.targets(), q.voice()] as const;
+
+/**
+ * Whether the checklist knows if it will show. Until then the page holds what sits below it, so
+ * the list doesn't arrive late and push everything down.
+ */
+export function useSetupSettled() {
+  const results = useQueries({ queries: setupQueries() });
+  return (
+    localStorage.getItem(DISMISSED) === "1" ||
+    results.every((r) => !r.isPending)
+  );
+}
+
 /**
  * A new workspace is mostly empty pages; this says what makes Worklog useful, in order, and ticks
  * each step off from real data rather than from clicks.
@@ -27,7 +42,7 @@ export function SetupChecklist({ meId }: { meId: string }) {
     () => localStorage.getItem(DISMISSED) === "1"
   );
   const [connections, boards, members, targets, voice] = useQueries({
-    queries: [q.connections(), q.boards(), q.members(), q.targets(), q.voice()],
+    queries: setupQueries(),
   });
   if (
     hidden ||

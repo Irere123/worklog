@@ -142,7 +142,16 @@ export function Briefs({ selectedId }: { selectedId?: string }) {
               <BriefNumbers data={selected.data} />
               <Markdown>{selected.body}</Markdown>
               <footer {...stylex.props(styles.end)}>
-                That’s everything for this brief.
+                <span>That’s everything for this brief.</span>
+                <Link
+                  to="/assistant"
+                  search={{
+                    ask: `About “${selected.title}”: what matters most in it for me, and what should I do first?`,
+                  }}
+                  {...stylex.props(styles.ask)}
+                >
+                  Ask your assistant about it
+                </Link>
               </footer>
             </article>
           )}
@@ -278,11 +287,16 @@ const styles = stylex.create({
   },
   // A ruled strip, like the figures box in a printed report: a brief is a document, and five
   // boxed tiles made it read as a dashboard.
+  // Five figures can't share one row on a phone, and wrapped they leave a ruled cell hanging, so
+  // there they become a figures list: label, then number, one per line.
   stats: {
     display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(96px, 1fr))",
-    rowGap: space.md,
-    paddingBottom: space.md,
+    gridTemplateColumns: {
+      default: "repeat(auto-fit, minmax(96px, 1fr))",
+      "@media (max-width: 640px)": "minmax(0, 1fr)",
+    },
+    rowGap: { default: space.md, "@media (max-width: 640px)": 0 },
+    paddingBottom: { default: space.md, "@media (max-width: 640px)": 0 },
     // The heading's rule above closes the strip's top edge.
     borderBottomWidth: 1,
     borderBottomStyle: "solid",
@@ -290,18 +304,47 @@ const styles = stylex.create({
   },
   stat: {
     display: "flex",
-    flexDirection: "column-reverse",
+    flexDirection: {
+      default: "column-reverse",
+      "@media (max-width: 640px)": "row-reverse",
+    },
+    justifyContent: {
+      default: null,
+      "@media (max-width: 640px)": "space-between",
+    },
+    alignItems: { default: null, "@media (max-width: 640px)": "baseline" },
     gap: 2,
-    paddingInline: space.lg,
-    borderInlineStartWidth: { default: 1, ":first-child": 0 },
+    paddingInline: { default: space.lg, "@media (max-width: 640px)": 0 },
+    paddingBlock: { default: null, "@media (max-width: 640px)": space.sm },
+    borderInlineStartWidth: {
+      default: 1,
+      ":first-child": 0,
+      "@media (max-width: 640px)": 0,
+    },
     borderInlineStartStyle: "solid",
     borderInlineStartColor: color.line,
-    paddingInlineStart: { default: space.lg, ":first-child": 0 },
+    paddingInlineStart: {
+      default: space.lg,
+      ":first-child": 0,
+      "@media (max-width: 640px)": 0,
+    },
+    borderTopWidth: {
+      default: 0,
+      "@media (max-width: 640px)": { default: 1, ":first-child": 0 },
+    },
+    borderTopStyle: "solid",
+    borderTopColor: color.line,
   },
   statValue: {
     margin: 0,
-    fontSize: text.titleLg,
-    lineHeight: leading.titleLg,
+    fontSize: {
+      default: text.titleLg,
+      "@media (max-width: 640px)": text.title,
+    },
+    lineHeight: {
+      default: leading.titleLg,
+      "@media (max-width: 640px)": leading.title,
+    },
     fontWeight: 600,
     letterSpacing: "-0.02em",
     fontVariantNumeric: "tabular-nums",
@@ -327,7 +370,18 @@ const styles = stylex.create({
     letterSpacing: "-0.02em",
   },
   when: { fontSize: text.label, color: color.fgMuted },
+  ask: {
+    color: color.accentFg,
+    textDecoration: {
+      default: "none",
+      ":hover": { default: null, [media.hover]: "underline" },
+    },
+  },
   end: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    gap: space.sm,
     marginTop: space.xl,
     paddingTop: space.xl,
     borderTopWidth: 1,

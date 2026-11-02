@@ -202,7 +202,8 @@ export function Sidebar({
         )}
         <Tooltip label={LIVE[live].label} side="top">
           <output {...stylex.props(styles.live)} aria-label={LIVE[live].label}>
-            <Dot tone={LIVE[live].tone} pulse={live === "live"} />
+            {/* Calm when all is well: only reconnecting moves. */}
+            <Dot tone={LIVE[live].tone} pulse={live === "connecting"} />
           </output>
         </Tooltip>
       </div>

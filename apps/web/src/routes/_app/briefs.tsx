@@ -11,6 +11,6 @@ export const Route = createFileRoute("/_app/briefs")({
 });
 
 function BriefsPage() {
-  const { id } = Route.useSearch();
+  const id = Route.useSearch({ select: (s) => s.id });
   return <Briefs selectedId={id} />;
 }

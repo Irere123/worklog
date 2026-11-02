@@ -1,5 +1,11 @@
 import {
   BrainIcon,
+  CaretLeftIcon,
+  CopyIcon,
+  DotsThreeIcon,
+  TrashIcon,
+  PencilSimpleIcon,
+  MagnifyingGlassIcon,
   ChatsCircleIcon,
   PlusIcon,
   ScrollIcon,
@@ -11,30 +17,34 @@ import type { ReactNode } from "react";
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 import { toast } from "sonner";
 
-import { api, unwrap } from "#api/client";
+import { ApiError, api, unwrap } from "#api/client";
 import { q } from "#api/queries";
 import { useMe } from "#features/auth/session";
 import { useMembers } from "#features/cards/card-bits";
-import { ago } from "#lib/time";
+import { ago, recencyLabel } from "#lib/time";
 import { Avatar } from "#ui/avatar";
 import { Button } from "#ui/button";
-import { ErrorNote, Skeleton } from "#ui/feedback";
+import { EmptyState, ErrorNote, Skeleton } from "#ui/feedback";
+import { Input } from "#ui/field";
 import { PageHeader } from "#ui/layout";
-import { Tooltip } from "#ui/overlay";
+import { Menu, MenuItem, Tooltip } from "#ui/overlay";
 import { color, leading, media, radius, space, text } from "#ui/tokens.stylex";
 
-import { Chat } from "./chat";
+import { Chat, PendingThread } from "./chat";
+import { Composer } from "./composer";
+import { useSuggestions } from "./suggestions";
 
-/** First questions worth asking, offered wherever the assistant waits for one. */
-export const STARTERS = [
-  "What changed while I was away?",
-  "What’s blocked right now?",
-  "Draft my standup",
-];
+// Past this many, the list gets a filter: scrolling stops being the quick way to find one.
+const FILTER_FROM = 8;
 
 export function Conversations({ children }: { children: ReactNode }) {
-  const list = useQuery(q.conversations());
+  const list = useQuery({ ...q.conversations(), select: notBeingDeleted });
   const { byId } = useMembers();
+  const [filter, setFilter] = useState("");
+  const term = filter.trim().toLowerCase();
+  const shown = (list.data ?? []).filter(
+    (c) => !term || (c.title ?? "new conversation").toLowerCase().includes(term)
+  );
   return (
     <div {...stylex.props(styles.layout)}>
       <aside {...stylex.props(styles.side)}>
@@ -52,41 +62,65 @@ export function Conversations({ children }: { children: ReactNode }) {
             </Link>
           </Tooltip>
         </div>
+        {(list.data?.length ?? 0) > FILTER_FROM && (
+          <div {...stylex.props(styles.filter)}>
+            <Input
+              aria-label="Find a conversation"
+              placeholder="Find a conversation"
+              value={filter}
+              onChange={(event) => setFilter(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Escape") {
+                  setFilter("");
+                }
+              }}
+              leading={<MagnifyingGlassIcon size={13} />}
+            />
+          </div>
+        )}
         <nav aria-label="Conversations" {...stylex.props(styles.list)}>
           {list.isPending && <Skeleton lines={6} height={30} />}
+          {term && shown.length === 0 && (
+            <p {...stylex.props(styles.listEmpty)}>
+              No conversation is called that. Titles come from the first thing
+              asked.
+            </p>
+          )}
           {list.data?.length === 0 && (
             <p {...stylex.props(styles.listEmpty)}>
               Conversations you start show up here, with briefs and pings in
               their own thread.
             </p>
           )}
-          {list.data?.map((c) => {
-            const agent = byId.get(c.agentId);
-            const owner = agent?.ownerId ? byId.get(agent.ownerId) : undefined;
-            return (
-              <Link
-                key={c.id}
-                to="/assistant/$conversationId"
-                params={{ conversationId: c.id }}
-                {...stylex.props(styles.item)}
-              >
-                {c.mode === "teammate" && owner ? (
-                  <Avatar person={owner} size={18} />
-                ) : (
-                  <span {...stylex.props(styles.dot)} />
-                )}
-                <span {...stylex.props(styles.itemTitle)}>
-                  {c.title ??
-                    (c.mode === "teammate"
-                      ? `${owner?.name ?? "Teammate"}'s assistant`
-                      : "New conversation")}
-                </span>
-                <span {...stylex.props(styles.itemTime)}>
-                  {ago(c.updatedAt)}
-                </span>
-              </Link>
-            );
-          })}
+          {groupByRecency(shown).map(([label, items]) => (
+            <section key={label} {...stylex.props(styles.group)}>
+              <h3 {...stylex.props(styles.groupLabel)}>{label}</h3>
+              {items.map((c) => {
+                const agent = byId.get(c.agentId);
+                const owner = agent?.ownerId
+                  ? byId.get(agent.ownerId)
+                  : undefined;
+                return (
+                  <Link
+                    key={c.id}
+                    to="/assistant/$conversationId"
+                    params={{ conversationId: c.id }}
+                    {...stylex.props(styles.item)}
+                  >
+                    {c.mode === "teammate" && owner && (
+                      <Avatar person={owner} size={16} />
+                    )}
+                    <span {...stylex.props(styles.itemTitle)}>
+                      {titleOf(c, owner?.name)}
+                    </span>
+                    <span {...stylex.props(styles.itemTime)}>
+                      {ago(c.updatedAt)}
+                    </span>
+                  </Link>
+                );
+              })}
+            </section>
+          ))}
         </nav>
         <div {...stylex.props(styles.sideFoot)}>
           <Link to="/settings/assistant" {...stylex.props(styles.footLink)}>
@@ -102,7 +136,36 @@ export function Conversations({ children }: { children: ReactNode }) {
   );
 }
 
-/** Opening a conversation needs a server id first; a question from ⌘K or Home rides along. */
+/**
+ * A new conversation starts at the composer, as in any assistant people already use: what's
+ * written here opens the conversation and is sent as its first message.
+ */
+/** What a conversation is called in lists and its header. */
+export function titleOf(
+  c: { title: string | null; inbox: boolean; mode: "owner" | "teammate" },
+  owner?: string
+) {
+  // The thread briefs and pings arrive in; "Inbox" would name the page of attention items.
+  if (c.inbox) {
+    return "From your assistant";
+  }
+  if (c.title) {
+    return c.title;
+  }
+  return c.mode === "teammate"
+    ? `${owner ?? "Teammate"}'s assistant`
+    : "New conversation";
+}
+
+function groupByRecency<T extends { updatedAt: string }>(items: T[]) {
+  const groups = new Map<string, T[]>();
+  for (const item of items) {
+    const label = recencyLabel(item.updatedAt);
+    groups.set(label, [...(groups.get(label) ?? []), item]);
+  }
+  return [...groups.entries()];
+}
+
 export function NewChat({ ask }: { ask?: string }) {
   const client = useQueryClient();
   const navigate = useNavigate();
@@ -113,74 +176,122 @@ export function NewChat({ ask }: { ask?: string }) {
     (m) => m.agentProvider === "worklog" && m.ownerId === me?.member.id
   );
   const open = useMutation({
-    mutationFn: async () =>
-      await unwrap(api.POST("/v1/conversations", { body: { to: "me" } })),
-    onSuccess: (reply) => {
-      void client.invalidateQueries({ queryKey: ["conversations"] });
+    mutationFn: async (question: string) => {
+      const reply = await unwrap(
+        api.POST("/v1/conversations", { body: { to: "me" } })
+      );
+      return { reply, question };
+    },
+    onSuccess: ({ reply, question }) => {
+      // Listed under the question straight away; the server names it once the first turn is in.
+      client.setQueryData(q.conversations().queryKey, (cached) => [
+        { ...reply.conversation, title: reply.conversation.title ?? question },
+        ...(cached ?? []).filter((c) => c.id !== reply.conversation.id),
+      ]);
       void navigate({
         to: "/assistant/$conversationId",
         params: { conversationId: reply.conversation.id },
-        search: ask ? { ask } : {},
+        search: { ask: question },
         replace: true,
       });
     },
     onError: (error) => toast.error(error.message),
   });
 
-  const start = useEffectEvent(() => {
-    open.mutate();
+  const start = useEffectEvent((question: string) => {
+    open.mutate(question);
   });
   useEffect(() => {
     if (ask && !started.current) {
       started.current = true;
-      start();
+      start(ask);
     }
   }, [ask]);
+  const firstName = me?.member.name.split(" ")[0];
+  const suggestions = useSuggestions();
+  const asking = open.variables ?? (open.isError ? undefined : ask);
+
+  if (asking && !open.isError) {
+    // The question shows the moment it's asked, as the thread will; the conversation opens under it.
+    return (
+      <>
+        <PageHeader title={asking} />
+        <PendingThread question={asking} agent={mine} />
+      </>
+    );
+  }
 
   return (
     <div {...stylex.props(styles.empty)}>
-      {mine ? (
-        <Avatar person={mine} size={48} />
-      ) : (
-        <span {...stylex.props(styles.emptyIcon)}>
-          <ChatsCircleIcon size={22} />
-        </span>
-      )}
-      <h2 {...stylex.props(styles.emptyTitle)}>Your assistant</h2>
-      <p {...stylex.props(styles.emptyText)}>
-        It knows your work and your team’s, learns from what you tell it the
-        same day, and stays quiet when there’s nothing to say.
-      </p>
-      <Button
-        variant="primary"
-        icon={<PlusIcon size={14} />}
-        busy={open.isPending}
-        onClick={() => open.mutate()}
-      >
-        Start a conversation
-      </Button>
-      <div {...stylex.props(styles.starters)}>
-        {STARTERS.map((question) => (
-          <button
-            key={question}
-            type="button"
-            disabled={open.isPending}
-            onClick={() => {
-              void navigate({ to: "/assistant", search: { ask: question } });
-            }}
-            {...stylex.props(styles.starter)}
-          >
-            {question}
-          </button>
-        ))}
+      <div {...stylex.props(styles.emptyColumn)}>
+        <div {...stylex.props(styles.emptyHead)}>
+          {mine && <Avatar person={mine} size={40} />}
+          <h1 {...stylex.props(styles.emptyTitle)}>
+            {firstName
+              ? `What can I find for you, ${firstName}?`
+              : "What can I find for you?"}
+          </h1>
+          <p {...stylex.props(styles.emptyText)}>
+            Your assistant reads the team’s activity and your board, remembers
+            what you tell it, and stays quiet when there’s nothing to say.
+          </p>
+        </div>
+        <Composer
+          busy={open.isPending}
+          label="Message your assistant"
+          placeholder="Ask anything about your team’s work…"
+          context={<span>Sees your work and your team’s</span>}
+          onSend={(question) => open.mutate(question)}
+        />
+        <ul {...stylex.props(styles.starters)}>
+          {suggestions.map((suggestion) => (
+            <li key={suggestion.label}>
+              <button
+                type="button"
+                disabled={open.isPending}
+                onClick={() => open.mutate(suggestion.ask)}
+                {...stylex.props(styles.starter)}
+              >
+                {suggestion.label}
+              </button>
+            </li>
+          ))}
+        </ul>
+        <RecentConversations />
       </div>
     </div>
+  );
+}
+
+/** On a phone the list beside the thread is hidden, so a new chat lists the latest ones. */
+function RecentConversations() {
+  const list = useQuery({ ...q.conversations(), select: notBeingDeleted });
+  const items = list.data?.slice(0, 8) ?? [];
+  if (items.length === 0) {
+    return null;
+  }
+  return (
+    <nav aria-label="Recent conversations" {...stylex.props(styles.recent)}>
+      <h3 {...stylex.props(styles.groupLabel)}>Recent</h3>
+      {items.map((c) => (
+        <Link
+          key={c.id}
+          to="/assistant/$conversationId"
+          params={{ conversationId: c.id }}
+          {...stylex.props(styles.item)}
+        >
+          <span {...stylex.props(styles.itemTitle)}>{titleOf(c)}</span>
+          <span {...stylex.props(styles.itemTime)}>{ago(c.updatedAt)}</span>
+        </Link>
+      ))}
+    </nav>
   );
 }
 
 export function ConversationView({ id, ask }: { id: string; ask?: string }) {
   const conversation = useQuery(q.conversation(id));
   const navigate = useNavigate();
+  const { byId } = useMembers();
   // The URL drops the question straight away, so a reload can't send it twice; keep it here.
   // oxlint-disable-next-line react/hook-use-state -- only the first value is wanted; there is nothing to set
   const [question] = useState(ask);
@@ -207,19 +318,75 @@ export function ConversationView({ id, ask }: { id: string; ask?: string }) {
     );
   }
   if (conversation.isError) {
+    // Gone is not broken: a deleted conversation, or one that was never yours (403), gets a way
+    // on instead of a Try again that can't work.
+    const gone =
+      conversation.error instanceof ApiError &&
+      (conversation.error.status === 404 || conversation.error.status === 403);
     return (
       <div {...stylex.props(styles.pad)}>
-        <ErrorNote error={conversation.error} />
+        {gone ? (
+          <EmptyState
+            icon={<ChatsCircleIcon size={20} />}
+            title="This conversation isn’t here anymore"
+            action={
+              <Button
+                variant="primary"
+                onClick={() => {
+                  void navigate({ to: "/assistant" });
+                }}
+              >
+                Start a new one
+              </Button>
+            }
+          >
+            It may have been deleted, or it belongs to someone else.
+          </EmptyState>
+        ) : (
+          <ErrorNote
+            error={conversation.error}
+            retry={() => {
+              void conversation.refetch();
+            }}
+          />
+        )}
       </div>
     );
   }
   const { messages, ...meta } = conversation.data;
+  const ownerOf = (agentId: string) => {
+    const agent = byId.get(agentId);
+    return agent?.ownerId ? byId.get(agent.ownerId)?.name : undefined;
+  };
   return (
     <>
       <PageHeader
+        back={
+          <Link
+            to="/assistant"
+            aria-label="All conversations"
+            {...stylex.props(styles.back)}
+          >
+            <CaretLeftIcon size={16} />
+          </Link>
+        }
+        actions={
+          meta.mode === "owner" && !meta.inbox ? (
+            <ConversationMenu id={meta.id} title={meta.title} />
+          ) : undefined
+        }
         title={
-          meta.title ??
-          (meta.mode === "teammate" ? "Teammate’s assistant" : "Conversation")
+          <EditableTitle
+            conversationId={meta.id}
+            editable={!meta.inbox}
+            title={
+              meta.inbox || meta.title
+                ? titleOf(meta, ownerOf(meta.agentId))
+                : (messages.find((m) => m.role === "user")?.text ??
+                  question ??
+                  titleOf(meta, ownerOf(meta.agentId)))
+            }
+          />
         }
       />
       <Chat conversation={meta} stored={messages} firstMessage={question} />
@@ -227,7 +394,258 @@ export function ConversationView({ id, ask }: { id: string; ask?: string }) {
   );
 }
 
+// How long a deleted conversation can still be brought back.
+const UNDO_MS = 5000;
+const pendingDeletes = new Map<string, ReturnType<typeof setTimeout>>();
+
+// The server keeps a deleted conversation until its Undo window ends, so a refetch meanwhile
+// (focus, a live message) must not bring it back into the list.
+function notBeingDeleted<T extends { id: string }>(list: T[]) {
+  return list.filter((c) => !pendingDeletes.has(c.id));
+}
+
+// A tab closed during the undo window still deletes: the request outlives the page.
+if (typeof window !== "undefined") {
+  window.addEventListener("pagehide", () => {
+    for (const [id, timer] of pendingDeletes) {
+      clearTimeout(timer);
+      void api.DELETE("/v1/conversations/{id}", {
+        params: { path: { id } },
+        keepalive: true,
+      });
+    }
+    pendingDeletes.clear();
+  });
+}
+
+async function deleteFor(id: string, restore: () => void) {
+  try {
+    await unwrap(
+      api.DELETE("/v1/conversations/{id}", { params: { path: { id } } })
+    );
+  } catch (error) {
+    restore();
+    toast.error(
+      error instanceof Error
+        ? error.message
+        : "That didn’t delete. Check your connection, then try again."
+    );
+  }
+}
+
+/**
+ * Deleting goes at once from the list and the page, with Undo for a few seconds instead of a
+ * confirm dialog; only then is it deleted for good.
+ */
+function ConversationMenu({ id, title }: { id: string; title: string | null }) {
+  const client = useQueryClient();
+  const navigate = useNavigate();
+  const { byId } = useMembers();
+  const copy = async () => {
+    try {
+      // Fetched fresh: a reply that just finished streaming isn't in the cached copy yet.
+      const detail = await client.query({
+        ...q.conversation(id),
+        staleTime: 0,
+      });
+      const names = {
+        user: byId.get(detail.askerId)?.name ?? "You",
+        assistant: byId.get(detail.agentId)?.name ?? "Assistant",
+      };
+      await navigator.clipboard.writeText(asMarkdown(detail, names));
+      toast("Copied the conversation as Markdown");
+    } catch {
+      toast.error("That didn’t copy. Try again.");
+    }
+  };
+  const remove = () => {
+    const key = q.conversations().queryKey;
+    const before = client.getQueryData(key);
+    client.setQueryData(key, (cached) => cached?.filter((c) => c.id !== id));
+    void navigate({ to: "/assistant" });
+    const timer = setTimeout(() => {
+      pendingDeletes.delete(id);
+      void deleteFor(id, () => {
+        client.setQueryData(key, before);
+      }).finally(() => {
+        void client.invalidateQueries({ queryKey: ["conversations"] });
+      });
+    }, UNDO_MS);
+    pendingDeletes.set(id, timer);
+    toast(title ? `Deleted “${title}”` : "Deleted the conversation", {
+      duration: UNDO_MS,
+      action: {
+        label: "Undo",
+        onClick: () => {
+          clearTimeout(timer);
+          pendingDeletes.delete(id);
+          client.setQueryData(key, before);
+          void navigate({
+            to: "/assistant/$conversationId",
+            params: { conversationId: id },
+          });
+        },
+      },
+    });
+  };
+  return (
+    <Menu
+      align="end"
+      trigger={
+        <Button
+          size="sm"
+          variant="ghost"
+          aria-label="Conversation options"
+          icon={<DotsThreeIcon size={15} />}
+        />
+      }
+    >
+      <MenuItem
+        icon={<CopyIcon size={14} />}
+        onClick={() => {
+          void copy();
+        }}
+      >
+        Copy as Markdown
+      </MenuItem>
+      <MenuItem icon={<TrashIcon size={14} />} onClick={remove}>
+        Delete conversation
+      </MenuItem>
+    </Menu>
+  );
+}
+
+function asMarkdown(
+  detail: {
+    title: string | null;
+    messages: { role: "user" | "assistant"; text: string }[];
+  },
+  names: Record<"user" | "assistant", string>
+) {
+  const turns = detail.messages
+    .filter((m) => m.text.trim() !== "")
+    .map((m) => `**${names[m.role]}**\n\n${m.text.trim()}`);
+  return `${[`# ${detail.title ?? "Conversation"}`, ...turns].join("\n\n")}\n`;
+}
+
+/**
+ * A conversation's name, renamed where it's read: click it (or its pencil), type, and Enter
+ * saves; Escape keeps the old one. The list updates at once.
+ */
+function EditableTitle({
+  conversationId,
+  title,
+  editable,
+}: {
+  conversationId: string;
+  title: string;
+  editable: boolean;
+}) {
+  const client = useQueryClient();
+  const [draft, setDraft] = useState<string | null>(null);
+  const rename = useMutation({
+    mutationFn: async (next: string) =>
+      await unwrap(
+        api.PATCH("/v1/conversations/{id}", {
+          params: { path: { id: conversationId } },
+          body: { title: next },
+        })
+      ),
+    onMutate: (next) => {
+      client.setQueryData(q.conversations().queryKey, (cached) =>
+        cached?.map((c) =>
+          c.id === conversationId ? { ...c, title: next } : c
+        )
+      );
+    },
+    onSettled: () => {
+      void client.invalidateQueries({ queryKey: ["conversations"] });
+    },
+    onError: (error) => toast.error(error.message),
+  });
+  if (!editable) {
+    return title;
+  }
+  if (draft === null) {
+    return (
+      <button
+        type="button"
+        title="Rename"
+        onClick={() => setDraft(title)}
+        {...stylex.props(styles.titleButton)}
+      >
+        <span {...stylex.props(styles.titleText)}>{title}</span>
+        <PencilSimpleIcon size={13} {...stylex.props(styles.titlePencil)} />
+      </button>
+    );
+  }
+  const save = () => {
+    const next = draft.trim();
+    setDraft(null);
+    if (next && next !== title) {
+      rename.mutate(next);
+    }
+  };
+  return (
+    <input
+      // oxlint-disable-next-line jsx-a11y/no-autofocus -- the person just asked to rename it
+      autoFocus
+      aria-label="Conversation name"
+      value={draft}
+      maxLength={120}
+      onChange={(event) => setDraft(event.target.value)}
+      onBlur={save}
+      onKeyDown={(event) => {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          save();
+        }
+        if (event.key === "Escape") {
+          event.preventDefault();
+          setDraft(null);
+        }
+      }}
+      {...stylex.props(styles.titleInput)}
+    />
+  );
+}
+
 const styles = stylex.create({
+  titleButton: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: space.sm,
+    maxWidth: "100%",
+    padding: 0,
+    borderWidth: 0,
+    font: "inherit",
+    color: "inherit",
+    backgroundColor: "transparent",
+    cursor: "text",
+  },
+  titleText: { minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" },
+  titlePencil: {
+    flexShrink: 0,
+    color: color.fgFaint,
+    opacity: {
+      default: 0,
+      ":is(button:hover > *)": { default: 0, [media.hover]: 1 },
+      ":is(button:focus-visible > *)": 1,
+      "@media (hover: none)": 1,
+    },
+  },
+  titleInput: {
+    width: "min(480px, 100%)",
+    paddingBlock: 2,
+    paddingInline: space.sm,
+    marginInline: `calc(-1 * ${space.sm})`,
+    borderWidth: 0,
+    borderRadius: radius.sm,
+    font: "inherit",
+    color: color.fg,
+    backgroundColor: color.ui,
+    outline: { default: "none", ":focus-visible": `2px solid ${color.focus}` },
+  },
   layout: {
     flexGrow: 1,
     minHeight: 0,
@@ -307,13 +725,33 @@ const styles = stylex.create({
       ":is([data-status=active])": color.uiActive,
     },
   },
-  dot: {
-    width: 6,
-    height: 6,
-    marginInline: 6,
-    borderRadius: "50%",
-    backgroundColor: color.accent,
-    flexShrink: 0,
+  group: { display: "flex", flexDirection: "column", gap: 1 },
+  filter: { paddingInline: space.sm, paddingTop: space.sm },
+  // The list sits beside the thread on wide screens; on a phone the thread needs a way back to it.
+  back: {
+    display: { default: "none", "@media (max-width: 860px)": "grid" },
+    placeItems: "center",
+    width: 28,
+    height: 28,
+    marginInlineStart: -6,
+    borderRadius: radius.sm,
+    color: color.fgMuted,
+  },
+  recent: {
+    display: { default: "none", "@media (max-width: 860px)": "flex" },
+    flexDirection: "column",
+    gap: 1,
+    marginTop: space.lg,
+  },
+  groupLabel: {
+    margin: 0,
+    paddingInline: space.md,
+    paddingTop: space.md,
+    paddingBottom: space.xs,
+    fontSize: text.caption,
+    lineHeight: leading.caption,
+    fontWeight: 500,
+    color: color.fgFaint,
   },
   itemTitle: {
     flexGrow: 1,
@@ -322,7 +760,16 @@ const styles = stylex.create({
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
   },
-  itemTime: { fontSize: 11.5, color: color.fgFaint, flexShrink: 0 },
+  itemTime: {
+    flexShrink: 0,
+    fontSize: text.caption,
+    // The open conversation's fill is a step darker, so its time steps up to stay readable.
+    color: {
+      default: color.fgFaint,
+      ":is([data-status=active] > *)": color.fgMuted,
+    },
+    fontVariantNumeric: "tabular-nums",
+  },
   sideFoot: {
     display: "flex",
     flexDirection: "column",
@@ -356,39 +803,65 @@ const styles = stylex.create({
     display: "flex",
     flexDirection: "column",
     alignItems: "center",
-    justifyContent: "center",
-    textAlign: "center",
+    justifyContent: {
+      default: "center",
+      "@media (max-width: 640px)": "flex-start",
+    },
+    paddingBlock: space.x4,
+    paddingInline: { default: space.x3, "@media (max-width: 640px)": space.md },
+    overflowY: "auto",
+  },
+  emptyColumn: {
+    display: "flex",
+    flexDirection: "column",
+    gap: space.xl,
+    width: "100%",
+    maxWidth: 680,
+    // Sits a little above centre, where the eye lands on an empty page.
+    marginBottom: { default: "10vh", "@media (max-width: 640px)": 0 },
+  },
+  emptyHead: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "flex-start",
     gap: space.md,
-    padding: space.x4,
+    paddingInline: space.sm,
   },
-  emptyIcon: {
-    display: "grid",
-    placeItems: "center",
-    width: 48,
-    height: 48,
-    borderRadius: radius.lg,
-    color: color.accentFg,
-    backgroundColor: color.accentSubtle,
+  emptyTitle: {
+    margin: 0,
+    marginTop: space.xs,
+    fontSize: text.titleLg,
+    lineHeight: leading.titleLg,
+    fontWeight: 600,
+    letterSpacing: "-0.01em",
+    textWrap: "balance",
   },
-  emptyTitle: { fontSize: text.title, fontWeight: 600 },
   emptyText: {
-    maxWidth: 400,
-    fontSize: text.label,
+    margin: 0,
+    maxWidth: 520,
+    fontSize: text.copy,
+    lineHeight: leading.copy,
     color: color.fgMuted,
-    marginBottom: space.md,
+    textWrap: "pretty",
   },
   starters: {
     display: "flex",
     flexWrap: "wrap",
-    justifyContent: "center",
     gap: space.sm,
-    marginTop: space.lg,
+    margin: 0,
+    paddingInline: space.sm,
+    listStyle: "none",
   },
+  // A long suggestion wraps on a phone, so the chip grows with it instead of clipping.
   starter: {
-    height: 28,
-    paddingInline: space.md,
-    borderRadius: radius.full,
-    fontSize: text.meta,
+    minHeight: 30,
+    paddingBlock: space.xs,
+    paddingInline: space.lg,
+    borderRadius: radius.lg,
+    textAlign: "start",
+    lineHeight: leading.label,
+    borderWidth: 0,
+    fontSize: text.label,
     color: {
       default: color.fgMuted,
       ":hover": { default: null, [media.hover]: color.fg },
@@ -398,6 +871,7 @@ const styles = stylex.create({
       ":hover": { default: null, [media.hover]: color.ui },
     },
     boxShadow: `inset 0 0 0 1px ${color.line}`,
+    cursor: "pointer",
   },
   listEmpty: {
     paddingInline: space.md,

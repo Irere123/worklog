@@ -16,7 +16,7 @@ type Activity = Schemas["Activity"];
 const STATES: Record<string, { label: string; tone: Tone; order: number }> = {
   needs_you: { label: "Needs a decision", tone: "amber", order: 0 },
   working: { label: "Working", tone: "blue", order: 1 },
-  failed: { label: "Stuck", tone: "red", order: 2 },
+  failed: { label: "Couldn’t finish", tone: "red", order: 2 },
   finished: { label: "Finished", tone: "green", order: 3 },
 };
 

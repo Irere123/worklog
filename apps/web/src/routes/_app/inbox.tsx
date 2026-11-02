@@ -23,7 +23,8 @@ export const Route = createFileRoute("/_app/inbox")({
 });
 
 function InboxPage() {
-  const { state = "open", item } = Route.useSearch();
+  const state = Route.useSearch({ select: (s) => s.state ?? "open" });
+  const item = Route.useSearch({ select: (s) => s.item });
   const navigate = useNavigate({ from: Route.fullPath });
   return (
     <Inbox

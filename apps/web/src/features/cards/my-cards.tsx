@@ -215,19 +215,25 @@ const styles = stylex.create({
     color: color.fgFaint,
   },
   gold: { flexShrink: 0, color: color.goldFg },
+  // On a phone the stage, faces and time leave a title about twenty characters, so there it wraps
+  // to two lines and the faces go: these are your cards, and the stage says where each stands.
   title: {
     flexGrow: 1,
     minWidth: 0,
     overflow: "hidden",
     textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
+    whiteSpace: { default: "nowrap", "@media (max-width: 640px)": "normal" },
+    display: { default: null, "@media (max-width: 640px)": "-webkit-box" },
+    WebkitLineClamp: { default: null, "@media (max-width: 640px)": 2 },
+    WebkitBoxOrient: { default: null, "@media (max-width: 640px)": "vertical" },
+    paddingBlock: { default: null, "@media (max-width: 640px)": space.sm },
     fontSize: text.label,
     lineHeight: leading.label,
     fontWeight: 500,
   },
   people: {
     flexShrink: 0,
-    display: "flex",
+    display: { default: "flex", "@media (max-width: 640px)": "none" },
     justifyContent: "flex-end",
     width: 48,
   },

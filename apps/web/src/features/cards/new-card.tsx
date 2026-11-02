@@ -17,9 +17,12 @@ import { color, leading, space, text } from "#ui/tokens.stylex";
 export function NewCardDialog({
   open,
   onClose,
+  initial,
 }: {
   open: boolean;
   onClose: () => void;
+  /** What the card starts with, when it comes from somewhere: a reply, a log. */
+  initial?: { title: string; body?: string };
 }) {
   const boards = useQuery(q.boards());
   const onBoard = useMatch({
@@ -27,8 +30,8 @@ export function NewCardDialog({
     shouldThrow: false,
   });
   const [picked, setPicked] = useState<string | null>(null);
-  const [title, setTitle] = useState("");
-  const [body, setBody] = useState("");
+  const [title, setTitle] = useState(initial?.title ?? "");
+  const [body, setBody] = useState(initial?.body ?? "");
   const [golden, setGolden] = useState(false);
   const client = useQueryClient();
   const navigate = useNavigate();
@@ -185,8 +188,15 @@ const styles = stylex.create({
     justifyContent: "space-between",
     gap: space.md,
   },
-  board: { width: 220 },
+  // At a fixed 220px the picker leaves a phone too little room for the golden ticket beside it.
+  board: {
+    width: { default: 220, "@media (max-width: 640px)": "auto" },
+    flexGrow: { default: 0, "@media (max-width: 640px)": 1 },
+    minWidth: 0,
+  },
   golden: {
+    flexShrink: 0,
+    whiteSpace: "nowrap",
     display: "inline-flex",
     alignItems: "center",
     gap: space.sm,
@@ -194,6 +204,8 @@ const styles = stylex.create({
     color: color.goldFg,
     cursor: "pointer",
   },
+  // Keyboard hints mean nothing on a touch screen; hidden rather than removed, it still pushes
+  // the buttons to the end.
   hint: {
     marginInlineEnd: "auto",
     display: "flex",
@@ -201,5 +213,9 @@ const styles = stylex.create({
     gap: space.sm,
     fontSize: text.meta,
     color: color.fgFaint,
+    visibility: {
+      default: null,
+      "@media (hover: none) and (pointer: coarse)": "hidden",
+    },
   },
 });

@@ -1,5 +1,6 @@
-// Checks the colour tokens against WCAG 2 contrast, in light and dark: text pairs need 4.5:1,
-// faint metadata 3:1. Run after changing src/ui/tokens.stylex.ts: bun run contrast
+// Checks the colour tokens against WCAG 2 contrast, in light and dark. Every text pair needs 4.5:1,
+// faint metadata included: times, counts and captions are read too. Run after changing
+// src/ui/tokens.stylex.ts: bun run contrast
 import { readFileSync } from "node:fs";
 
 const source = readFileSync(
@@ -23,8 +24,10 @@ const PAIRS: [string, string, number][] = [
   ["fgMuted", "surface", 4.5],
   ["fgMuted", "raised", 4.5],
   ["fgMuted", "sidebar", 4.5],
-  ["fgFaint", "bg", 3],
-  ["fgFaint", "raised", 3],
+  ["fgFaint", "bg", 4.5],
+  ["fgFaint", "surface", 4.5],
+  ["fgFaint", "sidebar", 4.5],
+  ["fgFaint", "raised", 4.5],
   ["accentFg", "bg", 4.5],
   ["accentFg", "accentSubtle", 4.5],
   ["fgOnSolid", "accent", 4.5],

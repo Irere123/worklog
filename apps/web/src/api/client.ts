@@ -1,5 +1,7 @@
 import createClient from "openapi-fetch";
 
+import { takeBootResponse } from "#lib/boot";
+
 import type { components, paths } from "./schema";
 
 export type Schemas = components["schemas"];
@@ -69,12 +71,58 @@ export async function unwrap<T>(call: Promise<Result<T>>): Promise<T> {
     return result.data;
   }
   const body = (result.error ?? {}) as {
-    error?: { code?: string; message?: string };
+    error?: {
+      code?: string;
+      message?: string;
+      issues?: { path?: (string | number)[]; message?: string }[];
+    };
   };
+  const [issue] = body.error?.issues ?? [];
   throw new ApiError(
     result.response.status,
     body.error?.code ?? "error",
-    body.error?.message ?? result.response.statusText
+    (issue ? readable(issue) : null) ??
+      body.error?.message ??
+      result.response.statusText
+  );
+}
+
+// The API's validation message is written for developers ("✖ Invalid email → at email"); a
+// person reads the first problem, named by its field: "Email: Invalid email address".
+function readable(issue: { path?: (string | number)[]; message?: string }) {
+  const field = issue.path?.findLast((part) => typeof part === "string");
+  if (!issue.message) {
+    return null;
+  }
+  if (typeof field !== "string") {
+    return issue.message;
+  }
+  const words = field.replaceAll(
+    /(?<lower>[a-z])(?<upper>[A-Z])/gu,
+    "$<lower> $<upper>"
+  );
+  return `${words.charAt(0).toUpperCase()}${words.slice(1).toLowerCase()}: ${issue.message}`;
+}
+
+/**
+ * Like `unwrap`, but answered by the boot script's early request for `path` when it made one.
+ */
+export async function unwrapEarly<T>(
+  path: string,
+  call: () => Promise<Result<T>>
+): Promise<T> {
+  const early = await takeBootResponse(path);
+  if (!early) {
+    return await unwrap(call());
+  }
+  const body: unknown = await early.json().catch(() => null);
+  return await unwrap(
+    Promise.resolve(
+      early.ok
+        ? // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the early request is the same call the caller types
+          { data: body as T, response: early }
+        : { error: body ?? {}, response: early }
+    )
   );
 }
 

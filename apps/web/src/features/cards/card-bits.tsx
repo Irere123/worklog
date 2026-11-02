@@ -11,6 +11,8 @@ import { useEffect, useMemo, useState } from "react";
 
 import type { Schemas } from "#api/client";
 import { q } from "#api/queries";
+import { useMe } from "#features/auth/session";
+import { isStale, ownerWord } from "#features/people/agent-run";
 import { ago, shortDay } from "#lib/time";
 import { Avatar, AvatarStack } from "#ui/avatar";
 import type { Tone } from "#ui/chip";
@@ -159,12 +161,54 @@ export function CardTile({
           ))}
         </div>
       )}
+      {!closed && <CardRun number={card.number} />}
       <TileMeta card={card} creator={creator} assignees={assignees} />
       {drifting && card.entropy && (
         <DriftBubble at={card.entropy.autoPostponeAt} />
       )}
       {closed && <Stamp card={card} />}
     </Link>
+  );
+}
+
+/**
+ * An agent at work on a card says so on the card, as a person at the desk would. Only runs that
+ * are moving or waiting on someone show: a finished run is in the history, and a stalled one is
+ * on People.
+ */
+export function CardRun({ number, full }: { number: number; full?: boolean }) {
+  const { data: on } = useQuery({
+    ...q.teamNow(3),
+    select: (rows) =>
+      rows.find(
+        (row) =>
+          row.agent?.cardNumber === number &&
+          (row.agent.state === "needs_you" ||
+            (row.agent.state === "working" && !isStale(row.agent)))
+      ),
+  });
+  const { byId } = useMembers();
+  const me = useMe();
+  const agent = on ? byId.get(on.memberId) : undefined;
+  if (!on?.agent || !agent) {
+    return null;
+  }
+  const owner = agent.ownerId ? byId.get(agent.ownerId) : undefined;
+  const waiting = on.agent.state === "needs_you";
+  const who = ownerWord(owner, me?.member.id) ?? "a person";
+  return (
+    <p {...stylex.props(styles.run, full === true && styles.runFull)}>
+      <Avatar person={agent} size={full === true ? 16 : 14} />
+      <span {...stylex.props(full !== true && styles.runText)}>
+        <span {...stylex.props(styles.runName)}>{agent.name}</span>{" "}
+        {waiting ? (
+          <span {...stylex.props(styles.runWaiting)}>needs {who}:</span>
+        ) : (
+          <span {...stylex.props(styles.runWorking)}>is on it:</span>
+        )}{" "}
+        {on.agent.title}
+      </span>
+    </p>
   );
 }
 
@@ -412,6 +456,28 @@ const styles = stylex.create({
     overflowWrap: "anywhere",
   },
   tags: { display: "flex", flexWrap: "wrap", gap: space.sm },
+  run: {
+    display: "flex",
+    alignItems: "center",
+    gap: space.xs,
+    fontSize: text.meta,
+    color: color.fgMuted,
+    minWidth: 0,
+  },
+  runText: {
+    minWidth: 0,
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+  },
+  runFull: {
+    alignItems: "flex-start",
+    fontSize: text.label,
+    lineHeight: leading.label,
+  },
+  runName: { fontWeight: 500, color: color.fg },
+  runWorking: { color: color.blueFg },
+  runWaiting: { color: color.amberFg, fontWeight: 500 },
   tagText: { fontSize: text.meta, color: color.fgMuted },
   due: {
     display: "inline-flex",

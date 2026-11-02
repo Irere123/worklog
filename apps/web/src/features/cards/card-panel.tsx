@@ -3,6 +3,8 @@ import {
   ArchiveIcon,
   ArrowCounterClockwiseIcon,
   ArrowsLeftRightIcon,
+  CardsIcon,
+  ChatsCircleIcon,
   CalendarBlankIcon,
   CheckIcon,
   ClockIcon,
@@ -11,6 +13,7 @@ import {
   HashIcon,
   HourglassMediumIcon,
   LinkSimpleIcon,
+  MicrophoneIcon,
   PencilSimpleIcon,
   PlusIcon,
   PushPinIcon,
@@ -26,9 +29,10 @@ import { useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import type { Schemas } from "#api/client";
-import { api, unwrap } from "#api/client";
+import { ApiError, api, unwrap } from "#api/client";
 import { q } from "#api/queries";
 import { ActivityLine, sameRun } from "#features/activity/activity-line";
+import { useDictation } from "#features/assistant/dictation";
 import { useMe } from "#features/auth/session";
 import { useTouch } from "#lib/pointer";
 import { ago, exactTime, fromNow } from "#lib/time";
@@ -36,7 +40,7 @@ import { Avatar } from "#ui/avatar";
 import { Button } from "#ui/button";
 import { Badge, Kbd, MOD } from "#ui/chip";
 import { DatePicker } from "#ui/date-picker";
-import { ErrorNote, Skeleton } from "#ui/feedback";
+import { EmptyState, ErrorNote, Skeleton } from "#ui/feedback";
 import { Textarea } from "#ui/field";
 import { layout } from "#ui/layout";
 import { Markdown } from "#ui/markdown";
@@ -62,7 +66,13 @@ import {
 
 import { useCardActions } from "./actions";
 import type { CardAction } from "./actions";
-import { DueChip, hueOfColor, stageLabel, useMembers } from "./card-bits";
+import {
+  CardRun,
+  DueChip,
+  hueOfColor,
+  stageLabel,
+  useMembers,
+} from "./card-bits";
 import { useCardRefs } from "./card-refs";
 import { usePins } from "./pins";
 
@@ -107,12 +117,23 @@ export function CardPanel({ number }: { number: number }) {
           )}
           {card.isError && (
             <div {...stylex.props(styles.pad)}>
-              <ErrorNote
-                error={card.error}
-                retry={() => {
-                  void card.refetch();
-                }}
-              />
+              {/* Trying again can't bring back a card that isn't there; closing is the way on. */}
+              {card.error instanceof ApiError && card.error.status === 404 ? (
+                <EmptyState
+                  icon={<CardsIcon size={20} />}
+                  title={`There’s no card #${number}`}
+                  action={<Button onClick={close}>Close</Button>}
+                >
+                  It may have been deleted, or it’s on a board you can’t see.
+                </EmptyState>
+              ) : (
+                <ErrorNote
+                  error={card.error}
+                  retry={() => {
+                    void card.refetch();
+                  }}
+                />
+              )}
             </div>
           )}
           {card.data && <CardBody card={card.data} />}
@@ -182,6 +203,10 @@ function CardBody({ card }: { card: CardDetail }) {
             onSave={(title) => act({ type: "edit", set: { title } })}
           />
 
+          {card.stage !== "done" && card.stage !== "not_now" && (
+            <CardRun number={card.number} full />
+          )}
+
           <StageBar
             card={card}
             columns={board.data?.columns ?? []}
@@ -220,6 +245,7 @@ type Act = (action: CardAction) => void;
 function CardHeader({ card, act }: { card: CardDetail; act: Act }) {
   const board = useQuery(q.board(card.boardId));
   const boards = useQuery(q.boards());
+  const navigate = useNavigate();
   return (
     <header {...stylex.props(styles.header)}>
       <span {...stylex.props(styles.number)}>#{card.number}</span>
@@ -328,6 +354,19 @@ function CardHeader({ card, act }: { card: CardDetail; act: Act }) {
           </>
         )}
         <MenuSeparator />
+        <MenuItem
+          icon={<ChatsCircleIcon size={14} />}
+          onClick={() => {
+            void navigate({
+              to: "/assistant",
+              search: {
+                ask: `Where does #${card.number} stand, and what's next for it?`,
+              },
+            });
+          }}
+        >
+          Ask your assistant about it
+        </MenuItem>
         <MenuItem
           icon={<LinkSimpleIcon size={14} />}
           onClick={() => {
@@ -919,13 +958,18 @@ function Composer({ number }: { number: number }) {
     },
     onError: (error) => toast.error(error.message),
   });
+  const refs = useCardRefs({ value: body, onChange: setBody, exclude: number });
+  const touch = useTouch();
+  const before = useRef("");
+  const dictation = useDictation((heard) => {
+    setBody(before.current ? `${before.current} ${heard}` : heard);
+  });
   const submit = () => {
+    dictation.cancel();
     if (body.trim() && !send.isPending) {
       send.mutate();
     }
   };
-  const refs = useCardRefs({ value: body, onChange: setBody, exclude: number });
-  const touch = useTouch();
   return (
     <div {...stylex.props(styles.composer)}>
       {refs.list && <div {...stylex.props(styles.refsAbove)}>{refs.list}</div>}
@@ -949,16 +993,41 @@ function Composer({ number }: { number: number }) {
         }}
         sx={styles.composerInput}
       />
-      <Button
-        variant="primary"
-        size="sm"
-        onClick={submit}
-        busy={send.isPending}
-        disabled={!body.trim()}
-        sx={styles.send}
-      >
-        Comment
-      </Button>
+      <div {...stylex.props(styles.send)}>
+        {dictation.supported && (
+          <Tooltip label={dictation.listening ? "Stop dictating" : "Dictate"}>
+            <Button
+              variant={dictation.listening ? "secondary" : "ghost"}
+              size="sm"
+              aria-label={dictation.listening ? "Stop dictating" : "Dictate"}
+              aria-pressed={dictation.listening}
+              icon={
+                <MicrophoneIcon
+                  size={14}
+                  weight={dictation.listening ? "fill" : "regular"}
+                />
+              }
+              onClick={() => {
+                if (dictation.listening) {
+                  dictation.stop();
+                } else {
+                  before.current = body.trim();
+                  dictation.start();
+                }
+              }}
+            />
+          </Tooltip>
+        )}
+        <Button
+          variant="primary"
+          size="sm"
+          onClick={submit}
+          busy={send.isPending}
+          disabled={!body.trim()}
+        >
+          Comment
+        </Button>
+      </div>
     </div>
   );
 }
@@ -1426,5 +1495,12 @@ const styles = stylex.create({
     paddingBottom: 40,
     backgroundColor: color.raised,
   },
-  send: { position: "absolute", right: 22, bottom: 22 },
+  send: {
+    position: "absolute",
+    right: 22,
+    bottom: 22,
+    display: "flex",
+    alignItems: "center",
+    gap: space.xs,
+  },
 });

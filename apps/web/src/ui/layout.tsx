@@ -9,12 +9,15 @@ import { color, leading, space, text } from "./tokens.stylex";
 /** Every page's header: title on the left, actions on the right, in the same place everywhere. */
 export function PageHeader({
   title,
+  back,
   icon,
   subtitle,
   actions,
   children,
 }: {
   title: ReactNode;
+  /** A way back to the parent page, drawn before the title without the icon's slot. */
+  back?: ReactNode;
   icon?: ReactNode;
   subtitle?: ReactNode;
   actions?: ReactNode;
@@ -24,6 +27,7 @@ export function PageHeader({
     <header {...stylex.props(styles.header)}>
       <div {...stylex.props(styles.headerRow)}>
         <div {...stylex.props(styles.titleWrap)}>
+          {back}
           {isShown(icon) && <span {...stylex.props(styles.icon)}>{icon}</span>}
           <h1 {...stylex.props(styles.title)}>{title}</h1>
           {isShown(subtitle) && (

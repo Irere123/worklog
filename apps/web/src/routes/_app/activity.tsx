@@ -10,6 +10,7 @@ import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 
+import { preloadActivity } from "#api/preload";
 import { q } from "#api/queries";
 import { SourceGlyph, sourceLabel } from "#features/activity/activity-line";
 import { DayRibbon } from "#features/activity/day-ribbon";
@@ -38,11 +39,14 @@ export const Route = createFileRoute("/_app/activity")({
     actor: typeof search.actor === "string" ? search.actor : undefined,
     source: typeof search.source === "string" ? search.source : undefined,
   }),
+  loaderDeps: ({ search }) => ({ actor: search.actor, source: search.source }),
+  loader: ({ context, deps }) => preloadActivity(context.queryClient, deps),
   component: ActivityPage,
 });
 
 function ActivityPage() {
-  const { actor, source } = Route.useSearch();
+  const actor = Route.useSearch({ select: (s) => s.actor });
+  const source = Route.useSearch({ select: (s) => s.source });
   const navigate = useNavigate({ from: Route.fullPath });
   const members = useQuery(q.members());
   const [text, setText] = useState("");

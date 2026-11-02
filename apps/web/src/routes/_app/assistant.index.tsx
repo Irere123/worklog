@@ -7,6 +7,6 @@ export const Route = createFileRoute("/_app/assistant/")({
 });
 
 function NewChatPage() {
-  const { ask } = Route.useSearch();
+  const ask = Route.useSearch({ select: (s) => s.ask });
   return <NewChat ask={ask} />;
 }

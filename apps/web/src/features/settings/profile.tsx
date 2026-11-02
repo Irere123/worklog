@@ -415,9 +415,16 @@ function Stat({ label, value }: { label: string; value: string }) {
 }
 
 const styles = stylex.create({
-  profile: { display: "flex", gap: space.xxl, alignItems: "flex-start" },
+  // Beside the fields the picture leaves a phone's inputs too narrow for an email, so it goes above.
+  profile: {
+    display: "flex",
+    flexDirection: { default: "row", "@media (max-width: 640px)": "column" },
+    gap: { default: space.xxl, "@media (max-width: 640px)": space.lg },
+    alignItems: "flex-start",
+  },
   fields: {
     flexGrow: 1,
+    alignSelf: { default: null, "@media (max-width: 640px)": "stretch" },
     display: "flex",
     flexDirection: "column",
     gap: space.lg,

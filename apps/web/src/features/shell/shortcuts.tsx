@@ -44,6 +44,7 @@ const GROUPS: { title: string; keys: [string, string][] }[] = [
       ["E", "Done"],
       ["H", "Snooze until tomorrow"],
       ["X", "Dismiss"],
+      ["⇧ X", "Dismiss, and fewer like it"],
       ["Y", "Allow (approvals)"],
       ["N", "Deny (approvals)"],
       ["Z", "Undo"],
@@ -68,8 +69,11 @@ const GROUPS: { title: string; keys: [string, string][] }[] = [
   {
     title: "Assistant",
     keys: [
-      ["↵", "Send"],
+      ["/", "Write to the assistant (Home or a conversation)"],
+      ["↵", "Send, or steer a reply"],
       ["⇧ ↵", "New line"],
+      ["↑", "Bring back your last question"],
+      ["#", "Link a card"],
       ["Esc", "Stop the reply"],
     ],
   },

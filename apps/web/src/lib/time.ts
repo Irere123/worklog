@@ -96,3 +96,50 @@ export function greeting(now = new Date()) {
   }
   return "Good evening";
 }
+
+/** Midnight at the start of yesterday, as an ISO string: the window the home page sums up. */
+export function startOfYesterday() {
+  const d = new Date();
+  d.setDate(d.getDate() - 1);
+  d.setHours(0, 0, 0, 0);
+  return d.toISOString();
+}
+
+/**
+ * The start of the activity page's 24-hour ribbon ending at `end`, on a ten-minute boundary so
+ * the key stays put between ticks and the route can ask for the same list before the page renders.
+ */
+export function ribbonSince(end: number) {
+  const step = 10 * 60_000;
+  return new Date(
+    Math.floor((end - 24 * 3_600_000) / step) * step
+  ).toISOString();
+}
+
+const monthFormat = new Intl.DateTimeFormat("en-GB", {
+  month: "long",
+  year: "numeric",
+});
+
+/** "Today", "Yesterday", "Previous 7 days", "Previous 30 days", then the month: list groups. */
+export function recencyLabel(iso: string, now = new Date()) {
+  const days = Math.round((startOfDay(now) - startOfDay(new Date(iso))) / DAY);
+  if (days <= 0) {
+    return "Today";
+  }
+  if (days === 1) {
+    return "Yesterday";
+  }
+  if (days < 7) {
+    return "Previous 7 days";
+  }
+  if (days < 30) {
+    return "Previous 30 days";
+  }
+  return monthFormat.format(new Date(iso));
+}
+
+/** Whether `iso` is more than `ms` in the past. */
+export function olderThan(iso: string, ms: number, now = Date.now()) {
+  return now - Date.parse(iso) > ms;
+}

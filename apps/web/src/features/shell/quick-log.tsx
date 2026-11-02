@@ -1,10 +1,11 @@
-import { LockIcon, UsersIcon } from "@phosphor-icons/react";
+import { LockIcon, MicrophoneIcon, UsersIcon } from "@phosphor-icons/react";
 import * as stylex from "@stylexjs/stylex";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { api, unwrap } from "#api/client";
+import { useDictation } from "#features/assistant/dictation";
 import { useMembers } from "#features/cards/card-bits";
 import { Avatar } from "#ui/avatar";
 import { Button } from "#ui/button";
@@ -54,12 +55,21 @@ export function QuickLog({
   const [card, setCard] = useState("");
   const [visibility, setVisibility] = useState<"team" | "private">("team");
   const client = useQueryClient();
+  // Spoken entries are marked as such, so their wording is read as dictation, not typing.
+  const [spoken, setSpoken] = useState(false);
+  const before = useRef("");
+  const dictation = useDictation((heard) => {
+    setSpoken(true);
+    setDraft(before.current ? `${before.current} ${heard}` : heard);
+  });
 
   const reset = () => {
     setDraft("");
     setKind("entry");
     setCard("");
     setVisibility("team");
+    setSpoken(false);
+    dictation.cancel();
   };
 
   const log = useMutation({
@@ -70,7 +80,7 @@ export function QuickLog({
             text: draft.trim(),
             kind,
             visibility,
-            via: "text",
+            via: spoken ? "voice" : "text",
             cardNumber: card ? Number(card.replace("#", "")) : undefined,
           },
         })
@@ -180,6 +190,30 @@ export function QuickLog({
             onChange={(e) => setCard(e.target.value.replaceAll(/[^\d#]/gu, ""))}
             sx={styles.card}
           />
+          {dictation.supported && (
+            <Button
+              size="sm"
+              variant={dictation.listening ? "secondary" : "ghost"}
+              aria-pressed={dictation.listening}
+              icon={
+                <MicrophoneIcon
+                  size={14}
+                  weight={dictation.listening ? "fill" : "regular"}
+                />
+              }
+              onClick={() => {
+                if (dictation.listening) {
+                  dictation.stop();
+                } else {
+                  before.current = draft.trim();
+                  dictation.start();
+                }
+              }}
+            >
+              {dictation.listening ? "Stop" : "Dictate"}
+            </Button>
+          )}
+          <span {...stylex.props(styles.spacer)} />
           <Segmented<"team" | "private">
             label="Who can see it"
             value={visibility}
@@ -247,13 +281,20 @@ const styles = stylex.create({
     marginInlineStart: space.xs,
   },
   textarea: { minHeight: 110, fontSize: text.copy, lineHeight: leading.copy },
+  // On a phone the card field, Dictate and who-sees-it don't fit one line; wrapping keeps
+  // "Only me" on screen.
   row: {
     display: "flex",
+    flexWrap: "wrap",
     alignItems: "center",
     gap: space.md,
+    rowGap: space.sm,
     justifyContent: "space-between",
   },
   card: { width: 160 },
+  spacer: { flexGrow: 1 },
+  // Keyboard hints mean nothing on a touch screen; hidden rather than removed, it still pushes
+  // the buttons to the end.
   hint: {
     marginInlineEnd: "auto",
     display: "flex",
@@ -261,5 +302,9 @@ const styles = stylex.create({
     gap: space.sm,
     fontSize: text.meta,
     color: color.fgFaint,
+    visibility: {
+      default: null,
+      "@media (hover: none) and (pointer: coarse)": "hidden",
+    },
   },
 });

@@ -113,6 +113,7 @@ export function Feed({
   });
   const items = virtual.getVirtualItems();
   const last = items.at(-1);
+  const pinnedDay = dayAbove(rows, items, virtual.scrollOffset ?? 0);
 
   useEffect(() => {
     if (
@@ -175,6 +176,12 @@ export function Feed({
           {header}
         </div>
       )}
+      {pinnedDay && (
+        // Keeps the day in view while reading down it, as a calendar's month does.
+        <div aria-hidden {...stylex.props(styles.pinned)}>
+          <p {...stylex.props(styles.day, styles.pinnedDay)}>{pinnedDay}</p>
+        </div>
+      )}
       <div
         {...stylex.props(styles.inner, styles.height(virtual.getTotalSize()))}
       >
@@ -194,7 +201,7 @@ export function Feed({
               )}
             >
               {row.kind === "day" ? (
-                <h3 {...stylex.props(styles.day)}>{row.label}</h3>
+                <h2 {...stylex.props(styles.day)}>{row.label}</h2>
               ) : (
                 <ActivityLine
                   activity={row.activity}
@@ -214,6 +221,29 @@ export function Feed({
       )}
     </div>
   );
+}
+
+/** The day heading the reader has scrolled past, unless the next one is already at the top. */
+function dayAbove(
+  rows: Row[],
+  items: { index: number; start: number; end: number }[],
+  offset: number
+) {
+  const first = items.find((item) => item.end > offset + 1);
+  if (
+    !first ||
+    first.start >= offset - 1 ||
+    rows[first.index]?.kind === "day"
+  ) {
+    return null;
+  }
+  for (let i = first.index; i >= 0; i -= 1) {
+    const row = rows[i];
+    if (row?.kind === "day") {
+      return row.label;
+    }
+  }
+  return null;
 }
 
 const styles = stylex.create({
@@ -246,6 +276,20 @@ const styles = stylex.create({
     color: color.fgOnSolid,
     backgroundColor: color.accent,
     boxShadow: shadow.float,
+  },
+  pinned: {
+    position: "sticky",
+    top: 0,
+    zIndex: 2,
+    height: 0,
+    maxWidth: 820,
+    marginInline: "auto",
+    width: "100%",
+    paddingInline: space.x3,
+  },
+  pinnedDay: {
+    paddingTop: space.md,
+    backgroundColor: color.bg,
   },
   header: {
     maxWidth: 820,

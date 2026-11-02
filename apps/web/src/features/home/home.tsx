@@ -1,19 +1,17 @@
-import {
-  ArrowRightIcon,
-  ArrowUpIcon,
-  CheckIcon,
-  TicketIcon,
-} from "@phosphor-icons/react";
+import { ArrowRightIcon, CheckIcon, TicketIcon } from "@phosphor-icons/react";
 import * as stylex from "@stylexjs/stylex";
+import { useHotkey } from "@tanstack/react-hotkeys";
 import { useQueries, useQuery } from "@tanstack/react-query";
-import { Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { Link, useNavigate, useRouter } from "@tanstack/react-router";
+import { useEffect, useRef, useState } from "react";
 
 import { q } from "#api/queries";
+import { Composer } from "#features/assistant/composer";
 import { useMe } from "#features/auth/session";
 import { stageLabel, useMembers } from "#features/cards/card-bits";
-import { kindOf } from "#features/inbox/inbox";
-import { ago, greeting } from "#lib/time";
+import { kindOf } from "#features/inbox/kinds";
+import { AgentRun, ownerWord } from "#features/people/agent-run";
+import { ago, greeting, startOfYesterday } from "#lib/time";
 import { Avatar } from "#ui/avatar";
 import { Badge, Dot } from "#ui/chip";
 import { Skeleton } from "#ui/feedback";
@@ -23,17 +21,16 @@ import {
   font,
   leading,
   media,
-  motion,
   radius,
-  shadow,
   space,
   text,
 } from "#ui/tokens.stylex";
 
-import { SetupChecklist } from "./setup";
+import { SetupChecklist, useSetupSettled } from "./setup";
 
 export function Home() {
   const me = useMe();
+  const settled = useSetupSettled();
   if (!me) {
     return null;
   }
@@ -49,10 +46,16 @@ export function Home() {
           <DaySummary />
           <Ask meId={me.member.id} />
         </header>
-        <SetupChecklist meId={me.member.id} />
-        <NeedsYou />
-        <MyCards />
-        <TeamNow selfId={me.member.id} />
+        {settled ? (
+          <>
+            <SetupChecklist meId={me.member.id} />
+            <NeedsYou />
+            <MyCards />
+            <TeamNow selfId={me.member.id} />
+          </>
+        ) : (
+          <Skeleton lines={4} height={44} />
+        )}
       </div>
     </div>
   );
@@ -79,16 +82,18 @@ function DaySummary() {
     return () => clearTimeout(timer);
   }, []);
   const waiting = useQuery(q.attention("open"));
-  const recent = useQuery(q.recentActivities({ since, limit: 200 }));
+  const counted = useQuery(q.activityCounts(since));
   const { byId } = useMembers();
-  if (!waiting.isSuccess || !recent.isSuccess) {
+  if (!waiting.isSuccess || !counted.isSuccess) {
     return <Skeleton lines={2} height={20} />;
   }
   const open = waiting.data;
   const decision = open.find((i) => i.kind === "agent.needs_you");
   const asker = decision?.fromId ? byId.get(decision.fromId) : undefined;
   const count = (re: RegExp) =>
-    recent.data.filter((a) => re.test(a.kind)).length;
+    counted.data
+      .filter((row) => re.test(row.kind))
+      .reduce((sum, row) => sum + row.count, 0);
   const done = [
     plural(count(/^card\.closed$/u), "card closed", "cards closed"),
     plural(count(/merged/u), "pull request merged", "pull requests merged"),
@@ -119,13 +124,6 @@ function DaySummary() {
       </span>
     </p>
   );
-}
-
-function startOfYesterday() {
-  const d = new Date();
-  d.setDate(d.getDate() - 1);
-  d.setHours(0, 0, 0, 0);
-  return d.toISOString();
 }
 
 function plural(n: number, one: string, many: string) {
@@ -173,57 +171,40 @@ function TeammateNow({
 }
 
 function Ask({ meId }: { meId: string }) {
-  const [value, setValue] = useState("");
   const navigate = useNavigate();
+  const router = useRouter();
+  const box = useRef<HTMLTextAreaElement>(null);
+  useHotkey("/", () => box.current?.focus(), {
+    meta: { name: "Write to the assistant", group: "Assistant" },
+  });
   const { list } = useMembers();
   const assistant = list.find(
     (m) => m.agentProvider === "worklog" && m.ownerId === meId
   );
-  const question = value.trim();
-  const ask = () => {
-    if (question) {
-      void navigate({ to: "/assistant", search: { ask: question } });
-    }
-  };
   return (
-    <form
-      onSubmit={(e) => {
-        e.preventDefault();
-        ask();
-      }}
-      {...stylex.props(styles.ask)}
-    >
-      <textarea
-        rows={1}
-        aria-label="Ask your assistant"
+    <div {...stylex.props(styles.ask)}>
+      <Composer
+        autoFocus={false}
+        inputRef={box}
+        label="Ask your assistant"
         placeholder="Ask about the team’s work…"
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
-            e.preventDefault();
-            ask();
-          }
+        context={
+          assistant && (
+            <>
+              <Avatar person={assistant} size={16} />
+              Your assistant answers from the team’s activity
+            </>
+          )
+        }
+        onSend={(question) => {
+          void navigate({ to: "/assistant", search: { ask: question } });
         }}
-        {...stylex.props(styles.askInput)}
+        // The assistant's code loads while the question is typed, so sending opens it at once.
+        onStartTyping={() => {
+          void router.preloadRoute({ to: "/assistant" });
+        }}
       />
-      <div {...stylex.props(styles.askFoot)}>
-        {assistant && (
-          <span {...stylex.props(styles.askWho)}>
-            <Avatar person={assistant} size={16} />
-            Your assistant answers from the team’s activity
-          </span>
-        )}
-        <button
-          type="submit"
-          aria-label="Ask"
-          disabled={!question}
-          {...stylex.props(styles.askSend)}
-        >
-          <ArrowUpIcon size={14} weight="bold" />
-        </button>
-      </div>
-    </form>
+    </div>
   );
 }
 
@@ -340,12 +321,16 @@ function MyCards() {
 }
 
 function TeamNow({ selfId }: { selfId: string }) {
-  const { list } = useMembers();
+  const { list, byId } = useMembers();
   const people = list.filter((m) => m.kind === "human" && m.id !== selfId);
-  const snapshots = useQueries({
-    queries: people.map((p) => q.now(p.handle, 3)),
+  const team = useQuery(q.teamNow(3));
+  const byMember = new Map(team.data?.map((row) => [row.memberId, row]));
+  // Agents are teammates too; the ones mid-run or waiting on someone are part of "right now".
+  const agents = list.filter((m) => {
+    const state = byMember.get(m.id)?.agent?.state;
+    return m.kind === "agent" && (state === "working" || state === "needs_you");
   });
-  if (people.length === 0) {
+  if (people.length + agents.length === 0) {
     return null;
   }
   return (
@@ -358,8 +343,8 @@ function TeamNow({ selfId }: { selfId: string }) {
       }
     >
       <ul {...stylex.props(styles.list)}>
-        {people.map((person, i) => {
-          const snap = snapshots[i]?.data;
+        {people.map((person) => {
+          const snap = byMember.get(person.id);
           return (
             <li key={person.id}>
               <Link
@@ -372,8 +357,8 @@ function TeamNow({ selfId }: { selfId: string }) {
                   <p {...stylex.props(styles.title)}>{person.name}</p>
                   <p {...stylex.props(styles.meta)}>
                     <TeammateNow
-                      current={snap?.inProgress[0]}
-                      recent={snap?.recent[0]}
+                      current={snap?.current ?? undefined}
+                      recent={snap?.latest ?? undefined}
                     />
                   </p>
                 </div>
@@ -381,6 +366,32 @@ function TeamNow({ selfId }: { selfId: string }) {
                   <span {...stylex.props(styles.time)}>
                     {ago(snap.lastActiveAt)}
                   </span>
+                )}
+              </Link>
+            </li>
+          );
+        })}
+        {agents.map((agent) => {
+          const run = byMember.get(agent.id)?.agent;
+          const owner = agent.ownerId ? byId.get(agent.ownerId) : undefined;
+          return (
+            <li key={agent.id}>
+              <Link
+                to="/people/$handle"
+                params={{ handle: agent.handle }}
+                {...stylex.props(styles.row)}
+              >
+                <Avatar person={agent} size={24} />
+                <div {...stylex.props(layout.grow)}>
+                  <p {...stylex.props(styles.title)}>{agent.name}</p>
+                  <p {...stylex.props(styles.meta)}>
+                    {run && (
+                      <AgentRun run={run} owner={ownerWord(owner, selfId)} />
+                    )}
+                  </p>
+                </div>
+                {run && (
+                  <span {...stylex.props(styles.time)}>{ago(run.at)}</span>
                 )}
               </Link>
             </li>
@@ -424,7 +435,9 @@ const styles = stylex.create({
     marginTop: space.md,
     fontSize: text.titleSm,
     lineHeight: leading.titleSm,
-    textWrap: "balance",
+    // Balance halves the second sentence on a phone and leaves a gap beside it; pretty only
+    // keeps a last word from hanging alone.
+    textWrap: "pretty",
   },
   summaryNow: { color: color.fg },
   summaryLine: { color: color.fgMuted },
@@ -438,73 +451,7 @@ const styles = stylex.create({
     textDecorationThickness: 1,
     textUnderlineOffset: 3,
   },
-  ask: {
-    display: "flex",
-    flexDirection: "column",
-    marginTop: space.x3,
-    borderRadius: 14,
-    backgroundColor: color.raised,
-    boxShadow: {
-      default: shadow.card,
-      ":focus-within": shadow.float,
-    },
-    cursor: "text",
-    transitionProperty: "box-shadow",
-    transitionDuration: motion.fast,
-  },
-  askInput: {
-    minHeight: 48,
-    maxHeight: 200,
-    paddingTop: space.lg,
-    paddingBottom: space.xs,
-    paddingInline: space.xl,
-    borderWidth: 0,
-    backgroundColor: "transparent",
-    resize: "none",
-    fontSize: { default: text.copy, "@media (max-width: 640px)": 16 },
-    lineHeight: leading.copy,
-    color: color.fg,
-    outline: "none",
-    fieldSizing: "content",
-    "::placeholder": { color: color.fgFaint },
-  },
-  askFoot: {
-    display: "flex",
-    alignItems: "center",
-    gap: space.md,
-    paddingBottom: space.sm,
-    paddingInlineStart: space.xl,
-    paddingInlineEnd: space.sm,
-  },
-  askWho: {
-    display: "inline-flex",
-    alignItems: "center",
-    gap: space.sm,
-    flexGrow: 1,
-    minWidth: 0,
-    fontSize: text.meta,
-    color: color.fgFaint,
-    whiteSpace: "nowrap",
-    overflow: "hidden",
-    textOverflow: "ellipsis",
-  },
-  askSend: {
-    display: "grid",
-    placeItems: "center",
-    width: 28,
-    height: 28,
-    flexShrink: 0,
-    borderRadius: radius.full,
-    color: { default: color.fgOnSolid, ":disabled": color.fgFaint },
-    backgroundColor: {
-      default: color.accent,
-      ":hover": { default: null, [media.hover]: color.accentHover },
-      ":disabled": color.ui,
-    },
-    cursor: { default: "pointer", ":disabled": "default" },
-    transitionProperty: "background-color, color",
-    transitionDuration: motion.fast,
-  },
+  ask: { marginTop: space.x3 },
   more: {
     display: "inline-flex",
     alignItems: "center",

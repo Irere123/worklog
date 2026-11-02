@@ -259,6 +259,13 @@ export function CommandPalette({
           </Command.Group>
         )}
 
+        <ConversationResults
+          search={search}
+          onPick={(id) =>
+            go("/assistant/$conversationId", { conversationId: id })()
+          }
+        />
+
         {(members.data?.length ?? 0) > 0 && (
           <Command.Group
             heading="People and agents"
@@ -390,6 +397,35 @@ function cardNumberIn(search: string) {
 
 function cardValue(number: number, title = "open") {
   return `card ${number} ${title}`;
+}
+
+/** Past conversations, matched only against what's typed: unasked, they'd crowd out the pages. */
+function ConversationResults({
+  search,
+  onPick,
+}: {
+  search: string;
+  onPick: (id: string) => void;
+}) {
+  const typed = search.trim().length > 0;
+  const conversations = useQuery({ ...q.conversations(), enabled: typed });
+  if (!typed || (conversations.data?.length ?? 0) === 0) {
+    return null;
+  }
+  return (
+    <Command.Group heading="Conversations" {...stylex.props(styles.group)}>
+      {conversations.data?.slice(0, 50).map((c) => (
+        <Item
+          key={c.id}
+          value={`conversation ${c.title ?? ""}`}
+          icon={<ChatsCircleIcon size={15} />}
+          onSelect={() => onPick(c.id)}
+        >
+          {c.title ?? "New conversation"}
+        </Item>
+      ))}
+    </Command.Group>
+  );
 }
 
 function splitOut<T extends { number: number }>(

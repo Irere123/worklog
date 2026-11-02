@@ -6,14 +6,14 @@ import {
   UsersIcon,
 } from "@phosphor-icons/react";
 import * as stylex from "@stylexjs/stylex";
-import { useMutation, useQueries, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 import { useMemo } from "react";
 import { toast } from "sonner";
 
-import type { Schemas } from "#api/client";
 import { api, unwrap } from "#api/client";
+import type { Schemas } from "#api/client";
 import { q } from "#api/queries";
 import { Feed } from "#features/activity/feed";
 import { useMe } from "#features/auth/session";
@@ -36,6 +36,7 @@ import {
   text,
 } from "#ui/tokens.stylex";
 
+import { AgentRun, isStale, ownerWord } from "./agent-run";
 import { AgentSessions, sessionsOf } from "./sessions";
 
 type Member = Schemas["Member"];
@@ -63,7 +64,7 @@ export function PeopleList() {
       <PageHeader
         title="People"
         icon={<UsersIcon size={16} />}
-        subtitle={`${humans.length} people · ${agents.length} agents`}
+        subtitle={`${count(humans.length, "person", "people")} · ${count(agents.length, "agent", "agents")}`}
       />
       <Page>
         <div {...stylex.props(layout.stack, styles.sections)}>
@@ -84,16 +85,20 @@ export function PeopleList() {
   );
 }
 
+function count(n: number, one: string, many: string) {
+  return `${n} ${n === 1 ? one : many}`;
+}
+
 function PeopleGrid({ members }: { members: Member[] }) {
-  const snapshots = useQueries({
-    queries: members.map((m) => q.now(m.handle, 3)),
-  });
+  const team = useQuery(q.teamNow(3));
+  const byMember = new Map(team.data?.map((row) => [row.memberId, row]));
   const { byId } = useMembers();
+  const me = useMe();
   return (
     <ul {...stylex.props(styles.grid)}>
-      {members.map((m, i) => {
-        const snap = snapshots[i]?.data;
-        const current = snap?.inProgress[0];
+      {members.map((m) => {
+        const snap = byMember.get(m.id);
+        const current = snap?.current ?? undefined;
         const owner = m.ownerId ? byId.get(m.ownerId) : undefined;
         const time = localTime(m.timezone);
         return (
@@ -113,11 +118,21 @@ function PeopleGrid({ members }: { members: Member[] }) {
                   </p>
                 </div>
               </div>
-              {snapshots[i]?.isPending === true ? (
+              {team.isPending ? (
                 <Skeleton lines={1} height={12} />
               ) : (
                 <p {...stylex.props(styles.now)}>
-                  <NowLine current={current} recent={snap?.recent[0]} />
+                  {snap?.agent ? (
+                    <AgentRun
+                      run={snap.agent}
+                      owner={ownerWord(owner, me?.member.id)}
+                    />
+                  ) : (
+                    <NowLine
+                      current={current}
+                      recent={snap?.latest ?? undefined}
+                    />
+                  )}
                 </p>
               )}
               <div {...stylex.props(styles.foot)}>
@@ -321,10 +336,29 @@ function PersonFacts({
   lastActiveAt?: string | null;
 }) {
   const { byId } = useMembers();
+  const me = useMe();
   const owner = m.ownerId ? byId.get(m.ownerId) : undefined;
   const time = localTime(m.timezone);
+  // An agent mid-run or waiting on someone says so first, as on Home and its card; a finished
+  // run is already in Sessions.
+  const { data: run } = useQuery({
+    ...q.teamNow(3),
+    select: (rows) => {
+      const agent = rows.find((row) => row.memberId === m.id)?.agent;
+      return agent &&
+        (agent.state === "needs_you" ||
+          (agent.state === "working" && !isStale(agent)))
+        ? agent
+        : null;
+    },
+  });
   return (
     <dl {...stylex.props(styles.facts)}>
+      {run && (
+        <Fact label="Right now">
+          <AgentRun run={run} owner={ownerWord(owner, me?.member.id)} />
+        </Fact>
+      )}
       <Fact label="Role">{roleOf(m)}</Fact>
       {m.kind === "agent" && (
         <Fact label="Works for">

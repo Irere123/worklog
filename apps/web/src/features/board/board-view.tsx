@@ -27,7 +27,7 @@ import type { CardAction } from "#features/cards/actions";
 import { CardTile, COLUMN_COLORS, hueOfColor } from "#features/cards/card-bits";
 import type { Card } from "#features/cards/card-bits";
 import { Button } from "#ui/button";
-import { SkeletonBlock } from "#ui/feedback";
+import { SkeletonBlock, VisuallyHidden } from "#ui/feedback";
 import { Input } from "#ui/field";
 import {
   Menu,
@@ -404,12 +404,12 @@ function EdgeColumn({
         <button
           type="button"
           onClick={onToggle}
-          aria-label={`Show ${title} (${cards.length})`}
           {...stylex.props(styles.pill, over && styles.pillOver)}
         >
-          <span {...stylex.props(styles.pillCount)}>{cards.length}</span>
+          <span {...stylex.props(styles.pillCount)}>{cards.length}</span>{" "}
           <span {...stylex.props(styles.pillLabel)}>{title}</span>
           <span {...stylex.props(styles.pillIcon)}>{icon}</span>
+          <VisuallyHidden>, show</VisuallyHidden>
         </button>
       </div>
     );

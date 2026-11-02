@@ -7,22 +7,48 @@ import {
   useRouter,
   useSearch,
 } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { Suspense, lazy, useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import { useLiveEvents } from "#api/live";
 import type { SentNews } from "#api/live";
-import { CardPanel } from "#features/cards/card-panel";
-import { NewCardDialog } from "#features/cards/new-card";
-import { kindOf } from "#features/inbox/inbox";
+import { CardPreviews } from "#features/cards/card-preview";
+import { kindOf } from "#features/inbox/kinds";
 import { showDesktopAlert } from "#lib/desktop-alerts";
 import { color } from "#ui/tokens.stylex";
 
-import { CommandPalette } from "./command";
 import { MobileBar } from "./mobile-bar";
-import { QuickLog } from "./quick-log";
-import { Shortcuts } from "./shortcuts";
 import { Sidebar } from "./sidebar";
+
+// Dialogs and the card panel stay out of the first download: they load once the page is idle,
+// so the first press of ⌘K or C still opens at once.
+const loaders = {
+  palette: async () => await import("./command"),
+  shortcuts: async () => await import("./shortcuts"),
+  log: async () => await import("./quick-log"),
+  card: async () => await import("#features/cards/new-card"),
+  panel: async () => await import("#features/cards/card-panel"),
+};
+const CommandPalette = lazy(async () => {
+  const { CommandPalette: component } = await loaders.palette();
+  return { default: component };
+});
+const Shortcuts = lazy(async () => {
+  const { Shortcuts: component } = await loaders.shortcuts();
+  return { default: component };
+});
+const QuickLog = lazy(async () => {
+  const { QuickLog: component } = await loaders.log();
+  return { default: component };
+});
+const NewCardDialog = lazy(async () => {
+  const { NewCardDialog: component } = await loaders.card();
+  return { default: component };
+});
+const CardPanel = lazy(async () => {
+  const { CardPanel: component } = await loaders.panel();
+  return { default: component };
+});
 
 export type ShellDialog = "palette" | "shortcuts" | "log" | "card" | null;
 
@@ -77,6 +103,14 @@ export function Shell() {
     },
   });
   const [dialog, setDialog] = useState<ShellDialog>(null);
+  // A dialog mounts on first use and stays, so its closing animation can play.
+  const [used, setUsed] = useState<ReadonlySet<ShellDialog>>(new Set());
+  const show = (next: ShellDialog) => {
+    setDialog(next);
+    if (next) {
+      setUsed((prev) => (prev.has(next) ? prev : new Set(prev).add(next)));
+    }
+  };
   const [drawer, setDrawer] = useState(false);
   const router = useRouter();
   // Any navigation, from a link in the drawer or anywhere else, puts the drawer away.
@@ -84,8 +118,22 @@ export function Shell() {
     () => router.subscribe("onBeforeNavigate", () => setDrawer(false)),
     [router]
   );
-  const search = useSearch({ from: "/_app" });
-  const open = (d: ShellDialog) => () => setDialog(d);
+  const card = useSearch({ from: "/_app", select: (s) => s.card });
+  useEffect(() => {
+    const warm = () => {
+      for (const load of Object.values(loaders)) {
+        void load();
+      }
+    };
+    if (typeof requestIdleCallback === "function") {
+      const id = requestIdleCallback(warm, { timeout: 4000 });
+      return () => cancelIdleCallback(id);
+    }
+    const id = setTimeout(warm, 2000);
+    return () => clearTimeout(id);
+  }, []);
+  const mounted = (d: ShellDialog) => dialog === d || used.has(d);
+  const open = (d: ShellDialog) => () => show(d);
 
   useHotkey("Mod+K", open("palette"), {
     meta: { name: "Command menu", group: "General" },
@@ -126,7 +174,7 @@ export function Shell() {
     meta: { name: "Go to Settings", group: "Navigate" },
   });
   // Fizzy's number keys. They pause while a card is open, where digits sort a Maybe? card.
-  const cardOpen = search.card !== undefined;
+  const cardOpen = card !== undefined;
   const mine = (tab: "assigned" | "added") => () => {
     void navigate({ to: "/mine", search: { tab } });
   };
@@ -157,7 +205,7 @@ export function Shell() {
         drawer={drawer}
         onOpen={(d) => {
           setDrawer(false);
-          setDialog(d);
+          show(d);
         }}
       />
       {drawer && (
@@ -171,24 +219,32 @@ export function Shell() {
       <div {...stylex.props(styles.column)}>
         <MobileBar
           onMenu={() => setDrawer(true)}
-          onSearch={() => setDialog("palette")}
+          onSearch={() => show("palette")}
         />
         <main id="main" tabIndex={-1} {...stylex.props(styles.main)}>
           <Outlet />
         </main>
       </div>
-      <CommandPalette
-        open={dialog === "palette"}
-        onClose={() => setDialog(null)}
-        onOpen={setDialog}
-      />
-      <Shortcuts
-        open={dialog === "shortcuts"}
-        onClose={() => setDialog(null)}
-      />
-      <QuickLog open={dialog === "log"} onClose={() => setDialog(null)} />
-      <NewCardDialog open={dialog === "card"} onClose={() => setDialog(null)} />
-      {search.card !== undefined && <CardPanel number={search.card} />}
+      <CardPreviews />
+      <Suspense fallback={null}>
+        {mounted("palette") && (
+          <CommandPalette
+            open={dialog === "palette"}
+            onClose={() => show(null)}
+            onOpen={show}
+          />
+        )}
+        {mounted("shortcuts") && (
+          <Shortcuts open={dialog === "shortcuts"} onClose={() => show(null)} />
+        )}
+        {mounted("log") && (
+          <QuickLog open={dialog === "log"} onClose={() => show(null)} />
+        )}
+        {mounted("card") && (
+          <NewCardDialog open={dialog === "card"} onClose={() => show(null)} />
+        )}
+        {card !== undefined && <CardPanel number={card} />}
+      </Suspense>
     </div>
   );
 }

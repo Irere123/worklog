@@ -13,9 +13,10 @@ import {
   UsersIcon,
 } from "@phosphor-icons/react";
 import * as stylex from "@stylexjs/stylex";
-import { Link } from "@tanstack/react-router";
+import { Link, useLocation } from "@tanstack/react-router";
 import type { LinkProps } from "@tanstack/react-router";
 import type { ReactNode } from "react";
+import { useEffect, useRef } from "react";
 
 import { isShown } from "#lib/node";
 import { PageHeader } from "#ui/layout";
@@ -102,11 +103,12 @@ const GROUPS: {
 ];
 
 export function SettingsFrame({ children }: { children: ReactNode }) {
+  const nav = useActiveInView();
   return (
     <>
       <PageHeader title="Settings" icon={<GearIcon size={16} />} />
       <div {...stylex.props(styles.layout)}>
-        <nav aria-label="Settings" {...stylex.props(styles.nav)}>
+        <nav ref={nav} aria-label="Settings" {...stylex.props(styles.nav)}>
           {GROUPS.map((group) => (
             <div key={group.title} {...stylex.props(styles.group)}>
               <p {...stylex.props(styles.groupTitle)}>{group.title}</p>
@@ -130,6 +132,29 @@ export function SettingsFrame({ children }: { children: ReactNode }) {
       </div>
     </>
   );
+}
+
+/**
+ * On a phone the sections are one scrolling row, and a page opened from a link can be off its
+ * edge; this brings the current one to the middle. Only the row scrolls, never the page.
+ */
+function useActiveInView() {
+  const ref = useRef<HTMLElement>(null);
+  const pathname = useLocation({ select: (l) => l.pathname });
+  useEffect(() => {
+    const row = ref.current;
+    // A nested page, like one connection, has no link of its own; its section's is current.
+    const current =
+      row?.querySelector<HTMLElement>(`a[href="${CSS.escape(pathname)}"]`) ??
+      row?.querySelector<HTMLElement>('[aria-current="page"]');
+    if (!row || !current || row.scrollWidth <= row.clientWidth) {
+      return;
+    }
+    const box = row.getBoundingClientRect();
+    const at = current.getBoundingClientRect();
+    row.scrollLeft += at.left - box.left - (box.width - at.width) / 2;
+  }, [pathname]);
+  return ref;
 }
 
 export function SettingsPage({

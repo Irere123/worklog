@@ -87,10 +87,10 @@ export function Count({
   );
 }
 
+// Opacity only, so the browser animates it without repainting the page each frame.
 const pulse = stylex.keyframes({
-  "0%": { boxShadow: "0 0 0 0 currentColor" },
-  "70%": { boxShadow: "0 0 0 5px transparent" },
-  "100%": { boxShadow: "0 0 0 0 transparent" },
+  "0%, 100%": { opacity: 1 },
+  "50%": { opacity: 0.35 },
 });
 
 const styles = stylex.create({
@@ -116,8 +116,10 @@ const styles = stylex.create({
   },
   pulse: {
     animationName: pulse,
-    animationDuration: "1.8s",
+    animationDuration: "1.6s",
+    animationTimingFunction: "ease-in-out",
     animationIterationCount: "infinite",
+    "@media (prefers-reduced-motion: reduce)": { animationName: "none" },
   },
   // Keyboard hints mean nothing on a touch screen.
   keys: {

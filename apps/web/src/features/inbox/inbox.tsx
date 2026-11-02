@@ -2,15 +2,12 @@ import {
   AlarmIcon,
   ArrowSquareOutIcon,
   CaretLeftIcon,
-  ChatCenteredDotsIcon,
+  ChatsCircleIcon,
   CheckIcon,
   KanbanIcon,
-  RobotIcon,
   ThumbsDownIcon,
   ThumbsUpIcon,
   TrayIcon,
-  UserPlusIcon,
-  WarningCircleIcon,
   XIcon,
 } from "@phosphor-icons/react";
 import * as stylex from "@stylexjs/stylex";
@@ -18,7 +15,14 @@ import { useHotkey } from "@tanstack/react-hotkeys";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useSearch } from "@tanstack/react-router";
 import type { ReactNode } from "react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  memo,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { toast } from "sonner";
 
 import type { Schemas } from "#api/client";
@@ -29,11 +33,11 @@ import { ActivityLine, foldRuns } from "#features/activity/activity-line";
 import { useMe } from "#features/auth/session";
 import { UNDO_MS } from "#features/cards/actions";
 import { STAGE_TONE, stageLabel, useMembers } from "#features/cards/card-bits";
+import { clip } from "#lib/text";
 import { ago, exactTime, fromNow } from "#lib/time";
 import { Avatar, AvatarStack } from "#ui/avatar";
 import { Button } from "#ui/button";
 import { Badge, Kbd } from "#ui/chip";
-import type { Tone } from "#ui/chip";
 import { EmptyState, ErrorNote, Skeleton } from "#ui/feedback";
 import { Segmented } from "#ui/field";
 import { PageHeader, layout } from "#ui/layout";
@@ -45,9 +49,12 @@ import {
   media,
   motion,
   radius,
+  shadow,
   space,
   text,
 } from "#ui/tokens.stylex";
+
+import { kindOf } from "./kinds";
 
 type Item = Schemas["AttentionListItem"];
 
@@ -59,62 +66,11 @@ const TABS: { value: AttentionState; label: string }[] = [
 ];
 
 /** Why an item is here, in the reader's words: every row must be able to explain itself. */
-const KINDS: Record<string, { label: string; icon: ReactNode; tone: Tone }> = {
-  "agent.needs_you": {
-    label: "Agent needs a decision",
-    icon: <RobotIcon size={13} />,
-    tone: "amber",
-  },
-  "agent.failed": {
-    label: "Agent couldn’t finish",
-    icon: <RobotIcon size={13} />,
-    tone: "red",
-  },
-  "agent.finished": {
-    label: "Agent finished",
-    icon: <RobotIcon size={13} />,
-    tone: "green",
-  },
-  "assistant.approval": {
-    label: "Approval",
-    icon: <ChatCenteredDotsIcon size={13} />,
-    tone: "amber",
-  },
-  "card.assigned": {
-    label: "Assigned to you",
-    icon: <UserPlusIcon size={13} />,
-    tone: "blue",
-  },
-  "card.activity": {
-    label: "Card you follow",
-    icon: <KanbanIcon size={13} />,
-    tone: "neutral",
-  },
-  "card.drifting": {
-    label: "Drifting",
-    icon: <AlarmIcon size={13} />,
-    tone: "amber",
-  },
-  blocking: {
-    label: "Someone is blocked on you",
-    icon: <WarningCircleIcon size={13} />,
-    tone: "red",
-  },
-  mention: {
-    label: "Mentioned you",
-    icon: <ChatCenteredDotsIcon size={13} />,
-    tone: "blue",
-  },
-};
-
-export function kindOf(kind: string) {
-  return (
-    KINDS[kind] ?? {
-      label: kind.replaceAll(/[._]/gu, " "),
-      icon: <TrayIcon size={13} />,
-      tone: "neutral" as Tone,
-    }
-  );
+// A decision gets help weighing it; anything else, the context around it.
+function askAbout(item: Item) {
+  return item.kind === "agent.needs_you"
+    ? `Help me decide: ${item.title.replace(/^[^:]+ needs you:\s*/u, "")} What are the trade-offs, and what would you do?`
+    : `What should I know about this before I act: ${item.title}?`;
 }
 
 function tomorrowMorning() {
@@ -178,6 +134,14 @@ export function Inbox({
   // Phones show one pane: the detail opens over the list when a row is tapped.
   const [opened, setOpened] = useState(initialItem !== undefined);
   const actions = useInboxActions(state);
+  const rowActions = useRowActions({
+    select: (id) => {
+      setSelectedId(id);
+      setOpened(true);
+    },
+    done: (item) => actions.update(item, "done"),
+    snooze: (item) => actions.update(item, "snoozed", tomorrowMorning()),
+  });
   const groups = useMemo(
     () => groupOf(items.data ?? [], state),
     [items.data, state]
@@ -225,7 +189,10 @@ export function Inbox({
 
   // A card opened from here sits on top with its own keys (E edits it, D closes it): the inbox
   // underneath must not act on the same keypress.
-  const free = useSearch({ from: "/_app" }).card === undefined;
+  const free = useSearch({
+    from: "/_app",
+    select: (s) => s.card === undefined,
+  });
   useHotkey("J", () => move(1), { enabled: free });
   useHotkey("K", () => move(-1), { enabled: free });
   useHotkey("ArrowDown", () => move(1), { enabled: free });
@@ -238,6 +205,11 @@ export function Inbox({
   useHotkey(
     "X",
     run((item) => actions.update(item, "dismissed")),
+    { enabled: free && state !== "dismissed" }
+  );
+  useHotkey(
+    "Shift+X",
+    run((item) => actions.dismissLess(item)),
     { enabled: free && state !== "dismissed" }
   );
   useHotkey(
@@ -288,7 +260,12 @@ export function Inbox({
           />
         }
       />
-      <div {...stylex.props(styles.split)}>
+      <div
+        {...stylex.props(
+          styles.split,
+          items.isSuccess && list.length === 0 && styles.splitEmpty
+        )}
+      >
         <div {...stylex.props(styles.listPane)}>
           {items.isPending && (
             <div {...stylex.props(styles.pad)}>
@@ -319,14 +296,12 @@ export function Inbox({
                 )}
                 <ul>
                   {group.items.map((item) => (
-                    <Row
+                    <InboxRow
                       key={item.id}
                       item={item}
                       selected={item.id === selected?.id}
-                      onSelect={() => {
-                        setSelectedId(item.id);
-                        setOpened(true);
-                      }}
+                      canFinish={state !== "done"}
+                      actions={rowActions}
                     />
                   ))}
                 </ul>
@@ -335,7 +310,13 @@ export function Inbox({
           </div>
           {list.length > 0 && <Legend state={state} />}
         </div>
-        <div {...stylex.props(styles.detailPane, opened && styles.detailOpen)}>
+        <div
+          {...stylex.props(
+            styles.detailPane,
+            opened && styles.detailOpen,
+            items.isSuccess && list.length === 0 && styles.detailHidden
+          )}
+        >
           <button
             type="button"
             onClick={() => setOpened(false)}
@@ -424,24 +405,54 @@ function Budget() {
     : `Only what’s waiting on you · pinged you ${sent} of ${cap} times today`;
 }
 
+type RowActions = {
+  select: (id: string) => void;
+  done: (item: Item) => void;
+  snooze: (item: Item) => void;
+};
+
+/**
+ * Row handlers that keep one identity for the page's life but always call the latest code, so a
+ * memoized row stays put while J and K move the selection.
+ */
+function useRowActions(latest: RowActions) {
+  const ref = useRef(latest);
+  useLayoutEffect(() => {
+    ref.current = latest;
+  });
+  return useMemo<RowActions>(
+    () => ({
+      select: (id) => ref.current.select(id),
+      done: (item) => ref.current.done(item),
+      snooze: (item) => ref.current.snooze(item),
+    }),
+    []
+  );
+}
+
+// Moving through the list changes two rows; the rest keep their render.
+const InboxRow = memo(Row);
+
 function Row({
   item,
   selected,
-  onSelect,
+  canFinish,
+  actions,
 }: {
   item: Item;
   selected: boolean;
-  onSelect: () => void;
+  canFinish: boolean;
+  actions: RowActions;
 }) {
   const { byId } = useMembers();
   const from = item.fromId ? byId.get(item.fromId) : undefined;
   const kind = kindOf(item.kind);
   return (
-    <li data-id={item.id}>
+    <li data-id={item.id} {...stylex.props(styles.rowItem)}>
       <button
         type="button"
         aria-current={selected || undefined}
-        onClick={onSelect}
+        onClick={() => actions.select(item.id)}
         {...stylex.props(styles.row, selected && styles.rowSelected)}
       >
         <span {...stylex.props(styles.rowAvatar)}>
@@ -453,7 +464,9 @@ function Row({
         </span>
         <span {...stylex.props(layout.grow)}>
           <span {...stylex.props(styles.rowTitle)}>{item.title}</span>
-          <span {...stylex.props(styles.rowMeta)}>
+          <span
+            {...stylex.props(styles.rowMeta, selected && styles.onSelected)}
+          >
             <span {...stylex.props(kindText[kind.tone])}>{kind.label}</span>
             {item.count > 1 && <span>· {item.count} updates</span>}
             {item.state === "snoozed" && item.snoozedUntil && (
@@ -463,7 +476,7 @@ function Row({
         </span>
         <time
           title={exactTime(item.updatedAt)}
-          {...stylex.props(styles.rowTime)}
+          {...stylex.props(styles.rowTime, selected && styles.onSelected)}
         >
           {item.priority === "high" && (
             <span
@@ -474,6 +487,31 @@ function Row({
           {ago(item.updatedAt)}
         </time>
       </button>
+      {/* With a mouse, a row can be cleared where it is; the keys and the detail pane do the same. */}
+      <span {...stylex.props(styles.quick)}>
+        {canFinish && (
+          <Tooltip label="Done" shortcut="E">
+            <button
+              type="button"
+              aria-label={`Done: ${item.title}`}
+              onClick={() => actions.done(item)}
+              {...stylex.props(styles.quickButton)}
+            >
+              <CheckIcon size={14} />
+            </button>
+          </Tooltip>
+        )}
+        <Tooltip label="Snooze until tomorrow" shortcut="H">
+          <button
+            type="button"
+            aria-label={`Snooze until tomorrow: ${item.title}`}
+            onClick={() => actions.snooze(item)}
+            {...stylex.props(styles.quickButton)}
+          >
+            <AlarmIcon size={14} />
+          </button>
+        </Tooltip>
+      </span>
     </li>
   );
 }
@@ -647,6 +685,13 @@ function Detail({
             Move back to open
           </Button>
         )}
+        <Link
+          to="/assistant"
+          search={{ ask: askAbout(item) }}
+          {...stylex.props(styles.askLink)}
+        >
+          <ChatsCircleIcon size={14} /> Ask your assistant
+        </Link>
       </div>
 
       <div {...stylex.props(styles.feedback)}>
@@ -792,8 +837,35 @@ function Empty({ state }: { state: AttentionState }) {
       </EmptyState>
     );
   }
-  return <EmptyState title={`Nothing ${state}`} />;
+  const empty = OTHER_EMPTY[state];
+  return (
+    <EmptyState icon={empty.icon} title={empty.title}>
+      {empty.say}
+    </EmptyState>
+  );
 }
+
+// What each tab would hold and how something gets there, so an empty tab teaches its key.
+const OTHER_EMPTY: Record<
+  Exclude<AttentionState, "open">,
+  { icon: ReactNode; title: string; say: string }
+> = {
+  snoozed: {
+    icon: <AlarmIcon size={20} />,
+    title: "Nothing snoozed",
+    say: "Press H on an item to put it away until tomorrow morning. It comes back here, then to Open when it's time.",
+  },
+  done: {
+    icon: <CheckIcon size={20} />,
+    title: "Nothing done yet",
+    say: "Items you mark done with E land here for a while, so you can undo or look back.",
+  },
+  dismissed: {
+    icon: <XIcon size={20} />,
+    title: "Nothing dismissed",
+    say: "Dismiss with X when something wasn't worth your attention. Worklog learns what to stay quiet about.",
+  },
+};
 
 type Undo = { item: Item; from: AttentionState; toast?: string | number };
 
@@ -881,28 +953,79 @@ function useInboxActions(state: AttentionState) {
     open: "Moved back to open",
   };
 
-  const undo = () => {
-    const previous = last.current;
-    if (!previous) {
-      return;
+  // Each toast's Undo reverts the change it announced, even after a newer one; Z reverts the newest.
+  const revert = (entry: Undo) => {
+    if (last.current === entry) {
+      last.current = null;
     }
-    last.current = null;
-    toast.dismiss(previous.toast);
-    updateMutation.mutate({ item: previous.item, next: previous.from });
+    toast.dismiss(entry.toast);
+    updateMutation.mutate({ item: entry.item, next: entry.from });
+  };
+  const undo = () => {
+    if (last.current) {
+      revert(last.current);
+    }
+  };
+
+  // The moment someone dismisses a ping is when they know whether they want its kind at all,
+  // so the toast asks then rather than leaving it to a menu on a row that's gone.
+  const lessMutation = useMutation({
+    mutationFn: async ({ item }: { item: Item; dismissal: Undo }) =>
+      await unwrap(
+        api.POST("/v1/attention/{id}/feedback", {
+          params: { path: { id: item.id } },
+          body: { signal: "less_like_this" },
+        })
+      ),
+    // The dismissal's own toast says what happened, so one toast tells the whole story and its
+    // Undo still brings the item back.
+    onSuccess: (result, { item, dismissal }) => {
+      toast(
+        result.muted
+          ? `Got it: fewer “${kindOf(result.kind).label.toLowerCase()}” pings from now on`
+          : "Thanks, Worklog learns from this",
+        {
+          id: dismissal.toast,
+          duration: UNDO_MS,
+          description: clip(item.title, 72),
+          cancel: undefined,
+          action: { label: "Undo", onClick: () => revert(dismissal) },
+        }
+      );
+    },
+    onError: (error) => toast.error(error.message),
+  });
+
+  const update = (item: Item, next: AttentionState, until?: Date) => {
+    updateMutation.mutate({ item, next, until });
+    const entry: Undo = { item, from: item.state };
+    const undoAction = { label: "Undo", onClick: () => revert(entry) };
+    entry.toast = toast(MESSAGES[next], {
+      duration: UNDO_MS,
+      description: clip(item.title, 72),
+      ...(next === "dismissed"
+        ? {
+            cancel: undoAction,
+            action: {
+              label: "Less like this",
+              onClick: (event) => {
+                event.preventDefault();
+                lessMutation.mutate({ item, dismissal: entry });
+              },
+            },
+          }
+        : { action: undoAction }),
+    });
+    last.current = entry;
+    return entry;
   };
 
   return {
     update(item: Item, next: AttentionState, until?: Date) {
-      updateMutation.mutate({ item, next, until });
-      last.current = {
-        item,
-        from: item.state,
-        toast: toast(MESSAGES[next], {
-          duration: UNDO_MS,
-          description: item.title,
-          action: { label: "Undo", onClick: undo },
-        }),
-      };
+      update(item, next, until);
+    },
+    dismissLess(item: Item) {
+      lessMutation.mutate({ item, dismissal: update(item, "dismissed") });
     },
     act(item: Item, actionId: string, label: string) {
       last.current = null;
@@ -923,6 +1046,9 @@ const styles = stylex.create({
     },
     position: "relative",
   },
+  // Nothing to read means nothing to show beside it: the empty state takes the page.
+  splitEmpty: { gridTemplateColumns: "minmax(0, 1fr)" },
+  detailHidden: { display: "none" },
   listPane: {
     display: "flex",
     flexDirection: "column",
@@ -953,6 +1079,49 @@ const styles = stylex.create({
     transitionDuration: motion.fast,
     outline: { default: "none", ":focus-visible": `2px solid ${color.focus}` },
   },
+  rowItem: { position: "relative" },
+  quick: {
+    position: "absolute",
+    top: space.sm,
+    right: space.sm,
+    display: { default: "flex", "@media (hover: none)": "none" },
+    gap: space.xxs,
+    padding: space.xxs,
+    borderRadius: radius.md,
+    backgroundColor: color.raised,
+    boxShadow: shadow.card,
+    opacity: {
+      default: 0,
+      ":is(li:hover > *)": { default: 0, [media.hover]: 1 },
+      ":focus-within": 1,
+    },
+    pointerEvents: {
+      default: "none",
+      ":is(li:hover > *)": { default: "none", [media.hover]: "auto" },
+      ":focus-within": "auto",
+    },
+    transitionProperty: "opacity",
+    transitionDuration: motion.fast,
+  },
+  quickButton: {
+    display: "grid",
+    placeItems: "center",
+    width: 26,
+    height: 26,
+    borderRadius: radius.sm,
+    borderWidth: 0,
+    color: color.fgMuted,
+    backgroundColor: {
+      default: "transparent",
+      ":hover": { default: null, [media.hover]: color.ui },
+    },
+    cursor: "pointer",
+    transform: { default: null, ":active": "scale(0.95)" },
+    transitionProperty: "transform",
+    transitionDuration: motion.fast,
+  },
+  // The selected row's fill is a step darker, so its faint text steps up to stay readable.
+  onSelected: { color: color.fgMuted },
   rowSelected: {
     backgroundColor: {
       default: color.uiActive,
@@ -1179,6 +1348,25 @@ const styles = stylex.create({
     borderTopColor: color.line,
   },
   btnKbd: { marginInlineStart: space.xs },
+  askLink: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: space.sm,
+    height: 32,
+    paddingInline: space.md,
+    marginInlineStart: "auto",
+    borderRadius: radius.sm,
+    fontSize: text.label,
+    fontWeight: 500,
+    color: {
+      default: color.fgMuted,
+      ":hover": { default: null, [media.hover]: color.fg },
+    },
+    backgroundColor: {
+      default: "transparent",
+      ":hover": { default: null, [media.hover]: color.ui },
+    },
+  },
   feedback: {
     display: "flex",
     alignItems: "center",

@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { q } from "#api/queries";
 import { useMembers } from "#features/cards/card-bits";
 import type { Member } from "#features/cards/card-bits";
-import { clockTime } from "#lib/time";
+import { clockTime, ribbonSince } from "#lib/time";
 import { Avatar } from "#ui/avatar";
 import { color, media, radius, space, text } from "#ui/tokens.stylex";
 
@@ -15,6 +15,9 @@ import type { Activity } from "./activity-line";
 const HOUR = 3_600_000;
 const SPAN = 24 * HOUR;
 const LANES = 8;
+const LANE_HEIGHT = 24;
+// The heading, axis and padding around the lanes.
+const FRAME_HEIGHT = 68;
 
 type Lane = { member: Member; events: Activity[] };
 
@@ -36,9 +39,9 @@ export function DayRibbon({
     const timer = setInterval(() => setEnd(Date.now()), 10 * 60_000);
     return () => clearInterval(timer);
   }, []);
-  const since = new Date(end - SPAN).toISOString();
+  const since = ribbonSince(end);
   const recent = useQuery(q.recentActivities({ since, limit: 500 }));
-  const { byId } = useMembers();
+  const { byId, list } = useMembers();
 
   const lanes = useMemo(() => {
     const byActor = new Map<string, Activity[]>();
@@ -56,6 +59,18 @@ export function DayRibbon({
       .toSorted((a, b) => b.events.length - a.events.length);
   }, [recent.data, byId]);
 
+  if (recent.isPending) {
+    // Held open at about the size it will be, so the feed below doesn't jump when the lanes land.
+    const expected = Math.min(Math.max(list.length, 1), LANES);
+    return (
+      <div
+        aria-hidden
+        {...stylex.props(
+          styles.placeholder(expected * LANE_HEIGHT + FRAME_HEIGHT)
+        )}
+      />
+    );
+  }
   if (lanes.length === 0) {
     return null;
   }
@@ -169,6 +184,7 @@ function hourMarks(end: number) {
 }
 
 const styles = stylex.create({
+  placeholder: (height: number) => ({ height }),
   ribbon: {
     display: "flex",
     flexDirection: "column",
@@ -199,7 +215,7 @@ const styles = stylex.create({
     gridTemplateColumns: "96px 1fr",
     alignItems: "center",
     width: "100%",
-    height: 24,
+    height: LANE_HEIGHT,
     paddingInline: space.xs,
     borderRadius: radius.sm,
     backgroundColor: {

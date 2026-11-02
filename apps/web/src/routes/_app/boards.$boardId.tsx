@@ -13,14 +13,22 @@ import * as stylex from "@stylexjs/stylex";
 import { useHotkey } from "@tanstack/react-hotkeys";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useRef, useState } from "react";
+import {
+  Suspense,
+  lazy,
+  memo,
+  useDeferredValue,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { toast } from "sonner";
 
 import { api, unwrap } from "#api/client";
+import { preloadBoard } from "#api/preload";
 import { q } from "#api/queries";
 import type { paths } from "#api/schema";
 import { useMe } from "#features/auth/session";
-import { BoardList } from "#features/board/board-list";
 import { BoardView } from "#features/board/board-view";
 import { PromptDialog } from "#features/board/prompt-dialog";
 import { NewCardDialog } from "#features/cards/new-card";
@@ -36,14 +44,25 @@ type BoardEdit = NonNullable<
   paths["/v1/boards/{id}"]["patch"]["requestBody"]
 >["content"]["application/json"];
 
+// The list view brings a table library the board itself doesn't need; it loads when chosen.
+const BoardList = lazy(async () => {
+  const { BoardList: list } = await import("#features/board/board-list");
+  return { default: list };
+});
+
+// Typing in the filter re-renders the page at once; the board waits for the deferred text.
+const StillBoard = memo(BoardView);
+
 const DRIFT_DAYS = [3, 7, 30, 90, 365] as const;
 
 export const Route = createFileRoute("/_app/boards/$boardId")({
-  loader: async ({ context, params }) =>
-    await context.queryClient.query({
+  loader: async ({ context, params }) => {
+    preloadBoard(context.queryClient, params.boardId);
+    return await context.queryClient.query({
       ...q.board(params.boardId),
       staleTime: "static",
-    }),
+    });
+  },
   validateSearch: (search: Record<string, unknown>): { view?: "list" } =>
     search.view === "list" ? { view: "list" } : {},
   head: ({ loaderData }) => ({
@@ -59,6 +78,13 @@ function BoardPage() {
   const me = useMe();
   const [mine, setMine] = useState<"all" | "mine">("all");
   const [textFilter, setTextFilter] = useState("");
+  // The box answers each keystroke at once; a full board re-filters just behind it.
+  const filterText = useDeferredValue(textFilter);
+  const meId = me?.member.id;
+  const filter = useMemo(
+    () => ({ mine: mine === "mine", text: filterText, meId }),
+    [mine, filterText, meId]
+  );
   const filterInput = useRef<HTMLInputElement>(null);
   useHotkey(
     "F",
@@ -69,7 +95,8 @@ function BoardPage() {
     { meta: { name: "Filter the board", group: "Board" } }
   );
   const [adding, setAdding] = useState(false);
-  const { view } = Route.useSearch();
+  // Selected, so opening a card (?card=) doesn't render the whole board again.
+  const view = Route.useSearch({ select: (s) => s.view });
   const navigate = useNavigate({ from: Route.fullPath });
 
   if (!board.data) {
@@ -138,23 +165,11 @@ function BoardPage() {
         }
       />
       {view === "list" ? (
-        <BoardList
-          board={board.data}
-          filter={{
-            mine: mine === "mine",
-            text: textFilter,
-            meId: me?.member.id,
-          }}
-        />
+        <Suspense fallback={null}>
+          <BoardList board={board.data} filter={filter} />
+        </Suspense>
       ) : (
-        <BoardView
-          board={board.data}
-          filter={{
-            mine: mine === "mine",
-            text: textFilter,
-            meId: me?.member.id,
-          }}
-        />
+        <StillBoard board={board.data} filter={filter} />
       )}
       <NewCardDialog open={adding} onClose={() => setAdding(false)} />
     </>

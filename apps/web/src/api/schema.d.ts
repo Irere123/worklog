@@ -505,6 +505,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/activities/counts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * How much of each kind of work happened since a time
+         * @description Counts by `kind` (`card.closed`, `card.created`, a source's merged pull requests…) for a summary line, without paging through the stream. Your own private entries are counted; others' aren't.
+         */
+        get: operations["activity.counts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/activities/{id}": {
         parameters: {
             query?: never;
@@ -536,6 +556,26 @@ export interface paths {
          * @description Calls, WhatsApp threads, decisions, fixes done off the radar. Clients can transcribe voice on-device and send `via: "voice"`. With AI configured, entries are titled, classified (decision / blocker / win) and linked to the right card in the background; blockers that name a teammate land in that teammate's attention list.
          */
         post: operations["log.create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/now": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * What everyone is on right now, in one call
+         * @description Each member's current card and the latest thing they did in the last `days` (7 by default). Members with neither are left out. Built for pages that list the team; for one person's full picture use `GET /v1/members/{ref}/now`.
+         */
+        get: operations["team.now"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -583,7 +623,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /**
+         * One of your items, in whatever state it's in
+         * @description For checking where one request stands, such as an approval a conversation asked for, without paging through a list.
+         */
+        get: operations["attention.get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -750,10 +794,15 @@ export interface paths {
         get: operations["conversation.get"];
         put?: never;
         post?: never;
-        delete?: never;
+        /**
+         * Delete one of your conversations with your own assistant
+         * @description Its messages and ratings go with it. A conversation with a teammate's assistant can't be deleted, since they can read it. What your assistant learned from it stays in your memory, where you can forget it.
+         */
+        delete: operations["conversation.delete"];
         options?: never;
         head?: never;
-        patch?: never;
+        /** Rename one of your conversations */
+        patch: operations["conversation.rename"];
         trace?: never;
     };
     "/v1/conversations/{id}/warm": {
@@ -1632,6 +1681,50 @@ export interface components {
              */
             updatedAt: string;
         };
+        ActivityCounts: {
+            /** @example card.closed */
+            kind: string;
+            count: number;
+        }[];
+        TeamNow: {
+            memberId: string;
+            /** @description The card they're on: golden first, then the most recently active */
+            current: {
+                number: number;
+                title: string;
+                column: string | null;
+                golden: boolean;
+            } | null;
+            /** @description The latest thing they did in the window */
+            latest: {
+                /**
+                 * Format: date-time
+                 * @example 2026-10-26T08:30:00.000Z
+                 */
+                at: string;
+                kind: string;
+                source: string;
+                title: string;
+            } | null;
+            /** @description For an agent: where its latest run stands, from the last update that said */
+            agent: {
+                /** @enum {string} */
+                state: "working" | "needs_you" | "finished" | "failed";
+                title: string;
+                /**
+                 * Format: date-time
+                 * @example 2026-10-26T08:30:00.000Z
+                 */
+                at: string;
+                /** @description The card the run is on, if it named one */
+                cardNumber: number | null;
+            } | null;
+            /**
+             * Format: date-time
+             * @example 2026-10-26T08:30:00.000Z
+             */
+            lastActiveAt: string | null;
+        }[];
         WorkSnapshot: {
             person: {
                 id: string;
@@ -1799,6 +1892,8 @@ export interface components {
             /** @enum {string} */
             role: "user" | "assistant";
             text: string;
+            /** @description What the assistant did before this reply, in order: its reasoning and the tools it called. Empty for your own messages. */
+            steps: components["schemas"]["MessageStep"][];
             /**
              * @description How you rated this reply; null if you haven't
              * @enum {string|null}
@@ -1809,6 +1904,40 @@ export interface components {
              * @example 2026-10-26T08:30:00.000Z
              */
             createdAt: string;
+        };
+        MessageStep: {
+            /** @enum {string} */
+            kind: "thought";
+            /** @description The model's reasoning */
+            text: string;
+        } | {
+            /** @enum {string} */
+            kind: "tool";
+            /** @example search_activity */
+            tool: string;
+            /** @description What the tool was asked */
+            input?: unknown;
+            /** @description False if the tool failed */
+            ok: boolean;
+            /** @description How many results came back, when the tool returns a list */
+            count: number | null;
+            /** @description The first 8 cards or events a lookup found, so they can be checked */
+            found: components["schemas"]["StepFound"][];
+            /** @description Set when a write teammates would see is waiting for your Allow: the attention item to answer */
+            approvalId: string | null;
+        };
+        StepFound: {
+            title: string;
+            /** @description Set for a card */
+            number: number | null;
+            /**
+             * Format: date-time
+             * @description When it happened, for activity
+             * @example 2026-10-26T08:30:00.000Z
+             */
+            at: string | null;
+            source: string | null;
+            url: string | null;
         };
         WarmResult: {
             /** @description False when it was warmed moments ago, a turn is running, or AI isn't configured */
@@ -4505,6 +4634,55 @@ export interface operations {
             };
         };
     };
+    "activity.counts": {
+        parameters: {
+            query: {
+                since: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ActivityCounts"];
+                };
+            };
+            /** @description Invalid request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid credentials */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     "activity.delete": {
         parameters: {
             query?: never;
@@ -4616,6 +4794,55 @@ export interface operations {
             };
         };
     };
+    "team.now": {
+        parameters: {
+            query?: {
+                days?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TeamNow"];
+                };
+            };
+            /** @description Invalid request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid credentials */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     "member.now": {
         parameters: {
             query?: {
@@ -4686,6 +4913,55 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AttentionListItem"][];
+                };
+            };
+            /** @description Invalid request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid credentials */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    "attention.get": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttentionItem"];
                 };
             };
             /** @description Invalid request */
@@ -5346,6 +5622,110 @@ export interface operations {
                     "application/json": components["schemas"]["Conversation"] & {
                         messages: components["schemas"]["Message"][];
                     };
+                };
+            };
+            /** @description Invalid request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid credentials */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    "conversation.delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Ok"];
+                };
+            };
+            /** @description Invalid request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid credentials */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    "conversation.rename": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    title: string;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Conversation"];
                 };
             };
             /** @description Invalid request */

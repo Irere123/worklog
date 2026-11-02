@@ -1,3 +1,5 @@
+import monoLatinUrl from "@fontsource-variable/geist-mono/files/geist-mono-latin-wght-normal.woff2?url";
+import interLatinUrl from "@fontsource-variable/inter/files/inter-latin-opsz-normal.woff2?url";
 import * as stylex from "@stylexjs/stylex";
 import {
   HeadContent,
@@ -9,6 +11,7 @@ import type { ReactNode } from "react";
 import { Toaster } from "sonner";
 
 import { NotFound, RouteError } from "#features/shell/fallbacks";
+import { BOOT_SCRIPT } from "#lib/boot";
 import { THEME_SCRIPT } from "#lib/theme";
 import type { RouterContext } from "#router";
 import { TooltipProvider } from "#ui/overlay";
@@ -52,6 +55,15 @@ export const Route = createRootRouteWithContext<RouterContext>()({
       { rel: "manifest", href: "/manifest.webmanifest" },
       { rel: "apple-touch-icon", href: "/apple-touch-icon.png" },
       { rel: "icon", href: "/favicon.svg", type: "image/svg+xml" },
+      // The stylesheets only ask for a font once text renders, after the app has booted;
+      // fetching the Latin files up front saves that wait and the reflow when they swap in.
+      ...[interLatinUrl, monoLatinUrl].map((href) => ({
+        rel: "preload",
+        href,
+        as: "font",
+        type: "font/woff2",
+        crossOrigin: "anonymous" as const,
+      })),
       { rel: "stylesheet", href: globalUrl },
       { rel: "stylesheet", href: interUrl },
       { rel: "stylesheet", href: monoUrl },
@@ -61,6 +73,7 @@ export const Route = createRootRouteWithContext<RouterContext>()({
     ],
     scripts: [
       { children: THEME_SCRIPT },
+      { children: BOOT_SCRIPT },
       // Routes load lazily, so their rules compile after the first stylesheet fetch; the runtime
       // refetches it whenever new rules appear.
       ...(import.meta.env.DEV

@@ -17,7 +17,14 @@ function read(): Theme {
 
 export function setTheme(theme: Theme) {
   localStorage.setItem(KEY, theme);
+  // Every colour changes at once; buttons fading on their own would read as lag, not a switch.
+  const still = document.createElement("style");
+  still.textContent = "*,*::before,*::after{transition:none!important}";
+  document.head.append(still);
   document.documentElement.style.colorScheme = schemeOf(theme);
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => still.remove());
+  });
   for (const listener of listeners) {
     listener();
   }

@@ -1,6 +1,6 @@
 import { infiniteQueryOptions, queryOptions } from "@tanstack/react-query";
 
-import { api, unwrap } from "./client";
+import { api, unwrap, unwrapEarly } from "./client";
 import type { paths } from "./schema";
 
 type Query<P extends keyof paths> = paths[P] extends {
@@ -27,14 +27,19 @@ export const q = {
   session: () =>
     queryOptions({
       queryKey: ["session"],
-      queryFn: async () => await unwrap(api.GET("/v1/session")),
+      queryFn: async () =>
+        await unwrapEarly(
+          "/v1/session",
+          async () => await api.GET("/v1/session")
+        ),
       staleTime: 5 * 60_000,
       retry: false,
     }),
   me: () =>
     queryOptions({
       queryKey: ["me"],
-      queryFn: async () => await unwrap(api.GET("/v1/me")),
+      queryFn: async () =>
+        await unwrapEarly("/v1/me", async () => await api.GET("/v1/me")),
       staleTime: 5 * 60_000,
     }),
   members: () =>
@@ -60,6 +65,13 @@ export const q = {
             params: { path: { ref }, query: { days } },
           })
         ),
+    }),
+  // Under "now" so the live stream refreshes it with each person's; an object can't be a handle.
+  teamNow: (days = 7) =>
+    queryOptions({
+      queryKey: ["now", { team: true }, days],
+      queryFn: async () =>
+        await unwrap(api.GET("/v1/now", { params: { query: { days } } })),
     }),
   tokens: (ref: string) =>
     queryOptions({
@@ -141,12 +153,31 @@ export const q = {
         await unwrap(api.GET("/v1/activities", { params: { query: filter } })),
     }),
 
+  // Under "activities" so the live stream refreshes it with the feed.
+  activityCounts: (since: string) =>
+    queryOptions({
+      queryKey: ["activities", "counts", since],
+      queryFn: async () =>
+        await unwrap(
+          api.GET("/v1/activities/counts", { params: { query: { since } } })
+        ),
+    }),
+
   attention: (state: AttentionState = "open") =>
     queryOptions({
       queryKey: ["attention", state],
       queryFn: async () =>
         await unwrap(
           api.GET("/v1/attention", { params: { query: { state } } })
+        ),
+    }),
+  // Under "attention" so every write that refreshes the inbox refreshes this item too.
+  attentionItem: (id: string) =>
+    queryOptions({
+      queryKey: ["attention", "item", id],
+      queryFn: async () =>
+        await unwrap(
+          api.GET("/v1/attention/{id}", { params: { path: { id } } })
         ),
     }),
   attentionMetrics: (days = 14) =>

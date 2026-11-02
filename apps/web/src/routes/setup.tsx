@@ -60,7 +60,8 @@ function Setup() {
             body: {
               workspaceName: value.workspaceName,
               name: value.name,
-              email: value.email,
+              // Optional: an empty field means "no email", not an address to check.
+              email: value.email.trim() || undefined,
               timezone: zone(),
             },
           })

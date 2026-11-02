@@ -8,7 +8,7 @@ export const Route = createFileRoute("/_app/assistant/$conversationId")({
 
 function ConversationPage() {
   const { conversationId } = Route.useParams();
-  const { ask } = Route.useSearch();
+  const ask = Route.useSearch({ select: (s) => s.ask });
   return (
     <ConversationView key={conversationId} id={conversationId} ask={ask} />
   );
