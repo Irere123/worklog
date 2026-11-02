@@ -28,6 +28,18 @@ These are the small things that make a screen ours. Use them where they fit, and
 - **Stamps** for closure, golden tickets for the one card that matters, and a countdown badge as a card drifts.
 - **The tab knows what needs you:** the icon carries the inbox count, as a calendar's tab shows the date.
 
+## How an agent shows its work
+
+The assistant and every agent follow the same rules, so their work reads as part of the log, not as a black box ([research](research/design-inspiration-2026-11.md)).
+
+- **Steps in plain words.** A tool call is one line with the tool's own icon and its object: "Searched activity for “blocked” · 3 results", "Read #8". Never a raw tool name, never a green tick for success.
+- **Lookups fold, changes don't.** Once the answer starts, reads fold into "Checked 3 things · 4s"; anything that changed the record (a comment, a move, memory) stays in view as its own line.
+- **Reasoning stays folded,** even while it streams. "Thinking…" says it's there; a click shows it.
+- **Writes others will see wait in place.** A held write reads "Wants your OK to move #9 to Investigating" with Allow and Deny, the same request as in the inbox.
+- **Work shows where it happens.** An agent's run that names a card is one line on that card ("Atlas needs you: …"), edited in place, never a stream of posts. It shows only while the run is moving or waiting on someone.
+- **Every claim can be checked.** Opening a lookup lists what it found; a `#8` shows the card on hover.
+- **One place for each control.** Send becomes Stop; actions sit under the reply, pinned on the latest one. Nothing animates on send, and only what arrives live moves in.
+
 ## Standards are code
 
 The old design system scaled consistency. Ours has to scale intent, for teammates and agents building without a designer in the room. So the rules live where code is written:
