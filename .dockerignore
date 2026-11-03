@@ -1,0 +1,17 @@
+# Only what the image builds from: everything else would bust the build cache or leak into it.
+**/node_modules
+**/dist
+**/.env
+**/.env.*
+!**/.env.example
+.git
+.github
+.vscode
+.railway
+docs
+tinybird
+apps/api/test
+**/*.log
+**/.output
+**/.tanstack
+**/.nitro
