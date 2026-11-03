@@ -1,0 +1,43 @@
+name: Tinybird
+
+# Only when the project changes: Tinybird Local is a large image to start for nothing.
+on:
+  push:
+    branches: [main]
+    paths: ["tinybird/**", ".github/workflows/tinybird.yml"]
+  pull_request:
+    paths: ["tinybird/**", ".github/workflows/tinybird.yml"]
+
+permissions:
+  contents: read
+
+jobs:
+  tinybird:
+    name: Project builds (and deploys from main)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      tinybird:
+        image: tinybirdco/tinybird-local:latest
+        ports:
+          - 7181:7181
+    defaults:
+      run:
+        working-directory: tinybird
+    env:
+      TINYBIRD_HOST: ${{ secrets.TINYBIRD_HOST }}
+      TINYBIRD_DEPLOY_TOKEN: ${{ secrets.TINYBIRD_DEPLOY_TOKEN }}
+    steps:
+      - uses: actions/checkout@v5
+      - name: Tinybird CLI
+        run: |
+          curl -fsSL https://tinybird.co | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: Tinybird Local is up
+        run: timeout 180 sh -c 'until curl -s -o /dev/null http://localhost:7181; do sleep 2; done'
+      - name: Datasources and endpoints build on Tinybird Local
+        run: tb --local build
+      # Skipped until the repository has the TINYBIRD_HOST and TINYBIRD_DEPLOY_TOKEN secrets.
+      - name: Deploys to Tinybird Cloud
+        if: github.event_name == 'push' && env.TINYBIRD_DEPLOY_TOKEN != ''
+        run: tb --cloud --host "$TINYBIRD_HOST" --token "$TINYBIRD_DEPLOY_TOKEN" deploy
