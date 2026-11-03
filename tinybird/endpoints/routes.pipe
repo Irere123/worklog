@@ -5,7 +5,7 @@ DESCRIPTION >
 
 TOKEN "worklog_read" READ
 
-NODE routes
+NODE endpoint
 SQL >
     %
     SELECT

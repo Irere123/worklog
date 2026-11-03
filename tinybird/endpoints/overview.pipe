@@ -34,7 +34,7 @@ SQL >
         {% if defined(service) %} AND service = {{ String(service) }} {% end %}
     GROUP BY bucket
 
-NODE overview
+NODE endpoint
 SQL >
     %
     SELECT

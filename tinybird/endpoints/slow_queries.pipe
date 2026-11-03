@@ -4,7 +4,7 @@ DESCRIPTION >
 
 TOKEN "worklog_read" READ
 
-NODE slow_queries
+NODE endpoint
 SQL >
     %
     SELECT

@@ -14,7 +14,7 @@ SQL >
     WHERE level = {{ String(level, 'error') }} AND fingerprint != ''
     GROUP BY fingerprint
 
-NODE issues
+NODE endpoint
 SQL >
     %
     SELECT
