@@ -3,6 +3,7 @@ import type { ErrorHandler } from "hono";
 import { compress } from "hono/compress";
 import { cors } from "hono/cors";
 import { HTTPException } from "hono/http-exception";
+import { routePath } from "hono/route";
 
 import type { AppContext } from "./context";
 import { authMiddleware } from "./http/auth";
@@ -28,9 +29,12 @@ import {
   setupRoutes,
 } from "./http/routes/setup";
 import { workRoutes } from "./http/routes/work";
+import { traceRequests } from "./http/trace";
 import { webAppRoutes } from "./http/web";
 import { webOrigins } from "./lib/auth";
 import { ApiError } from "./lib/errors";
+import { log } from "./telemetry/log";
+import { activeSpan } from "./telemetry/trace";
 
 export const API_INFO = {
   title: "Worklog API",
@@ -59,7 +63,11 @@ const handleError: ErrorHandler = (err, c) => {
   if (err instanceof HTTPException) {
     return err.getResponse();
   }
-  console.error("[api] unhandled error", err);
+  activeSpan()?.fail(err);
+  log.error("api: unhandled error", {
+    error: err,
+    route: `${c.req.method} ${routePath(c)}`,
+  });
   return c.json(
     { error: { code: "internal", message: "Something went wrong" } },
     500
@@ -68,6 +76,8 @@ const handleError: ErrorHandler = (err, c) => {
 
 export function createApp(ctx: AppContext) {
   const app = router();
+
+  app.use("*", traceRequests());
 
   // Cookie sessions only from our own web origins; anyone may call with an API key (no cookies → no CSRF).
   const trusted = new Set(webOrigins(ctx.config));
@@ -82,7 +92,11 @@ export function createApp(ctx: AppContext) {
         "x-worklog-workspace",
         "last-event-id",
       ],
-      exposeHeaders: ["set-auth-token", "x-worklog-conversation"],
+      exposeHeaders: [
+        "set-auth-token",
+        "x-worklog-conversation",
+        "x-worklog-trace",
+      ],
     })
   );
   app.use("*", async (c, next) => {

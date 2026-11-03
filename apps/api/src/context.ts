@@ -16,6 +16,8 @@ import type { Auth } from "./lib/auth";
 import { SecretBox } from "./lib/crypto";
 import { createMailer } from "./lib/mailer";
 import type { Mailer } from "./lib/mailer";
+import { tracedFetch } from "./telemetry/instrument";
+import { startTelemetry } from "./telemetry/start";
 import { claimMemberships } from "./work/members";
 
 export type AppContext = {
@@ -40,9 +42,15 @@ export async function createContext(
   env: Config,
   overrides: Partial<
     Pick<AppContext, "models" | "mailer" | "fetch" | "now">
-  > = {}
+  > & { service?: string } = {}
 ): Promise<AppContext> {
   const { db, close } = await openDb(env.DATABASE_URL, env.DATABASE_POOL_SIZE);
+  const rawFetch = overrides.fetch ?? fetch;
+  const stopTelemetry = startTelemetry(env, {
+    service: overrides.service ?? "script",
+    pool: db.$client,
+    fetch: rawFetch,
+  });
   await installQueue(db);
   const secrets = new SecretBox(
     env.WORKLOG_SECRET_KEY,
@@ -73,12 +81,17 @@ export async function createContext(
     models:
       "models" in overrides ? (overrides.models ?? null) : createModels(config),
     mailer,
-    fetch: overrides.fetch ?? fetch,
+    fetch: tracedFetch(rawFetch),
     now: overrides.now ?? (() => new Date()),
     close: async () => {
-      stopTally();
-      await tally.flush();
-      await close();
+      // Last, and whatever fails before it: what went wrong while closing is in what it ships.
+      try {
+        stopTally();
+        await tally.flush();
+        await close();
+      } finally {
+        await stopTelemetry();
+      }
     },
   };
   return ctx;

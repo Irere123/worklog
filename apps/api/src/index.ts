@@ -4,9 +4,12 @@ import { createContext } from "./context";
 import { syncAppsFromEnv } from "./ingest/apps";
 import { startStreams } from "./ingest/streams";
 import { startWorker } from "./jobs/tasks";
+import { log } from "./telemetry/log";
+import { reportCrashes } from "./telemetry/start";
 
+reportCrashes();
 const config = loadConfig();
-const ctx = await createContext(config);
+const ctx = await createContext(config, { service: "api" });
 const app = createApp(ctx);
 // Apps that come from the environment pick up what changed there since the last start.
 await syncAppsFromEnv(ctx);
@@ -23,13 +26,17 @@ const server = Bun.serve({
   idleTimeout: 0,
 });
 
-console.log(
-  `Worklog API on ${server.url.href} — docs at ${config.PUBLIC_URL}/docs`
-);
-console.log(
-  `  AI: ${ctx.models ? `${config.WORKLOG_MODEL} / ${config.WORKLOG_FAST_MODEL} via OpenRouter` : "off (set OPENROUTER_API_KEY)"}`
-);
-console.log(`  Mail: ${ctx.mailer.kind} · Jobs: ${stopWorker ? "on" : "off"}`);
+log.info("Worklog API started", {
+  url: server.url.href,
+  docs: `${config.PUBLIC_URL}/docs`,
+  ai: ctx.models
+    ? `${config.WORKLOG_MODEL} / ${config.WORKLOG_FAST_MODEL} via OpenRouter`
+    : "off (set OPENROUTER_API_KEY)",
+  mail: ctx.mailer.kind,
+  jobs: stopWorker ? "on" : "off",
+  telemetry: config.TINYBIRD_TOKEN ? "Tinybird" : "console only",
+  release: config.WORKLOG_RELEASE,
+});
 
 // A second signal (Ctrl-C twice, `docker stop`) must not close everything again.
 let shuttingDown = false;
@@ -46,7 +53,7 @@ async function shutdown() {
     await ctx.close();
     process.exit(0);
   } catch (error) {
-    console.error("Shutdown failed", error);
+    log.error("shutdown failed", { error });
     process.exit(1);
   }
 }

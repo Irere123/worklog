@@ -74,6 +74,17 @@ const Env = z.object({
   // requested a month ago and long since done must not ping anyone.
   BACKFILL_NOTIFY_HOURS: z.coerce.number().int().min(0).default(48),
 
+  // Spans, logs and runtime samples go to Tinybird (tinybird/ holds its project) when the token is
+  // set, one with append rights on its datasources. Unset: logs only reach the console.
+  TINYBIRD_TOKEN: z.string().optional(),
+  // The workspace's region: https://api.tinybird.co, https://api.us-east.tinybird.co, …
+  TINYBIRD_HOST: z.url().default("https://api.tinybird.co"),
+  // Share of traces kept. A trace with an error, or slower than TELEMETRY_SLOW_MS, is always kept.
+  TELEMETRY_SAMPLE_RATE: z.coerce.number().min(0).max(1).default(1),
+  TELEMETRY_SLOW_MS: z.coerce.number().int().min(0).default(2000),
+  // What's running, so an error can be traced to the deploy that brought it: a git sha or tag.
+  WORKLOG_RELEASE: z.string().default("dev"),
+
   RUN_SCHEDULER: z
     .enum(["true", "false"])
     .default("true")

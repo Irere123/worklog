@@ -4,6 +4,10 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 
+import { instrumentPool } from "#telemetry/instrument";
+import { log } from "#telemetry/log";
+import { outsideTrace } from "#telemetry/trace";
+
 import * as authSchema from "./auth-schema";
 import { migrate } from "./migrate";
 import * as appSchema from "./schema";
@@ -26,6 +30,7 @@ export async function openDb(
   poolSize = 10
 ): Promise<{ db: Db; close: () => Promise<void> }> {
   const pool = new Pool({ connectionString: url, max: poolSize });
+  instrumentPool(pool);
   pool.on("error", logError);
   pool.on("connect", (connection) => {
     connection.on("error", logError);
@@ -42,5 +47,9 @@ export async function openDb(
 
 // A connection can drop (a server restart); unhandled, that error crashes the process.
 function logError(error: Error) {
-  console.error("[db] connection error", error);
+  // A connection's socket keeps the trace of the request that opened it; its error isn't that
+  // request's.
+  outsideTrace(() => {
+    log.error("db: connection error", { error });
+  });
 }

@@ -1,6 +1,8 @@
 import { sql } from "drizzle-orm";
 
 import type { AppContext } from "#context";
+import { log } from "#telemetry/log";
+import { traced } from "#telemetry/trace";
 
 /**
  * `durable: false` commits without waiting for the disk: a crash can lose the transaction whole,
@@ -21,21 +23,25 @@ export async function transact<T>(
     return await fn(ctx);
   }
   const bus = ctx.bus.hold();
-  const result = await ctx.db.transaction(async (db) => {
-    if (opts.durable === false) {
-      await db.execute(sql`set local synchronous_commit = off`);
-    }
-    return await fn({ ...ctx, db, bus });
-  });
+  const result = await traced(
+    "db.transaction",
+    {},
+    async () =>
+      await ctx.db.transaction(async (db) => {
+        if (opts.durable === false) {
+          await db.execute(sql`set local synchronous_commit = off`);
+        }
+        return await fn({ ...ctx, db, bus });
+      })
+  );
   // Committed, whatever happens to its events: throwing now would tell the caller the write failed,
   // and a retry would find it done. A client that misses the event catches up on its next read.
   try {
     await bus.release();
   } catch (error) {
-    console.error(
-      "[bus] a committed transaction's events weren't published",
-      error
-    );
+    log.error("bus: a committed transaction's events weren't published", {
+      error,
+    });
   }
   return result;
 }

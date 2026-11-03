@@ -4,15 +4,29 @@ import type { AppContext } from "#context";
 import type { Db } from "#db";
 import { addJob, unlockStaleJobs } from "#db/queries/jobs";
 import type { NewJob } from "#db/queries/jobs";
+import { log } from "#telemetry/log";
 
 export type JobHandler = (
   ctx: AppContext,
   payload: Record<string, unknown>
 ) => Promise<void>;
 
-export const logger = new Logger(() => (level, message) => {
-  if (level === "error" || level === "warning") {
-    console.error(`[jobs] ${message}`);
+// Graphile Worker's messages vary with the job, so they go in a field; the error it hands over
+// is what groups them into issues. A task's own failure is logged by the task wrapper.
+export const logger = new Logger((scope) => (level, message, meta) => {
+  if (meta?.failure === true) {
+    return;
+  }
+  const fields = {
+    error: meta?.error,
+    detail: message,
+    label: scope.label,
+    task: scope.taskIdentifier,
+  };
+  if (level === "error") {
+    log.error("jobs: worker error", fields);
+  } else if (level === "warning") {
+    log.warn("jobs: worker warning", fields);
   }
 });
 

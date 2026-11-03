@@ -23,6 +23,8 @@ import { pruneDeliveries, pruneIngestState } from "#ingest/retention";
 import { noticeSilence } from "#ingest/silence";
 import { reconcileAll, syncConnection, syncStream } from "#ingest/sync";
 import { DAY_MS } from "#lib/time";
+import { log } from "#telemetry/log";
+import { activeSpan, traced } from "#telemetry/trace";
 import { nudgeDrifting, sweepEntropy } from "#work/drift";
 
 import { logger, releaseAbandonedJobs } from "./queue";
@@ -72,23 +74,25 @@ const TASKS: Record<
   "sync:reconcile": async (ctx) => {
     const gone = await reconcileInstallations(ctx);
     if (gone) {
-      console.log(`[scheduler] ${gone} installation(s) were removed`);
+      log.info("scheduler: installations were removed", { count: gone });
     }
     const n = await reconcileAll(ctx);
     if (n) {
-      console.log(`[scheduler] catching up ${n} connection(s)`);
+      log.info("scheduler: catching up connections", { count: n });
     }
   },
   "secrets:reseal": async (ctx) => {
     const n = await resealSecrets(ctx);
     if (n) {
-      console.log(`[scheduler] re-sealed ${n} secret(s) with the current key`);
+      log.info("scheduler: re-sealed secrets with the current key", {
+        count: n,
+      });
     }
   },
   "connections:silence": async (ctx) => {
     const n = await noticeSilence(ctx);
     if (n) {
-      console.log(`[scheduler] ${n} connection(s) went quiet`);
+      log.info("scheduler: connections went quiet", { count: n });
     }
   },
   "identity:enrich": async (ctx, payload) => {
@@ -117,7 +121,7 @@ const TASKS: Record<
   "automations:run": async (ctx) => {
     const queued = await queueDueAutomations(ctx);
     if (queued) {
-      console.log(`[scheduler] queued ${queued} automation(s)`);
+      log.info("scheduler: queued automations", { count: queued });
     }
   },
   "automation:run": async (ctx, payload) => {
@@ -131,19 +135,19 @@ const TASKS: Record<
     const postponed = await sweepEntropy(ctx);
     await nudgeDrifting(ctx);
     if (postponed) {
-      console.log(`[scheduler] postponed ${postponed} card(s)`);
+      log.info("scheduler: postponed cards", { count: postponed });
     }
   },
   "jobs:release": async (ctx) => {
     const n = await releaseAbandonedJobs(ctx);
     if (n) {
-      console.log(`[scheduler] released ${n} job(s) whose worker died`);
+      log.info("scheduler: released jobs whose worker died", { count: n });
     }
   },
   "ingest:sweep": async (ctx) => {
     const n = await drainStranded(ctx);
     if (n) {
-      console.log(`[scheduler] ${n} lane(s) had deliveries left waiting`);
+      log.info("scheduler: lanes had deliveries left waiting", { count: n });
     }
   },
   "events:prune": async (ctx) => {
@@ -153,7 +157,7 @@ const TASKS: Record<
     await pruneIngestState(ctx);
     const pruned = await pruneDeliveries(ctx);
     if (pruned) {
-      console.log(`[scheduler] pruned ${pruned} stored webhook(s)`);
+      log.info("scheduler: pruned stored webhooks", { count: pruned });
     }
   },
 };
@@ -208,13 +212,50 @@ export async function runJobsOnce(ctx: AppContext) {
 
 const PayloadSchema = z.record(z.string(), z.unknown());
 
+// Each run is the root of its own trace: a job can run long after whatever queued it, and a
+// lane's job drains deliveries from many requests. A failure is logged here, once, with the
+// attempt it was, so retries that end in success are still visible.
 function taskList(ctx: AppContext): TaskList {
   return Object.fromEntries(
     Object.entries(TASKS).map(([name, handle]) => [
       name,
-      async (payload: unknown) => {
-        await handle(ctx, PayloadSchema.parse(payload ?? {}));
+      async (payload: unknown, helpers) => {
+        const { job } = helpers;
+        await traced(
+          `job ${name}`,
+          {
+            "job.task": name,
+            "job.id": job.id,
+            "job.attempt": job.attempts,
+            "job.max_attempts": job.max_attempts,
+            "job.wait_ms": Math.max(0, Date.now() - job.run_at.getTime()),
+            "workspace.id": workspaceOf(payload),
+          },
+          async () => {
+            try {
+              await handle(ctx, PayloadSchema.parse(payload ?? {}));
+            } catch (error) {
+              const final = job.attempts >= job.max_attempts;
+              activeSpan()?.set({ "job.final": final });
+              log.error("jobs: task failed", {
+                error,
+                task: name,
+                attempt: job.attempts,
+                maxAttempts: job.max_attempts,
+                final,
+              });
+              throw error;
+            }
+          },
+          { kind: "consumer", parent: null }
+        );
       },
     ])
   );
+}
+
+function workspaceOf(payload: unknown) {
+  const parsed = PayloadSchema.safeParse(payload);
+  const id = parsed.success ? parsed.data.workspaceId : null;
+  return typeof id === "string" ? id : null;
 }
