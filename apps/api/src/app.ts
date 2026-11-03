@@ -7,6 +7,7 @@ import { routePath } from "hono/route";
 
 import type { AppContext } from "./context";
 import { authMiddleware } from "./http/auth";
+import { healthReport } from "./http/health";
 import { hookRoutes } from "./http/hooks";
 import { oauthRoutes } from "./http/oauth";
 import { router } from "./http/router";
@@ -126,9 +127,10 @@ export function createApp(ctx: AppContext) {
     )
   );
 
-  app.get("/health", (c) =>
-    c.json({ ok: true, ai: ctx.models !== null, mailer: ctx.mailer.kind })
-  );
+  app.get("/health", async (c) => {
+    const { status, body } = await healthReport(ctx);
+    return c.json(body, status);
+  });
 
   app
     .route("/", setupRoutes)

@@ -1,8 +1,9 @@
 import { loadConfig } from "./config";
 import { createContext } from "./context";
+import { healthReport } from "./http/health";
 import { syncAppsFromEnv } from "./ingest/apps";
 import { startStreams } from "./ingest/streams";
-import { startWorker } from "./jobs/tasks";
+import { exitWhenRunnerStops, startWorker } from "./jobs/tasks";
 import { log } from "./telemetry/log";
 import { reportCrashes } from "./telemetry/start";
 
@@ -15,14 +16,30 @@ await syncAppsFromEnv(ctx);
 const stop = await startWorker(ctx);
 // Sockets apps need open (Discord's Gateway): one process holds each.
 const stopStreams = startStreams(ctx);
+
+// Only /health, for the container's health check and a deploy's: it has no API to serve.
+const health = Bun.serve({
+  hostname: config.HOST,
+  port: config.WORKER_PORT,
+  fetch: async (req) => {
+    if (new URL(req.url).pathname !== "/health") {
+      return new Response("Not found", { status: 404 });
+    }
+    const { status, body } = await healthReport(ctx);
+    return Response.json(body, { status });
+  },
+});
+
 log.info("Worklog worker running (ingestion, automations, entropy)", {
+  health: `${health.url.href}health`,
+  concurrency: config.WORKER_CONCURRENCY,
   telemetry: config.TINYBIRD_TOKEN ? "Tinybird" : "console only",
   release: config.WORKLOG_RELEASE,
 });
 
 // A second signal (Ctrl-C twice, `docker stop`) must not close everything again.
 let shuttingDown = false;
-async function shutdown() {
+async function shutdown(code = 0) {
   if (shuttingDown) {
     return;
   }
@@ -30,8 +47,9 @@ async function shutdown() {
   try {
     await stopStreams();
     await stop();
+    await health.stop(true);
     await ctx.close();
-    process.exit(0);
+    process.exit(code);
   } catch (error) {
     log.error("shutdown failed", { error });
     process.exit(1);
@@ -42,4 +60,11 @@ process.on("SIGINT", () => {
 });
 process.on("SIGTERM", () => {
   void shutdown();
+});
+
+void exitWhenRunnerStops(stop.done, {
+  stopping: () => shuttingDown,
+  exit: async () => {
+    await shutdown(1);
+  },
 });

@@ -189,9 +189,36 @@ export async function startWorker(
     noHandleSignals: true,
     logger,
   });
-  return async () => {
-    await runner.stop();
-  };
+  // `done` settles when the runner stops, whether asked to or not: a process that outlives its
+  // runner takes no jobs while looking alive.
+  return Object.assign(
+    async () => {
+      await runner.stop();
+    },
+    { done: runner.promise }
+  );
+}
+
+/**
+ * Runs `exit` if the runner stops while the process isn't shutting down (it lost the database for
+ * good, say): a process that outlives its runner takes no jobs while looking alive, and exiting
+ * lets the platform restart it.
+ */
+export async function exitWhenRunnerStops(
+  done: Promise<void>,
+  opts: { stopping: () => boolean; exit: () => Promise<void> }
+) {
+  try {
+    await done;
+    if (!opts.stopping()) {
+      log.error("jobs: the runner stopped on its own");
+    }
+  } catch (error) {
+    log.error("jobs: the runner failed", { error });
+  }
+  if (!opts.stopping()) {
+    await opts.exit();
+  }
 }
 
 // runOnce stops when no job is free to run, and a job queued behind a running one in its lane isn't

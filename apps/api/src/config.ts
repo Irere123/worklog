@@ -5,6 +5,11 @@ const Env = z.object({
     .enum(["development", "test", "production"])
     .default("development"),
   PORT: z.coerce.number().int().default(4000),
+  // "::" listens on IPv6 as well, which Railway's private network uses. Left at 0.0.0.0 by
+  // default: a host with IPv6 turned off can't bind "::".
+  HOST: z.string().default("0.0.0.0"),
+  // The worker's health check, apart from PORT so it can run beside the API on one machine.
+  WORKER_PORT: z.coerce.number().int().default(4001),
   PUBLIC_URL: z.url().default("http://localhost:4000"),
   DATABASE_URL: z
     .string()
@@ -97,19 +102,38 @@ export function loadConfig(
   env: Record<string, string | undefined> = process.env
 ): Config {
   // `KEY=` in an .env file means "not set", not "set to an empty string".
-  const parsed = Env.safeParse(
+  const given = withPlatformDefaults(
     Object.fromEntries(Object.entries(env).filter(([, v]) => v !== ""))
   );
+  const parsed = Env.safeParse(given);
   if (!parsed.success) {
     throw new Error(`Invalid environment: ${z.prettifyError(parsed.error)}`);
   }
-  if (
-    parsed.data.NODE_ENV === "production" &&
-    (!parsed.data.WORKLOG_SECRET_KEY || !parsed.data.AUTH_SECRET)
-  ) {
-    throw new Error(
-      "WORKLOG_SECRET_KEY and AUTH_SECRET are required in production"
-    );
+  if (parsed.data.NODE_ENV === "production") {
+    const missing = [
+      parsed.data.WORKLOG_SECRET_KEY ? null : "WORKLOG_SECRET_KEY",
+      parsed.data.AUTH_SECRET ? null : "AUTH_SECRET",
+      // Sign-in links, OAuth callbacks and links in briefs all start with it: left at
+      // localhost, they'd all point nowhere.
+      given.PUBLIC_URL === undefined ? "PUBLIC_URL" : null,
+    ].filter((name) => name !== null);
+    if (missing.length > 0) {
+      throw new Error(`${missing.join(", ")} required in production`);
+    }
   }
   return parsed.data;
+}
+
+// What Railway sets on every deployment: the service's generated domain (a custom domain is set
+// as PUBLIC_URL instead) and the commit it was built from.
+function withPlatformDefaults(env: Record<string, string | undefined>) {
+  return {
+    ...env,
+    PUBLIC_URL:
+      env.PUBLIC_URL ??
+      (env.RAILWAY_PUBLIC_DOMAIN
+        ? `https://${env.RAILWAY_PUBLIC_DOMAIN}`
+        : undefined),
+    WORKLOG_RELEASE: env.WORKLOG_RELEASE ?? env.RAILWAY_GIT_COMMIT_SHA,
+  };
 }

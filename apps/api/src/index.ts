@@ -1,9 +1,11 @@
+import { setTimeout as sleep } from "node:timers/promises";
+
 import { createApp } from "./app";
 import { loadConfig } from "./config";
 import { createContext } from "./context";
 import { syncAppsFromEnv } from "./ingest/apps";
 import { startStreams } from "./ingest/streams";
-import { startWorker } from "./jobs/tasks";
+import { exitWhenRunnerStops, startWorker } from "./jobs/tasks";
 import { log } from "./telemetry/log";
 import { reportCrashes } from "./telemetry/start";
 
@@ -20,6 +22,7 @@ const stopStreams = config.RUN_SCHEDULER ? startStreams(ctx) : null;
 const stopRelay = await ctx.bus.listen();
 
 const server = Bun.serve({
+  hostname: config.HOST,
   port: config.PORT,
   fetch: app.fetch,
   // SSE streams stay open
@@ -38,9 +41,13 @@ log.info("Worklog API started", {
   release: config.WORKLOG_RELEASE,
 });
 
+// Under what a platform waits after SIGTERM before killing the process (Railway's draining time
+// is set to 30 seconds), so closing the database and flushing telemetry still get their turn.
+const DRAIN_MS = 10_000;
+
 // A second signal (Ctrl-C twice, `docker stop`) must not close everything again.
 let shuttingDown = false;
-async function shutdown() {
+async function shutdown(code = 0) {
   if (shuttingDown) {
     return;
   }
@@ -48,10 +55,14 @@ async function shutdown() {
   try {
     await stopStreams?.();
     await stopWorker?.();
-    await server.stop();
+    // A graceful stop waits for every open request, and an event stream never ends on its own:
+    // after the drain, what's still open is cut, and browsers reconnect to the new deployment
+    // with Last-Event-ID, missing nothing.
+    await Promise.race([server.stop(), sleep(DRAIN_MS)]);
+    await server.stop(true);
     await stopRelay();
     await ctx.close();
-    process.exit(0);
+    process.exit(code);
   } catch (error) {
     log.error("shutdown failed", { error });
     process.exit(1);
@@ -63,3 +74,12 @@ process.on("SIGINT", () => {
 process.on("SIGTERM", () => {
   void shutdown();
 });
+
+if (stopWorker) {
+  void exitWhenRunnerStops(stopWorker.done, {
+    stopping: () => shuttingDown,
+    exit: async () => {
+      await shutdown(1);
+    },
+  });
+}
