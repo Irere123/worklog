@@ -62,6 +62,7 @@ Telemetry is optional too. Set `TINYBIRD_TOKEN` to send traces, logs and errors 
 
 - [Connectors](docs/CONNECTORS.md): supported tools, noise rules, adding your own.
 - [Architecture](docs/ARCHITECTURE.md): how the server and the web app fit together.
+- [Deploying](docs/DEPLOY.md): Railway for production, Docker Compose for self-hosting, and the three images.
 - [Tinybird](tinybird/README.md): where traces, logs and errors go, and the endpoints that read them.
 - [Contributing](CONTRIBUTING.md) and [AGENTS.md](AGENTS.md): setup, conventions, and rules for AI agents.
 - [Research notes](docs/research/) behind the design.
