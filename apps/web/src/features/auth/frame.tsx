@@ -2,15 +2,7 @@ import * as stylex from "@stylexjs/stylex";
 import type { ReactNode } from "react";
 
 import { Logo } from "#features/shell/logo";
-import {
-  color,
-  leading,
-  media,
-  radius,
-  shadow,
-  space,
-  text,
-} from "#ui/tokens.stylex";
+import { color, leading, media, radius, space, text } from "#ui/tokens.stylex";
 
 export function AuthFrame({
   title,
@@ -119,7 +111,9 @@ const styles = stylex.create({
     padding: space.x3,
     borderRadius: radius.lg,
     backgroundColor: color.raised,
-    boxShadow: shadow.float,
+    borderWidth: 1,
+    borderStyle: "solid",
+    borderColor: color.line,
   },
   head: { display: "flex", flexDirection: "column", gap: space.xs },
   title: {
