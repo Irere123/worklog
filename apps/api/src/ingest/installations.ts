@@ -1,6 +1,7 @@
 import { listConnectors } from "#connectors";
 import type { AppContext } from "#context";
 import { listInstalledConnections } from "#db/queries/connections";
+import { log } from "#telemetry/log";
 
 import { loadApp } from "./apps";
 import { setStatus } from "./lifecycle";
@@ -21,10 +22,10 @@ export async function reconcileInstallations(ctx: AppContext) {
     try {
       current = await list(ctx, app);
     } catch (error) {
-      console.error(
-        `[lifecycle] can't list ${connector.id} installations`,
-        error
-      );
+      log.error("lifecycle: can't list installations", {
+        error,
+        connector: connector.id,
+      });
       continue;
     }
     const conns = await listInstalledConnections(ctx.db, {

@@ -9,6 +9,7 @@ import { listMembers, listMembersByHandles } from "#db/queries/members";
 import type { Member } from "#db/queries/members";
 import type { Visibility } from "#db/schema";
 import { transact } from "#db/transact";
+import { log } from "#telemetry/log";
 
 import { recordActivity } from "./activity";
 import { raiseAttention } from "./attention";
@@ -83,7 +84,7 @@ async function enrich(
   try {
     await structureLog(ctx, author, activityId, text, given);
   } catch (error) {
-    console.error("[worklog] structuring failed", error);
+    log.error("worklog: structuring failed", { error, activityId });
   }
 }
 

@@ -7,6 +7,7 @@ import { ProviderError } from "#connectors/http";
 import type { AppContext } from "#context";
 import { completeInstall, finishAppCreation } from "#ingest/install";
 import { ApiError } from "#lib/errors";
+import { log } from "#telemetry/log";
 
 type OAuthEnv = { Variables: { ctx: AppContext } };
 
@@ -36,7 +37,7 @@ async function shown(run: () => Promise<Response>) {
         400
       );
     }
-    console.error("[oauth] install failed", error);
+    log.error("oauth: install failed", { error });
     return page(
       "That didn't work",
       "<p>Something went wrong. Try again from Worklog.</p>",

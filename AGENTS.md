@@ -104,6 +104,7 @@ apps/web/src/
 - **One write path each:** `recordActivity`, `raiseAttention`, `appendMessages`.
 - **Writes, jobs and events:** a job that must follow a write is enqueued inside the same `transact`. Events publish after the commit.
 - **Inject the outside world:** `ctx.now()` and `ctx.fetch`, never `new Date()` or `fetch`.
+- **Log through `log`** (`#telemetry/log`), never `console`: a fixed message, what varies in its fields, and never content (messages, payloads, prompts), since logs leave for Tinybird. Wrap work worth timing on its own in `traced()`.
 - **AI is optional.** `ctx.models` is null without `OPENROUTER_API_KEY`, so every AI feature needs a fallback. Call models through `structured()` or `complete()` from `agent/generate.ts`, and render prompts with `prompt(name, vars)`.
 - **The assistant never writes its own instructions.** No tool may change `constitution.md` or the owner's voice.
 - **Helpers:** throw `notFound`, `forbidden`, `badRequest` or `conflict` from `lib/errors.ts`; use `returned()` for rows a write must return and `generateId(prefix)` for ids.

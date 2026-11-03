@@ -5,6 +5,7 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { bearer, magicLink } from "better-auth/plugins";
 
 import type { Config } from "#config";
+import { log } from "#telemetry/log";
 
 import { generateId } from "./ids";
 import type { Mailer } from "./mailer";
@@ -115,6 +116,6 @@ async function sendSignInLink(mailer: Mailer, email: string, url: string) {
       html: `<p><a href="${url}">Sign in to Worklog</a></p><p>The link expires in 5 minutes. If you didn't ask for it, ignore this email.</p>`,
     });
   } catch (error) {
-    console.error("[auth] magic link email failed", error);
+    log.error("auth: magic link email failed", { error });
   }
 }

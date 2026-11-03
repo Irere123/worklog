@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import type { StreamSpec, Streamed } from "#connectors/types";
 import { shortHash } from "#lib/crypto";
+import { log } from "#telemetry/log";
 
 import { API, botGet } from "./app";
 
@@ -186,7 +187,7 @@ export const discordGateway: StreamSpec = {
           } catch (error) {
             // Reconnect and resume from the last one stored: Discord sends the rest again.
             failed = true;
-            console.error("[discord] couldn't store a dispatch", error);
+            log.error("discord: couldn't store a dispatch", { error });
             ws.close(4000, "couldn't store a dispatch");
           }
           return at;
@@ -203,7 +204,7 @@ export const discordGateway: StreamSpec = {
         try {
           onMessage(e.data);
         } catch (error) {
-          console.error("[discord] gateway message failed", error);
+          log.error("discord: gateway message failed", { error });
         }
       });
       ws.addEventListener("close", (e) => {

@@ -1,6 +1,7 @@
 import type { AppContext } from "#context";
 import type { Member } from "#db/queries/members";
 import { ApiError } from "#lib/errors";
+import { log } from "#telemetry/log";
 
 export type Scope = {
   ctx: AppContext;
@@ -25,7 +26,7 @@ export function safe<I, O>(
       return capped(await fn(input));
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      console.warn(`[agent] tool failed: ${message}`);
+      log.warn("agent: tool failed", { error });
       const hint =
         error instanceof ApiError && error.status === 404
           ? next.notFound

@@ -10,6 +10,7 @@ import type {
 import type { AppContext } from "#context";
 import { tryHoldLock } from "#db/locks";
 import { findConnectionByExternalId } from "#db/queries/connections";
+import { log } from "#telemetry/log";
 
 import { loadApp } from "./apps";
 import { applyChange } from "./lifecycle";
@@ -100,7 +101,7 @@ async function runWatched(
       { signal: run.signal, state: opts.state }
     );
   } catch (error) {
-    console.error(`[stream] ${provider} dropped`, error);
+    log.error("stream: dropped", { error, provider });
   } finally {
     clearInterval(watch);
     opts.signal.removeEventListener("abort", stop);
@@ -121,7 +122,10 @@ async function holdOpen(
   const state: Record<string, unknown> = {};
   while (!signal.aborted) {
     const held = await tryHoldLock(ctx.pool, lock).catch((error: unknown) => {
-      console.error(`[stream] ${connector.id}: can't take the lock`, error);
+      log.error("stream: can't take the lock", {
+        error,
+        connector: connector.id,
+      });
       return null;
     });
     if (!held) {
@@ -142,13 +146,16 @@ async function holdOpen(
           state,
         });
         if (lost) {
-          console.error(
-            `[stream] ${connector.id}: lost its lock; taking it again`
-          );
+          log.warn("stream: lost its lock; taking it again", {
+            connector: connector.id,
+          });
           break;
         }
         if (typeof state.refused === "string") {
-          console.error(`[stream] ${connector.id}: ${state.refused}`);
+          log.error("stream: refused", {
+            connector: connector.id,
+            reason: state.refused,
+          });
           state.refused = undefined;
           await pause(REFUSED_MS, signal);
           continue;

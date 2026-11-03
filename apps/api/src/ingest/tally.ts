@@ -4,6 +4,7 @@ import type { ConnectionTally } from "#db/queries/connections";
 import { updateConnectorAppTally } from "#db/queries/connector-apps";
 import type { AppTally } from "#db/queries/connector-apps";
 import { updateIdentitySightings } from "#db/queries/identities";
+import { log } from "#telemetry/log";
 
 type Sighting = { n: number; first: Date; last: Date };
 
@@ -96,7 +97,7 @@ export class Tally {
     try {
       await this.flush();
     } catch (error) {
-      console.error("[tally] flush failed", error);
+      log.error("tally: flush failed", { error });
     }
   }
 

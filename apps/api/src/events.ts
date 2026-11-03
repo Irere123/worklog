@@ -9,6 +9,7 @@ import {
 } from "#db/queries/events";
 import type { StoredEvent } from "#db/queries/events";
 import type { EventType } from "#db/schema";
+import { log } from "#telemetry/log";
 
 type Listener = (event: StoredEvent) => void;
 
@@ -143,7 +144,7 @@ export class EventBus {
       try {
         listener(event);
       } catch (error) {
-        console.error("[bus] listener failed", error);
+        log.error("bus: listener failed", { error });
       }
     }
   }
@@ -200,7 +201,7 @@ export class EventBus {
     } catch (error) {
       // Once per outage, not four times a second.
       if (!this.hub.failing) {
-        console.error("[bus] relay failed", error);
+        log.error("bus: relay failed", { error });
       }
       this.hub.failing = true;
     } finally {

@@ -7,6 +7,7 @@ import {
   listConnectorApps,
   updateConnectorAppCredentialsIfUnchanged,
 } from "#db/queries/connector-apps";
+import { log } from "#telemetry/log";
 
 import { forgetCachedApps } from "./apps";
 
@@ -55,7 +56,7 @@ function resealedValue(ctx: AppContext, sealed: string, what: string) {
   try {
     return ctx.secrets.seal(ctx.secrets.open(sealed));
   } catch (error) {
-    console.error(`[secrets] can't re-seal ${what}`, error);
+    log.error("secrets: can't re-seal", { error, what });
     return null;
   }
 }

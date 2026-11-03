@@ -47,6 +47,7 @@ import { transact } from "#db/transact";
 import { enqueue } from "#jobs/queue";
 import { generateId } from "#lib/ids";
 import { HOUR_MS } from "#lib/time";
+import { log } from "#telemetry/log";
 import { recordActivity } from "#work/activity";
 
 import {
@@ -272,10 +273,12 @@ async function attemptTogether(
   } catch (error) {
     // Each one's own attempt records its own error; the people are already resolved. Said here
     // too, since what failed together (a deadlock with another lane) may succeed alone.
-    console.error(
-      `[ingest] ${deliveries.length} deliveries in lane ${lane} of ${loaded.view.id} failed together; trying each alone`,
-      error instanceof Error ? error.message : error
-    );
+    log.warn("ingest: deliveries failed together; trying each alone", {
+      error,
+      connectionId: loaded.view.id,
+      lane,
+      deliveries: deliveries.length,
+    });
     let clean = true;
     for (const delivery of deliveries) {
       clean = (await attempt(ctx, loaded, lane, delivery, people)) && clean;
@@ -298,10 +301,13 @@ async function attempt(
   } catch (error) {
     const attempts = delivery.attempts + 1;
     await scheduleNextRetry(ctx, loaded.view.id, lane);
-    console.error(
-      `[ingest] delivery ${inboundEventId} failed (attempt ${attempts}${attempts >= MAX_ATTEMPTS ? ", giving up" : ""})`,
-      error
-    );
+    log.error("ingest: delivery failed", {
+      error,
+      inboundEventId,
+      connectionId: loaded.view.id,
+      attempt: attempts,
+      givingUp: attempts >= MAX_ATTEMPTS,
+    });
     return false;
   }
 }
@@ -948,7 +954,10 @@ export async function replayLane(
       // Marked failed with its error; the rest of the lane is still rebuilt. Not retried: a
       // retry would run live, and its effects already happened.
       failed += 1;
-      console.error(`[ingest] replay of ${id} failed`, error);
+      log.error("ingest: replay of a delivery failed", {
+        error,
+        inboundEventId: id,
+      });
     }
   }
   return { reprocessed: ids.length - failed, failed, rebuiltFrom: removed };

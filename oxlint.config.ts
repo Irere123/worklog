@@ -58,6 +58,16 @@ export default defineConfig({
       rules: { "no-restricted-imports": "off" },
     },
     {
+      // Logs go through `log` (src/telemetry/log.ts), which keeps them with their trace and
+      // groups errors into issues; a console line reaches neither.
+      files: ["apps/api/src/**"],
+      rules: { "no-console": "error" },
+    },
+    {
+      files: ["apps/api/src/telemetry/**"],
+      rules: { "no-console": "off" },
+    },
+    {
       files: ["apps/web/**"],
       rules: {
         // StyleX convention: each file's \`stylex.create\` sits below its components, which

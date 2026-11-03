@@ -1,6 +1,7 @@
 import type { Config } from "#config";
 import type { ConnectorAppRow } from "#db/queries/connector-apps";
 import type { SecretBox } from "#lib/crypto";
+import { log } from "#telemetry/log";
 
 type SignInKeys = readonly [
   "GITHUB_CLIENT_ID" | "SLACK_CLIENT_ID" | "DISCORD_CLIENT_ID",
@@ -36,10 +37,10 @@ export function withAppSignIn(
         filled[keys[1]] = clientSecret;
       }
     } catch (error) {
-      console.error(
-        `[auth] can't read the ${app.provider} app's credentials`,
-        error
-      );
+      log.error("auth: can't read an app's credentials", {
+        error,
+        provider: app.provider,
+      });
     }
   }
   return filled;

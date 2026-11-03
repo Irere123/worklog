@@ -1135,9 +1135,12 @@ describe("turns", () => {
     ]);
     env.ctx.models = { main: model, fast: model };
     const warnings: string[] = [];
-    const warn = spyOn(console, "warn").mockImplementation((line: string) => {
-      warnings.push(line);
-    });
+    // A log line is its message and then its fields.
+    const warn = spyOn(console, "warn").mockImplementation(
+      (...parts: unknown[]) => {
+        warnings.push(parts.map((p) => JSON.stringify(p)).join(" "));
+      }
+    );
     try {
       const { id } = (
         await env.call("POST", "/v1/conversations", {

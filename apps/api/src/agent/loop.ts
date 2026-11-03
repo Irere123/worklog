@@ -36,6 +36,7 @@ import { getWorkspaceById } from "#db/queries/workspaces";
 import { badRequest, conflict, notFound } from "#lib/errors";
 import { generateId } from "#lib/ids";
 import { timezoneOf } from "#lib/time";
+import { log } from "#telemetry/log";
 import { listCards } from "#work/board";
 import { renderSnapshot, workSnapshot } from "#work/snapshot";
 
@@ -170,7 +171,7 @@ function heldTurn(ctx: AppContext, conversationId: string, until: Date) {
         controller.abort();
       }
     } catch (error) {
-      console.warn("[assistant] couldn't check for a stop:", error);
+      log.warn("assistant: couldn't check for a stop", { error });
     }
   };
   const timer = setInterval(() => {
@@ -363,8 +364,9 @@ function noteCacheMiss(
 ) {
   const read = steps[0]?.usage.inputTokenDetails.cacheReadTokens;
   if (warm && read === 0) {
-    console.warn(
-      `[assistant] cache miss: conversation ${conversationId} replayed warm history and read none of it from the cache`
+    log.warn(
+      "assistant: cache miss; replayed warm history and read none of it from the cache",
+      { conversationId }
     );
   }
 }
@@ -651,7 +653,7 @@ export async function askStream(
         );
       },
       onError: ({ error }) => {
-        console.error("[assistant] turn failed:", error);
+        log.error("assistant: turn failed", { error });
       },
     });
     // Finish (and persist) the turn even if the phone drops the connection mid-answer.
@@ -678,11 +680,13 @@ async function releaseWhenSettled(
 ) {
   try {
     await Promise.resolve(settled).catch((error: unknown) => {
-      console.error("[assistant] turn's stream failed:", error);
+      log.error("assistant: turn's stream failed", { error });
     });
   } finally {
     await release().catch((error: unknown) => {
-      console.error("[assistant] couldn't give the conversation back:", error);
+      log.error("assistant: couldn't give the conversation back", {
+        error,
+      });
     });
   }
 }

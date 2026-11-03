@@ -26,6 +26,7 @@ import {
   TokenInfo,
   UpdateMeRequest,
 } from "#http/schemas/members";
+import { log } from "#telemetry/log";
 import * as people from "#work/members";
 
 export const memberRoutes = router()
@@ -232,6 +233,6 @@ async function sendInvite(
       html: `<p>${inviter} added you to <b>${workspace}</b> on Worklog.</p><p><a href="${url}">Sign in</a> with this email address (or a GitHub, Discord or Slack account that uses it) to join.</p>`,
     });
   } catch (error) {
-    console.error("[members] invite email failed", error);
+    log.error("members: invite email failed", { error });
   }
 }

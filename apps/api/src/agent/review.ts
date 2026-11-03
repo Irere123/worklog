@@ -3,6 +3,7 @@ import { z } from "zod";
 import type { AppContext } from "#context";
 import { listRecentSaid } from "#db/queries/conversations";
 import { generateId } from "#lib/ids";
+import { log } from "#telemetry/log";
 import { raiseAttention } from "#work/attention";
 
 import { APPROVAL_KIND, describeAction, runAction } from "./actions";
@@ -97,9 +98,7 @@ async function review(
       timeout: "quick",
     });
   } catch (error) {
-    console.warn(
-      `[agent] review failed: ${error instanceof Error ? error.message : String(error)}`
-    );
+    log.warn("agent: review failed", { error });
     return { allow: false, reason: "The check didn't answer" };
   }
 }

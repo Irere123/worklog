@@ -13,6 +13,7 @@ export class ConsoleMailer implements Mailer {
   // oxlint-disable-next-line require-await -- fulfils the async Mailer contract; printing is synchronous
   async send(email: Email) {
     this.sent.push(email);
+    // oxlint-disable-next-line no-console -- the console is this mailer's outbox in development, and an email's text must not reach telemetry
     console.log(
       `[mail] to=${email.to} subject="${email.subject}"\n${email.text}\n`
     );
