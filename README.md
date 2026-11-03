@@ -56,10 +56,13 @@ To run both from one server, build the web app (`cd apps/web && bun run build`) 
 
 AI is optional. Set `OPENROUTER_API_KEY` for the assistant and model-written briefs. Without it, Worklog uses templates and rules.
 
+Telemetry is optional too. Set `TINYBIRD_TOKEN` to send traces, logs and errors to [Tinybird](tinybird/README.md). Without it, logs only go to the console.
+
 ## Docs
 
 - [Connectors](docs/CONNECTORS.md): supported tools, noise rules, adding your own.
 - [Architecture](docs/ARCHITECTURE.md): how the server and the web app fit together.
+- [Tinybird](tinybird/README.md): where traces, logs and errors go, and the endpoints that read them.
 - [Contributing](CONTRIBUTING.md) and [AGENTS.md](AGENTS.md): setup, conventions, and rules for AI agents.
 - [Research notes](docs/research/) behind the design.
 
