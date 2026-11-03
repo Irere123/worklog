@@ -1,0 +1,12 @@
+# HTTPS for a server that faces the internet: `web` serves WORKLOG_DOMAIN on 443, with a
+# certificate from Let's Encrypt (renewed on its own), and redirects 80 to it. Point the domain's
+# DNS at this server first.
+#   docker compose -f compose.yaml -f compose.https.yaml up -d
+services:
+  web:
+    environment:
+      SITE_ADDRESS: ${WORKLOG_DOMAIN:?set WORKLOG_DOMAIN in .env}
+    ports: !override
+      - 80:80
+      - 443:443
+      - 443:443/udp

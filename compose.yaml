@@ -1,0 +1,155 @@
+# Self-hosting Worklog. docs/DEPLOY.md has the walk-through:
+#   cp .env.compose.example .env                            # then fill it in
+#   docker compose up -d                                    # http://127.0.0.1:8080, for your own proxy
+#   docker compose -f compose.yaml -f compose.https.yaml up -d   # or HTTPS on WORKLOG_DOMAIN
+#
+# Images are pulled when published (WORKLOG_VERSION picks the tag) or built from this checkout
+# with `--build`. The API isn't published: only `web` faces out, and passes the API's paths on.
+name: worklog
+
+x-logging: &logging # Docker's default log file grows without limit.
+  logging:
+    driver: json-file
+    options:
+      max-size: 10m
+      max-file: "5"
+
+x-database: &database
+  DATABASE_URL: postgres://worklog:${POSTGRES_PASSWORD}@postgres:5432/worklog
+
+x-backend: &backend
+  <<: *logging
+  restart: unless-stopped
+  env_file: .env
+  depends_on:
+    migrate:
+      condition: service_completed_successfully
+
+services:
+  postgres:
+    <<: *logging
+    image: postgres:18
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: worklog
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: worklog
+    # Postgres 18 keeps its data in a versioned folder under this one.
+    volumes:
+      - postgres:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U worklog -d worklog"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # Brings the schema up to date once, before the API and the worker start: a migration that
+  # fails stops the rollout here, with the database as it was.
+  migrate:
+    <<: *logging
+    image: ghcr.io/irere123/worklog-api:${WORKLOG_VERSION:-latest}
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+      target: api
+      args:
+        WORKLOG_RELEASE: ${WORKLOG_RELEASE:-}
+    command: ["bun", "scripts/migrate.ts"]
+    restart: "no"
+    env_file: .env
+    environment:
+      <<: *database
+    healthcheck:
+      disable: true
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  api:
+    <<: *backend
+    image: ghcr.io/irere123/worklog-api:${WORKLOG_VERSION:-latest}
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+      target: api
+      args:
+        WORKLOG_RELEASE: ${WORKLOG_RELEASE:-}
+    environment:
+      <<: *database
+      RUN_SCHEDULER: "false"
+    # Covers the API's 10-second drain of open event streams and its shutdown after.
+    stop_grace_period: 30s
+
+  worker:
+    <<: *backend
+    image: ghcr.io/irere123/worklog-worker:${WORKLOG_VERSION:-latest}
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+      target: worker
+      args:
+        WORKLOG_RELEASE: ${WORKLOG_RELEASE:-}
+    environment:
+      <<: *database
+    # Running jobs finish before it stops; a briefing can wait on a model for a while.
+    stop_grace_period: 2m
+
+  web:
+    <<: *logging
+    image: ghcr.io/irere123/worklog-web:${WORKLOG_VERSION:-latest}
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    restart: unless-stopped
+    environment:
+      API_UPSTREAM: api:4000
+    # This machine only, for a proxy on it to reach; compose.https.yaml serves the internet.
+    ports:
+      - ${WORKLOG_BIND:-127.0.0.1}:${WORKLOG_PORT:-8080}:8080
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      api:
+        condition: service_healthy
+
+  # A compressed dump every BACKUP_EVERY_SECONDS (a day), kept BACKUP_KEEP_DAYS, in BACKUP_DIR on
+  # this machine. Copy them elsewhere too: a backup on the same disk doesn't survive the disk.
+  backup:
+    <<: *logging
+    image: postgres:18
+    restart: unless-stopped
+    environment:
+      PGHOST: postgres
+      PGUSER: worklog
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      PGDATABASE: worklog
+      BACKUP_KEEP_DAYS: ${BACKUP_KEEP_DAYS:-14}
+      BACKUP_EVERY_SECONDS: ${BACKUP_EVERY_SECONDS:-86400}
+    volumes:
+      - ${BACKUP_DIR:-./backups}:/backups
+    depends_on:
+      postgres:
+        condition: service_healthy
+    entrypoint: ["sh", "-c"]
+    # Written under a temporary name and renamed when complete, so a dump cut short never looks
+    # like a backup. A failed dump is reported and tried again next round.
+    command:
+      - |
+        while true; do
+          name="/backups/worklog-$$(date -u +%Y%m%dT%H%M%SZ).dump"
+          if pg_dump --format=custom --file="$$name.partial"; then
+            mv "$$name.partial" "$$name"
+            echo "backup: wrote $$name"
+          else
+            rm -f "$$name.partial"
+            echo "backup: pg_dump failed" >&2
+          fi
+          find /backups -name 'worklog-*.dump' -mtime +"$$BACKUP_KEEP_DAYS" -delete
+          sleep "$$BACKUP_EVERY_SECONDS"
+        done
+
+volumes:
+  postgres:
+  caddy_data:
+  caddy_config:

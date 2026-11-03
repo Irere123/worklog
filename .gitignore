@@ -8,3 +8,4 @@ dist/
 .nitro/
 # Tinybird CLI login and local state
 tinybird/.tinyb*
+backups/
