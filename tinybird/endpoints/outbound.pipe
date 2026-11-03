@@ -1,0 +1,27 @@
+DESCRIPTION >
+    Calls to other services (GitHub, Slack, Discord, delivery targets, OpenRouter) by host:
+    volume, failures, rate limits and latency.
+
+TOKEN "worklog_read" READ
+
+NODE outbound
+SQL >
+    %
+    SELECT
+        JSONExtractString(attributes, 'server.address') AS host,
+        sum(weight) AS calls,
+        sumIf(weight, status = 'error') AS failures,
+        sumIf(weight, JSONExtractInt(attributes, 'http.status_code') = 429) AS rate_limited,
+        sumIf(weight, JSONExtractInt(attributes, 'http.status_code') IN (401, 403)) AS refused,
+        round(quantileExactWeighted(0.5)(duration_ms, weight), 1) AS p50_ms,
+        round(quantileExactWeighted(0.95)(duration_ms, weight), 1) AS p95_ms
+    FROM spans
+    WHERE
+        kind = 'client'
+        AND JSONHas(attributes, 'server.address')
+        AND timestamp > now() - interval {{ Int32(hours, 24) }} hour
+        {% if defined(service) %} AND service = {{ String(service) }} {% end %}
+    GROUP BY host
+    ORDER BY calls DESC
+
+TYPE ENDPOINT

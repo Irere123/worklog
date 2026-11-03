@@ -1,0 +1,29 @@
+DESCRIPTION >
+    Background jobs by task: runs, failed attempts, failures that were the last attempt, how long
+    they ran and how long they waited in the queue past their time.
+
+TOKEN "worklog_read" READ
+
+NODE jobs
+SQL >
+    %
+    SELECT
+        JSONExtractString(attributes, 'job.task') AS task,
+        sum(weight) AS runs,
+        sumIf(weight, status = 'error') AS failures,
+        countIf(status = 'error' AND JSONExtractBool(attributes, 'job.final')) AS gave_up,
+        round(failures / runs, 4) AS failure_rate,
+        round(quantileExactWeighted(0.5)(duration_ms, weight), 1) AS p50_ms,
+        round(quantileExactWeighted(0.95)(duration_ms, weight), 1) AS p95_ms,
+        round(max(duration_ms), 1) AS max_ms,
+        round(quantileExactWeighted(0.95)(JSONExtractFloat(attributes, 'job.wait_ms'), weight), 1) AS p95_wait_ms,
+        round(sum(db_queries * weight) / runs, 1) AS avg_queries
+    FROM spans
+    WHERE
+        kind = 'consumer'
+        AND timestamp > now() - interval {{ Int32(hours, 24) }} hour
+        {% if defined(service) %} AND service = {{ String(service) }} {% end %}
+    GROUP BY task
+    ORDER BY runs DESC
+
+TYPE ENDPOINT

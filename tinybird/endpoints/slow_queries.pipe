@@ -1,0 +1,29 @@
+DESCRIPTION >
+    Queries that took 250 ms or more, or failed, grouped by statement, with how busy the pool was
+    (a query's time includes waiting for a connection) and the latest trace.
+
+TOKEN "worklog_read" READ
+
+NODE slow_queries
+SQL >
+    %
+    SELECT
+        JSONExtractString(attributes, 'db.statement') AS statement,
+        sum(weight) AS occurrences,
+        sumIf(weight, status = 'error') AS failures,
+        argMax(error_code, timestamp) AS last_error_code,
+        round(quantileExactWeighted(0.95)(duration_ms, weight), 1) AS p95_ms,
+        round(max(duration_ms), 1) AS max_ms,
+        max(JSONExtractInt(attributes, 'db.pool.waiting')) AS max_pool_waiting,
+        argMax(trace_id, timestamp) AS last_trace_id,
+        max(timestamp) AS last_seen
+    FROM spans
+    WHERE
+        name = 'db.query'
+        AND timestamp > now() - interval {{ Int32(hours, 24) }} hour
+        {% if defined(service) %} AND service = {{ String(service) }} {% end %}
+    GROUP BY statement
+    ORDER BY occurrences * p95_ms DESC
+    LIMIT {{ Int32(limit, 50) }}
+
+TYPE ENDPOINT

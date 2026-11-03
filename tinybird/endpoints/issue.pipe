@@ -1,0 +1,30 @@
+DESCRIPTION >
+    The occurrences of one issue, newest first, with their stacks, fields and traces.
+
+TOKEN "worklog_read" READ
+
+NODE occurrences
+SQL >
+    %
+    SELECT
+        timestamp,
+        service,
+        release,
+        instance,
+        message,
+        error_type,
+        error_message,
+        error_stack,
+        error_code,
+        error_frame,
+        attributes,
+        trace_id
+    FROM logs
+    WHERE
+        level = {{ String(level, 'error') }}
+        AND fingerprint = {{ String(fingerprint, required=True) }}
+        AND timestamp > now() - interval {{ Int32(hours, 168) }} hour
+    ORDER BY timestamp DESC
+    LIMIT {{ Int32(limit, 50) }}
+
+TYPE ENDPOINT

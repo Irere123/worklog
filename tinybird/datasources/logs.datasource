@@ -1,0 +1,31 @@
+DESCRIPTION >
+    Log lines from Worklog's processes, with the trace they were written in. Error lines carry
+    the error's type, message and stack, and a `fingerprint` that groups occurrences into issues.
+
+TOKEN "worklog_append" APPEND
+
+SCHEMA >
+    `timestamp` DateTime64(3) `json:$.timestamp`,
+    `level` LowCardinality(String) `json:$.level`,
+    `message` String `json:$.message`,
+    `trace_id` String `json:$.trace_id`,
+    `span_id` String `json:$.span_id`,
+    `error_type` LowCardinality(String) `json:$.error_type`,
+    `error_message` String `json:$.error_message`,
+    `error_stack` String `json:$.error_stack`,
+    `error_code` LowCardinality(String) `json:$.error_code` DEFAULT '',
+    `error_frame` String `json:$.error_frame` DEFAULT '',
+    `fingerprint` String `json:$.fingerprint`,
+    `attributes` String `json:$.attributes`,
+    `service` LowCardinality(String) `json:$.service`,
+    `release` LowCardinality(String) `json:$.release`,
+    `instance` LowCardinality(String) `json:$.instance`
+
+INDEXES >
+    trace_lookup trace_id TYPE bloom_filter(0.01) GRANULARITY 4,
+    issue_lookup fingerprint TYPE bloom_filter(0.01) GRANULARITY 4
+
+ENGINE "MergeTree"
+ENGINE_PARTITION_KEY "toYYYYMM(timestamp)"
+ENGINE_SORTING_KEY "level, service, timestamp"
+ENGINE_TTL "toDateTime(timestamp) + toIntervalDay(90)"

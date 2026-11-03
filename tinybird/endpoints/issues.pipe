@@ -1,0 +1,46 @@
+DESCRIPTION >
+    Errors grouped into issues: how often each happened in the window, when it was first and last
+    seen, the releases and services it hit, its code and where in our code it happened, and the
+    latest occurrence's trace. `is_new` marks issues first seen inside the window. `level=warn`
+    lists the warnings logged with an error instead.
+
+TOKEN "worklog_read" READ
+
+NODE first_seen
+SQL >
+    %
+    SELECT fingerprint, min(timestamp) AS first_seen
+    FROM logs
+    WHERE level = {{ String(level, 'error') }} AND fingerprint != ''
+    GROUP BY fingerprint
+
+NODE issues
+SQL >
+    %
+    SELECT
+        fingerprint,
+        argMax(message, timestamp) AS logged_as,
+        argMax(error_type, timestamp) AS error_type,
+        argMax(error_message, timestamp) AS error_message,
+        argMax(error_code, timestamp) AS error_code,
+        argMax(error_frame, timestamp) AS error_frame,
+        count() AS occurrences,
+        max(timestamp) AS last_seen,
+        any(f.first_seen) AS first_seen,
+        any(f.first_seen) > now() - interval {{ Int32(hours, 24) }} hour AS is_new,
+        argMax(trace_id, timestamp) AS last_trace_id,
+        groupUniqArray(release) AS releases,
+        groupUniqArray(service) AS services
+    FROM logs
+    LEFT JOIN first_seen AS f USING fingerprint
+    WHERE
+        level = {{ String(level, 'error') }}
+        AND fingerprint != ''
+        AND timestamp > now() - interval {{ Int32(hours, 24) }} hour
+        {% if defined(service) %} AND service = {{ String(service) }} {% end %}
+        {% if defined(release) %} AND release = {{ String(release) }} {% end %}
+    GROUP BY fingerprint
+    ORDER BY last_seen DESC
+    LIMIT {{ Int32(limit, 100) }}
+
+TYPE ENDPOINT

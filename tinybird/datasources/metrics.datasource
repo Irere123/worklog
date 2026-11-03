@@ -1,0 +1,18 @@
+DESCRIPTION >
+    Runtime samples from each process every 30 seconds: event loop lag, memory, CPU and the
+    database pool.
+
+TOKEN "worklog_append" APPEND
+
+SCHEMA >
+    `timestamp` DateTime64(3) `json:$.timestamp`,
+    `name` LowCardinality(String) `json:$.name`,
+    `value` Float64 `json:$.value`,
+    `service` LowCardinality(String) `json:$.service`,
+    `release` LowCardinality(String) `json:$.release`,
+    `instance` LowCardinality(String) `json:$.instance`
+
+ENGINE "MergeTree"
+ENGINE_PARTITION_KEY "toYYYYMM(timestamp)"
+ENGINE_SORTING_KEY "name, instance, timestamp"
+ENGINE_TTL "toDateTime(timestamp) + toIntervalDay(30)"

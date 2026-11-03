@@ -1,0 +1,25 @@
+DESCRIPTION >
+    Each process's runtime over time: event loop lag, memory, CPU and the database pool, one row
+    per instance, metric and bucket.
+
+TOKEN "worklog_read" READ
+
+NODE runtime
+SQL >
+    %
+    SELECT
+        toStartOfInterval(timestamp, interval {{ Int32(minutes, 5) }} minute) AS bucket,
+        instance,
+        service,
+        name,
+        round(avg(value), 2) AS avg,
+        round(max(value), 2) AS max
+    FROM metrics
+    WHERE
+        timestamp > now() - interval {{ Int32(hours, 6) }} hour
+        {% if defined(service) %} AND service = {{ String(service) }} {% end %}
+        {% if defined(name) %} AND name = {{ String(name) }} {% end %}
+    GROUP BY bucket, instance, service, name
+    ORDER BY bucket, instance, name
+
+TYPE ENDPOINT

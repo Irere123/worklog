@@ -1,0 +1,56 @@
+DESCRIPTION >
+    The health of the whole system over time, one row per bucket: requests, server errors and
+    p95 latency, job runs and failures, and error log lines. Every bucket in the window has a row,
+    so a stretch with no traffic reads as zero rather than missing. What to chart and alert on.
+
+TOKEN "worklog_read" READ
+
+NODE span_buckets
+SQL >
+    %
+    SELECT
+        toStartOfInterval(timestamp, interval {{ Int32(minutes, 5) }} minute) AS bucket,
+        sumIf(weight, kind = 'server') AS requests,
+        sumIf(weight, kind = 'server' AND status = 'error') AS server_errors,
+        round(quantileExactWeightedIf(0.95)(duration_ms, weight, kind = 'server'), 1) AS p95_request_ms,
+        sumIf(weight, kind = 'consumer') AS job_runs,
+        sumIf(weight, kind = 'consumer' AND status = 'error') AS job_failures
+    FROM spans
+    WHERE
+        timestamp > now() - interval {{ Int32(hours, 24) }} hour
+        {% if defined(service) %} AND service = {{ String(service) }} {% end %}
+    GROUP BY bucket
+
+NODE log_buckets
+SQL >
+    %
+    SELECT
+        toStartOfInterval(timestamp, interval {{ Int32(minutes, 5) }} minute) AS bucket,
+        count() AS error_logs
+    FROM logs
+    WHERE
+        level = 'error'
+        AND timestamp > now() - interval {{ Int32(hours, 24) }} hour
+        {% if defined(service) %} AND service = {{ String(service) }} {% end %}
+    GROUP BY bucket
+
+NODE overview
+SQL >
+    %
+    SELECT
+        bucket,
+        requests,
+        server_errors,
+        p95_request_ms,
+        job_runs,
+        job_failures,
+        error_logs
+    FROM span_buckets
+    FULL OUTER JOIN log_buckets USING bucket
+    ORDER BY bucket
+        WITH FILL
+        FROM toStartOfInterval(now() - interval {{ Int32(hours, 24) }} hour, interval {{ Int32(minutes, 5) }} minute)
+        TO now()
+        STEP toIntervalMinute({{ Int32(minutes, 5) }})
+
+TYPE ENDPOINT

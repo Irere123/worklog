@@ -1,0 +1,29 @@
+DESCRIPTION >
+    Model calls by model: calls, failures, tokens (and how many were read from the prompt cache),
+    latency and time to the first output.
+
+TOKEN "worklog_read" READ
+
+NODE models
+SQL >
+    %
+    SELECT
+        JSONExtractString(attributes, 'ai.model') AS model,
+        sum(weight) AS calls,
+        sumIf(weight, status = 'error') AS failures,
+        sum(JSONExtractInt(attributes, 'ai.tokens.input') * weight) AS input_tokens,
+        sum(JSONExtractInt(attributes, 'ai.tokens.cache_read') * weight) AS cache_read_tokens,
+        round(cache_read_tokens / greatest(input_tokens, 1), 3) AS cache_hit_rate,
+        sum(JSONExtractInt(attributes, 'ai.tokens.output') * weight) AS output_tokens,
+        round(quantileExactWeighted(0.5)(duration_ms, weight), 1) AS p50_ms,
+        round(quantileExactWeighted(0.95)(duration_ms, weight), 1) AS p95_ms,
+        round(quantileExactWeighted(0.95)(JSONExtractFloat(attributes, 'ai.first_output_ms'), weight), 1) AS p95_first_output_ms
+    FROM spans
+    WHERE
+        name = 'ai.model_call'
+        AND timestamp > now() - interval {{ Int32(hours, 24) }} hour
+        {% if defined(service) %} AND service = {{ String(service) }} {% end %}
+    GROUP BY model
+    ORDER BY calls DESC
+
+TYPE ENDPOINT

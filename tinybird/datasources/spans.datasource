@@ -1,0 +1,35 @@
+DESCRIPTION >
+    One row per span from Worklog's API and worker processes: requests, job runs, transactions,
+    outbound calls, model calls and slow queries. `attributes` is a JSON object as text. `weight`
+    is how many traces a kept span stands for under sampling: count with `sum(weight)`.
+
+TOKEN "worklog_append" APPEND
+
+SCHEMA >
+    `timestamp` DateTime64(3) `json:$.timestamp`,
+    `trace_id` String `json:$.trace_id`,
+    `span_id` String `json:$.span_id`,
+    `parent_id` String `json:$.parent_id`,
+    `name` LowCardinality(String) `json:$.name`,
+    `kind` LowCardinality(String) `json:$.kind`,
+    `duration_ms` Float64 `json:$.duration_ms`,
+    `status` LowCardinality(String) `json:$.status`,
+    `workspace_id` String `json:$.workspace_id`,
+    `db_queries` UInt32 `json:$.db_queries`,
+    `db_ms` Float64 `json:$.db_ms`,
+    `error_type` LowCardinality(String) `json:$.error_type`,
+    `error_message` String `json:$.error_message`,
+    `error_code` LowCardinality(String) `json:$.error_code` DEFAULT '',
+    `weight` UInt32 `json:$.weight` DEFAULT 1,
+    `attributes` String `json:$.attributes`,
+    `service` LowCardinality(String) `json:$.service`,
+    `release` LowCardinality(String) `json:$.release`,
+    `instance` LowCardinality(String) `json:$.instance`
+
+INDEXES >
+    trace_lookup trace_id TYPE bloom_filter(0.01) GRANULARITY 4
+
+ENGINE "MergeTree"
+ENGINE_PARTITION_KEY "toYYYYMM(timestamp)"
+ENGINE_SORTING_KEY "service, kind, name, timestamp"
+ENGINE_TTL "toDateTime(timestamp) + toIntervalDay(30)"

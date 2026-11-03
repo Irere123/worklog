@@ -1,0 +1,32 @@
+DESCRIPTION >
+    API routes by traffic: requests, server errors, latency percentiles and the queries each
+    request ran, which is where an N+1 shows. Counts are estimates under sampling, weighted by
+    how many requests each kept span stands for.
+
+TOKEN "worklog_read" READ
+
+NODE routes
+SQL >
+    %
+    SELECT
+        name AS route,
+        sum(weight) AS requests,
+        sumIf(weight, status = 'error') AS errors,
+        round(errors / requests, 4) AS error_rate,
+        sumIf(weight, JSONExtractInt(attributes, 'http.status_code') BETWEEN 400 AND 499) AS client_errors,
+        round(quantileExactWeighted(0.5)(duration_ms, weight), 1) AS p50_ms,
+        round(quantileExactWeighted(0.95)(duration_ms, weight), 1) AS p95_ms,
+        round(quantileExactWeighted(0.99)(duration_ms, weight), 1) AS p99_ms,
+        round(sum(db_queries * weight) / requests, 1) AS avg_queries,
+        max(db_queries) AS max_queries,
+        round(quantileExactWeighted(0.95)(db_ms, weight), 1) AS p95_db_ms
+    FROM spans
+    WHERE
+        kind = 'server'
+        AND timestamp > now() - interval {{ Int32(hours, 24) }} hour
+        {% if defined(service) %} AND service = {{ String(service) }} {% end %}
+    GROUP BY route
+    ORDER BY requests DESC
+    LIMIT {{ Int32(limit, 200) }}
+
+TYPE ENDPOINT

@@ -1,0 +1,57 @@
+DESCRIPTION >
+    Everything recorded for one trace, in time order: its spans and the log lines written inside
+    them. Every API response names its trace in the `x-worklog-trace` header. `days` (7 by
+    default) bounds how far back it looks.
+
+TOKEN "worklog_read" READ
+
+NODE timeline
+SQL >
+    %
+    SELECT *
+    FROM (
+        SELECT
+            'span' AS type,
+            timestamp,
+            span_id,
+            parent_id,
+            name,
+            kind,
+            duration_ms,
+            status,
+            db_queries,
+            db_ms,
+            error_type,
+            error_message,
+            error_code,
+            attributes,
+            service
+        FROM spans
+        WHERE
+            trace_id = {{ String(trace_id, required=True) }}
+            AND timestamp > now() - interval {{ Int32(days, 7) }} day
+        UNION ALL
+        SELECT
+            'log' AS type,
+            timestamp,
+            span_id,
+            '' AS parent_id,
+            message AS name,
+            '' AS kind,
+            0 AS duration_ms,
+            level AS status,
+            0 AS db_queries,
+            0 AS db_ms,
+            error_type,
+            error_message,
+            error_code,
+            attributes,
+            service
+        FROM logs
+        WHERE
+            trace_id = {{ String(trace_id, required=True) }}
+            AND timestamp > now() - interval {{ Int32(days, 7) }} day
+    )
+    ORDER BY timestamp
+
+TYPE ENDPOINT
