@@ -633,9 +633,10 @@ describe("automations", () => {
     } finally {
       bus.publish = publish;
     }
+    // Byte order, as toSorted compares: ids mix cases, which a locale's collation orders otherwise.
     const runs = await env.ctx.db.execute<{ id: string; n: number }>(sql`
       select automation_id as id, count(*)::int as n from automation_runs
-      where automation_id in (${digest.id}, ${morning.id}) group by 1 order by 1`);
+      where automation_id in (${digest.id}, ${morning.id}) group by 1 order by automation_id collate "C"`);
     expect(runs.rows).toEqual(
       [
         { id: digest.id, n: 1 },
