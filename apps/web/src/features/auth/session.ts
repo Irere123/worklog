@@ -36,7 +36,9 @@ export async function requestMagicLink(email: string, next: string) {
     }),
   });
   if (!res.ok) {
-    throw new Error("Couldn’t send the link. Check the address and try again.");
+    throw new Error(
+      "We couldn’t send the link. Check the address, then try again."
+    );
   }
 }
 
