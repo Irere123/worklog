@@ -14,7 +14,7 @@ import { AgentRun, ownerWord } from "#features/people/agent-run";
 import { ago, greeting, startOfYesterday } from "#lib/time";
 import { Avatar } from "#ui/avatar";
 import { Badge, Dot } from "#ui/chip";
-import { Skeleton } from "#ui/feedback";
+import { ErrorNote, Skeleton } from "#ui/feedback";
 import { Section, layout } from "#ui/layout";
 import {
   color,
@@ -50,7 +50,7 @@ export function Home() {
           <>
             <SetupChecklist meId={me.member.id} />
             <NeedsYou />
-            <MyCards />
+            <YourCards />
             <TeamNow selfId={me.member.id} />
           </>
         ) : (
@@ -262,27 +262,42 @@ function NeedsYou() {
   );
 }
 
-function MyCards() {
-  const [active, triage] = useQueries({
+/**
+ * The one place that gathers a person's cards from every board: what they're moving, then what's
+ * waiting for them to triage. Both lists arrive before either shows, so triage doesn't pop in under it.
+ */
+function YourCards() {
+  const lists = useQueries({
     queries: [
       q.cards({ assignee: "me", stage: "active" }),
       q.cards({ assignee: "me", stage: "triage" }),
     ],
+    combine: (results) => ({
+      cards: results.flatMap((r) => r.data ?? []),
+      pending: results.some((r) => r.isPending),
+      error: results.find((r) => r.isError)?.error ?? null,
+      retry: () => {
+        for (const r of results) {
+          void r.refetch();
+        }
+      },
+    }),
   });
   const boards = useQuery(q.boards());
   const boardName = (id: string) =>
     boards.data?.find((b) => b.id === id)?.name ?? "";
-  const cards = [...(active.data ?? []), ...(triage.data ?? [])];
+  const { cards } = lists;
   return (
     <Section title="Your cards">
-      {active.isPending && <Skeleton lines={3} height={36} />}
-      {active.isSuccess && cards.length === 0 && (
+      {lists.pending && <Skeleton lines={3} height={36} />}
+      {lists.error && <ErrorNote error={lists.error} retry={lists.retry} />}
+      {!lists.pending && !lists.error && cards.length === 0 && (
         <p {...stylex.props(layout.meta)}>
           Nothing assigned to you. Press C to add a card, or M on any card to
           take it.
         </p>
       )}
-      {cards.length > 0 && (
+      {!lists.pending && cards.length > 0 && (
         <ul {...stylex.props(styles.list)}>
           {cards.map((card) => (
             <li key={card.id}>
