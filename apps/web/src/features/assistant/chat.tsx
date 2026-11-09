@@ -28,6 +28,7 @@ import { toast } from "sonner";
 
 import type { Schemas } from "#api/client";
 import { api, authHeaders, unwrap } from "#api/client";
+import { q } from "#api/queries";
 import { useMembers } from "#features/cards/card-bits";
 import type { Member } from "#features/cards/card-bits";
 import { NewCardDialog } from "#features/cards/new-card";
@@ -51,6 +52,7 @@ import {
 } from "#ui/tokens.stylex";
 
 import { Composer, ComposerHint, TeamVisibleOnly } from "./composer";
+import { hasUnseenReply } from "./presence";
 import { WorkLog, liveSteps, storedSteps } from "./steps";
 import type { Step } from "./steps";
 import { useSuggestions } from "./suggestions";
@@ -131,6 +133,7 @@ export function Chat({
 
   useAdoptStored(chat, stored, busy);
   useFirstMessage(firstMessage, stored.length > 0, send);
+  useMarkSeen(conversation);
 
   const stop = async () => {
     await chat.stop();
@@ -262,6 +265,42 @@ function replyProgress(messages: ChatMessage[]) {
  * After a reply settles, the stored transcript replaces the streamed copy, so message ids match
  * the server's and replies can be rated.
  */
+/**
+ * An answer counts as seen once it's on screen in a tab someone is looking at, so the assistant
+ * stops showing it as news. A tab in the background waits until it's looked at again.
+ */
+function useMarkSeen(conversation: Conversation) {
+  const client = useQueryClient();
+  const { id } = conversation;
+  const unseen = hasUnseenReply(conversation);
+  const mark = useEffectEvent((conversationId: string) => {
+    if (document.visibilityState !== "visible") {
+      return;
+    }
+    const now = new Date().toISOString();
+    const stamp = <T extends { id: string; seenAt: string | null }>(c: T) =>
+      c.id === conversationId ? { ...c, seenAt: now } : c;
+    client.setQueryData(q.conversations().queryKey, (list) => list?.map(stamp));
+    client.setQueryData(
+      q.conversation(conversationId).queryKey,
+      (c) => c && stamp(c)
+    );
+    void api.POST("/v1/conversations/{id}/seen", {
+      params: { path: { id: conversationId } },
+    });
+  });
+  useEffect(() => {
+    const onVisible = () => {
+      if (unseen) {
+        mark(id);
+      }
+    };
+    onVisible();
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [id, unseen]);
+}
+
 function useAdoptStored(
   chat: { messages: ChatMessage[]; setMessages: (m: ChatMessage[]) => void },
   stored: Stored[],

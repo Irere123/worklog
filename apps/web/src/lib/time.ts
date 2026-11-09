@@ -17,6 +17,7 @@ const shortDate = new Intl.DateTimeFormat("en-GB", {
   month: "short",
 });
 const clock = new Intl.DateTimeFormat("en-GB", { timeStyle: "short" });
+const weekday = new Intl.DateTimeFormat("en-GB", { weekday: "long" });
 
 /** "now", "5m", "3h", "2d", then a date: compact enough for a meta line. */
 export function ago(iso: string, now = Date.now()) {
@@ -72,6 +73,17 @@ export function dayLabel(iso: string, now = new Date()) {
     return "Yesterday";
   }
   return dayFormat.format(date);
+}
+
+/** When something scheduled within the week happens: "at 08:30", "tomorrow at 08:30", "on Friday at 16:00". */
+export function upcoming(iso: string, now = new Date()) {
+  const date = new Date(iso);
+  const at = `at ${clock.format(date)}`;
+  const days = Math.round((startOfDay(date) - startOfDay(now)) / DAY);
+  if (days <= 0) {
+    return at;
+  }
+  return days === 1 ? `tomorrow ${at}` : `on ${weekday.format(date)} ${at}`;
 }
 
 function startOfDay(d: Date) {

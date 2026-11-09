@@ -825,6 +825,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/conversations/{id}/seen": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Say you've read what the assistant wrote in a conversation
+         * @description Call it when the conversation is open and a reply lands in it. Until then the reply counts as done but unseen in the assistant's presence.
+         */
+        post: operations["conversation.seen"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/assistant/presence": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * What your assistant is doing now
+         * @description Whether it's answering or running a routine (and its current step), how many changes wait for your OK, which answers you haven't seen yet, and the routine that runs next. An `assistant.updated` event on the event stream says when to read it again.
+         */
+        get: operations["assistant.presence"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/assistant/usage": {
         parameters: {
             query?: never;
@@ -1877,6 +1917,18 @@ export interface components {
             title: string | null;
             /**
              * Format: date-time
+             * @description When the assistant last wrote here
+             * @example 2026-10-26T08:30:00.000Z
+             */
+            repliedAt: string | null;
+            /**
+             * Format: date-time
+             * @description When the asker last had it open; a reply after this hasn't been seen
+             * @example 2026-10-26T08:30:00.000Z
+             */
+            seenAt: string | null;
+            /**
+             * Format: date-time
              * @example 2026-10-26T08:30:00.000Z
              */
             createdAt: string;
@@ -1942,6 +1994,72 @@ export interface components {
         WarmResult: {
             /** @description False when it was warmed moments ago, a turn is running, or AI isn't configured */
             warmed: boolean;
+        };
+        AssistantPresence: {
+            /**
+             * @description working: answering or running a routine; waiting: needs your OK; done: answered something you haven't looked at; idle: nothing of these
+             * @enum {string}
+             */
+            state: "working" | "waiting" | "done" | "idle";
+            working: ({
+                /** @enum {string} */
+                kind: "reply";
+                conversationId: string;
+                title: string | null;
+                inbox: boolean;
+                /** @description What it's doing now; null before its first lookup */
+                step: {
+                    tool: string;
+                    /** @description The step's short inputs; long text is cut */
+                    input: {
+                        [key: string]: unknown;
+                    };
+                    /**
+                     * Format: date-time
+                     * @example 2026-10-26T08:30:00.000Z
+                     */
+                    at: string;
+                } | null;
+            } | {
+                /**
+                 * @description Answering a teammate; what they asked stays between them and the assistant
+                 * @enum {string}
+                 */
+                kind: "teammate";
+            } | {
+                /** @enum {string} */
+                kind: "routine";
+                automationId: string;
+                /** @enum {string} */
+                routine: "brief.daily" | "brief.weekly" | "digest" | "check" | "consolidate" | "custom";
+                name: string;
+                /**
+                 * Format: date-time
+                 * @example 2026-10-26T08:30:00.000Z
+                 */
+                since: string;
+            })[];
+            /** @description Changes it holds for your OK */
+            waiting: number;
+            done: {
+                conversationId: string;
+                title: string | null;
+                /**
+                 * Format: date-time
+                 * @example 2026-10-26T08:30:00.000Z
+                 */
+                at: string;
+            }[];
+            /** @description The routine that runs next */
+            next: {
+                automationId: string;
+                name: string;
+                /**
+                 * Format: date-time
+                 * @example 2026-10-26T08:30:00.000Z
+                 */
+                at: string;
+            } | null;
         };
         AssistantUsage: {
             days: number;
@@ -2104,6 +2222,8 @@ export interface components {
                 at: string;
             } | null;
             failureCount: number;
+            /** @description Keeps the assistant itself in shape (the check, the memory tidy) rather than delivering something to you */
+            upkeep: boolean;
         };
         Schedule: {
             /** @enum {string} */
@@ -2313,7 +2433,7 @@ export interface components {
         Event: {
             seq: number;
             /** @enum {string} */
-            type: "activity.created" | "activity.updated" | "card.updated" | "attention.updated" | "brief.created" | "message.created" | "automation.ran" | "notification.sent";
+            type: "activity.created" | "activity.updated" | "card.updated" | "attention.updated" | "brief.created" | "message.created" | "automation.ran" | "notification.sent" | "assistant.updated";
             data: {
                 [key: string]: unknown;
             };
@@ -5795,6 +5915,102 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["WarmResult"];
+                };
+            };
+            /** @description Invalid request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid credentials */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    "conversation.seen": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Ok"];
+                };
+            };
+            /** @description Invalid request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid credentials */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    "assistant.presence": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssistantPresence"];
                 };
             };
             /** @description Invalid request */

@@ -28,6 +28,7 @@ import type { ReactNode } from "react";
 
 import type { LiveStatus } from "#api/live";
 import { q } from "#api/queries";
+import { AssistantFace, usePresence } from "#features/assistant/presence";
 import { signOut } from "#features/auth/session";
 import { useTabBadge } from "#lib/tab-badge";
 import { setTheme, useTheme } from "#lib/theme";
@@ -124,9 +125,7 @@ export function Sidebar({
         <NavItem to="/activity" icon={PulseIcon}>
           Activity
         </NavItem>
-        <NavItem to="/assistant" icon={ChatsCircleIcon}>
-          Assistant
-        </NavItem>
+        <AssistantItem />
         <NavItem to="/briefs" icon={NewspaperIcon}>
           Briefs
         </NavItem>
@@ -208,6 +207,43 @@ export function Sidebar({
         </Tooltip>
       </div>
     </nav>
+  );
+}
+
+/**
+ * The assistant is a colleague, not a page: its face sits here and shows what it's doing, and
+ * resting on it says in words. A count is what waits for your OK; a dot, an answer you haven't
+ * read.
+ */
+function AssistantItem() {
+  const { agent, presence, state, glance } = usePresence();
+  const line = glance?.line;
+  const waiting = presence?.waiting ?? 0;
+  const unseen = presence?.done.length ?? 0;
+  let trailing: ReactNode = null;
+  if (waiting > 0) {
+    trailing = <Count tone="accent">{waiting}</Count>;
+  } else if (unseen > 0) {
+    trailing = <Dot tone="accent" />;
+  }
+  return (
+    <Tooltip label={line ?? "Your assistant"} side="right">
+      <Link
+        to="/assistant"
+        aria-description={line ?? undefined}
+        {...stylex.props(styles.item)}
+      >
+        <span {...stylex.props(styles.itemIcon)}>
+          {agent ? (
+            <AssistantFace agent={agent} state={state} size={16} />
+          ) : (
+            <ChatsCircleIcon size={16} />
+          )}
+        </span>
+        <span {...stylex.props(styles.itemLabel)}>Assistant</span>
+        {trailing}
+      </Link>
+    </Tooltip>
   );
 }
 

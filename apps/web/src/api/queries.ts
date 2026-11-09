@@ -214,6 +214,13 @@ export const q = {
           api.GET("/v1/conversations/{id}", { params: { path: { id } } })
         ),
     }),
+  presence: () =>
+    queryOptions({
+      queryKey: ["presence"],
+      queryFn: async () => await unwrap(api.GET("/v1/assistant/presence")),
+      // The event stream says when it changes; reading it again on every page is waste.
+      staleTime: 60_000,
+    }),
   usage: (days = 7) =>
     queryOptions({
       queryKey: ["usage", days],
