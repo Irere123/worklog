@@ -16,6 +16,7 @@ import {
 import type { DbOrTx } from "#db";
 import { violates } from "#db/errors";
 import { conversations, messages, replyRatings } from "#db/schema";
+import type { TurnStep } from "#db/schema";
 import { returned } from "#lib/assert";
 import { conflict, notFound } from "#lib/errors";
 
@@ -79,7 +80,7 @@ export async function updateConversationById(
     set: Partial<
       Pick<
         ConversationRow,
-        "updatedAt" | "memoryPage" | "memorySeenAt" | "title"
+        "updatedAt" | "memoryPage" | "memorySeenAt" | "title" | "repliedAt"
       >
     >;
   }
@@ -213,13 +214,97 @@ export async function releaseConversationTurn(
 ) {
   await db
     .update(conversations)
-    .set({ turnUntil: null, turnStopUntil: null })
+    .set({ turnUntil: null, turnStopUntil: null, turnStep: null })
     .where(
       and(
         eq(conversations.id, params.id),
         eq(conversations.turnUntil, params.until)
       )
     );
+}
+
+// Only while the turn that took this lease still holds it: a step reported late can't outlive it.
+export async function setConversationTurnStep(
+  db: DbOrTx,
+  params: { id: string; until: Date; step: TurnStep }
+) {
+  await db
+    .update(conversations)
+    .set({ turnStep: params.step })
+    .where(
+      and(
+        eq(conversations.id, params.id),
+        eq(conversations.turnUntil, params.until)
+      )
+    );
+}
+
+// Never moves back, so a tab that reports late can't make an older reply news again.
+export async function setConversationSeen(
+  db: DbOrTx,
+  params: { id: string; askerId: string; now: Date }
+) {
+  const rows = await db
+    .update(conversations)
+    .set({
+      seenAt: sql`greatest(${conversations.seenAt}, ${params.now.toISOString()}::timestamptz)`,
+    })
+    .where(
+      and(
+        eq(conversations.id, params.id),
+        eq(conversations.askerId, params.askerId)
+      )
+    )
+    .returning({ id: conversations.id });
+  return rows.length > 0;
+}
+
+// Turns an agent is taking now, in anyone's conversation with it.
+export async function listRunningTurns(
+  db: DbOrTx,
+  params: { agentId: string; now: Date }
+) {
+  return await db
+    .select({
+      id: conversations.id,
+      askerId: conversations.askerId,
+      mode: conversations.mode,
+      inbox: conversations.inbox,
+      title: conversations.title,
+      step: conversations.turnStep,
+    })
+    .from(conversations)
+    .where(
+      and(
+        eq(conversations.agentId, params.agentId),
+        gt(conversations.turnUntil, params.now)
+      )
+    )
+    .orderBy(asc(conversations.updatedAt));
+}
+
+// Replies the asker hasn't opened the conversation to see since they were written.
+export async function listUnseenReplies(
+  db: DbOrTx,
+  params: { askerId: string; agentId: string }
+) {
+  return await db
+    .select({
+      id: conversations.id,
+      inbox: conversations.inbox,
+      title: conversations.title,
+      repliedAt: conversations.repliedAt,
+    })
+    .from(conversations)
+    .where(
+      and(
+        eq(conversations.askerId, params.askerId),
+        eq(conversations.agentId, params.agentId),
+        sql`${conversations.repliedAt} > coalesce(${conversations.seenAt}, '-infinity'::timestamptz)`
+      )
+    )
+    .orderBy(desc(conversations.repliedAt))
+    .limit(20);
 }
 
 // Only moves forward from the watermark the caller read, so two passes can't both learn the same messages.

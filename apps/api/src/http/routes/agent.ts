@@ -4,6 +4,7 @@ import {
   conversationDetail,
   createConversation,
   deleteConversation,
+  markConversationSeen,
   rateReply,
   renameConversation,
 } from "#agent/conversations";
@@ -14,6 +15,7 @@ import {
   stopTurn,
   warmConversation,
 } from "#agent/loop";
+import { assistantPresence } from "#agent/presence";
 import { replayRating } from "#agent/replay";
 import { setVoice } from "#agent/voice";
 import {
@@ -25,6 +27,7 @@ import { findVoice, listVoices } from "#db/queries/voices";
 import { body, errors, Id, json, Ok, respond, router } from "#http/router";
 import {
   AgentReply,
+  AssistantPresence,
   AssistantUsage,
   ChatRequest,
   chatClientId,
@@ -245,6 +248,46 @@ export const agentRoutes = router()
           c.get("member"),
           c.req.valid("param").id
         ),
+        200
+      )
+  )
+  .openapi(
+    createRoute({
+      method: "post",
+      path: "/v1/conversations/{id}/seen",
+      operationId: "conversation.seen",
+      tags: ["Assistant"],
+      summary: "Say you've read what the assistant wrote in a conversation",
+      description:
+        "Call it when the conversation is open and a reply lands in it. Until then the reply counts as done but unseen in the assistant's presence.",
+      request: { params: Id },
+      responses: { 200: json(Ok), ...errors },
+    }),
+    async (c) => {
+      await markConversationSeen(
+        c.get("ctx"),
+        c.get("member"),
+        c.req.valid("param").id
+      );
+      return respond(c, Ok, { ok: true }, 200);
+    }
+  )
+  .openapi(
+    createRoute({
+      method: "get",
+      path: "/v1/assistant/presence",
+      operationId: "assistant.presence",
+      tags: ["Assistant"],
+      summary: "What your assistant is doing now",
+      description:
+        "Whether it's answering or running a routine (and its current step), how many changes wait for your OK, which answers you haven't seen yet, and the routine that runs next. An `assistant.updated` event on the event stream says when to read it again.",
+      responses: { 200: json(AssistantPresence), ...errors },
+    }),
+    async (c) =>
+      respond(
+        c,
+        AssistantPresence,
+        await assistantPresence(c.get("ctx"), c.get("member")),
         200
       )
   )

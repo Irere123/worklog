@@ -9,7 +9,7 @@ import {
   streamText,
   toUIMessageStream,
 } from "ai";
-import type { LanguageModelUsage, ModelMessage } from "ai";
+import type { LanguageModelUsage, ModelMessage, ToolSet } from "ai";
 
 import type { AppContext } from "#context";
 import { listOpenAttention, listPendingFollowUps } from "#db/queries/attention";
@@ -33,6 +33,7 @@ import {
 import type { Member } from "#db/queries/members";
 import { findVoice } from "#db/queries/voices";
 import { getWorkspaceById } from "#db/queries/workspaces";
+import type { TurnStep } from "#db/schema";
 import { badRequest, conflict, notFound } from "#lib/errors";
 import { generateId } from "#lib/ids";
 import { timezoneOf } from "#lib/time";
@@ -57,6 +58,7 @@ import {
 import type { Channel } from "./instructions";
 import { memoryChanges, memoryPage } from "./memory";
 import { CACHED, TIMEOUTS } from "./models";
+import { reportingSteps, turnPresence } from "./presence";
 import { assistantTools } from "./tools";
 
 const MAX_STEPS = 10;
@@ -125,7 +127,8 @@ async function openConversation(
  * assistant is still answering waits in line, then reads what came before it, rather than being
  * answered beside it by a model that never saw it. Returns what gives the conversation back.
  */
-async function takeTurn(ctx: AppContext, conversationId: string) {
+async function takeTurn(ctx: AppContext, conversation: ConversationRow) {
+  const conversationId = conversation.id;
   const token = `${ctx.now().getTime()}:${generateId()}`;
   await enqueueConversationTurn(ctx.db, { id: conversationId, token });
   try {
@@ -140,7 +143,7 @@ async function takeTurn(ctx: AppContext, conversationId: string) {
           until,
         })
       ) {
-        return heldTurn(ctx, conversationId, until);
+        return await heldTurn(ctx, conversation, until);
       }
       if (waited >= TURN_WAIT_MS) {
         throw conflict("The assistant is still answering in this conversation");
@@ -159,10 +162,17 @@ async function takeTurn(ctx: AppContext, conversationId: string) {
 
 /**
  * The turn this request holds: `signal` aborts it when someone asks it to stop (the owner, or a
- * message sent with `interrupt`), whichever process that request reached, and `release` gives the
- * conversation back and stops watching.
+ * message sent with `interrupt`), whichever process that request reached; `step` records what it's
+ * doing for the owner's view of their assistant; and `release` gives the conversation back and
+ * stops watching.
  */
-function heldTurn(ctx: AppContext, conversationId: string, until: Date) {
+async function heldTurn(
+  ctx: AppContext,
+  conversation: ConversationRow,
+  until: Date
+) {
+  const conversationId = conversation.id;
+  const presence = await turnPresence(ctx, conversation, until);
   const controller = new AbortController();
   const check = async () => {
     try {
@@ -179,9 +189,11 @@ function heldTurn(ctx: AppContext, conversationId: string, until: Date) {
   }, STOP_POLL_MS);
   return {
     signal: controller.signal,
+    step: presence.step,
     release: async () => {
       clearInterval(timer);
       await releaseConversationTurn(ctx.db, { id: conversationId, until });
+      await presence.ended();
     },
   };
 }
@@ -244,7 +256,8 @@ async function prepareTurn(
   asker: Member,
   opened: ConversationRow,
   message: string,
-  channel: Channel = "api"
+  channel: Channel = "api",
+  onStep?: (step: Omit<TurnStep, "at">) => Promise<void>
 ) {
   // Read once the turn is ours: the turn before may have moved it on, or compaction its recap.
   const conversation =
@@ -298,21 +311,31 @@ async function prepareTurn(
       recap: conversation.recap,
     }),
     messages: [...history, userMessage],
-    tools: assistantTools({
-      ctx,
-      agent,
-      owner,
-      asker,
-      mode: conversation.mode,
-      conversationId: conversation.id,
-      said: message,
-    }),
+    tools: reported(
+      assistantTools({
+        ctx,
+        agent,
+        owner,
+        asker,
+        mode: conversation.mode,
+        conversationId: conversation.id,
+        said: message,
+      }),
+      onStep
+    ),
     stopWhen: isStepCount(MAX_STEPS),
     timeout: TIMEOUTS.chat,
     providerOptions: CACHED,
   };
   const warm = history.length > 0 && quietFor < CACHE_WARM_MS;
   return { conversation, owner, userMessage, params, warm, memory };
+}
+
+function reported(
+  tools: ToolSet,
+  onStep?: (step: Omit<TurnStep, "at">) => Promise<void>
+) {
+  return onStep === undefined ? tools : reportingSteps(tools, onStep);
 }
 
 /**
@@ -494,14 +517,14 @@ export async function ask(
   if (input.interrupt === true) {
     await requestTurnStop(ctx.db, { id: opened.id, now: ctx.now() });
   }
-  const { release, signal } = await takeTurn(ctx, opened.id);
+  const { release, signal, step } = await takeTurn(ctx, opened);
   try {
     const repeat = await sentBefore(ctx, opened, input);
     if (repeat !== null) {
       return { conversation: opened, reply: repeat };
     }
     const { conversation, owner, userMessage, params, warm, memory } =
-      await prepareTurn(ctx, asker, opened, input.message, input.channel);
+      await prepareTurn(ctx, asker, opened, input.message, input.channel, step);
     const sent = { clientId: input.clientId, said: input.message, memory };
     if (!ctx.models) {
       const reply = await offlineReply(ctx, conversation, owner, input.message);
@@ -583,12 +606,19 @@ export async function askStream(
   if (input.interrupt === true) {
     await requestTurnStop(ctx.db, { id: opened.id, now: ctx.now() });
   }
-  const { release, signal } = await takeTurn(ctx, opened.id);
+  const { release, signal, step } = await takeTurn(ctx, opened);
   let turn: Awaited<ReturnType<typeof prepareTurn>> | string;
   try {
     turn =
       (await sentBefore(ctx, opened, input)) ??
-      (await prepareTurn(ctx, asker, opened, input.message, input.channel));
+      (await prepareTurn(
+        ctx,
+        asker,
+        opened,
+        input.message,
+        input.channel,
+        step
+      ));
   } catch (error) {
     await release();
     throw error;

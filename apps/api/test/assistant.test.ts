@@ -4,6 +4,7 @@ import { MockLanguageModelV4 } from "ai/test";
 
 import { CONSTITUTION, prompt as renderPrompt } from "#agent/prompts";
 import type { PromptName } from "#agent/prompts";
+import { listEventsAfter } from "#db/queries/events";
 
 import { scriptedModel, testEnv } from "./harness";
 import type { TestEnv } from "./harness";
@@ -1629,5 +1630,171 @@ describe("prompts", () => {
       expect(text).not.toContain("{{");
     }
     expect(() => renderPrompt("brief", {})).toThrow("needs {{name}}");
+  });
+});
+
+// What the owner's tabs were told about their assistant.
+async function ownerEvents(owner: {
+  member: { id: string };
+  workspace: { id: string };
+}) {
+  const rows = await listEventsAfter(env.ctx.db, {
+    workspaceId: owner.workspace.id,
+    memberId: owner.member.id,
+    afterSeq: 0,
+    limit: 500,
+  });
+  return rows.filter((e) => e.type === "assistant.updated").map((e) => e.data);
+}
+
+describe("presence", () => {
+  test("shows the step a turn is on, then the answer as done until it's seen", async () => {
+    const owner = await env.workspace();
+    const turn = { answering: true };
+    const held = (async () => {
+      while (turn.answering) {
+        await Bun.sleep(5);
+      }
+    })();
+    const { model, prompts } = scriptedModel([
+      { tool: "search_activity", input: { query: "blocked" } },
+      { text: "Nothing is blocked.", until: held },
+    ]);
+    env.ctx.models = { main: model, fast: model };
+    const presence = async () =>
+      (
+        await env.call("GET", "/v1/assistant/presence", {
+          token: owner.token,
+        })
+      ).body;
+    expect(await presence()).toMatchObject({
+      state: "idle",
+      working: [],
+      waiting: 0,
+      done: [],
+    });
+
+    const { id } = (
+      await env.call("POST", "/v1/conversations", { token: owner.token })
+    ).body.conversation;
+    const answer = env.call("POST", `/v1/conversations/${id}/messages`, {
+      token: owner.token,
+      body: { message: "What's blocked?" },
+    });
+    while (prompts.length < 2) {
+      await Bun.sleep(10);
+    }
+    expect(await presence()).toMatchObject({
+      state: "working",
+      working: [
+        {
+          kind: "reply",
+          conversationId: id,
+          // Named from what was asked once the first turn is stored.
+          title: null,
+          step: { tool: "search_activity", input: { query: "blocked" } },
+        },
+      ],
+    });
+
+    // The step travels with the event, so an open tab updates without asking again.
+    const told = await ownerEvents(owner);
+    expect(told).toContainEqual({
+      conversationId: id,
+      step: expect.objectContaining({ tool: "search_activity" }),
+    });
+
+    turn.answering = false;
+    expect((await answer).body.reply).toBe("Nothing is blocked.");
+    const after = await presence();
+    expect(after.state).toBe("done");
+    expect(after.working).toEqual([]);
+    expect(after.done).toEqual([
+      { conversationId: id, title: "What's blocked?", at: expect.any(String) },
+    ]);
+    const [listed] = (
+      await env.call("GET", "/v1/conversations", { token: owner.token })
+    ).body;
+    expect(listed.seenAt).toBeNull();
+    expect(listed.repliedAt).toEqual(after.done[0].at);
+
+    const seen = await env.call("POST", `/v1/conversations/${id}/seen`, {
+      token: owner.token,
+    });
+    expect(seen.status).toBe(200);
+    expect(await presence()).toMatchObject({ state: "idle", done: [] });
+  });
+
+  test("a teammate's question shows only that one is being answered", async () => {
+    const owner = await env.workspace();
+    const sam = await env.teammate(owner.token, "Sam");
+    const turn = { answering: true };
+    const held = (async () => {
+      while (turn.answering) {
+        await Bun.sleep(5);
+      }
+    })();
+    const { model, prompts } = scriptedModel([
+      { tool: "search_activity", input: { query: "salary review" } },
+      { text: "I can't say.", until: held },
+    ]);
+    env.ctx.models = { main: model, fast: model };
+
+    const answer = env.call("POST", "/v1/conversations", {
+      token: sam.token,
+      body: { to: owner.member.handle, message: "Is the salary review done?" },
+    });
+    while (prompts.length < 2) {
+      await Bun.sleep(10);
+    }
+    const presence = (
+      await env.call("GET", "/v1/assistant/presence", { token: owner.token })
+    ).body;
+    expect(presence.working).toEqual([{ kind: "teammate" }]);
+    expect(JSON.stringify(presence)).not.toContain("salary");
+    const told = await ownerEvents(owner);
+    expect(told.length).toBeGreaterThan(0);
+    expect(JSON.stringify(told)).not.toContain("salary");
+    turn.answering = false;
+    await answer;
+
+    // Sam's answer is Sam's to see, not the owner's news.
+    const later = (
+      await env.call("GET", "/v1/assistant/presence", { token: owner.token })
+    ).body;
+    expect(later).toMatchObject({ state: "idle", working: [], done: [] });
+    const other = await env.call(
+      "POST",
+      `/v1/conversations/${(await answer).body.conversation.id}/seen`,
+      { token: owner.token }
+    );
+    expect(other.status).toBe(403);
+  });
+
+  test("names the routine that runs next, and isn't working once a run is over", async () => {
+    const owner = await env.workspace();
+    const created = await env.call("POST", "/v1/automations", {
+      token: owner.token,
+      body: {
+        kind: "brief.daily",
+        name: "Morning brief",
+        schedule: { type: "daily", at: "08:00" },
+      },
+    });
+    expect(created.status).toBe(201);
+    const run = await env.call(
+      "POST",
+      `/v1/automations/${created.body.id}/run`,
+      { token: owner.token }
+    );
+    expect(run.status).toBe(200);
+    const presence = (
+      await env.call("GET", "/v1/assistant/presence", { token: owner.token })
+    ).body;
+    expect(presence.working).toEqual([]);
+    expect(presence.next).toMatchObject({
+      automationId: created.body.id,
+      name: "Morning brief",
+    });
   });
 });

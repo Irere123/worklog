@@ -1,7 +1,7 @@
 import { z } from "@hono/zod-openapi";
 
 import type { Automation as AutomationRow } from "#db/queries/automations";
-import { AUTOMATION_KINDS } from "#db/schema";
+import { AUTOMATION_KINDS, UPKEEP_KINDS } from "#db/schema";
 
 import { derived, HH_MM, Timestamp } from "./common";
 
@@ -43,12 +43,17 @@ export const Automation = z
       .object({ status: z.string(), summary: z.string(), at: z.string() })
       .nullable(),
     failureCount: z.number().int(),
+    upkeep: z.boolean().openapi({
+      description:
+        "Keeps the assistant itself in shape (the check, the memory tidy) rather than delivering something to you",
+    }),
   })
   .openapi("Automation");
 
 export const AutomationResponse = derived(Automation, (a: AutomationRow) => ({
   ...a,
   lastResult: a.state.lastResult ?? null,
+  upkeep: UPKEEP_KINDS.includes(a.kind),
 }));
 
 export const CreateAutomationRequest = z.object({

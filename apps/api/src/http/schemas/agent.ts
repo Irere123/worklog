@@ -3,7 +3,7 @@ import { z } from "@hono/zod-openapi";
 import { MAX_VOICE_CHARS } from "#agent/voice";
 import type { MessageRow } from "#db/queries/conversations";
 import type { VoiceRow } from "#db/queries/voices";
-import { REPLY_RATINGS } from "#db/schema";
+import { AUTOMATION_KINDS, REPLY_RATINGS } from "#db/schema";
 
 import { derived, IsoTimestamp, Timestamp } from "./common";
 
@@ -15,6 +15,13 @@ export const Conversation = z
     mode: z.enum(["owner", "teammate"]),
     inbox: z.boolean(),
     title: z.string().nullable(),
+    repliedAt: Timestamp.nullable().openapi({
+      description: "When the assistant last wrote here",
+    }),
+    seenAt: Timestamp.nullable().openapi({
+      description:
+        "When the asker last had it open; a reply after this hasn't been seen",
+    }),
     createdAt: Timestamp,
     updatedAt: Timestamp,
   })
@@ -401,6 +408,63 @@ export const WarmResult = z
 export const UsageQuery = z.object({
   days: z.coerce.number().int().min(1).max(90).default(7),
 });
+
+const PresenceStep = z.object({
+  tool: z.string(),
+  input: z.record(z.string(), z.unknown()).openapi({
+    description: "The step's short inputs; long text is cut",
+  }),
+  at: IsoTimestamp,
+});
+
+export const AssistantPresence = z
+  .object({
+    state: z.enum(["working", "waiting", "done", "idle"]).openapi({
+      description:
+        "working: answering or running a routine; waiting: needs your OK; done: answered something you haven't looked at; idle: nothing of these",
+    }),
+    working: z.array(
+      z.discriminatedUnion("kind", [
+        z.object({
+          kind: z.literal("reply"),
+          conversationId: z.string(),
+          title: z.string().nullable(),
+          inbox: z.boolean(),
+          step: PresenceStep.nullable().openapi({
+            description: "What it's doing now; null before its first lookup",
+          }),
+        }),
+        z.object({
+          kind: z.literal("teammate").openapi({
+            description:
+              "Answering a teammate; what they asked stays between them and the assistant",
+          }),
+        }),
+        z.object({
+          kind: z.literal("routine"),
+          automationId: z.string(),
+          routine: z.enum(AUTOMATION_KINDS),
+          name: z.string(),
+          since: Timestamp,
+        }),
+      ])
+    ),
+    waiting: z.number().int().openapi({
+      description: "Changes it holds for your OK",
+    }),
+    done: z.array(
+      z.object({
+        conversationId: z.string(),
+        title: z.string().nullable(),
+        at: Timestamp,
+      })
+    ),
+    next: z
+      .object({ automationId: z.string(), name: z.string(), at: Timestamp })
+      .nullable()
+      .openapi({ description: "The routine that runs next" }),
+  })
+  .openapi("AssistantPresence");
 
 export const AssistantUsage = z
   .object({

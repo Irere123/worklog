@@ -16,6 +16,7 @@ import {
   lockConversation,
   measureReplay,
   nextMessageSeq,
+  setConversationSeen,
   updateConversationById,
   upsertReplyRating,
 } from "#db/queries/conversations";
@@ -33,6 +34,7 @@ import { badRequest, forbidden, notFound } from "#lib/errors";
 import { generateId } from "#lib/ids";
 
 import { mustCompactNow } from "./compaction";
+import { presenceChanged } from "./presence";
 
 /**
  * How long a conversation stays quiet before the assistant learns from it and compacts it: long
@@ -62,6 +64,9 @@ export async function createConversation(
     learnedThroughSeq: 0,
     turnUntil: null,
     turnStopUntil: null,
+    turnStep: null,
+    repliedAt: null,
+    seenAt: null,
     warmedAt: null,
     turnQueue: [],
     memoryPage: null,
@@ -90,6 +95,24 @@ export async function getConversation(
     throw forbidden();
   }
   return row;
+}
+
+/** The asker has the conversation open, so what the assistant wrote there is no longer news. */
+export async function markConversationSeen(
+  ctx: AppContext,
+  viewer: Member,
+  id: string
+) {
+  const conversation = await getConversation(ctx, viewer, id);
+  await setConversationSeen(ctx.db, {
+    id: conversation.id,
+    askerId: viewer.id,
+    now: ctx.now(),
+  });
+  await presenceChanged(ctx, {
+    workspaceId: viewer.workspaceId,
+    ownerId: viewer.id,
+  });
 }
 
 // What the model replays: the messages after the recap, which travels in the instructions.
@@ -175,10 +198,14 @@ export async function appendMessages(
     });
     await insertMessages(tx.db, inserted);
     const opening = inserted.find((m) => m.role === "user")?.text;
+    const replied = inserted.some(
+      (m) => m.role === "assistant" && (m.text ?? "") !== ""
+    );
     await updateConversationById(tx.db, {
       id: conversation.id,
       set: {
         updatedAt: tx.now(),
+        ...(replied ? { repliedAt: tx.now() } : {}),
         // Named once, after what the person first asked, so a list of conversations can be told
         // apart; later turns never rename it.
         ...(next === 1 && conversation.title === null && opening

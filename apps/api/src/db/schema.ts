@@ -681,6 +681,7 @@ export const EVENT_TYPES = [
   "message.created",
   "automation.ran",
   "notification.sent",
+  "assistant.updated",
 ] as const;
 export type EventType = (typeof EVENT_TYPES)[number];
 
@@ -755,6 +756,8 @@ export const AUTOMATION_KINDS = [
   "custom",
 ] as const;
 export type AutomationKind = (typeof AUTOMATION_KINDS)[number];
+/** Routines that keep the assistant itself in shape: they deliver nothing anyone waits for. */
+export const UPKEEP_KINDS: readonly AutomationKind[] = ["check", "consolidate"];
 
 export const automations = pgTable(
   "automations",
@@ -785,6 +788,11 @@ export const automations = pgTable(
     claimedAt: ts("claimed_at"),
     lastRunAt: ts("last_run_at"),
     lastStatus: text("last_status"),
+    /**
+     * Set while a run is underway, so the assistant can show it's at work. A worker that dies
+     * mid-run leaves it set: readers ignore one older than the longest run.
+     */
+    runningSince: ts("running_since"),
     failureCount: integer("failure_count").notNull().default(0),
     createdAt: createdAt(),
   },
@@ -968,6 +976,12 @@ export const conversations = pgTable(
     turnUntil: ts("turn_until"),
     /** Set to a running turn's lease to ask it to stop; the turn checks while it waits on the model. */
     turnStopUntil: ts("turn_stop_until"),
+    /** What the running turn is doing now, for the assistant's presence; cleared with the turn. */
+    turnStep: jsonb("turn_step").$type<TurnStep>(),
+    /** When the assistant last wrote here, which is news until the asker has seen it. */
+    repliedAt: ts("replied_at"),
+    /** When the asker last had the conversation open. */
+    seenAt: ts("seen_at"),
     /** Who's waiting for a turn, in the order they came: `<ms since epoch>:<id>`. */
     turnQueue: text("turn_queue")
       .array()
@@ -976,8 +990,21 @@ export const conversations = pgTable(
     createdAt: createdAt(),
     updatedAt: ts("updated_at").notNull().defaultNow(),
   },
-  (t) => [index("conversations_asker_idx").on(t.askerId, t.updatedAt)]
+  (t) => [
+    index("conversations_asker_idx").on(t.askerId, t.updatedAt),
+    // Presence asks which of an agent's conversations hold a turn: only a few rows ever do.
+    index("conversations_turning_idx")
+      .on(t.agentId)
+      .where(sql`${t.turnUntil} is not null`)
+      .concurrently(),
+  ]
 );
+
+export type TurnStep = {
+  tool: string;
+  input: Record<string, unknown>;
+  at: string;
+};
 
 export type TurnUsage = {
   inputTokens: number;
