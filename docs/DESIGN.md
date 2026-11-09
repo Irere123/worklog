@@ -39,6 +39,7 @@ The assistant and every agent follow the same rules, so their work reads as part
 - **Work shows where it happens.** An agent's run that names a card is one line on that card ("Atlas needs you: …"), edited in place, never a stream of posts. It shows only while the run is moving or waiting on someone.
 - **Every claim can be checked.** Opening a lookup lists what it found; a `#8` shows the card on hover.
 - **Its face says how it's doing.** The assistant's avatar in the sidebar breathes while it works, glances up when it wants your OK, and is still otherwise. There is no separate status light to learn. Resting on it says the current step in words ("Searching activity for “blocked”"); a dot marks an answer you haven't read. A teammate's question shows only as "Answering a teammate".
+- **Its work lives on its page, not in settings.** What it holds for your OK and the routines it runs on its own (when each runs next, what it said last, a switch) sit under the composer on the assistant's page.
 - **One place for each control.** Send becomes Stop; actions sit under the reply, pinned on the latest one. Nothing animates on send, and only what arrives live moves in.
 
 ## Standards are code
@@ -51,7 +52,7 @@ The old design system scaled consistency. Ours has to scale intent, for teammate
 
 ## Done is not good: the editor's pass
 
-A screen that renders is a draft. Before calling it finished, use it the way a person would, on a laptop and on a 390px phone, in light and dark, and fix what you find:
+A screen that renders is a draft. For anything an agent does, start with xAI's test for Grok Bot: did this help someone hand work off, or give them one more thing to manage? Cut what only adds managing. Then, before calling it finished, use it the way a person would, on a laptop and on a 390px phone, in light and dark, and fix what you find:
 
 1. **Context:** could this screen sit unchanged in any other product? If so, it's someone else's pattern. Make it say something only Worklog knows.
 2. **Every state:** check loading, empty, error, one item, many items, a long title, a missing picture and a slow network.
