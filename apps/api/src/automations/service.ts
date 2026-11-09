@@ -1,3 +1,4 @@
+import { presenceChanged } from "#agent/presence";
 import type { AppContext } from "#context";
 import {
   deleteAutomationById,
@@ -16,6 +17,15 @@ import { generateId } from "#lib/ids";
 import { timezoneOf } from "#lib/time";
 
 import { jitterFor, nextRun } from "./schedule";
+
+type NewAutomation = {
+  kind: AutomationKind;
+  name: string;
+  schedule: Schedule;
+  targetIds?: string[];
+  instructions?: string | null;
+  enabled?: boolean;
+};
 
 export async function createDefaultAutomations(
   ctx: AppContext,
@@ -71,7 +81,7 @@ export async function createDefaultAutomations(
   ];
   await transact(ctx, async (tx) => {
     for (const d of defaults) {
-      await createAutomation(tx, member, d);
+      await addAutomation(tx, member, d);
     }
   });
 }
@@ -79,43 +89,14 @@ export async function createDefaultAutomations(
 export async function createAutomation(
   ctx: AppContext,
   member: Member,
-  input: {
-    kind: AutomationKind;
-    name: string;
-    schedule: Schedule;
-    targetIds?: string[];
-    instructions?: string | null;
-    enabled?: boolean;
-  }
+  input: NewAutomation
 ) {
-  if (input.kind === "custom" && !input.instructions) {
-    throw badRequest("Custom automations need instructions");
-  }
-  const tz = timezoneOf(
-    member,
-    await getWorkspaceById(ctx.db, { id: member.workspaceId })
-  );
-  const id = generateId();
-  const row = {
-    id,
+  const created = await addAutomation(ctx, member, input);
+  await presenceChanged(ctx, {
     workspaceId: member.workspaceId,
-    memberId: member.id,
-    kind: input.kind,
-    name: input.name,
-    schedule: input.schedule,
-    targetIds: input.targetIds ?? [],
-    instructions: input.instructions ?? null,
-    enabled: input.enabled ?? true,
-    nextRunAt: nextRun(
-      input.schedule,
-      tz,
-      ctx.now(),
-      member.settings,
-      jitterFor(id)
-    ),
-    createdAt: ctx.now(),
-  };
-  return await insertAutomation(ctx.db, row);
+    ownerId: member.id,
+  });
+  return created;
 }
 
 export async function updateAutomation(
@@ -152,20 +133,64 @@ export async function updateAutomation(
   if (!row) {
     throw notFound("Automation");
   }
+  await presenceChanged(ctx, {
+    workspaceId: member.workspaceId,
+    ownerId: member.id,
+  });
   return row;
 }
 
 export async function deleteAutomation(
   ctx: AppContext,
-  memberId: string,
+  member: Member,
   id: string
 ) {
-  if (!(await deleteAutomationById(ctx.db, { id, memberId }))) {
+  if (!(await deleteAutomationById(ctx.db, { id, memberId: member.id }))) {
     throw notFound("Automation");
   }
+  await presenceChanged(ctx, {
+    workspaceId: member.workspaceId,
+    ownerId: member.id,
+  });
 }
 
 export async function listRuns(ctx: AppContext, memberId: string, id: string) {
   await getAutomationById(ctx.db, { id, memberId });
   return await listAutomationRuns(ctx.db, { automationId: id });
+}
+
+// Unannounced: a member's defaults are made in a transaction, before their assistant exists.
+async function addAutomation(
+  ctx: AppContext,
+  member: Member,
+  input: NewAutomation
+) {
+  if (input.kind === "custom" && !input.instructions) {
+    throw badRequest("Custom automations need instructions");
+  }
+  const tz = timezoneOf(
+    member,
+    await getWorkspaceById(ctx.db, { id: member.workspaceId })
+  );
+  const id = generateId();
+  const row = {
+    id,
+    workspaceId: member.workspaceId,
+    memberId: member.id,
+    kind: input.kind,
+    name: input.name,
+    schedule: input.schedule,
+    targetIds: input.targetIds ?? [],
+    instructions: input.instructions ?? null,
+    enabled: input.enabled ?? true,
+    nextRunAt: nextRun(
+      input.schedule,
+      tz,
+      ctx.now(),
+      member.settings,
+      jitterFor(id)
+    ),
+    createdAt: ctx.now(),
+  };
+  return await insertAutomation(ctx.db, row);
 }

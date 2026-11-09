@@ -1,3 +1,4 @@
+import { presenceChanged } from "#agent/presence";
 import type { AppContext } from "#context";
 import {
   countFeedbackByKind,
@@ -20,6 +21,7 @@ import {
 import type { AttentionItem } from "#db/queries/attention";
 import { setCheckDueBy } from "#db/queries/automations";
 import { findMemberById } from "#db/queries/members";
+import { APPROVAL_KIND } from "#db/schema";
 import type { FEEDBACK_SIGNALS, Priority } from "#db/schema";
 import { transact } from "#db/transact";
 import { badRequest, notFound } from "#lib/errors";
@@ -97,7 +99,7 @@ export async function raiseAttention(
   ctx: AppContext,
   input: AttentionInput
 ): Promise<AttentionItem | null> {
-  return await transact(ctx, async (tx) => {
+  const raised = await transact(ctx, async (tx) => {
     const now = tx.now();
     const priority = await applySenderQuota(tx, input);
     const row = await upsertAttention(tx.db, {
@@ -150,6 +152,10 @@ export async function raiseAttention(
     });
     return row;
   });
+  if (raised) {
+    await waitingChanged(ctx, raised);
+  }
+  return raised;
 }
 
 async function applySenderQuota(
@@ -219,6 +225,7 @@ export async function updateAttention(
       state: row.state,
     },
   });
+  await waitingChanged(ctx, row);
   return row;
 }
 
@@ -430,5 +437,18 @@ export function assertAction(item: AttentionItem, actionId: string) {
   const offered = item.actions ?? [];
   if (!offered.some((a) => a.id === actionId)) {
     throw badRequest(`"${actionId}" isn't an action on this item`);
+  }
+}
+
+// How many of the assistant's requests wait for an OK is part of its presence.
+async function waitingChanged(
+  ctx: AppContext,
+  item: Pick<AttentionItem, "kind" | "workspaceId" | "memberId">
+) {
+  if (item.kind === APPROVAL_KIND) {
+    await presenceChanged(ctx, {
+      workspaceId: item.workspaceId,
+      ownerId: item.memberId,
+    });
   }
 }

@@ -2,11 +2,12 @@ import type { AppContext } from "#context";
 import { getAttentionById } from "#db/queries/attention";
 import { findMemberById } from "#db/queries/members";
 import type { Member } from "#db/queries/members";
+import { APPROVAL_KIND } from "#db/schema";
 import { badRequest, forbidden } from "#lib/errors";
 import { assertAction, updateAttention } from "#work/attention";
 import { performAttentionAction } from "#work/drift";
 
-import { APPROVAL_KIND, isAction, runAction } from "./actions";
+import { isAction, runAction } from "./actions";
 
 /**
  * Answers an attention item's one-click question. A request from the member's assistant to make a

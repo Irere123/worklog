@@ -1,4 +1,8 @@
-import { infiniteQueryOptions, queryOptions } from "@tanstack/react-query";
+import {
+  infiniteQueryOptions,
+  queryOptions,
+  replaceEqualDeep,
+} from "@tanstack/react-query";
 
 import { api, unwrap, unwrapEarly } from "./client";
 import type { paths } from "./schema";
@@ -218,8 +222,14 @@ export const q = {
     queryOptions({
       queryKey: ["presence"],
       queryFn: async () => await unwrap(api.GET("/v1/assistant/presence")),
-      // The event stream says when it changes; reading it again on every page is waste.
-      staleTime: 60_000,
+      // Every change arrives whole on the event stream, which replays what a dropped connection
+      // missed. A read on focus now and then catches the little that changes with no event: a
+      // routine whose worker died, a snoozed request waking.
+      staleTime: 5 * 60_000,
+      // A read and an event, or events from two server processes, can land out of order: the
+      // later snapshot stays, whichever arrived last.
+      structuralSharing: (before: unknown, after: unknown) =>
+        asOf(before) > asOf(after) ? before : replaceEqualDeep(before, after),
     }),
   usage: (days = 7) =>
     queryOptions({
@@ -321,3 +331,12 @@ export const q = {
       queryFn: async () => await unwrap(api.GET("/v1/apps")),
     }),
 };
+
+function asOf(presence: unknown) {
+  return typeof presence === "object" &&
+    presence !== null &&
+    "asOf" in presence &&
+    typeof presence.asOf === "string"
+    ? presence.asOf
+    : "";
+}

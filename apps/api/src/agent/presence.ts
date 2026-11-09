@@ -11,12 +11,9 @@ import {
 } from "#db/queries/conversations";
 import type { ConversationRow } from "#db/queries/conversations";
 import { findMemberById, getPersonalAgent } from "#db/queries/members";
-import type { Member } from "#db/queries/members";
-import { UPKEEP_KINDS } from "#db/schema";
+import { APPROVAL_KIND, UPKEEP_KINDS } from "#db/schema";
 import type { AutomationKind, TurnStep } from "#db/schema";
 import { log } from "#telemetry/log";
-
-import { APPROVAL_KIND } from "./actions";
 
 export type Working =
   | {
@@ -41,10 +38,13 @@ export type Presence = {
   waiting: number;
   done: { conversationId: string; title: string | null; at: Date }[];
   next: { automationId: string; name: string; at: Date } | null;
+  /** When it was read: snapshots from two processes can arrive out of order, and the later wins. */
+  asOf: Date;
 };
 
-/** What the owner's tabs are told; a step comes with it so they needn't read presence again. */
-type Change = { conversationId: string; step: TurnStep } | null;
+export type ReportStep = (step: Omit<TurnStep, "at">) => void;
+
+type Owner = { workspaceId: string; ownerId: string };
 
 /**
  * Longer than a routine takes: a run that died without clearing its mark stops counting as work
@@ -56,29 +56,33 @@ const RUN_STALE_MS = 15 * 60_000;
 const STEP_TEXT_CHARS = 200;
 
 /**
+ * Snapshots for one owner go out one at a time, in order. A change that arrives while one waits to
+ * start rides on it: that read hasn't begun, so it will see the change. Parallel tool calls and a
+ * turn ending as a routine starts cost one read, not one each.
+ */
+const queued = new Map<string, Promise<void>>();
+const sending = new Map<string, Promise<void>>();
+
+/**
  * What the owner's assistant is doing, at a glance: answering, running a routine, waiting on them
  * for an OK, or done with something they haven't looked at yet. A teammate's question shows only
  * that one is being answered: what they asked is theirs.
  */
 export async function assistantPresence(
   ctx: AppContext,
-  owner: Member
+  ownerId: string
 ): Promise<Presence> {
   const now = ctx.now();
-  const agent = await getPersonalAgent(ctx.db, { ownerId: owner.id });
+  const agent = await getPersonalAgent(ctx.db, { ownerId });
   const [turns, automations, waiting, unseen] = await Promise.all([
     listRunningTurns(ctx.db, { agentId: agent.id, now }),
-    listAutomations(ctx.db, { memberId: owner.id }),
-    countOpenAttention(ctx.db, {
-      memberId: owner.id,
-      kind: APPROVAL_KIND,
-      now,
-    }),
-    listUnseenReplies(ctx.db, { askerId: owner.id, agentId: agent.id }),
+    listAutomations(ctx.db, { memberId: ownerId }),
+    countOpenAttention(ctx.db, { memberId: ownerId, kind: APPROVAL_KIND, now }),
+    listUnseenReplies(ctx.db, { askerId: ownerId, agentId: agent.id }),
   ]);
   const working: Working[] = [
     ...turns.map((turn): Working =>
-      turn.askerId === owner.id
+      turn.askerId === ownerId
         ? {
             kind: "reply",
             conversationId: turn.id,
@@ -116,13 +120,14 @@ export async function assistantPresence(
     waiting,
     done,
     next: nextRoutine(automations, now),
+    asOf: now,
   };
 }
 
 /**
  * Presence for one turn, reported to the assistant's owner: that it started, each step it takes,
- * and that it ended. Reporting never fails the turn: presence is a courtesy, the answer is the
- * work.
+ * and that it ended. Only the end is waited for: presence is a courtesy, the answer is the work,
+ * and a tool shouldn't start late so a sidebar can say it started.
  */
 export async function turnPresence(
   ctx: AppContext,
@@ -130,57 +135,51 @@ export async function turnPresence(
   until: Date
 ) {
   const ownerId = await ownerOf(ctx, conversation);
-  const tell = async (change: Change) => {
+  const tell = async () => {
     if (ownerId !== null) {
       await presenceChanged(ctx, {
         workspaceId: conversation.workspaceId,
         ownerId,
-        change,
       });
     }
   };
-  await tell(null);
-  return {
-    step: async (step: Omit<TurnStep, "at">) => {
-      const taken = { ...step, at: ctx.now().toISOString() };
-      try {
-        await setConversationTurnStep(ctx.db, {
-          id: conversation.id,
-          until,
-          step: taken,
-        });
-      } catch (error) {
-        log.warn("assistant: couldn't record a step", { error });
-        return;
-      }
-      // What a teammate's turn is doing stays theirs: the owner hears only that it's running.
-      await tell(
-        conversation.mode === "owner"
-          ? { conversationId: conversation.id, step: taken }
-          : null
-      );
-    },
-    ended: async () => {
-      await tell(null);
-    },
+  const record = async (step: Omit<TurnStep, "at">) => {
+    try {
+      await setConversationTurnStep(ctx.db, {
+        id: conversation.id,
+        until,
+        step: { ...step, at: ctx.now().toISOString() },
+      });
+    } catch (error) {
+      log.warn("assistant: couldn't record a step", { error });
+      return;
+    }
+    await tell();
   };
+  void tell();
+  const step: ReportStep = (taken) => {
+    // What a teammate's turn is doing stays theirs: the owner sees only that it runs.
+    if (conversation.mode === "owner") {
+      void record(taken);
+    }
+  };
+  return { step, ended: tell };
 }
 
-/** Tells the owner's open tabs to look again, or what changed when that's all they need. */
-export async function presenceChanged(
-  ctx: AppContext,
-  params: { workspaceId: string; ownerId: string; change?: Change }
-) {
-  try {
-    await ctx.bus.publish({
-      workspaceId: params.workspaceId,
-      audienceId: params.ownerId,
-      type: "assistant.updated",
-      data: params.change ?? {},
-    });
-  } catch (error) {
-    log.warn("assistant: couldn't announce presence", { error });
+/**
+ * Sends the owner's open tabs their assistant's presence as it is now, whole, so no tab has to
+ * read it again. Call it after the change commits. Never throws: a missed snapshot is corrected by
+ * the next.
+ */
+export async function presenceChanged(ctx: AppContext, owner: Owner) {
+  const waiting = queued.get(owner.ownerId);
+  if (waiting) {
+    await waiting;
+    return;
   }
+  const next = sendAfter(sending.get(owner.ownerId), ctx, owner);
+  queued.set(owner.ownerId, next);
+  await next;
 }
 
 /** Whether a routine's runs show as the assistant at work: upkeep runs too often to be news. */
@@ -189,10 +188,7 @@ export function showsAtWork(automation: Pick<Automation, "kind">) {
 }
 
 /** The same tools, each calling `report` as it starts. */
-export function reportingSteps(
-  tools: ToolSet,
-  report: (step: Omit<TurnStep, "at">) => Promise<void>
-): ToolSet {
+export function reportingSteps(tools: ToolSet, report: ReportStep): ToolSet {
   return Object.fromEntries(
     Object.entries(tools).map(([name, tool]) => {
       const { execute } = tool;
@@ -200,13 +196,42 @@ export function reportingSteps(
         return [name, tool];
       }
       const reporting: typeof execute = async (input, options) => {
-        await report({ tool: name, input: stepInput(input) });
+        report({ tool: name, input: stepInput(input) });
         const result: unknown = await execute(input, options);
         return result;
       };
       return [name, { ...tool, execute: reporting }];
     })
   );
+}
+
+// Even with nothing to wait for, the await lets the caller mark this queued before it starts.
+async function sendAfter(
+  before: Promise<void> | undefined,
+  ctx: AppContext,
+  owner: Owner
+) {
+  await before;
+  queued.delete(owner.ownerId);
+  const send = announce(ctx, owner);
+  sending.set(owner.ownerId, send);
+  await send;
+  if (sending.get(owner.ownerId) === send) {
+    sending.delete(owner.ownerId);
+  }
+}
+
+async function announce(ctx: AppContext, { workspaceId, ownerId }: Owner) {
+  try {
+    await ctx.bus.publish({
+      workspaceId,
+      audienceId: ownerId,
+      type: "assistant.updated",
+      data: await assistantPresence(ctx, ownerId),
+    });
+  } catch (error) {
+    log.warn("assistant: couldn't announce presence", { error });
+  }
 }
 
 // In the owner's own conversation they are the asker; only a teammate's needs the agent looked up.

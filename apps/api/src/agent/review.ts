@@ -2,11 +2,12 @@ import { z } from "zod";
 
 import type { AppContext } from "#context";
 import { listRecentSaid } from "#db/queries/conversations";
+import { APPROVAL_KIND } from "#db/schema";
 import { generateId } from "#lib/ids";
 import { log } from "#telemetry/log";
 import { raiseAttention } from "#work/attention";
 
-import { APPROVAL_KIND, describeAction, runAction } from "./actions";
+import { describeAction, runAction } from "./actions";
 import type { ActionName } from "./actions";
 import { structured } from "./generate";
 import { prompt, UNTRUSTED_NOTE } from "./prompts";

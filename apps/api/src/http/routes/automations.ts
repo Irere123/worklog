@@ -100,7 +100,7 @@ export const automationRoutes = router()
     async (c) => {
       await automations.deleteAutomation(
         c.get("ctx"),
-        c.get("member").id,
+        c.get("member"),
         c.req.valid("param").id
       );
       return respond(c, Ok, { ok: true }, 200);

@@ -280,14 +280,14 @@ export const agentRoutes = router()
       tags: ["Assistant"],
       summary: "What your assistant is doing now",
       description:
-        "Whether it's answering or running a routine (and its current step), how many changes wait for your OK, which answers you haven't seen yet, and the routine that runs next. An `assistant.updated` event on the event stream says when to read it again.",
+        "Whether it's answering or running a routine (and its current step), how many changes wait for your OK, which answers you haven't seen yet, and the routine that runs next. Every change also arrives whole as an `assistant.updated` event on the event stream, so read this once and keep the newest by `asOf`.",
       responses: { 200: json(AssistantPresence), ...errors },
     }),
     async (c) =>
       respond(
         c,
         AssistantPresence,
-        await assistantPresence(c.get("ctx"), c.get("member")),
+        await assistantPresence(c.get("ctx"), c.get("member").id),
         200
       )
   )

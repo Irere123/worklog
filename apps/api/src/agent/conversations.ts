@@ -289,6 +289,10 @@ export async function renameConversation(
     throw badRequest("The thread briefs arrive in can't be renamed");
   }
   await updateConversationById(ctx.db, { id, set: { title } });
+  await presenceChanged(ctx, {
+    workspaceId: viewer.workspaceId,
+    ownerId: viewer.id,
+  });
   return { ...conversation, title };
 }
 
@@ -312,6 +316,10 @@ export async function deleteConversation(
   await deleteConversationById(ctx.db, {
     id,
     workspaceId: viewer.workspaceId,
+  });
+  await presenceChanged(ctx, {
+    workspaceId: viewer.workspaceId,
+    ownerId: viewer.id,
   });
 }
 

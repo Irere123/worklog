@@ -3,6 +3,7 @@ import { useEffect, useEffectEvent, useState } from "react";
 
 import { auth } from "./client";
 import type { Schemas } from "./client";
+import { q } from "./queries";
 
 type Presence = Schemas["AssistantPresence"];
 
@@ -21,12 +22,12 @@ const STALE: Record<EventType, QueryKey[]> = {
   "activity.created": [["activities"], ["now"]],
   "activity.updated": [["activities"], ["now"]],
   "card.updated": [["cards"], ["card"], ["now"]],
-  "attention.updated": [["attention"], ["presence"]],
+  "attention.updated": [["attention"]],
   "brief.created": [["briefs"]],
   "message.created": [["conversations"]],
-  "automation.ran": [["automations"], ["presence"]],
+  "automation.ran": [["automations"]],
   "notification.sent": [],
-  // Read again unless the event says all that changed (see `patchStep`).
+  // Carries the whole snapshot, so nothing is read again.
   "assistant.updated": [],
 };
 
@@ -92,60 +93,25 @@ function isSentNews(value: unknown): value is SentNews {
   );
 }
 
-type ReplyWork = Extract<Presence["working"][number], { kind: "reply" }>;
+const STATES = new Set<unknown>(["working", "waiting", "done", "idle"]);
 
-/** A step the assistant took in the owner's own conversation: all that changed. */
-type StepNews = {
-  conversationId: string;
-  step: NonNullable<ReplyWork["step"]>;
-};
-
-function isStepNews(value: unknown): value is StepNews {
-  if (
-    typeof value !== "object" ||
-    value === null ||
-    !("conversationId" in value) ||
-    typeof value.conversationId !== "string" ||
-    !("step" in value)
-  ) {
-    return false;
-  }
-  const { step } = value;
+/** The assistant's presence as the server sends it on every change: whole, never a diff. */
+function isPresence(value: unknown): value is Presence {
   return (
-    typeof step === "object" &&
-    step !== null &&
-    "tool" in step &&
-    typeof step.tool === "string" &&
-    "at" in step &&
-    typeof step.at === "string" &&
-    "input" in step &&
-    typeof step.input === "object" &&
-    step.input !== null
+    typeof value === "object" &&
+    value !== null &&
+    "state" in value &&
+    STATES.has(value.state) &&
+    "asOf" in value &&
+    typeof value.asOf === "string" &&
+    "working" in value &&
+    Array.isArray(value.working) &&
+    "waiting" in value &&
+    typeof value.waiting === "number" &&
+    "done" in value &&
+    Array.isArray(value.done) &&
+    "next" in value
   );
-}
-
-/**
- * Moves a turn the cache already shows on to its next step, which saves every open tab a read of
- * presence for each tool the assistant calls. False when there's no such turn to move.
- */
-function patchStep(client: QueryClient, news: StepNews) {
-  const key = ["presence"];
-  const presence = client.getQueryData<Presence>(key);
-  const shown = presence?.working.some(
-    (w) => w.kind === "reply" && w.conversationId === news.conversationId
-  );
-  if (!presence || shown !== true) {
-    return false;
-  }
-  client.setQueryData<Presence>(key, {
-    ...presence,
-    working: presence.working.map((w) =>
-      w.kind === "reply" && w.conversationId === news.conversationId
-        ? { ...w, step: news.step }
-        : w
-    ),
-  });
-  return true;
 }
 
 function payloadOf(event: Event): unknown {
@@ -244,9 +210,13 @@ function subscribe(
       notify.attention(news);
     }
   });
+  // Out-of-order snapshots are settled by the query itself, which keeps the newest.
   source.addEventListener("assistant.updated", (event) => {
     const data = payloadOf(event);
-    if (!isStepNews(data) || !patchStep(client, data)) {
+    if (isPresence(data)) {
+      client.setQueryData(q.presence().queryKey, data);
+    } else {
+      // Replayed from before snapshots travelled with the event.
       onEvent([["presence"]])();
     }
   });

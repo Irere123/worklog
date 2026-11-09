@@ -463,6 +463,10 @@ export const AssistantPresence = z
       .object({ automationId: z.string(), name: z.string(), at: Timestamp })
       .nullable()
       .openapi({ description: "The routine that runs next" }),
+    asOf: Timestamp.openapi({
+      description:
+        "When this was read. Events can arrive out of order across server processes; keep the latest",
+    }),
   })
   .openapi("AssistantPresence");
 

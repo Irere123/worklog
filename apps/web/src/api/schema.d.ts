@@ -854,7 +854,7 @@ export interface paths {
         };
         /**
          * What your assistant is doing now
-         * @description Whether it's answering or running a routine (and its current step), how many changes wait for your OK, which answers you haven't seen yet, and the routine that runs next. An `assistant.updated` event on the event stream says when to read it again.
+         * @description Whether it's answering or running a routine (and its current step), how many changes wait for your OK, which answers you haven't seen yet, and the routine that runs next. Every change also arrives whole as an `assistant.updated` event on the event stream, so read this once and keep the newest by `asOf`.
          */
         get: operations["assistant.presence"];
         put?: never;
@@ -2060,6 +2060,12 @@ export interface components {
                  */
                 at: string;
             } | null;
+            /**
+             * Format: date-time
+             * @description When this was read. Events can arrive out of order across server processes; keep the latest
+             * @example 2026-10-26T08:30:00.000Z
+             */
+            asOf: string;
         };
         AssistantUsage: {
             days: number;

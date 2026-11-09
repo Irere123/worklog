@@ -1647,6 +1647,21 @@ async function ownerEvents(owner: {
   return rows.filter((e) => e.type === "assistant.updated").map((e) => e.data);
 }
 
+// Announcing doesn't hold up a turn, so a snapshot lands a moment after what it reports.
+async function toldWhen(
+  owner: Parameters<typeof ownerEvents>[0],
+  matches: (presence: any) => boolean
+) {
+  for (let tries = 0; tries < 200; tries += 1) {
+    const last = (await ownerEvents(owner)).at(-1);
+    if (last !== undefined && matches(last)) {
+      return last;
+    }
+    await Bun.sleep(10);
+  }
+  throw new Error("presence was never announced as expected");
+}
+
 describe("presence", () => {
   test("shows the step a turn is on, then the answer as done until it's seen", async () => {
     const owner = await env.workspace();
@@ -1697,11 +1712,15 @@ describe("presence", () => {
       ],
     });
 
-    // The step travels with the event, so an open tab updates without asking again.
-    const told = await ownerEvents(owner);
-    expect(told).toContainEqual({
-      conversationId: id,
-      step: expect.objectContaining({ tool: "search_activity" }),
+    // Each change arrives whole, so an open tab never reads presence again.
+    expect(
+      await toldWhen(
+        owner,
+        (p) => p.working[0]?.step?.tool === "search_activity"
+      )
+    ).toMatchObject({
+      state: "working",
+      working: [{ kind: "reply", conversationId: id }],
     });
 
     turn.answering = false;
@@ -1717,12 +1736,20 @@ describe("presence", () => {
     ).body;
     expect(listed.seenAt).toBeNull();
     expect(listed.repliedAt).toEqual(after.done[0].at);
+    expect((await ownerEvents(owner)).at(-1)).toEqual({
+      ...after,
+      asOf: expect.any(String),
+    });
 
     const seen = await env.call("POST", `/v1/conversations/${id}/seen`, {
       token: owner.token,
     });
     expect(seen.status).toBe(200);
     expect(await presence()).toMatchObject({ state: "idle", done: [] });
+    expect((await ownerEvents(owner)).at(-1)).toMatchObject({
+      state: "idle",
+      done: [],
+    });
   });
 
   test("a teammate's question shows only that one is being answered", async () => {
@@ -1752,9 +1779,8 @@ describe("presence", () => {
     ).body;
     expect(presence.working).toEqual([{ kind: "teammate" }]);
     expect(JSON.stringify(presence)).not.toContain("salary");
-    const told = await ownerEvents(owner);
-    expect(told.length).toBeGreaterThan(0);
-    expect(JSON.stringify(told)).not.toContain("salary");
+    await toldWhen(owner, (p) => p.working.length > 0);
+    expect(JSON.stringify(await ownerEvents(owner))).not.toContain("salary");
     turn.answering = false;
     await answer;
 
@@ -1796,5 +1822,48 @@ describe("presence", () => {
       automationId: created.body.id,
       name: "Morning brief",
     });
+    expect((await ownerEvents(owner)).at(-1)).toMatchObject({
+      working: [],
+      next: { automationId: created.body.id },
+    });
+
+    await env.call("PATCH", `/v1/automations/${created.body.id}`, {
+      token: owner.token,
+      body: { enabled: false },
+    });
+    const off: any = (await ownerEvents(owner)).at(-1);
+    expect(off.next?.automationId).not.toBe(created.body.id);
+  });
+
+  test("counts the changes waiting for an OK until one is answered", async () => {
+    const owner = await env.workspace();
+    const { model } = scriptedModel([
+      {
+        tool: "propose_routine",
+        input: {
+          name: "Friday reviews",
+          instructions: "List the reviews still waiting on me",
+          schedule: { type: "weekly", weekday: 5, at: "16:00" },
+        },
+      },
+      { text: "I've suggested it; allow it when you're ready." },
+    ]);
+    env.ctx.models = { main: model, fast: model };
+    await env.call("POST", "/v1/conversations", {
+      token: owner.token,
+      body: { message: "Every Friday, tell me which reviews wait on me" },
+    });
+    expect((await ownerEvents(owner)).at(-1)).toMatchObject({
+      state: "waiting",
+      waiting: 1,
+    });
+
+    const request = (
+      await env.call("GET", "/v1/attention", { token: owner.token })
+    ).body.find((i: any) => i.kind === "assistant.approval");
+    await env.call("POST", `/v1/attention/${request.id}/actions/deny`, {
+      token: owner.token,
+    });
+    expect((await ownerEvents(owner)).at(-1)).toMatchObject({ waiting: 0 });
   });
 });

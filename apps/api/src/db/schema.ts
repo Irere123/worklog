@@ -564,6 +564,8 @@ export const ATTENTION_STATES = [
 ] as const;
 export const PRIORITIES = ["low", "normal", "high"] as const;
 export type Priority = (typeof PRIORITIES)[number];
+/** The attention items an assistant raises to ask its owner before a write the review held back. */
+export const APPROVAL_KIND = "assistant.approval";
 
 export const attentionItems = pgTable(
   "attention_items",

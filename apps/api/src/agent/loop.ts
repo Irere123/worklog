@@ -33,7 +33,6 @@ import {
 import type { Member } from "#db/queries/members";
 import { findVoice } from "#db/queries/voices";
 import { getWorkspaceById } from "#db/queries/workspaces";
-import type { TurnStep } from "#db/schema";
 import { badRequest, conflict, notFound } from "#lib/errors";
 import { generateId } from "#lib/ids";
 import { timezoneOf } from "#lib/time";
@@ -59,6 +58,7 @@ import type { Channel } from "./instructions";
 import { memoryChanges, memoryPage } from "./memory";
 import { CACHED, TIMEOUTS } from "./models";
 import { reportingSteps, turnPresence } from "./presence";
+import type { ReportStep } from "./presence";
 import { assistantTools } from "./tools";
 
 const MAX_STEPS = 10;
@@ -257,7 +257,7 @@ async function prepareTurn(
   opened: ConversationRow,
   message: string,
   channel: Channel = "api",
-  onStep?: (step: Omit<TurnStep, "at">) => Promise<void>
+  onStep?: ReportStep
 ) {
   // Read once the turn is ours: the turn before may have moved it on, or compaction its recap.
   const conversation =
@@ -331,10 +331,7 @@ async function prepareTurn(
   return { conversation, owner, userMessage, params, warm, memory };
 }
 
-function reported(
-  tools: ToolSet,
-  onStep?: (step: Omit<TurnStep, "at">) => Promise<void>
-) {
+function reported(tools: ToolSet, onStep?: ReportStep) {
   return onStep === undefined ? tools : reportingSteps(tools, onStep);
 }
 

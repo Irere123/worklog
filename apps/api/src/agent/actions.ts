@@ -6,13 +6,11 @@ import { getAttentionById } from "#db/queries/attention";
 import { getBoardWithColumns, listBoards } from "#db/queries/boards";
 import { getCardByNumber } from "#db/queries/cards";
 import type { Member } from "#db/queries/members";
+import { APPROVAL_KIND } from "#db/schema";
 import { badRequest } from "#lib/errors";
 import * as board from "#work/board";
 import { performAttentionAction } from "#work/drift";
 import { LOG_KINDS, logWork } from "#work/log";
-
-/** The attention items an assistant raises to ask its owner before a write the review held back. */
-export const APPROVAL_KIND = "assistant.approval";
 
 /**
  * The writes an assistant makes that its owner's teammates will see, in one place: its tools run

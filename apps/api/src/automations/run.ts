@@ -214,6 +214,12 @@ export async function runAutomation(
       summary: outcome.summary.slice(0, 280),
     },
   });
+  if (shown) {
+    await presenceChanged(ctx, {
+      workspaceId: member.workspaceId,
+      ownerId: member.id,
+    });
+  }
   return { automationId: automation.id, ...outcome };
 }
 
