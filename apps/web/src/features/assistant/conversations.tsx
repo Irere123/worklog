@@ -36,7 +36,9 @@ import { Chat, PendingThread } from "./chat";
 import { Composer } from "./composer";
 import { AssistantFace, hasUnseenReply, usePresence } from "./presence";
 import type { Glance } from "./presence";
+import { Routines } from "./routines";
 import { useSuggestions } from "./suggestions";
+import { WaitingOnYou } from "./waiting";
 
 // Past this many, the list gets a filter: scrolling stops being the quick way to find one.
 const FILTER_FROM = 8;
@@ -277,6 +279,8 @@ export function NewChat({ ask }: { ask?: string }) {
             </li>
           ))}
         </ul>
+        <WaitingOnYou />
+        <Routines />
         <RecentConversations />
       </div>
     </div>
