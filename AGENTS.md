@@ -162,3 +162,17 @@ oxfmt and oxlint with [Ultracite](https://www.ultracite.ai)'s presets enforce th
 - Conventional Commits, checked by commitlint: `type(scope): subject`, lowercase, no final period.
 - Keep messages short, one logical change per commit, and never use `--no-verify`.
 - When you change something documented, update `docs/ARCHITECTURE.md`, `docs/CONNECTORS.md` or the README in the same change.
+- **PR descriptions put judgment first and detail second.** An agent's full write-up is accurate but tiring, and a reviewer first needs to know whether the PR deserves their attention. So:
+  - Open with one short paragraph: the least a reviewer must read to know what changed and why. Add a screenshot when the change shows on screen.
+  - Put the full description (changes, migrations, checks) in a collapsed block, labelled with the model and effort that wrote it:
+
+    ```md
+    <details><summary>Claude Opus 5.5, high effort</summary>
+
+    ## What changes
+
+    …
+    </details>
+    ```
+
+  - The person opening the PR owns the opener: rewrite it until it says what they would tell a reviewer. Leave a blank line after `<summary>` so GitHub renders the Markdown inside.
