@@ -208,12 +208,10 @@ export async function composeBrief(
   if (!ctx.models) {
     return { title, body: templateBrief(data), composedBy: "template" };
   }
-  const memory = await renderMemory(
-    ctx,
-    member.id,
-    visibility === "private",
-    1
-  );
+  const memory = await renderMemory(ctx, member.id, {
+    includePrivate: visibility === "private",
+    journalDays: 1,
+  });
   const { text, modelId } = await complete(ctx.models, {
     model: "main",
     instructions: [

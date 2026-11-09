@@ -76,7 +76,7 @@ export async function runRoutine(
       }),
       UNTRUSTED_NOTE,
     ].join("\n\n"),
-    prompt: `${turnPreamble(ctx.now(), tz, member, "api")}\nRoutine "${automation.name}":\n${automation.instructions}\n\n${last}What you know about ${member.name}:\n${await renderMemory(ctx, member.id, everything, 1)}`,
+    prompt: `${turnPreamble(ctx.now(), tz, member, "api")}\nRoutine "${automation.name}":\n${automation.instructions}\n\n${last}What you know about ${member.name}:\n${await renderMemory(ctx, member.id, { includePrivate: everything, journalDays: 1 })}`,
     tools: { ...readTools(scope), send_message },
     stopWhen: [isStepCount(MAX_STEPS), hasToolCall("send_message")],
     timeout: TIMEOUTS.background,

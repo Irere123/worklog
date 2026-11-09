@@ -53,6 +53,7 @@ export const memoryRoutes = router()
         workspaceId: me.workspaceId,
         memberId: me.id,
         source: "self",
+        confirmed: true,
         ...input,
         expiresAt: expiresAt ? new Date(expiresAt) : null,
       });

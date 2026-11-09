@@ -74,6 +74,7 @@ function bullets(
 
 function notes(r: MemoryRow, tz: string) {
   const parts = [
+    r.confirmed ? "" : "unconfirmed",
     r.expiresAt ? `until ${lastLocalDate(r.expiresAt, tz)}` : "",
     r.aliases.length ? `also: ${r.aliases.join(", ")}` : "",
   ].filter(Boolean);

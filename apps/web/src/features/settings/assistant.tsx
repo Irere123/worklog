@@ -283,7 +283,13 @@ export function MemoryPage() {
                 <p {...stylex.props(styles.memoryText)}>{m.content}</p>
                 <div {...stylex.props(styles.memoryMeta)}>
                   <Badge tone={KINDS[m.kind].tone}>{KINDS[m.kind].label}</Badge>
-                  <span>{SOURCES[m.source]}</span>
+                  {m.confirmed ? (
+                    <span>{SOURCES[m.source]}</span>
+                  ) : (
+                    <span title="Not something you said outright, so conversations don’t start with it. Tell your assistant if it’s right.">
+                      It inferred this
+                    </span>
+                  )}
                   <span title={exactTime(m.updatedAt)}>{ago(m.updatedAt)}</span>
                   {m.visibility === "team" ? (
                     <span {...stylex.props(styles.vis)}>

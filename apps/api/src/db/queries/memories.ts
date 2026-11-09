@@ -40,6 +40,7 @@ export async function listMemories(
     kinds?: MemoryKind[];
     since?: string;
     createdAfter?: Date;
+    confirmedOnly?: boolean;
     q?: string;
     limit?: number;
   }
@@ -54,6 +55,9 @@ export async function listMemories(
   }
   if (!params.includePrivate) {
     where.push(eq(memories.visibility, "team"));
+  }
+  if (params.confirmedOnly === true) {
+    where.push(eq(memories.confirmed, true));
   }
   if (params.kinds && params.kinds.length > 0) {
     where.push(inArray(memories.kind, params.kinds));
@@ -200,6 +204,27 @@ export async function setMemoriesSuperseded(
         eq(memories.memberId, params.memberId),
         inArray(memories.id, params.ids),
         eq(memories.status, "active")
+      )
+    )
+    .returning();
+}
+
+export async function setMemoriesConfirmed(
+  db: DbOrTx,
+  params: { memberId: string; ids: string[]; now: Date }
+) {
+  if (!params.ids.length) {
+    return [];
+  }
+  return await db
+    .update(memories)
+    .set({ confirmed: true, updatedAt: params.now })
+    .where(
+      and(
+        eq(memories.memberId, params.memberId),
+        inArray(memories.id, params.ids),
+        eq(memories.status, "active"),
+        eq(memories.confirmed, false)
       )
     )
     .returning();

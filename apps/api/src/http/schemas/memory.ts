@@ -2,7 +2,23 @@ import { z } from "@hono/zod-openapi";
 
 import { MEMORY_KINDS, VISIBILITY } from "#db/schema";
 
-import { Timestamp } from "./common";
+import { IsoTimestamp, Timestamp } from "./common";
+
+export const MemoryEvidence = z
+  .discriminatedUnion("kind", [
+    z.object({
+      kind: z.literal("activity"),
+      id: z
+        .string()
+        .openapi({ description: "The activity it was learned from" }),
+    }),
+    z.object({
+      kind: z.literal("said"),
+      at: IsoTimestamp,
+      text: z.string().openapi({ description: "What you said, quoted" }),
+    }),
+  ])
+  .openapi("MemoryEvidence");
 
 export const Memory = z
   .object({
@@ -18,6 +34,14 @@ export const Memory = z
     }),
     day: z.string().nullable(),
     source: z.enum(["self", "agent", "teammate"]),
+    confirmed: z.boolean().openapi({
+      description:
+        "False when the assistant inferred it rather than was told or shown it; it then stays out of what conversations start with",
+    }),
+    evidence: z.array(MemoryEvidence).openapi({
+      description:
+        "What it was learned from, so it can be checked against the record",
+    }),
     expiresAt: Timestamp.nullable(),
     createdAt: Timestamp,
     updatedAt: Timestamp,

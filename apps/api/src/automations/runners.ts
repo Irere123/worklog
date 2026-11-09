@@ -396,7 +396,10 @@ async function classify(
       reason: defaultReason(c),
     }));
   }
-  const memory = await renderMemory(ctx, member.id, true, 0);
+  const memory = await renderMemory(ctx, member.id, {
+    includePrivate: true,
+    journalDays: 0,
+  });
   const output = await structured(ctx.models, {
     model: "fast",
     instructions: [

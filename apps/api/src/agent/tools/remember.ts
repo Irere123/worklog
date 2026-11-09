@@ -8,7 +8,7 @@ import { startOfLocalDate, timezoneOf } from "#lib/time";
 import { safe } from "./scope";
 import type { Scope } from "./scope";
 
-export function rememberTool({ ctx, owner }: Scope) {
+export function rememberTool({ ctx, owner, said }: Scope) {
   return tool({
     description: `Save something durable about ${owner.name}. profile = how they work, what they own, preferences; fact = knowledge worth keeping (decisions, context, why).`,
     inputSchema: z.object({
@@ -17,6 +17,11 @@ export function rememberTool({ ctx, owner }: Scope) {
       private: z
         .boolean()
         .describe("True if teammates asking this assistant must not see it"),
+      confirmed: z
+        .boolean()
+        .describe(
+          `True if ${owner.name} said it or their work shows it outright; false if you're inferring it`
+        ),
       supersedes: z
         .array(z.string())
         .optional()
@@ -39,6 +44,7 @@ export function rememberTool({ ctx, owner }: Scope) {
         content,
         kind,
         private: isPrivate,
+        confirmed,
         supersedes,
         aliases,
         expiresOn,
@@ -54,6 +60,11 @@ export function rememberTool({ ctx, owner }: Scope) {
           content,
           visibility: isPrivate ? "private" : "team",
           source: "agent",
+          confirmed,
+          // Quoted, since this turn's message is stored only once the turn ends.
+          evidence: said.trim()
+            ? [{ kind: "said", at: ctx.now().toISOString(), text: said }]
+            : [],
           supersedes,
           aliases,
           expiresAt: expiresOn ? startOfLocalDate(expiresOn, tz, 1) : null,

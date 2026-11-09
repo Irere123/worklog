@@ -848,6 +848,15 @@ export const notifications = pgTable(
 export const MEMORY_KINDS = ["profile", "fact", "journal", "digest"] as const;
 export type MemoryKind = (typeof MEMORY_KINDS)[number];
 
+/**
+ * What a line was learned from. Activity is cited by id, so checking the line reads the record as
+ * it stands now. What the owner said is quoted, since the message it came from may not be stored
+ * yet when the assistant remembers it mid-turn.
+ */
+export type MemoryEvidence =
+  | { kind: "activity"; id: string }
+  | { kind: "said"; at: string; text: string };
+
 /** Visibility is enforced in queries, not in prompts. */
 export const memories = pgTable(
   "memories",
@@ -880,6 +889,15 @@ export const memories = pgTable(
     supersededBy: text("superseded_by"),
     day: date("day"),
     source: text("source", { enum: ["self", "agent", "teammate"] }).notNull(),
+    /**
+     * False for an inference the evidence doesn't state outright ("seems to prefer mornings"):
+     * recall still finds it, marked, but it stays out of the digest every conversation starts with.
+     */
+    confirmed: boolean("confirmed").notNull().default(true),
+    evidence: jsonb("evidence")
+      .$type<MemoryEvidence[]>()
+      .notNull()
+      .default(sql`'[]'::jsonb`),
     /** Time-bound knowledge ("on leave until Friday") stops being recalled after this. */
     expiresAt: ts("expires_at"),
     createdAt: createdAt(),

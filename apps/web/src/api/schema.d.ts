@@ -2015,6 +2015,10 @@ export interface components {
             day: string | null;
             /** @enum {string} */
             source: "self" | "agent" | "teammate";
+            /** @description False when the assistant inferred it rather than was told or shown it; it then stays out of what conversations start with */
+            confirmed: boolean;
+            /** @description What it was learned from, so it can be checked against the record */
+            evidence: components["schemas"]["MemoryEvidence"][];
             /**
              * Format: date-time
              * @example 2026-10-26T08:30:00.000Z
@@ -2030,6 +2034,22 @@ export interface components {
              * @example 2026-10-26T08:30:00.000Z
              */
             updatedAt: string;
+        };
+        MemoryEvidence: {
+            /** @enum {string} */
+            kind: "activity";
+            /** @description The activity it was learned from */
+            id: string;
+        } | {
+            /** @enum {string} */
+            kind: "said";
+            /**
+             * Format: date-time
+             * @example 2026-10-26T08:30:00.000Z
+             */
+            at: string;
+            /** @description What you said, quoted */
+            text: string;
         };
         MemoryExport: {
             files: {

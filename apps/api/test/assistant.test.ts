@@ -189,6 +189,7 @@ describe("assistant", () => {
           content: "Owns the payments service",
           kind: "profile",
           private: false,
+          confirmed: true,
         },
       },
       { text: "Noted." },

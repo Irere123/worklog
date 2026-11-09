@@ -33,6 +33,25 @@ function asked(call: any): string {
     .join("");
 }
 
+// A line as a memory pass's model writes it, citing the ids it was shown.
+function learnedLine(content: string, confirmed: boolean, evidence: string[]) {
+  return {
+    content,
+    aliases: [],
+    expiresOn: null,
+    confirmed,
+    evidence,
+    supersedes: [],
+  };
+}
+
+function rememberFact(content: string, isPrivate: boolean) {
+  return {
+    tool: "remember",
+    input: { content, kind: "fact", private: isPrivate, confirmed: true },
+  };
+}
+
 // About 22k tokens a turn, so three turns cross the compaction budget.
 function big(label: string) {
   return `${label} ${"x".repeat(90_000)}`;
@@ -166,6 +185,9 @@ test("what the owner told their assistant is consolidated privately, and time-bo
             content: "On leave until 30 Oct; Sam covers payments",
             aliases: ["leave", "@sam"],
             expiresOn: "2026-10-30",
+            confirmed: true,
+            evidence: [],
+            supersedes: [],
           },
         ],
         profile: [],
@@ -218,9 +240,11 @@ test("Sunday's run tidies memory: duplicates merge and stale lines retire, keepi
             content: "Prefers written, async updates over calls",
             aliases: ["async", "calls"],
             expiresOn: null,
+            confirmed: true,
           },
         ],
         retire: [c],
+        confirm: [],
       }),
     },
     { text: "team digest" },
@@ -483,6 +507,8 @@ test("once a conversation goes quiet the assistant learns from what its owner sa
             content: "Prefers answers in French",
             aliases: ["language", "french"],
             expiresOn: null,
+            confirmed: true,
+            evidence: [],
             supersedes: [],
           },
         ],
@@ -504,7 +530,7 @@ test("once a conversation goes quiet the assistant learns from what its owner sa
   expect(prompts).toHaveLength(2);
   const pass = asked(prompts[1]);
   expect(pass).toContain(
-    '{"from":"owner","text":"Please answer me in French from now on."}'
+    '"from":"owner","text":"Please answer me in French from now on."}'
   );
   expect(pass).not.toContain("hates mornings");
   const [learned] = await memories(env, owner.token, "?q=french");
@@ -601,7 +627,7 @@ test("what Worklog adds around a message isn't taken for the owner's words", asy
   await env.drain({ later: owner.workspace.id });
 
   const pass = asked(prompts[1]);
-  expect(pass).toContain('{"from":"owner","text":"What\'s new?"}');
+  expect(pass).toContain('"from":"owner","text":"What\'s new?"}');
   expect(pass).not.toContain("Open right now");
   expect(pass).not.toContain("approve every refund");
 });
@@ -633,6 +659,8 @@ test("a memory pass can only replace lines it was shown", async () => {
             content: "Reviews onboarding copy",
             aliases: [],
             expiresOn: null,
+            confirmed: true,
+            evidence: [],
             supersedes: [secret.id],
           },
         ],
@@ -667,6 +695,8 @@ test("an owner's rating of a reply is learned from; a teammate's is kept but tea
             content: "Wants the answer first, then detail",
             aliases: ["short answers"],
             expiresOn: null,
+            confirmed: true,
+            evidence: [],
             supersedes: [],
           },
         ],
@@ -927,4 +957,187 @@ test("a rated reply can be asked again with today's prompts, and the replay chan
     await env.call("GET", `/v1/conversations/${id}`, { token: owner.token })
   ).body;
   expect(after.messages).toHaveLength(4);
+});
+
+test("each line cites what it was learned from, and inferences stay out of the digest", async () => {
+  const env = await testEnv();
+  const owner = await env.workspace();
+  env.ctx.now = () => TUESDAY;
+  const log = (
+    await env.call("POST", "/v1/logs", {
+      token: owner.token,
+      body: { text: "Moved the retry queue onto the new broker" },
+    })
+  ).body;
+  const chat = scriptedModel([{ text: "Noted." }]);
+  env.ctx.models = { main: chat.model, fast: chat.model };
+  const { conversation } = (
+    await env.call("POST", "/v1/conversations", {
+      token: owner.token,
+      body: { message: "I'm taking over billing from Sam next month." },
+    })
+  ).body;
+  const said = (
+    await env.call("GET", `/v1/conversations/${conversation.id}`, {
+      token: owner.token,
+    })
+  ).body.messages.find((m: any) => m.role === "user");
+
+  const writer = scriptedModel([
+    {
+      text: JSON.stringify({
+        journal: "- moved the retry queue",
+        facts: [
+          learnedLine("Owns the retry queue", true, [
+            log.id,
+            said.id,
+            "made_up",
+          ]),
+        ],
+        profile: [],
+      }),
+    },
+    {
+      text: JSON.stringify({
+        journal: "- planned the billing handover",
+        facts: [],
+        profile: [
+          learnedLine("Taking over billing from Sam", true, [said.id]),
+          learnedLine("Seems to prefer infrastructure work", false, [log.id]),
+        ],
+      }),
+    },
+    { text: "team digest" },
+    { text: "private digest" },
+  ]);
+  env.ctx.models = { main: writer.model, fast: writer.model };
+  await consolidate(env, owner.token, WEDNESDAY);
+  expect(asked(writer.prompts[0])).toContain(`"id":"${log.id}"`);
+  expect(asked(writer.prompts[1])).toContain(`"id":"${said.id}"`);
+
+  const [fact] = await memories(env, owner.token, "?kind=fact");
+  // The team pass was never shown the message, and nobody can cite an id that doesn't exist.
+  expect(fact).toMatchObject({
+    content: "Owns the retry queue",
+    visibility: "team",
+    confirmed: true,
+    evidence: [{ kind: "activity", id: log.id }],
+  });
+  const profile = await memories(env, owner.token, "?kind=profile");
+  expect(
+    profile.find((m: any) => m.content === "Taking over billing from Sam")
+  ).toMatchObject({
+    confirmed: true,
+    evidence: [
+      { kind: "said", text: "I'm taking over billing from Sam next month." },
+    ],
+  });
+  expect(
+    profile.find((m: any) => m.content.startsWith("Seems to prefer"))
+  ).toMatchObject({ confirmed: false });
+
+  const privateDigestInput = asked(writer.prompts[3]);
+  expect(privateDigestInput).toContain("Taking over billing from Sam");
+  expect(privateDigestInput).not.toContain("Seems to prefer");
+});
+
+test("a team-visible line the assistant remembers keeps no quote of what its owner said", async () => {
+  const env = await testEnv();
+  const owner = await env.workspace();
+  const { model } = scriptedModel([
+    rememberFact("Owns the payments service", false),
+    rememberFact("Interviewing elsewhere", true),
+    { text: "Noted." },
+  ]);
+  env.ctx.models = { main: model, fast: model };
+  await env.call("POST", "/v1/conversations", {
+    token: owner.token,
+    body: { message: "I own payments now. Between us, I'm interviewing." },
+  });
+  const facts = await memories(env, owner.token, "?kind=fact");
+  const find = (content: string) =>
+    facts.find((m: any) => m.content === content);
+  expect(find("Owns the payments service").evidence).toEqual([]);
+  expect(find("Interviewing elsewhere").evidence).toMatchObject([
+    {
+      kind: "said",
+      text: "I own payments now. Between us, I'm interviewing.",
+    },
+  ]);
+});
+
+test("Sunday's tidy checks each line against the record it cites, correcting and confirming", async () => {
+  const env = await testEnv();
+  const owner = await env.workspace();
+  env.ctx.now = () => TUESDAY;
+  const log = (
+    await env.call("POST", "/v1/logs", {
+      token: owner.token,
+      body: { text: "Handed the payments service over to Sam" },
+    })
+  ).body;
+  const first = scriptedModel([
+    {
+      text: JSON.stringify({
+        journal: "- payments handover",
+        facts: [
+          learnedLine("Took over the payments service from Sam", false, [
+            log.id,
+          ]),
+          learnedLine("Works with Sam on payments", false, [log.id]),
+        ],
+        profile: [],
+      }),
+    },
+    { text: "team digest" },
+    { text: "private digest" },
+  ]);
+  env.ctx.models = { main: first.model, fast: first.model };
+  await consolidate(env, owner.token, WEDNESDAY);
+  const facts = await memories(env, owner.token, "?kind=fact");
+  const id = (content: string) =>
+    facts.find((m: any) => m.content === content).id as string;
+  const wrong = id("Took over the payments service from Sam");
+  const right = id("Works with Sam on payments");
+
+  const tidy = scriptedModel([
+    {
+      text: JSON.stringify({
+        rewrites: [
+          {
+            replaces: [wrong],
+            kind: "fact",
+            content: "Handed the payments service over to Sam",
+            aliases: ["payments", "@sam"],
+            expiresOn: null,
+            confirmed: true,
+          },
+        ],
+        retire: [],
+        confirm: [right, "not_theirs"],
+      }),
+    },
+    { text: "team digest" },
+    { text: "private digest" },
+  ]);
+  env.ctx.models = { main: tidy.model, fast: tidy.model };
+  const run = await consolidate(env, owner.token, MONDAY);
+  expect(run.summary).toContain("1 line(s) merged, 0 retired, 1 confirmed");
+  const shown = asked(tidy.prompts[0]);
+  expect(shown).toContain(
+    `[${wrong}] fact (unconfirmed): Took over the payments service from Sam`
+  );
+  expect(shown).toContain('"Handed the payments service over to Sam"');
+
+  const after = await memories(env, owner.token, "?kind=fact");
+  expect(
+    after
+      .map((m: any) => ({ content: m.content, confirmed: m.confirmed }))
+      .toSorted((a: any, b: any) => a.content.localeCompare(b.content))
+  ).toEqual([
+    { content: "Handed the payments service over to Sam", confirmed: true },
+    { content: "Works with Sam on payments", confirmed: true },
+  ]);
+  const corrected = after.find((m: any) => m.content.startsWith("Handed"));
+  expect(corrected.evidence).toEqual([{ kind: "activity", id: log.id }]);
 });

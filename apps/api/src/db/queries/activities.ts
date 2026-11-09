@@ -114,6 +114,31 @@ export async function updateActivityById(
   return returned(rows, "activity");
 }
 
+// The entries memory cites, visible the same way as in `listActivities`; one deleted since is missing.
+export async function listActivitiesByIds(
+  db: DbOrTx,
+  params: { workspaceId: string; ids: string[]; privateFor: string[] }
+) {
+  if (!params.ids.length) {
+    return [];
+  }
+  return await db
+    .select()
+    .from(activities)
+    .where(
+      and(
+        eq(activities.workspaceId, params.workspaceId),
+        inArray(activities.id, params.ids),
+        params.privateFor.length > 0
+          ? or(
+              eq(activities.visibility, "team"),
+              inArray(activities.actorId, params.privateFor)
+            )
+          : eq(activities.visibility, "team")
+      )
+    );
+}
+
 // Team-visible activity plus private entries authored by anyone in `privateFor` (the viewer and their personal agent in owner mode).
 export async function listActivities(
   db: DbOrTx,

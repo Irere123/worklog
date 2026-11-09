@@ -13,6 +13,7 @@ import {
 import type { ConversationRow, MessageRow } from "#db/queries/conversations";
 import { findMemberById } from "#db/queries/members";
 import { getWorkspaceById } from "#db/queries/workspaces";
+import type { MemoryEvidence } from "#db/schema";
 import { transact } from "#db/transact";
 import { startOfLocalDate, timezoneOf } from "#lib/time";
 
@@ -44,6 +45,14 @@ const Learned = z.object({
           .describe(
             "YYYY-MM-DD after which it no longer holds, for time-bound knowledge; null if it lasts"
           ),
+        confirmed: z
+          .boolean()
+          .describe(
+            "True if they said it outright; false if you're inferring it from how they talk"
+          ),
+        evidence: z
+          .array(z.string())
+          .describe("Ids of their messages and ratings above that show it"),
         supersedes: z
           .array(z.string())
           .describe("Ids of the lines shown above that this one replaces"),
@@ -100,22 +109,37 @@ export async function learnFromConversation(
     return null;
   }
 
-  const memory = await loadMemory(ctx, owner.id, true, 0);
+  const memory = await loadMemory(ctx, owner.id, {
+    includePrivate: true,
+    journalDays: 0,
+  });
+  const quotes = new Map<string, MemoryEvidence>();
   // JSON with who said each thing, so a reply that quotes "Emma: …" can't pass for Emma speaking.
   const transcript = rows.slice(-MAX_MESSAGES).flatMap((r) => {
     const said = ownerSaid(r);
     if (said !== null) {
-      return [{ from: "owner", text: said.slice(0, MAX_LINE_CHARS) }];
+      const text = said.slice(0, MAX_LINE_CHARS);
+      quotes.set(r.id, { kind: "said", at: r.createdAt.toISOString(), text });
+      return [{ id: r.id, from: "owner", text }];
     }
     return r.role === "assistant" && r.text
       ? [{ from: "assistant", text: r.text.slice(0, MAX_LINE_CHARS) }]
       : [];
   });
-  const rated = ratings.map((r) => ({
-    rating: r.rating,
-    reply: (r.reply ?? "").slice(0, RATED_REPLY_CHARS),
-    ownerNote: r.note?.slice(0, MAX_LINE_CHARS) ?? null,
-  }));
+  const rated = ratings.map((r) => {
+    const ownerNote = r.note?.slice(0, MAX_LINE_CHARS) ?? null;
+    quotes.set(r.id, {
+      kind: "said",
+      at: r.updatedAt.toISOString(),
+      text: `Rated a reply ${r.rating}${ownerNote ? `: ${ownerNote}` : ""}`,
+    });
+    return {
+      id: r.id,
+      rating: r.rating,
+      reply: (r.reply ?? "").slice(0, RATED_REPLY_CHARS),
+      ownerNote,
+    };
+  });
   const output = await structured(ctx.models, {
     model: "fast",
     instructions: [prompt("learn", { name: owner.name }), UNTRUSTED_NOTE],
@@ -144,6 +168,11 @@ export async function learnFromConversation(
         aliases: r.aliases,
         visibility: "private",
         source: "agent",
+        confirmed: r.confirmed,
+        evidence: [...new Set(r.evidence)].flatMap((id) => {
+          const quote = quotes.get(id);
+          return quote ? [quote] : [];
+        }),
         expiresAt: r.expiresOn
           ? (startOfLocalDate(r.expiresOn, tz, 1) ?? null)
           : null,

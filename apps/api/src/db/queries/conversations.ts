@@ -337,7 +337,11 @@ export async function listOwnerMessages(
   params: { ownerId: string; since: Date; until: Date; limit: number }
 ) {
   return await db
-    .select({ text: messages.text, createdAt: messages.createdAt })
+    .select({
+      id: messages.id,
+      text: messages.text,
+      createdAt: messages.createdAt,
+    })
     .from(messages)
     .innerJoin(conversations, eq(conversations.id, messages.conversationId))
     .where(

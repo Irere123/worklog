@@ -8,10 +8,13 @@ import {
   setMemoriesSuperseded,
 } from "#db/queries/memories";
 import type { MemoryRow } from "#db/queries/memories";
-import type { MemoryKind, Visibility } from "#db/schema";
+import type { MemoryEvidence, MemoryKind, Visibility } from "#db/schema";
 import { transact } from "#db/transact";
 import { notFound } from "#lib/errors";
 import { generateId } from "#lib/ids";
+
+const MAX_EVIDENCE = 10;
+const MAX_QUOTE_CHARS = 500;
 
 export async function addMemory(
   ctx: AppContext,
@@ -22,6 +25,8 @@ export async function addMemory(
     content: string;
     visibility?: Visibility;
     source: MemoryRow["source"];
+    confirmed: boolean;
+    evidence?: MemoryEvidence[];
     day?: string | null;
     aliases?: string[];
     expiresAt?: Date | null;
@@ -41,6 +46,8 @@ export async function addMemory(
     supersededBy: null,
     day: input.day ?? null,
     source: input.source,
+    confirmed: input.confirmed,
+    evidence: keptEvidence(input.evidence ?? [], input.visibility ?? "team"),
     expiresAt: input.expiresAt ?? null,
     createdAt: now,
     updatedAt: now,
@@ -123,13 +130,19 @@ export async function retireMemories(
   });
 }
 
+type MemoryView = {
+  includePrivate: boolean;
+  journalDays?: number;
+  /** For what's put in front of every conversation, where a wrong guess would spread to all of them. */
+  confirmedOnly?: boolean;
+};
+
 export async function renderMemory(
   ctx: AppContext,
   memberId: string,
-  includePrivate: boolean,
-  journalDays = 3
+  view: MemoryView
 ) {
-  const memory = await loadMemory(ctx, memberId, includePrivate, journalDays);
+  const memory = await loadMemory(ctx, memberId, view);
   return memory.text;
 }
 
@@ -140,14 +153,15 @@ export async function renderMemory(
 export async function loadMemory(
   ctx: AppContext,
   memberId: string,
-  includePrivate: boolean,
-  journalDays = 3
+  view: MemoryView
 ) {
+  const { includePrivate, journalDays = 3, confirmedOnly } = view;
   const now = ctx.now();
   const profile = await listMemories(ctx.db, {
     memberId,
     kinds: ["profile"],
     includePrivate,
+    confirmedOnly,
     now,
     limit: 40,
   });
@@ -155,6 +169,7 @@ export async function loadMemory(
     memberId,
     kinds: ["fact"],
     includePrivate,
+    confirmedOnly,
     now,
     limit: 60,
   });
@@ -170,8 +185,8 @@ export async function loadMemory(
   return {
     shown: new Set([...profile, ...facts].map((r) => r.id)),
     text: [
-      section("Profile", profile, (r) => `- ${r.content} [${r.id}]`),
-      section("Facts", facts, (r) => `- ${r.content} [${r.id}]`),
+      section("Profile", profile, bullet),
+      section("Facts", facts, bullet),
       section("Recent journal", journal, (r) => `### ${r.day}\n${r.content}`),
     ].join("\n\n"),
   };
@@ -184,7 +199,8 @@ const CHANGES_LIMIT = 20;
 // from all their memory, teammates the one built from team memory, followed by what memory learned
 // and forgot since it was written, so a preference told this morning shapes this afternoon's
 // answers instead of waiting for tonight's rewrite. Without a digest yet (a new member, or no AI)
-// it's rendered raw.
+// it's rendered raw. Unconfirmed lines stay out of all of it, since whatever is here reaches every
+// conversation; recall still finds them, marked.
 export async function memoryPage(
   ctx: AppContext,
   memberId: string,
@@ -195,7 +211,11 @@ export async function memoryPage(
     visibility: includePrivate ? "private" : "team",
   });
   if (!digest) {
-    return await renderMemory(ctx, memberId, includePrivate, 1);
+    return await renderMemory(ctx, memberId, {
+      includePrivate,
+      journalDays: 1,
+      confirmedOnly: true,
+    });
   }
   const changes = await memoryChanges(
     ctx,
@@ -229,6 +249,7 @@ export async function memoryChanges(
       includePrivate,
       now: ctx.now(),
       kinds: ["profile", "fact"],
+      confirmedOnly: true,
       createdAfter: since,
       limit: CHANGES_LIMIT,
     }),
@@ -265,8 +286,24 @@ async function replaceLatest(
   return await addMemory(ctx, {
     ...input,
     source: "agent",
+    confirmed: true,
     supersedes: existing,
   });
+}
+
+// A team-visible line keeps only the activity it cites: what the owner said to their own assistant
+// stays private even when the line it taught is shared, so no pass over team memory can read it.
+function keptEvidence(evidence: MemoryEvidence[], visibility: Visibility) {
+  return evidence
+    .filter((e) => visibility === "private" || e.kind === "activity")
+    .map((e) =>
+      e.kind === "said" ? { ...e, text: e.text.slice(0, MAX_QUOTE_CHARS) } : e
+    )
+    .slice(-MAX_EVIDENCE);
+}
+
+function bullet(r: MemoryRow) {
+  return `- ${r.content}${r.confirmed ? "" : " (unconfirmed)"} [${r.id}]`;
 }
 
 function cleanAliases(aliases: string[]) {
