@@ -27,21 +27,18 @@ import {
 } from "@phosphor-icons/react";
 import type { IconProps } from "@phosphor-icons/react";
 import * as stylex from "@stylexjs/stylex";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import type { UIMessage } from "ai";
 import type { ComponentType } from "react";
 import { useState } from "react";
-import { toast } from "sonner";
 
 import type { Schemas } from "#api/client";
-import { api, unwrap } from "#api/client";
 import { q } from "#api/queries";
 import { SourceGlyph } from "#features/activity/activity-line";
 import type { Member } from "#features/cards/card-bits";
 import { Logo } from "#features/shell/logo";
 import { ago } from "#lib/time";
-import { Button } from "#ui/button";
 import { Markdown } from "#ui/markdown";
 import {
   color,
@@ -54,6 +51,8 @@ import {
   text,
 } from "#ui/tokens.stylex";
 
+import { AllowDeny, useAnswerApproval } from "./approvals";
+import type { Answer } from "./approvals";
 import { ASKS, describe, summarize } from "./tool-words";
 
 /** One thing the assistant did on the way to a reply, live or from the stored transcript. */
@@ -421,6 +420,11 @@ function ToolRow({
   );
 }
 
+const ANSWERED: Record<Answer, string> = {
+  allow: "you allowed it",
+  deny: "you declined it",
+};
+
 /**
  * A write teammates would see that the review held back: it waits here and in the inbox for the
  * owner's Allow or Deny, and a tap runs exactly what was proposed.
@@ -434,27 +438,10 @@ function HeldRow({
   approvalId: string;
   people: Map<string, Member>;
 }) {
-  const client = useQueryClient();
   // Asked by id: the open list is capped and leaves out snoozed items, both still waiting.
   const request = useQuery(q.attentionItem(approvalId));
-  const [answer, setAnswer] = useState<"allow" | "deny" | null>(null);
-  const act = useMutation({
-    mutationFn: async (actionId: "allow" | "deny") =>
-      await unwrap(
-        api.POST("/v1/attention/{id}/actions/{actionId}", {
-          params: { path: { id: approvalId, actionId } },
-        })
-      ),
-    onMutate: (actionId) => setAnswer(actionId),
-    onSuccess: () => {
-      void client.invalidateQueries({ queryKey: ["attention"] });
-      void client.invalidateQueries({ queryKey: ["cards"] });
-    },
-    onError: (error) => {
-      setAnswer(null);
-      toast.error(error.message);
-    },
-  });
+  const act = useAnswerApproval();
+  const answer = act.isError ? null : (act.variables?.answer ?? null);
   const waiting =
     answer === null &&
     (request.data?.state === "open" || request.data?.state === "snoozed");
@@ -465,12 +452,7 @@ function HeldRow({
     (request.data !== undefined && !waiting);
   const what =
     ASKS[step.tool]?.(step.input) ?? describe(step, people).toLowerCase();
-  let status = "answered in your inbox";
-  if (answer === "allow") {
-    status = "you allowed it";
-  } else if (answer === "deny") {
-    status = "you declined it";
-  }
+  const status = answer === null ? "answered in your inbox" : ANSWERED[answer];
   return (
     <li {...stylex.props(styles.step)}>
       <div {...stylex.props(styles.held, waiting && styles.heldWaiting)}>
@@ -485,16 +467,9 @@ function HeldRow({
         </span>
         {waiting && (
           <span {...stylex.props(styles.heldActions)}>
-            <Button
-              size="sm"
-              variant="primary"
-              onClick={() => act.mutate("allow")}
-            >
-              Allow
-            </Button>
-            <Button size="sm" onClick={() => act.mutate("deny")}>
-              Deny
-            </Button>
+            <AllowDeny
+              onAnswer={(a) => act.mutate({ id: approvalId, answer: a })}
+            />
           </span>
         )}
       </div>

@@ -4,7 +4,6 @@ import {
   EnvelopeSimpleIcon,
   HashIcon,
   PaperPlaneRightIcon,
-  PlayIcon,
   PlusIcon,
   TrashIcon,
   WebhooksLogoIcon,
@@ -18,10 +17,9 @@ import { toast } from "sonner";
 import type { Schemas } from "#api/client";
 import { api, unwrap } from "#api/client";
 import { q } from "#api/queries";
-import { ago, agoPhrase, fromNow } from "#lib/time";
+import { ago } from "#lib/time";
 import { Button } from "#ui/button";
 import { Badge } from "#ui/chip";
-import type { Tone } from "#ui/chip";
 import { EmptyState, Skeleton } from "#ui/feedback";
 import {
   Checkbox,
@@ -29,7 +27,6 @@ import {
   Input,
   Select,
   Stepper,
-  Switch,
   Textarea,
   TimeSelect,
 } from "#ui/field";
@@ -37,104 +34,20 @@ import { Dialog, Menu, MenuItem, Tooltip } from "#ui/overlay";
 import { color, media, radius, space, text } from "#ui/tokens.stylex";
 
 import { Card, SettingsPage, settingsStyles } from "./frame";
+import { RoutineList } from "./routine-list";
+import { DAYS, KINDS, statusOf } from "./routine-words";
 
 type Automation = Schemas["Automation"];
 type Schedule = Automation["schedule"];
 type Kind = Automation["kind"];
 
-const DAYS = [
-  "Sunday",
-  "Monday",
-  "Tuesday",
-  "Wednesday",
-  "Thursday",
-  "Friday",
-  "Saturday",
-];
-
-export function describeSchedule(s: Schedule) {
-  if (s.type === "daily") {
-    return `${daysPhrase(s.weekdays)} at ${s.at}`;
-  }
-  if (s.type === "weekly") {
-    return `${DAYS[s.weekday]}s at ${s.at}`;
-  }
-  return `Every ${s.minutes >= 60 ? `${s.minutes / 60} h` : `${s.minutes} min`}${s.activeHoursOnly === true ? " during working hours" : ""}`;
-}
-
-function daysPhrase(weekdays: number[] | undefined) {
-  const days = (weekdays ?? [0, 1, 2, 3, 4, 5, 6])
-    .toSorted((a, b) => a - b)
-    .join(",");
-  const named: Record<string, string> = {
-    "0,1,2,3,4,5,6": "Every day",
-    "1,2,3,4,5": "Weekdays",
-    "0,6": "Weekends",
-  };
-  return (
-    named[days] ?? (weekdays ?? []).map((d) => DAYS[d]?.slice(0, 3)).join(", ")
-  );
-}
-
-const KINDS: Record<Kind, string> = {
-  "brief.daily": "Daily brief",
-  "brief.weekly": "Weekly brief",
-  digest: "Digest of held items",
-  check: "Check-in",
-  consolidate: "Memory tidy-up",
-  custom: "Custom routine",
-};
-
-const STATUS: Record<string, { label: string; tone: Tone }> = {
-  delivered: { label: "Delivered", tone: "green" },
-  quiet: { label: "Nothing to say", tone: "neutral" },
-  skipped: { label: "Skipped", tone: "neutral" },
-  failed: { label: "Failed", tone: "red" },
-};
-
-function statusOf(status: string) {
-  return STATUS[status] ?? { label: status, tone: "neutral" as Tone };
-}
-
 export function Automations() {
   const automations = useQuery(q.automations());
   const [editing, setEditing] = useState<Automation | "new" | null>(null);
-  const client = useQueryClient();
-  const refresh = () => {
-    void client.invalidateQueries({ queryKey: ["automations"] });
-  };
-  const toggle = useMutation({
-    mutationFn: async (a: Automation) =>
-      await unwrap(
-        api.PATCH("/v1/automations/{id}", {
-          params: { path: { id: a.id } },
-          body: { enabled: !a.enabled },
-        })
-      ),
-    onSuccess: refresh,
-    onError: (error) => toast.error(error.message),
-  });
-  const run = useMutation({
-    mutationFn: async (a: Automation) =>
-      await unwrap(
-        api.POST("/v1/automations/{id}/run", { params: { path: { id: a.id } } })
-      ),
-    onSuccess: (result) => {
-      refresh();
-      toast(
-        result.status === "delivered"
-          ? "Ran and delivered"
-          : `Ran: ${statusOf(result.status).label}`,
-        { description: result.summary ?? undefined }
-      );
-    },
-    onError: (error) => toast.error(error.message),
-  });
-
   return (
     <SettingsPage
       title="Automations"
-      description="Routines your assistant runs on a schedule: briefs, digests, check-ins and your own. Quiet runs send nothing."
+      description="Routines your assistant runs on a schedule: briefs, digests, check-ins and your own. Quiet runs send nothing. They're also on your assistant's page."
       actions={
         <Button
           size="sm"
@@ -158,62 +71,9 @@ export function Automations() {
             title="No routines yet"
           />
         )}
-        <ul {...stylex.props(settingsStyles.list)}>
-          {automations.data?.map((a) => (
-            <li key={a.id} {...stylex.props(settingsStyles.listRow)}>
-              <Switch
-                checked={a.enabled}
-                onCheckedChange={() => toggle.mutate(a)}
-                label={`${a.name} enabled`}
-              />
-              <button
-                type="button"
-                onClick={() => setEditing(a)}
-                {...stylex.props(settingsStyles.main, styles.rowButton)}
-              >
-                <p {...stylex.props(settingsStyles.strong)}>{a.name}</p>
-                <p {...stylex.props(settingsStyles.sub)}>
-                  {KINDS[a.kind]} · {describeSchedule(a.schedule)}
-                  {a.enabled && a.nextRunAt
-                    ? ` · runs ${fromNow(a.nextRunAt)}`
-                    : ""}
-                </p>
-              </button>
-              {a.lastStatus && (
-                <Tooltip
-                  label={
-                    a.lastRunAt
-                      ? `Last ran ${agoPhrase(a.lastRunAt)}`
-                      : "Last run"
-                  }
-                >
-                  <span>
-                    <Badge tone={statusOf(a.lastStatus).tone}>
-                      {statusOf(a.lastStatus).label}
-                    </Badge>
-                  </span>
-                </Tooltip>
-              )}
-              {a.failureCount > 0 && (
-                <Badge tone="red">
-                  {a.failureCount === 1
-                    ? "1 failure"
-                    : `${a.failureCount} failures`}
-                </Badge>
-              )}
-              <Tooltip label="Run now">
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  aria-label={`Run ${a.name} now`}
-                  icon={<PlayIcon size={14} />}
-                  busy={run.isPending && run.variables?.id === a.id}
-                  onClick={() => run.mutate(a)}
-                />
-              </Tooltip>
-            </li>
-          ))}
-        </ul>
+        {automations.data && (
+          <RoutineList routines={automations.data} onEdit={setEditing} />
+        )}
       </Card>
       {editing !== null && (
         <AutomationDialog
@@ -225,7 +85,7 @@ export function Automations() {
   );
 }
 
-function AutomationDialog({
+export function AutomationDialog({
   automation,
   onClose,
 }: {
@@ -828,7 +688,6 @@ function targetNoun(kind: Schemas["DeliveryTarget"]["kind"]) {
 }
 
 const styles = stylex.create({
-  rowButton: { textAlign: "left" },
   body: {
     display: "flex",
     flexDirection: "column",
