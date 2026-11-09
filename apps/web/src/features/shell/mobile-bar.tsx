@@ -4,14 +4,16 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 
 import { q } from "#api/queries";
-import { Count } from "#ui/chip";
+import { AssistantFace, usePresence } from "#features/assistant/presence";
+import { Count, Dot } from "#ui/chip";
 import { color, radius, space, text } from "#ui/tokens.stylex";
 
 import { Logo } from "./logo";
 
 /**
- * Narrow screens only: the sidebar folds into a drawer, and this bar keeps the three things a
- * phone visit is for one tap away: the menu, search, and what's waiting in the inbox.
+ * Narrow screens only: the sidebar folds into a drawer, and this bar keeps what a phone visit is
+ * for one tap away: the menu, search, your assistant (whose face shows what it's doing) and
+ * what's waiting in the inbox.
  */
 export function MobileBar({
   onMenu,
@@ -23,6 +25,9 @@ export function MobileBar({
   const me = useQuery(q.me());
   const attention = useQuery(q.attention("open"));
   const waiting = attention.data?.length ?? 0;
+  const { agent, state, glance, presence } = usePresence();
+  const line = glance?.line;
+  const unseen = (presence?.done.length ?? 0) > 0;
   return (
     <header {...stylex.props(styles.bar)}>
       <button
@@ -47,6 +52,18 @@ export function MobileBar({
       >
         <MagnifyingGlassIcon size={18} />
       </button>
+      <Link
+        to="/assistant"
+        aria-label={line ? `Assistant: ${line}` : "Assistant"}
+        {...stylex.props(styles.icon, styles.inbox)}
+      >
+        <AssistantFace agent={agent} state={state} size={20} />
+        {unseen && (
+          <span {...stylex.props(styles.dot)}>
+            <Dot tone="accent" />
+          </span>
+        )}
+      </Link>
       <Link
         to="/inbox"
         aria-label={`Inbox, ${waiting} waiting`}
@@ -91,6 +108,7 @@ const styles = stylex.create({
   },
   inbox: { color: color.fg },
   badge: { position: "absolute", top: 2, right: 0 },
+  dot: { position: "absolute", top: 8, right: 7, display: "inline-flex" },
   brand: {
     display: "flex",
     alignItems: "center",

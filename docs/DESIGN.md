@@ -7,7 +7,7 @@ Read this before building a screen. A model asked for "an inbox" or "a dashboard
 Worklog is the team's logbook. The tools write it, so nobody has to report status, and anyone can read what really happened. Three values decide close calls:
 
 - **Honest.** Every row is something that happened, with a source, a person or agent, and a time. Every item in the inbox says why it's there. An agent's work is labelled and has a human answerable for it. Nothing is invented to fill space: an empty state says what will appear and when.
-- **Calm.** Only attention gets counted: one number, on the inbox. The app stays quiet until something needs you, and things that drift fade rather than shout. Each screen has one main action, and keyboard hints sit beside the actions they trigger.
+- **Calm.** Only attention gets counted: one number on the inbox, and on the assistant only the changes waiting for your OK. The app stays quiet until something needs you, and things that drift fade rather than shout. Each screen has one main action, and keyboard hints sit beside the actions they trigger.
 - **Human.** People appear as their faces and in their own words, and each agent has a face of its own. Neutrals are warm, like paper. Fizzy's playfulness stays: Maybe?, golden tickets, rubber stamps.
 
 ## How it sounds
@@ -38,6 +38,7 @@ The assistant and every agent follow the same rules, so their work reads as part
 - **Writes others will see wait in place.** A held write reads "Wants your OK to move #9 to Investigating" with Allow and Deny, the same request as in the inbox.
 - **Work shows where it happens.** An agent's run that names a card is one line on that card ("Atlas needs you: …"), edited in place, never a stream of posts. It shows only while the run is moving or waiting on someone.
 - **Every claim can be checked.** Opening a lookup lists what it found; a `#8` shows the card on hover.
+- **Its face says how it's doing.** The assistant's avatar in the sidebar breathes while it works, glances up when it wants your OK, and is still otherwise. There is no separate status light to learn. Resting on it says the current step in words ("Searching activity for “blocked”"); a dot marks an answer you haven't read. A teammate's question shows only as "Answering a teammate".
 - **One place for each control.** Send becomes Stop; actions sit under the reply, pinned on the latest one. Nothing animates on send, and only what arrives live moves in.
 
 ## Standards are code

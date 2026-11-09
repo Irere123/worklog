@@ -21,10 +21,12 @@ import { ApiError, api, unwrap } from "#api/client";
 import { q } from "#api/queries";
 import { useMe } from "#features/auth/session";
 import { useMembers } from "#features/cards/card-bits";
+import type { Member } from "#features/cards/card-bits";
 import { ago, recencyLabel } from "#lib/time";
 import { Avatar } from "#ui/avatar";
 import { Button } from "#ui/button";
-import { EmptyState, ErrorNote, Skeleton } from "#ui/feedback";
+import { Dot } from "#ui/chip";
+import { EmptyState, ErrorNote, Skeleton, VisuallyHidden } from "#ui/feedback";
 import { Input } from "#ui/field";
 import { PageHeader } from "#ui/layout";
 import { Menu, MenuItem, Tooltip } from "#ui/overlay";
@@ -32,6 +34,8 @@ import { color, leading, media, radius, space, text } from "#ui/tokens.stylex";
 
 import { Chat, PendingThread } from "./chat";
 import { Composer } from "./composer";
+import { AssistantFace, hasUnseenReply, usePresence } from "./presence";
+import type { Glance } from "./presence";
 import { useSuggestions } from "./suggestions";
 
 // Past this many, the list gets a filter: scrolling stops being the quick way to find one.
@@ -40,6 +44,12 @@ const FILTER_FROM = 8;
 export function Conversations({ children }: { children: ReactNode }) {
   const list = useQuery({ ...q.conversations(), select: notBeingDeleted });
   const { byId } = useMembers();
+  const { agent: mine, presence } = usePresence();
+  const busy = new Set(
+    presence?.working.flatMap((w) =>
+      w.kind === "reply" ? [w.conversationId] : []
+    )
+  );
   const [filter, setFilter] = useState("");
   const term = filter.trim().toLowerCase();
   const shown = (list.data ?? []).filter(
@@ -110,12 +120,19 @@ export function Conversations({ children }: { children: ReactNode }) {
                     {c.mode === "teammate" && owner && (
                       <Avatar person={owner} size={16} />
                     )}
-                    <span {...stylex.props(styles.itemTitle)}>
+                    <span
+                      {...stylex.props(
+                        styles.itemTitle,
+                        hasUnseenReply(c) && styles.itemUnseen
+                      )}
+                    >
                       {titleOf(c, owner?.name)}
                     </span>
-                    <span {...stylex.props(styles.itemTime)}>
-                      {ago(c.updatedAt)}
-                    </span>
+                    <ItemStatus
+                      conversation={c}
+                      working={busy.has(c.id)}
+                      agent={mine}
+                    />
                   </Link>
                 );
               })}
@@ -171,10 +188,8 @@ export function NewChat({ ask }: { ask?: string }) {
   const navigate = useNavigate();
   const started = useRef(false);
   const me = useMe();
-  const { list } = useMembers();
-  const mine = list.find(
-    (m) => m.agentProvider === "worklog" && m.ownerId === me?.member.id
-  );
+  const { agent: mine, state, glance } = usePresence();
+  const conversations = useQuery(q.conversations());
   const open = useMutation({
     mutationFn: async (question: string) => {
       const reply = await unwrap(
@@ -225,16 +240,21 @@ export function NewChat({ ask }: { ask?: string }) {
     <div {...stylex.props(styles.empty)}>
       <div {...stylex.props(styles.emptyColumn)}>
         <div {...stylex.props(styles.emptyHead)}>
-          {mine && <Avatar person={mine} size={40} />}
+          {mine && <AssistantFace agent={mine} state={state} size={40} />}
           <h1 {...stylex.props(styles.emptyTitle)}>
             {firstName
               ? `What can I find for you, ${firstName}?`
               : "What can I find for you?"}
           </h1>
-          <p {...stylex.props(styles.emptyText)}>
-            Your assistant reads the team’s activity and your board, remembers
-            what you tell it, and stays quiet when there’s nothing to say.
-          </p>
+          {/* Someone new learns what it is; after that, the line says what it's doing. */}
+          {conversations.data?.length === 0 || !glance ? (
+            <p {...stylex.props(styles.emptyText)}>
+              Your assistant reads the team’s activity and your board, remembers
+              what you tell it, and stays quiet when there’s nothing to say.
+            </p>
+          ) : (
+            <StatusLine glance={glance} />
+          )}
         </div>
         <Composer
           busy={open.isPending}
@@ -263,6 +283,61 @@ export function NewChat({ ask }: { ask?: string }) {
   );
 }
 
+/** What the assistant is doing, linked to where it's doing it when that's a conversation. */
+function StatusLine({ glance }: { glance: Glance }) {
+  return (
+    <p aria-live="polite" {...stylex.props(styles.emptyText)}>
+      {glance.conversationId ? (
+        <Link
+          to="/assistant/$conversationId"
+          params={{ conversationId: glance.conversationId }}
+          {...stylex.props(styles.statusLink)}
+        >
+          {glance.line}
+        </Link>
+      ) : (
+        glance.line
+      )}
+    </p>
+  );
+}
+
+// Where a row's time goes: the assistant's face while it's answering there, a dot for an answer
+// not yet read, otherwise how long ago it moved.
+function ItemStatus({
+  conversation,
+  working,
+  agent,
+}: {
+  conversation: {
+    updatedAt: string;
+    repliedAt: string | null;
+    seenAt: string | null;
+  };
+  working: boolean;
+  agent: Member | undefined;
+}) {
+  if (working) {
+    return (
+      <span {...stylex.props(styles.itemTime)}>
+        <VisuallyHidden>Answering</VisuallyHidden>
+        <AssistantFace agent={agent} state="working" size={14} />
+      </span>
+    );
+  }
+  return (
+    <span {...stylex.props(styles.itemTime)}>
+      {hasUnseenReply(conversation) && (
+        <>
+          <VisuallyHidden>New answer, </VisuallyHidden>
+          <Dot tone="accent" />
+        </>
+      )}
+      {ago(conversation.updatedAt)}
+    </span>
+  );
+}
+
 /** On a phone the list beside the thread is hidden, so a new chat lists the latest ones. */
 function RecentConversations() {
   const list = useQuery({ ...q.conversations(), select: notBeingDeleted });
@@ -280,8 +355,15 @@ function RecentConversations() {
           params={{ conversationId: c.id }}
           {...stylex.props(styles.item)}
         >
-          <span {...stylex.props(styles.itemTitle)}>{titleOf(c)}</span>
-          <span {...stylex.props(styles.itemTime)}>{ago(c.updatedAt)}</span>
+          <span
+            {...stylex.props(
+              styles.itemTitle,
+              hasUnseenReply(c) && styles.itemUnseen
+            )}
+          >
+            {titleOf(c)}
+          </span>
+          <ItemStatus conversation={c} working={false} agent={undefined} />
         </Link>
       ))}
     </nav>
@@ -760,7 +842,11 @@ const styles = stylex.create({
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
   },
+  itemUnseen: { fontWeight: 600, color: color.fg },
   itemTime: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: space.xs,
     flexShrink: 0,
     fontSize: text.caption,
     // The open conversation's fill is a step darker, so its time steps up to stay readable.
@@ -803,8 +889,9 @@ const styles = stylex.create({
     display: "flex",
     flexDirection: "column",
     alignItems: "center",
+    // "safe": once routines fill the page it scrolls from the top instead of clipping it.
     justifyContent: {
-      default: "center",
+      default: "safe center",
       "@media (max-width: 640px)": "flex-start",
     },
     paddingBlock: space.x4,
@@ -813,6 +900,7 @@ const styles = stylex.create({
   },
   emptyColumn: {
     display: "flex",
+    flexShrink: 0,
     flexDirection: "column",
     gap: space.xl,
     width: "100%",
@@ -835,6 +923,15 @@ const styles = stylex.create({
     fontWeight: 600,
     letterSpacing: "-0.01em",
     textWrap: "balance",
+  },
+  statusLink: {
+    color: "inherit",
+    textDecorationLine: "underline",
+    textDecorationColor: {
+      default: color.line,
+      ":hover": { default: null, [media.hover]: color.fgMuted },
+    },
+    textUnderlineOffset: 3,
   },
   emptyText: {
     margin: 0,
