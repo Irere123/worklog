@@ -16,8 +16,8 @@ COPY apps/web/package.json apps/web/
 # --omit=peer: Bun installs a package's optional peers whenever the lockfile has them, and Better
 # Auth's (drizzle-kit, Vite, TanStack Start) and Drizzle's (PGlite) would triple the image. The
 # API's own dependencies cover every peer it uses.
-RUN --mount=type=cache,target=/root/.bun/install/cache \
-    bun install --frozen-lockfile --ignore-scripts --production --omit=peer --filter @worklog/api
+# No cache mount: Railway only accepts one whose id names a single service, and this file builds two.
+RUN bun install --frozen-lockfile --ignore-scripts --production --omit=peer --filter @worklog/api
 
 FROM oven/bun:${BUN_VERSION}-slim AS runtime
 # What a deployment reports as its release in health checks and telemetry. Railway also sets

@@ -12,8 +12,8 @@ COPY package.json bun.lock ./
 COPY apps/api/package.json apps/api/
 COPY apps/web/package.json apps/web/
 # --ignore-scripts: the only install script wires git hooks, and there's no repo here.
-RUN --mount=type=cache,target=/root/.bun/install/cache \
-    bun install --frozen-lockfile --ignore-scripts --filter @worklog/web
+# No cache mount: Railway only accepts one whose id is a service's, hard-coded.
+RUN bun install --frozen-lockfile --ignore-scripts --filter @worklog/web
 COPY apps/web apps/web
 RUN bun run --filter @worklog/web build \
     && bun apps/web/scripts/precompress.ts apps/web/dist/client
