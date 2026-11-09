@@ -6,11 +6,6 @@ import { addJob, unlockStaleJobs } from "#db/queries/jobs";
 import type { NewJob } from "#db/queries/jobs";
 import { log } from "#telemetry/log";
 
-export type JobHandler = (
-  ctx: AppContext,
-  payload: Record<string, unknown>
-) => Promise<void>;
-
 // Graphile Worker's messages vary with the job, so they go in a field; the error it hands over
 // is what groups them into issues. A task's own failure is logged by the task wrapper.
 export const logger = new Logger((scope) => (level, message, meta) => {

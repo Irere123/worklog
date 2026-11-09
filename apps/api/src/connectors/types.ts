@@ -1,8 +1,6 @@
 import type { Config } from "#config";
 import type { AppContext } from "#context";
 
-export const EVENT_SCHEMA_VERSION = 1;
-
 export type ExternalActor = {
   /** The source's most stable id for the account, not the login. */
   id: string;

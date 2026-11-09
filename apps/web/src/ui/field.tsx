@@ -382,16 +382,6 @@ export function Segmented<T extends string>({
   );
 }
 
-export const fieldStyles = stylex.create({
-  bare: {
-    borderWidth: 0,
-    backgroundColor: "transparent",
-    boxShadow: "none",
-    paddingInline: 0,
-    outline: { default: "none", ":focus-visible": "none" },
-  },
-});
-
 const styles = stylex.create({
   field: { display: "flex", flexDirection: "column", gap: space.sm },
   label: { fontSize: text.label, fontWeight: 500, color: color.fg },

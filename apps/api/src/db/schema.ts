@@ -160,7 +160,6 @@ export const CONNECTION_STATUSES = [
   "suspended",
   "revoked",
 ] as const;
-export type ConnectionStatus = (typeof CONNECTION_STATUSES)[number];
 
 export const connections = pgTable(
   "connections",

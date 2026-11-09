@@ -71,15 +71,6 @@ export async function updateConnectorAppCredentialsIfUnchanged(
   return rows.length > 0;
 }
 
-export async function deleteConnectorApp(
-  db: DbOrTx,
-  params: { provider: string }
-) {
-  await db
-    .delete(connectorApps)
-    .where(eq(connectorApps.provider, params.provider));
-}
-
 export type AppTally = {
   provider: string;
   unrouted: number;

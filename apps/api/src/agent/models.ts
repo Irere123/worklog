@@ -46,7 +46,3 @@ export const TIMEOUTS = {
 export const CACHED = {
   openrouter: { cacheControl: { type: "ephemeral" } },
 } as const;
-
-export function modelIdOf(model: LanguageModel): string {
-  return typeof model === "string" ? model : model.modelId;
-}

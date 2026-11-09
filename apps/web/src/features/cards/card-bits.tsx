@@ -289,7 +289,7 @@ export function stageLabel(stage: Card["stage"]) {
 }
 
 /** The last quarter of a card's drift window, counted down so it can't be missed. */
-export function DriftBubble({ at }: { at: string }) {
+function DriftBubble({ at }: { at: string }) {
   const now = useHourlyNow();
   const days = Math.max(0, Math.ceil((Date.parse(at) - now) / DAY));
   return (
@@ -326,7 +326,7 @@ function driftUnit(days: number) {
   return days === 1 ? "day" : "days";
 }
 
-export function Stamp({ card }: { card: Card }) {
+function Stamp({ card }: { card: Card }) {
   const done = card.stage === "done";
   const at = done ? card.closedAt : card.postponedAt;
   const system = !done && card.autoPostponed;
