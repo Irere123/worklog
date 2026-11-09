@@ -1,5 +1,4 @@
 import {
-  CardsIcon,
   CaretUpDownIcon,
   ChatsCircleIcon,
   GearIcon,
@@ -118,9 +117,6 @@ export function Sidebar({
           trailing={open > 0 ? <Count tone="accent">{open}</Count> : null}
         >
           Inbox
-        </NavItem>
-        <NavItem to="/mine" icon={CardsIcon}>
-          My cards
         </NavItem>
         <NavItem to="/activity" icon={PulseIcon}>
           Activity

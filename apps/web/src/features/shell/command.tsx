@@ -1,6 +1,5 @@
 import {
   ArrowElbowDownLeftIcon,
-  CardsIcon,
   ChatsCircleIcon,
   GearIcon,
   HouseIcon,
@@ -199,13 +198,6 @@ export function CommandPalette({
             hint={<Kbd>G I</Kbd>}
           >
             Inbox
-          </Item>
-          <Item
-            icon={<CardsIcon size={15} />}
-            onSelect={go("/mine")}
-            hint={<Kbd>G M</Kbd>}
-          >
-            My cards
           </Item>
           <Item
             icon={<PulseIcon size={15} />}

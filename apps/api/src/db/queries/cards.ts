@@ -27,7 +27,6 @@ export type CardFilters = {
   boardId?: string;
   stage?: CardStage;
   assigneeId?: string;
-  createdById?: string;
   golden?: boolean;
   tag?: string;
   q?: string;
@@ -121,9 +120,6 @@ export async function listCardRows(
   }
   if (params.golden !== undefined) {
     where.push(eq(cards.golden, params.golden));
-  }
-  if (params.createdById) {
-    where.push(eq(cards.createdById, params.createdById));
   }
   if (params.q) {
     // "14" or "#14" is how people name a card, so a number finds that card as well as text.

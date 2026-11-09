@@ -47,18 +47,6 @@ export function preloadBoard(client: QueryClient, board: string) {
   void client.query(q.teamNow(3)).catch(ignore);
 }
 
-export function preloadMine(client: QueryClient, tab: "assigned" | "added") {
-  void client
-    .query(
-      q.cards(
-        tab === "assigned"
-          ? { assignee: "me", limit: 500 }
-          : { addedBy: "me", limit: 500 }
-      )
-    )
-    .catch(ignore);
-}
-
 export function preloadActivity(
   client: QueryClient,
   filter: Omit<ActivityFilter, "before" | "limit">

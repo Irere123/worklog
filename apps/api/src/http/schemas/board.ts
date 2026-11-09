@@ -124,10 +124,6 @@ export const ListCardsQuery = z.object({
     .string()
     .optional()
     .openapi({ description: 'Member id, handle or "me"' }),
-  addedBy: z
-    .string()
-    .optional()
-    .openapi({ description: 'Who added the card: member id, handle or "me"' }),
   golden: z.enum(["true", "false"]).optional(),
   tag: z.string().optional(),
   q: z.string().optional(),

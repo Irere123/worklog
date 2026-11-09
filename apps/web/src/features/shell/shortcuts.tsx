@@ -23,11 +23,8 @@ const GROUPS: { title: string; keys: [string, string][] }[] = [
     title: "Navigate",
     keys: [
       ["1", "Home"],
-      ["2", "Assigned to me"],
-      ["3", "Added by me"],
       ["G H", "Home"],
       ["G I", "Inbox"],
-      ["G M", "My cards"],
       ["G A", "Activity"],
       ["G B", "Boards"],
       ["G C", "Assistant"],

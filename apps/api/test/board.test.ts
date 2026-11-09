@@ -40,7 +40,7 @@ describe("board (Fizzy rules)", () => {
     expect(b.body.number).toBe(2);
   });
 
-  test("cards can be listed by who added them and who they're assigned to", async () => {
+  test("cards can be listed by who they're assigned to", async () => {
     const { token, board, member } = await boardSetup();
     const sam = await env.teammate(token, "Sam");
     await env.call("POST", "/v1/cards", {
@@ -56,8 +56,6 @@ describe("board (Fizzy rules)", () => {
         (c: { title: string }) => c.title
       );
 
-    expect(await titles("addedBy=me")).toEqual(["Mine"]);
-    expect(await titles(`addedBy=${sam.member.handle}`)).toEqual(["Sam's"]);
     expect(await titles("assignee=me")).toEqual(["Sam's"]);
   });
 

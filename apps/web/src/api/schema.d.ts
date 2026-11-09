@@ -3768,8 +3768,6 @@ export interface operations {
                 stage?: "triage" | "active" | "not_now" | "done";
                 /** @description Member id, handle or "me" */
                 assignee?: string;
-                /** @description Who added the card: member id, handle or "me" */
-                addedBy?: string;
                 golden?: "true" | "false";
                 tag?: string;
                 q?: string;

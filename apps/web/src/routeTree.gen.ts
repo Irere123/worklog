@@ -18,7 +18,6 @@ import { Route as AppAssistantRouteImport } from './routes/_app/assistant'
 import { Route as AppBriefsRouteImport } from './routes/_app/briefs'
 import { Route as AppHomeRouteImport } from './routes/_app/home'
 import { Route as AppInboxRouteImport } from './routes/_app/inbox'
-import { Route as AppMineRouteImport } from './routes/_app/mine'
 import { Route as AppSettingsRouteImport } from './routes/_app/settings'
 import { Route as AppAssistantIndexRouteImport } from './routes/_app/assistant.index'
 import { Route as AppAssistantConversationIdRouteImport } from './routes/_app/assistant.$conversationId'
@@ -82,11 +81,6 @@ const AppHomeRoute = AppHomeRouteImport.update({
 const AppInboxRoute = AppInboxRouteImport.update({
   id: '/inbox',
   path: '/inbox',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppMineRoute = AppMineRouteImport.update({
-  id: '/mine',
-  path: '/mine',
   getParentRoute: () => AppRoute,
 } as any)
 const AppSettingsRoute = AppSettingsRouteImport.update({
@@ -203,7 +197,6 @@ export interface FileRoutesByFullPath {
   '/briefs': typeof AppBriefsRoute
   '/home': typeof AppHomeRoute
   '/inbox': typeof AppInboxRoute
-  '/mine': typeof AppMineRoute
   '/settings': typeof AppSettingsRouteWithChildren
   '/assistant/$conversationId': typeof AppAssistantConversationIdRoute
   '/boards/$boardId': typeof AppBoardsBoardIdRoute
@@ -233,7 +226,6 @@ export interface FileRoutesByTo {
   '/briefs': typeof AppBriefsRoute
   '/home': typeof AppHomeRoute
   '/inbox': typeof AppInboxRoute
-  '/mine': typeof AppMineRoute
   '/assistant/$conversationId': typeof AppAssistantConversationIdRoute
   '/boards/$boardId': typeof AppBoardsBoardIdRoute
   '/boards/new': typeof AppBoardsNewRoute
@@ -265,7 +257,6 @@ export interface FileRoutesById {
   '/_app/briefs': typeof AppBriefsRoute
   '/_app/home': typeof AppHomeRoute
   '/_app/inbox': typeof AppInboxRoute
-  '/_app/mine': typeof AppMineRoute
   '/_app/settings': typeof AppSettingsRouteWithChildren
   '/_app/assistant/$conversationId': typeof AppAssistantConversationIdRoute
   '/_app/boards/$boardId': typeof AppBoardsBoardIdRoute
@@ -298,7 +289,6 @@ export interface FileRouteTypes {
     | '/briefs'
     | '/home'
     | '/inbox'
-    | '/mine'
     | '/settings'
     | '/assistant/$conversationId'
     | '/boards/$boardId'
@@ -328,7 +318,6 @@ export interface FileRouteTypes {
     | '/briefs'
     | '/home'
     | '/inbox'
-    | '/mine'
     | '/assistant/$conversationId'
     | '/boards/$boardId'
     | '/boards/new'
@@ -359,7 +348,6 @@ export interface FileRouteTypes {
     | '/_app/briefs'
     | '/_app/home'
     | '/_app/inbox'
-    | '/_app/mine'
     | '/_app/settings'
     | '/_app/assistant/$conversationId'
     | '/_app/boards/$boardId'
@@ -452,13 +440,6 @@ declare module '@tanstack/react-router' {
       path: '/inbox'
       fullPath: '/inbox'
       preLoaderRoute: typeof AppInboxRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/_app/mine': {
-      id: '/_app/mine'
-      path: '/mine'
-      fullPath: '/mine'
-      preLoaderRoute: typeof AppMineRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/settings': {
@@ -659,7 +640,6 @@ interface AppRouteChildren {
   AppBriefsRoute: typeof AppBriefsRoute
   AppHomeRoute: typeof AppHomeRoute
   AppInboxRoute: typeof AppInboxRoute
-  AppMineRoute: typeof AppMineRoute
   AppSettingsRoute: typeof AppSettingsRouteWithChildren
   AppBoardsBoardIdRoute: typeof AppBoardsBoardIdRoute
   AppBoardsNewRoute: typeof AppBoardsNewRoute
@@ -674,7 +654,6 @@ const AppRouteChildren: AppRouteChildren = {
   AppBriefsRoute: AppBriefsRoute,
   AppHomeRoute: AppHomeRoute,
   AppInboxRoute: AppInboxRoute,
-  AppMineRoute: AppMineRoute,
   AppSettingsRoute: AppSettingsRouteWithChildren,
   AppBoardsBoardIdRoute: AppBoardsBoardIdRoute,
   AppBoardsNewRoute: AppBoardsNewRoute,

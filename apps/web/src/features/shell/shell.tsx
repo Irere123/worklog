@@ -158,9 +158,6 @@ export function Shell() {
   useHotkey(["G", "B"], go("/boards"), {
     meta: { name: "Go to Boards", group: "Navigate" },
   });
-  useHotkey(["G", "M"], go("/mine"), {
-    meta: { name: "Go to My cards", group: "Navigate" },
-  });
   useHotkey(["G", "C"], go("/assistant"), {
     meta: { name: "Go to Assistant", group: "Navigate" },
   });
@@ -173,22 +170,11 @@ export function Shell() {
   useHotkey(["G", "S"], go("/settings"), {
     meta: { name: "Go to Settings", group: "Navigate" },
   });
-  // Fizzy's number keys. They pause while a card is open, where digits sort a Maybe? card.
+  // Single keys pause while a card is open, where digits sort a Maybe? card.
   const cardOpen = card !== undefined;
-  const mine = (tab: "assigned" | "added") => () => {
-    void navigate({ to: "/mine", search: { tab } });
-  };
   useHotkey("1", go("/home"), {
     enabled: !cardOpen,
     meta: { name: "Home", group: "Navigate" },
-  });
-  useHotkey("2", mine("assigned"), {
-    enabled: !cardOpen,
-    meta: { name: "Assigned to me", group: "Navigate" },
-  });
-  useHotkey("3", mine("added"), {
-    enabled: !cardOpen,
-    meta: { name: "Added by me", group: "Navigate" },
   });
   useHotkey("B", go("/boards/new"), {
     enabled: !cardOpen,
