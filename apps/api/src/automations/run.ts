@@ -1,4 +1,5 @@
 import { runConsolidate } from "#agent/memory/consolidate";
+import { presenceChanged, showsAtWork } from "#agent/presence";
 import type { AppContext } from "#context";
 import { findNextFollowUpAt } from "#db/queries/attention";
 import {
@@ -106,6 +107,18 @@ export async function runAutomation(
     member,
     await getWorkspaceById(ctx.db, { id: member.workspaceId })
   );
+  // Upkeep runs every half hour for everyone; marking it would cost two writes a run for no news.
+  const shown = showsAtWork(automation);
+  if (shown) {
+    await updateAutomationById(ctx.db, {
+      id: automation.id,
+      set: { runningSince: startedAt },
+    });
+    await presenceChanged(ctx, {
+      workspaceId: member.workspaceId,
+      ownerId: member.id,
+    });
+  }
 
   let outcome: RunOutcome;
   let error: string | null = null;
@@ -154,6 +167,7 @@ export async function runAutomation(
       set: {
         lastRunAt: startedAt,
         lastStatus: outcome.status,
+        ...(shown ? { runningSince: null } : {}),
         failureCount,
         state,
         // Only to turn it off: written back as loaded, it would undo someone turning it off

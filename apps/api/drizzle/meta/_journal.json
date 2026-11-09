@@ -148,6 +148,20 @@
       "when": 1794230636182,
       "tag": "0020_memory_evidence",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1794251637749,
+      "tag": "0021_assistant_presence",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1794255233593,
+      "tag": "0022_conversations_turning_index",
+      "breakpoints": true
     }
   ]
 }

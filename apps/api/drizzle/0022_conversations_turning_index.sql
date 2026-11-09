@@ -1,0 +1,1 @@
+CREATE INDEX CONCURRENTLY "conversations_turning_idx" ON "conversations" USING btree ("agent_id") WHERE "conversations"."turn_until" is not null;

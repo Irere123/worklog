@@ -125,6 +125,23 @@ export async function countHighPriorityFrom(
   return row?.n ?? 0;
 }
 
+export async function countOpenAttention(
+  db: DbOrTx,
+  params: { memberId: string; kind: string; now: Date }
+) {
+  const [row] = await db
+    .select({ n: count() })
+    .from(attentionItems)
+    .where(
+      and(
+        eq(attentionItems.memberId, params.memberId),
+        eq(attentionItems.kind, params.kind),
+        openOrWoken(params.now)
+      )
+    );
+  return row?.n ?? 0;
+}
+
 export async function listOpenAttention(
   db: DbOrTx,
   params: { memberId: string; now: Date; limit?: number }
