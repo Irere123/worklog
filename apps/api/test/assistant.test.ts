@@ -1799,6 +1799,16 @@ describe("presence", () => {
 
   test("names the routine that runs next, and isn't working once a run is over", async () => {
     const owner = await env.workspace();
+    // The default routines run through the day: left on, which one is next depends on the clock.
+    const defaults = await env.call("GET", "/v1/automations", {
+      token: owner.token,
+    });
+    for (const a of defaults.body) {
+      await env.call("PATCH", `/v1/automations/${a.id}`, {
+        token: owner.token,
+        body: { enabled: false },
+      });
+    }
     const created = await env.call("POST", "/v1/automations", {
       token: owner.token,
       body: {
