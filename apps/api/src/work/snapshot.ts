@@ -1,14 +1,22 @@
 import type { AppContext } from "#context";
 import {
+  countActivitiesByActorHour,
   listActivities,
   listAgentStates,
   listLatestByActor,
 } from "#db/queries/activities";
 import { listCurrentCards } from "#db/queries/cards";
+import { listMembers } from "#db/queries/members";
 import type { Member } from "#db/queries/members";
-import { DAY_MS } from "#lib/time";
+import { getWorkspaceById } from "#db/queries/workspaces";
+import { DAY_MS, isValidTimeZone, localDate, timezoneOf } from "#lib/time";
 
 import { listCards } from "./board";
+
+export const RHYTHM_DAYS = 14;
+
+/** Thirteen weeks: a quarter, which fits a profile's column as a calendar of days. */
+export const PROFILE_RHYTHM_DAYS = 91;
 
 export async function workSnapshot(
   ctx: AppContext,
@@ -61,9 +69,33 @@ export async function workSnapshot(
 export type WorkSnapshot = Awaited<ReturnType<typeof workSnapshot>>;
 
 /**
- * Everyone at a glance, as Home and People show them: each member's current card and the latest
- * thing they did. Built from two queries for the whole workspace. The asker's own private entries
- * count for them; everyone else's stay out.
+ * One person's page: their snapshot and a quarter of daily activity. The rhythm stays out of
+ * `workSnapshot`, which the assistant reads, where 91 numbers would only be noise.
+ */
+export async function memberNow(
+  ctx: AppContext,
+  asker: Member,
+  person: Member,
+  opts: { days?: number }
+) {
+  const includePrivate = person.id === asker.id;
+  const snapshot = await workSnapshot(ctx, person, { ...opts, includePrivate });
+  const rhythms = await rhythmsOf(ctx, {
+    workspaceId: person.workspaceId,
+    privateFor: includePrivate ? [person.id] : [],
+    days: PROFILE_RHYTHM_DAYS,
+    actorIds: [person.id],
+  });
+  return {
+    ...snapshot,
+    rhythm: rhythms.get(person.id) ?? emptyRhythm(PROFILE_RHYTHM_DAYS),
+  };
+}
+
+/**
+ * Everyone at a glance, as Home and People show them: each member's current card, the latest
+ * thing they did and how much they did each day lately. Built from a few queries for the whole
+ * workspace. The asker's own private entries count for them; everyone else's stay out.
  */
 export async function teamNow(
   ctx: AppContext,
@@ -83,9 +115,15 @@ export async function teamNow(
     workspaceId: asker.workspaceId,
     since: new Date(ctx.now().getTime() - days * DAY_MS),
   });
+  const rhythms = await rhythmsOf(ctx, {
+    workspaceId: asker.workspaceId,
+    privateFor: [asker.id],
+    days: RHYTHM_DAYS,
+  });
   const ids = new Set([
     ...current.map((c) => c.memberId),
     ...latest.flatMap((l) => (l.actorId ? [l.actorId] : [])),
+    ...rhythms.keys(),
   ]);
   return [...ids].map((memberId) => {
     const card = current.find((c) => c.memberId === memberId);
@@ -118,8 +156,76 @@ export async function teamNow(
           }
         : null,
       lastActiveAt: last?.at.toISOString() ?? null,
+      rhythm: rhythms.get(memberId) ?? emptyRhythm(RHYTHM_DAYS),
     };
   });
+}
+
+/**
+ * Activities per day over the last `days` of each member's own calendar, oldest first and today
+ * last. Private entries count only for `privateFor`.
+ */
+async function rhythmsOf(
+  ctx: AppContext,
+  params: {
+    workspaceId: string;
+    privateFor: string[];
+    days: number;
+    actorIds?: string[];
+  }
+) {
+  const { workspaceId, days } = params;
+  const now = ctx.now();
+  // A day more than shown: the zones furthest ahead of UTC start their days earlier.
+  const hours = await countActivitiesByActorHour(ctx.db, {
+    workspaceId,
+    privateFor: params.privateFor,
+    actorIds: params.actorIds,
+    since: new Date(now.getTime() - (days + 1) * DAY_MS),
+  });
+  if (hours.length === 0) {
+    return new Map<string, number[]>();
+  }
+  const workspace = await getWorkspaceById(ctx.db, { id: workspaceId });
+  const people = await listMembers(ctx.db, {
+    workspaceId,
+    includeDeactivated: true,
+  });
+  const zones = new Map(
+    people.map((m) => {
+      const zone = timezoneOf(m, workspace);
+      // Member time zones are free text; one Intl can't read falls back to the workspace's.
+      return [m.id, isValidTimeZone(zone) ? zone : workspace.timezone];
+    })
+  );
+  const rhythms = new Map<string, number[]>();
+  for (const row of hours) {
+    if (!row.actorId) {
+      continue;
+    }
+    const zone = zones.get(row.actorId) ?? workspace.timezone;
+    const back = daysBetween(
+      localDate(new Date(row.hour), zone),
+      localDate(now, zone)
+    );
+    // Hours are UTC buckets: in a half-hour zone up to 30 minutes land on the neighbouring day.
+    if (back < 0 || back >= days) {
+      continue;
+    }
+    const counts = rhythms.get(row.actorId) ?? emptyRhythm(days);
+    const at = days - 1 - back;
+    counts[at] = (counts[at] ?? 0) + row.count;
+    rhythms.set(row.actorId, counts);
+  }
+  return rhythms;
+}
+
+function emptyRhythm(days: number) {
+  return Array.from({ length: days }, () => 0);
+}
+
+function daysBetween(from: string, to: string) {
+  return Math.round((Date.parse(to) - Date.parse(from)) / DAY_MS);
 }
 
 export function renderSnapshot(s: WorkSnapshot): string {

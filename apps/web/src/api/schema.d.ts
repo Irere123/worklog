@@ -571,7 +571,7 @@ export interface paths {
         };
         /**
          * What everyone is on right now, in one call
-         * @description Each member's current card and the latest thing they did in the last `days` (7 by default). Members with neither are left out. Built for pages that list the team; for one person's full picture use `GET /v1/members/{ref}/now`.
+         * @description Each member's current card, the latest thing they did in the last `days` (7 by default) and their activity per day over the last 14. Members with none of these are left out. Built for pages that list the team; for one person's full picture use `GET /v1/members/{ref}/now`.
          */
         get: operations["team.now"];
         put?: never;
@@ -1764,6 +1764,8 @@ export interface components {
              * @example 2026-10-26T08:30:00.000Z
              */
             lastActiveAt: string | null;
+            /** @description Activities per day over the last 14 days of the member's own calendar, oldest first and today last */
+            rhythm: number[];
         }[];
         WorkSnapshot: {
             person: {
@@ -1806,6 +1808,8 @@ export interface components {
              * @example 2026-10-26T08:30:00.000Z
              */
             lastActiveAt: string | null;
+            /** @description Activities per day over the last 91 days (13 weeks) of their own calendar, oldest first and today last. Their private entries count only when they ask */
+            rhythm: number[];
         };
         AttentionListItem: components["schemas"]["AttentionItem"] & {
             /** @description The linked card's number, to open or fetch it */

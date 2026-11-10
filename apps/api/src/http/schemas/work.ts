@@ -35,6 +35,10 @@ export const Snapshot = z
       })
     ),
     lastActiveAt: IsoTimestamp.nullable(),
+    rhythm: z.array(z.number().int()).openapi({
+      description:
+        "Activities per day over the last 91 days (13 weeks) of their own calendar, oldest first and today last. Their private entries count only when they ask",
+    }),
   })
   .openapi("WorkSnapshot");
 
@@ -78,6 +82,10 @@ export const TeamNow = z
             "For an agent: where its latest run stands, from the last update that said",
         }),
       lastActiveAt: IsoTimestamp.nullable(),
+      rhythm: z.array(z.number().int()).openapi({
+        description:
+          "Activities per day over the last 14 days of the member's own calendar, oldest first and today last",
+      }),
     })
   )
   .openapi("TeamNow");

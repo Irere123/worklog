@@ -11,7 +11,7 @@ import {
 } from "#http/schemas/work";
 import { logWork } from "#work/log";
 import { resolveMember } from "#work/members";
-import { teamNow, workSnapshot } from "#work/snapshot";
+import { memberNow, teamNow } from "#work/snapshot";
 
 export const workRoutes = router()
   .openapi(
@@ -43,7 +43,7 @@ export const workRoutes = router()
       tags: ["People"],
       summary: "What everyone is on right now, in one call",
       description:
-        "Each member's current card and the latest thing they did in the last `days` (7 by default). Members with neither are left out. Built for pages that list the team; for one person's full picture use `GET /v1/members/{ref}/now`.",
+        "Each member's current card, the latest thing they did in the last `days` (7 by default) and their activity per day over the last 14. Members with none of these are left out. Built for pages that list the team; for one person's full picture use `GET /v1/members/{ref}/now`.",
       request: { query: SnapshotQuery },
       responses: { 200: json(TeamNow), ...errors },
     }),
@@ -71,8 +71,7 @@ export const workRoutes = router()
       const ctx = c.get("ctx");
       const me = c.get("member");
       const person = await resolveMember(ctx, me, c.req.valid("param").ref);
-      const snapshot = await workSnapshot(ctx, person, {
-        includePrivate: person.id === me.id,
+      const snapshot = await memberNow(ctx, me, person, {
         days: c.req.valid("query").days,
       });
       return respond(c, Snapshot, snapshot, 200);

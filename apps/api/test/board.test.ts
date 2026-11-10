@@ -390,6 +390,49 @@ describe("the team at a glance", () => {
     );
     expect(anaForAna.latest.title).toContain("Interviewing");
   });
+
+  test("each member's rhythm counts two weeks of their own days, today last, private entries only for them", async () => {
+    const owner = await env.workspace();
+    const ana = await env.teammate(owner.token, "Ana", {
+      timezone: "Africa/Kigali",
+    });
+    for (const [text, daysAgo, visibility] of [
+      ["Reviewed the importer", 0, "team"],
+      ["Paired with Eric", 2, "team"],
+      ["Wrote the runbook", 2, "team"],
+      ["Planned the quarter", 20, "team"],
+      ["Interviewing elsewhere", 0, "private"],
+    ] as const) {
+      await env.call("POST", "/v1/logs", {
+        token: ana.token,
+        body: { text, visibility, occurredAt: daysAgoIso(daysAgo) },
+      });
+    }
+
+    const rhythmFor = async (token: string) =>
+      (await env.call("GET", "/v1/now", { token })).body.find(
+        (row: any) => row.memberId === ana.member.id
+      ).rhythm as number[];
+
+    const seenByOwner = await rhythmFor(owner.token);
+    expect(seenByOwner).toHaveLength(14);
+    expect(seenByOwner[13]).toBe(1);
+    expect(seenByOwner[11]).toBe(2);
+    expect(seenByOwner.reduce((a, b) => a + b, 0)).toBe(3);
+    expect((await rhythmFor(ana.token))[13]).toBe(2);
+
+    // A person's own page reads a quarter, the same way.
+    const page = await env.call("GET", `/v1/members/${ana.member.handle}/now`, {
+      token: owner.token,
+    });
+    expect(page.body.rhythm).toHaveLength(91);
+    expect(page.body.rhythm[90]).toBe(1);
+    expect(page.body.rhythm[70]).toBe(1);
+    const own = await env.call("GET", "/v1/members/me/now", {
+      token: ana.token,
+    });
+    expect(own.body.rhythm[90]).toBe(2);
+  });
 });
 
 describe("counting the day", () => {
@@ -437,3 +480,7 @@ describe("counting the day", () => {
     );
   });
 });
+
+function daysAgoIso(days: number) {
+  return new Date(Date.now() - days * 86_400_000 - 1000).toISOString();
+}

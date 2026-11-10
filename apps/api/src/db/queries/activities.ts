@@ -10,6 +10,7 @@ import {
   lt,
   lte,
   or,
+  sql,
 } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
 
@@ -248,6 +249,43 @@ export async function countActivitiesByKind(
       )
     )
     .groupBy(activities.kind);
+}
+
+/**
+ * How much each person or agent did per hour since `since`. Hours rather than days because a
+ * day only means something in the actor's own time zone, which the caller applies. Private
+ * entries count only for `privateFor`.
+ */
+export async function countActivitiesByActorHour(
+  db: DbOrTx,
+  params: {
+    workspaceId: string;
+    privateFor: string[];
+    since: Date;
+    actorIds?: string[];
+  }
+) {
+  const hour = sql<Date>`date_trunc('hour', ${activities.occurredAt})`;
+  return await db
+    .select({ actorId: activities.actorId, hour, count: count() })
+    .from(activities)
+    .where(
+      and(
+        eq(activities.workspaceId, params.workspaceId),
+        isNotNull(activities.actorId),
+        params.actorIds
+          ? inArray(activities.actorId, params.actorIds)
+          : undefined,
+        gte(activities.occurredAt, params.since),
+        params.privateFor.length > 0
+          ? or(
+              eq(activities.visibility, "team"),
+              inArray(activities.actorId, params.privateFor)
+            )
+          : eq(activities.visibility, "team")
+      )
+    )
+    .groupBy(activities.actorId, hour);
 }
 
 /**
