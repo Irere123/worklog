@@ -1,7 +1,6 @@
 import {
   ChatCircleIcon,
   ChatCircleTextIcon,
-  ClockIcon,
   TicketIcon,
 } from "@phosphor-icons/react";
 import * as stylex from "@stylexjs/stylex";
@@ -30,53 +29,87 @@ import {
   media,
   motion,
   radius,
-  shadow,
   space,
   text,
 } from "#ui/tokens.stylex";
 
 import { AgentRun, isStale, ownerWord } from "./agent-run";
+import { clockOf, DAY_NAMES, useMinute } from "./presence";
+import type { Clock } from "./presence";
+import { RhythmCalendar, RhythmStrip } from "./rhythm";
 import { AgentSessions, sessionsOf } from "./sessions";
 
 type Member = Schemas["Member"];
+type Snap = Schemas["TeamNow"][number];
 
-function localTime(zone: string | null) {
-  if (!zone) {
-    return null;
-  }
-  try {
-    return new Intl.DateTimeFormat("en-GB", {
-      timeStyle: "short",
-      timeZone: zone,
-    }).format(new Date());
-  } catch {
-    return null;
-  }
+// The window "Last" and "active" lines look back over; the rhythm always covers two weeks.
+const RECENT_DAYS = 3;
+
+/** Personal assistants answer for their person and have no work of their own to list. */
+function isAssistant(m: Member) {
+  return m.agentProvider === "worklog";
 }
 
 export function PeopleList() {
-  const { list } = useMembers();
+  const { list, byId } = useMembers();
+  const team = useQuery(q.teamNow(RECENT_DAYS));
+  const now = useMinute();
+  const snaps = useMemo(
+    () => new Map(team.data?.map((row) => [row.memberId, row])),
+    [team.data]
+  );
   const humans = list.filter((m) => m.kind === "human");
-  const agents = list.filter((m) => m.kind === "agent");
+  const agents = list.filter((m) => m.kind === "agent" && !isAssistant(m));
+  const teamAgents = agents.filter((a) => !a.ownerId || !byId.has(a.ownerId));
+  const scale = Math.max(1, ...(team.data?.flatMap((r) => r.rhythm) ?? []));
+  const clocks = new Map(humans.map((m) => [m.id, clockOf(m, now)]));
+  const knowHours = [...clocks.values()].some((c) => c?.inHours !== null);
+  const inHours = [...clocks.values()].filter((c) => c?.inHours === true);
+  const row = (m: Member) => (
+    <PersonRow
+      key={m.id}
+      member={m}
+      snap={snaps.get(m.id)}
+      pending={team.isPending}
+      clock={clocks.get(m.id) ?? clockOf(m, now)}
+      today={todayOf(m, now)}
+      scale={scale}
+      agents={agents.filter((a) => a.ownerId === m.id)}
+      snaps={snaps}
+    />
+  );
   return (
     <>
       <PageHeader
         title="People"
-        subtitle={`${count(humans.length, "person", "people")} · ${count(agents.length, "agent", "agents")}`}
+        subtitle={[
+          count(humans.length, "person", "people"),
+          knowHours && `${inHours.length} in working hours`,
+          agents.length > 0 && count(agents.length, "agent", "agents"),
+        ]
+          .filter(Boolean)
+          .join(" · ")}
       />
       <Page>
         <div {...stylex.props(layout.stack, styles.sections)}>
-          <Section title="People">
-            <PeopleGrid members={humans} />
-          </Section>
-          <Section title="Agents">
-            <p {...stylex.props(layout.meta)}>
-              Agents work on behalf of a person, who stays accountable for them.
-              Each one reports what it’s doing and asks when it needs a
-              decision.
-            </p>
-            <PeopleGrid members={agents} />
-          </Section>
+          <div>
+            <ColumnHeads />
+            <ul {...stylex.props(styles.roster)}>{humans.map(row)}</ul>
+            {humans.length === 1 && agents.length === 0 && (
+              <p {...stylex.props(styles.alone)}>
+                Just you so far.{" "}
+                <Link to="/settings/members" {...stylex.props(styles.link)}>
+                  Invite your teammates
+                </Link>{" "}
+                and their work shows up here as their tools record it.
+              </p>
+            )}
+          </div>
+          {teamAgents.length > 0 && (
+            <Section title="Agents for the whole team">
+              <ul {...stylex.props(styles.roster)}>{teamAgents.map(row)}</ul>
+            </Section>
+          )}
         </div>
       </Page>
     </>
@@ -87,68 +120,200 @@ function count(n: number, one: string, many: string) {
   return `${n} ${n === 1 ? one : many}`;
 }
 
-function PeopleGrid({ members }: { members: Member[] }) {
-  const team = useQuery(q.teamNow(3));
-  const byMember = new Map(team.data?.map((row) => [row.memberId, row]));
-  const { byId } = useMembers();
-  const me = useMe();
+function todayOf(m: Member, now: Date) {
+  return clockOf(m, now)?.date ?? localDate(now);
+}
+
+function pad(n: number) {
+  return String(n).padStart(2, "0");
+}
+
+function localDate(now: Date) {
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+}
+
+function ColumnHeads() {
   return (
-    <ul {...stylex.props(styles.grid)}>
-      {members.map((m) => {
-        const snap = byMember.get(m.id);
-        const current = snap?.current ?? undefined;
-        const owner = m.ownerId ? byId.get(m.ownerId) : undefined;
-        const time = localTime(m.timezone);
-        return (
-          <li key={m.id}>
+    <div aria-hidden {...stylex.props(styles.grid, styles.heads)}>
+      <span {...stylex.props(styles.whoHead)}>Person</span>
+      <span {...stylex.props(styles.nowHead)}>On now</span>
+      <span {...stylex.props(styles.rhythmCell)}>Two weeks</span>
+      <span {...stylex.props(styles.clock)}>Their time</span>
+    </div>
+  );
+}
+
+function PersonRow({
+  member: m,
+  snap,
+  pending,
+  clock,
+  today,
+  scale,
+  agents,
+  snaps,
+  nested = false,
+}: {
+  member: Member;
+  snap: Snap | undefined;
+  pending: boolean;
+  clock: Clock | null;
+  today: string;
+  scale: number;
+  agents: Member[];
+  snaps: Map<string, Snap>;
+  nested?: boolean;
+}) {
+  const now = useMinute();
+  const agent = m.kind === "agent";
+  return (
+    <li {...stylex.props(nested ? styles.nestedItem : styles.item)}>
+      <div
+        {...stylex.props(styles.grid, styles.row, nested && styles.rowNested)}
+      >
+        <div {...stylex.props(styles.who)}>
+          <Avatar person={m} size={nested ? 24 : 32} />
+          <div {...stylex.props(layout.grow)}>
             <Link
               to="/people/$handle"
               params={{ handle: m.handle }}
-              {...stylex.props(styles.card)}
+              {...stylex.props(styles.name, styles.stretch)}
             >
-              <div {...stylex.props(layout.row)}>
-                <Avatar person={m} size={36} />
-                <div {...stylex.props(layout.grow)}>
-                  <p {...stylex.props(styles.name)}>{m.name}</p>
-                  <p {...stylex.props(styles.sub)}>
-                    {roleOf(m)}
-                    {owner ? ` · for ${owner.name.split(" ")[0]}` : ""}
-                  </p>
-                </div>
-              </div>
-              {team.isPending ? (
-                <Skeleton lines={1} height={12} />
-              ) : (
-                <p {...stylex.props(styles.now)}>
-                  {snap?.agent ? (
-                    <AgentRun
-                      run={snap.agent}
-                      owner={ownerWord(owner, me?.member.id)}
-                    />
-                  ) : (
-                    <NowLine
-                      current={current}
-                      recent={snap?.latest ?? undefined}
-                    />
-                  )}
-                </p>
-              )}
-              <div {...stylex.props(styles.foot)}>
-                <span>@{m.handle}</span>
-                {time && (
-                  <span {...stylex.props(layout.rowTight)}>
-                    <ClockIcon size={11} /> {time}
-                  </span>
-                )}
-                {snap?.lastActiveAt && (
-                  <span>active {ago(snap.lastActiveAt)}</span>
-                )}
-              </div>
+              {m.name}
             </Link>
-          </li>
-        );
-      })}
-    </ul>
+            <p {...stylex.props(styles.sub, layout.truncate)}>
+              {agent && m.agentProvider
+                ? `${roleOf(m)} · ${providerName(m.agentProvider)}`
+                : roleOf(m)}
+            </p>
+          </div>
+        </div>
+        <div {...stylex.props(styles.now)}>
+          {pending ? (
+            <Skeleton lines={1} height={12} />
+          ) : (
+            <NowCell member={m} snap={snap} />
+          )}
+        </div>
+        <div {...stylex.props(styles.rhythmCell, styles.above)}>
+          <RhythmStrip
+            counts={snap?.rhythm ?? []}
+            today={today}
+            workdays={workdaysOf(m)}
+            scale={scale}
+            name={firstName(m)}
+          />
+        </div>
+        <div {...stylex.props(styles.clock)}>
+          {clock ? <ClockCell clock={clock} /> : null}
+        </div>
+      </div>
+      {agents.length > 0 && (
+        <ul>
+          {agents.map((a) => (
+            <PersonRow
+              key={a.id}
+              member={a}
+              snap={snaps.get(a.id)}
+              pending={pending}
+              clock={null}
+              today={todayOf(a, now)}
+              scale={scale}
+              agents={[]}
+              snaps={snaps}
+              nested
+            />
+          ))}
+        </ul>
+      )}
+    </li>
+  );
+}
+
+/** What they're on, in the order a teammate asks: a run waiting on someone, their card, their last move. */
+function NowCell({ member: m, snap }: { member: Member; snap?: Snap }) {
+  const { byId } = useMembers();
+  const me = useMe();
+  const run = snap?.agent;
+  if (
+    run &&
+    (run.state === "needs_you" || (run.state === "working" && !isStale(run)))
+  ) {
+    const owner = m.ownerId ? byId.get(m.ownerId) : undefined;
+    return (
+      <p {...stylex.props(styles.nowLine, styles.clamp)}>
+        <AgentRun run={run} owner={ownerWord(owner, me?.member.id)} />
+      </p>
+    );
+  }
+  const current = snap?.current;
+  const latest = snap?.latest;
+  const meta = [
+    current?.column,
+    latest &&
+      (current ? `active ${agoPhrase(latest.at)}` : agoPhrase(latest.at)),
+  ]
+    .filter(Boolean)
+    .join(" · ");
+  return (
+    <>
+      {current ? (
+        <p {...stylex.props(styles.nowLine, layout.truncate)}>
+          <CardLink number={current.number} />
+          {current.golden && (
+            <TicketIcon
+              size={12}
+              aria-label="Golden ticket"
+              {...stylex.props(styles.gold)}
+            />
+          )}{" "}
+          {current.title}
+        </p>
+      ) : (
+        <p
+          {...stylex.props(
+            styles.nowLine,
+            layout.truncate,
+            !latest && styles.quiet
+          )}
+        >
+          {latest ? latest.title : `Nothing in the last ${RECENT_DAYS} days`}
+        </p>
+      )}
+      {meta && <p {...stylex.props(styles.sub, layout.truncate)}>{meta}</p>}
+    </>
+  );
+}
+
+function CardLink({ number }: { number: number }) {
+  return (
+    <Link
+      to="."
+      search={(prev: Record<string, unknown>) => ({ ...prev, card: number })}
+      {...stylex.props(styles.number, styles.above)}
+    >
+      #{number}
+    </Link>
+  );
+}
+
+function ClockCell({ clock }: { clock: Clock }) {
+  return (
+    <>
+      <p {...stylex.props(styles.time)}>
+        {clock.time} <span {...stylex.props(styles.place)}>{clock.place}</span>
+      </p>
+      <p {...stylex.props(styles.sub, styles.hoursLine)}>
+        {clock.inHours === true && (
+          <>
+            <span {...stylex.props(styles.hoursDot)} />
+            Working hours
+          </>
+        )}
+        {clock.inHours === false &&
+          (clock.back ? `Off · back ${clock.back}` : "Off")}
+      </p>
+    </>
   );
 }
 
@@ -186,6 +351,7 @@ export function Person({ handle }: { handle: string }) {
   }
   const m = member.data;
   const self = me?.member.id === m.id;
+  const first = m.name.split(" ")[0] ?? m.name;
 
   return (
     <>
@@ -208,39 +374,29 @@ export function Person({ handle }: { handle: string }) {
                 }
               }}
             >
-              {self
-                ? "Your assistant"
-                : `Ask ${m.name.split(" ")[0]}'s assistant`}
+              {self ? "Your assistant" : `Ask ${first}'s assistant`}
             </Button>
           )
         }
       />
       <div {...stylex.props(styles.personSplit)}>
         <aside {...stylex.props(styles.profile)}>
-          <Avatar person={m} size={64} />
-          <div>
-            <h2 {...stylex.props(styles.profileName)}>{m.name}</h2>
-            <p {...stylex.props(styles.sub)}>@{m.handle}</p>
-          </div>
-          <PersonFacts member={m} lastActiveAt={snap.data?.lastActiveAt} />
-          {m.kind === "human" && !self && (
-            <p {...stylex.props(styles.askNote)}>
-              <ChatCircleIcon size={13} /> Their assistant answers from{" "}
-              {m.name.split(" ")[0]}’s team-visible work only. Private notes
-              stay private.
-            </p>
-          )}
+          <Profile member={m} self={self} rhythm={snap.data?.rhythm} />
         </aside>
         <div {...stylex.props(styles.personMain)}>
           <div {...stylex.props(styles.nowBlock)}>
             <NowList
               title="Working on"
-              empty="Nothing in progress."
+              empty={
+                m.kind === "agent"
+                  ? "No cards in progress."
+                  : `${self ? "You have" : `${first} has`} no cards in progress.`
+              }
               items={snap.data?.inProgress.map((c) => ({
-                key: c.number,
                 number: c.number,
                 title: c.title,
                 meta: c.column ?? undefined,
+                at: c.lastActiveAt,
                 golden: c.golden,
               }))}
             />
@@ -248,7 +404,6 @@ export function Person({ handle }: { handle: string }) {
               title="Up next"
               empty="Nothing queued."
               items={snap.data?.upNext.map((c) => ({
-                key: c.number,
                 number: c.number,
                 title: c.title,
               }))}
@@ -267,7 +422,7 @@ export function Person({ handle }: { handle: string }) {
                   filter={{ actor: handle }}
                   hideActor
                   skip={m.kind === "agent" ? inSessions.has : undefined}
-                  emptyText={`Nothing from ${m.name} yet.`}
+                  emptyText={`Nothing from ${m.name} yet. Their work shows up here as their tools record it.`}
                 />
               </div>
             </>
@@ -292,105 +447,209 @@ function useSessionSteps(handle: string) {
   }, [recent.data]);
 }
 
-function Fact({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <div {...stylex.props(styles.fact)}>
-      <dt {...stylex.props(styles.factLabel)}>{label}</dt>
-      <dd>{children}</dd>
-    </div>
-  );
-}
-
-function NowLine({
-  current,
-  recent,
-}: {
-  current?: { number: number; title: string };
-  recent?: { title: string };
-}) {
-  if (current) {
-    return (
-      <>
-        <span {...stylex.props(styles.nowLabel)}>On</span> #{current.number}{" "}
-        {current.title}
-      </>
-    );
-  }
-  if (recent) {
-    return (
-      <>
-        <span {...stylex.props(styles.nowLabel)}>Last</span> {recent.title}
-      </>
-    );
-  }
-  return <span {...stylex.props(layout.faint)}>Nothing recent</span>;
-}
-
-function PersonFacts({
+function Profile({
   member: m,
-  lastActiveAt,
+  self,
+  rhythm,
 }: {
   member: Member;
-  lastActiveAt?: string | null;
+  self: boolean;
+  rhythm?: number[];
 }) {
-  const { byId } = useMembers();
-  const me = useMe();
-  const owner = m.ownerId ? byId.get(m.ownerId) : undefined;
-  const time = localTime(m.timezone);
-  // An agent mid-run or waiting on someone says so first, as on Home and its card; a finished
-  // run is already in Sessions.
-  const { data: run } = useQuery({
-    ...q.teamNow(3),
-    select: (rows) => {
-      const agent = rows.find((row) => row.memberId === m.id)?.agent;
-      return agent &&
-        (agent.state === "needs_you" ||
-          (agent.state === "working" && !isStale(agent)))
-        ? agent
-        : null;
-    },
-  });
+  const now = useMinute();
+  const clock = clockOf(m, now);
+  const first = firstName(m);
+  // The same query as the People list, so arriving from there costs nothing.
+  const team = useQuery(q.teamNow(RECENT_DAYS));
+  const row = team.data?.find((r) => r.memberId === m.id);
+
   return (
-    <dl {...stylex.props(styles.facts)}>
-      {run && (
-        <Fact label="Right now">
-          <AgentRun run={run} owner={ownerWord(owner, me?.member.id)} />
+    <>
+      <div {...stylex.props(styles.identity)}>
+        <Avatar person={m} size={72} />
+        <p {...stylex.props(styles.handle)}>
+          @{m.handle} · {roleOf(m)}
+        </p>
+      </div>
+
+      {clock && (
+        <p {...stylex.props(styles.sentence)}>
+          <span {...stylex.props(styles.time)}>{clock.time}</span> in{" "}
+          {clock.place}.{" "}
+          <HoursSentence clock={clock} who={self ? "you" : first} />
+        </p>
+      )}
+
+      {row && <LiveRun member={m} row={row} />}
+
+      {rhythm && (
+        <Fact label="Activity">
+          <RhythmCalendar
+            counts={rhythm}
+            today={clock?.date ?? localDate(now)}
+            workdays={workdaysOf(m)}
+            name={self ? "you" : first}
+          />
         </Fact>
       )}
-      <Fact label="Role">{roleOf(m)}</Fact>
-      {m.kind === "agent" && (
-        <Fact label="Works for">
-          {owner ? (
-            <Link
-              to="/people/$handle"
-              params={{ handle: owner.handle }}
-              {...stylex.props(styles.link)}
-            >
-              {owner.name}
-            </Link>
-          ) : (
-            "The team"
-          )}
-        </Fact>
+
+      {m.kind === "human" && <AnswersFor member={m} self={self} />}
+      {m.kind === "agent" && <WorksFor member={m} />}
+
+      {m.kind === "human" && !self && (
+        <p {...stylex.props(styles.askNote)}>
+          <ChatCircleIcon size={13} {...stylex.props(styles.askIcon)} />
+          <span>
+            {first}’s assistant answers from their team-visible work only.
+            Private notes stay private.
+          </span>
+        </p>
       )}
-      {m.agentProvider && (
-        <Fact label="Runs on">{providerName(m.agentProvider)}</Fact>
-      )}
-      {time && (
-        <Fact label="Local time">
-          {time} · {m.timezone}
-        </Fact>
-      )}
-      {lastActiveAt && (
-        <Fact label="Last active">{agoPhrase(lastActiveAt)}</Fact>
-      )}
-      <Fact label="Member since">
+
+      <p {...stylex.props(styles.since)}>
+        In Worklog since{" "}
         {new Date(m.createdAt).toLocaleDateString("en-GB", {
           month: "long",
           year: "numeric",
         })}
-      </Fact>
-    </dl>
+      </p>
+    </>
+  );
+}
+
+function firstName(m: { name: string }) {
+  return m.name.split(" ")[0] ?? m.name;
+}
+
+function workdaysOf(m: Member) {
+  return m.settings.workdays ?? [0, 1, 2, 3, 4, 5, 6];
+}
+
+/** An agent mid-run or waiting on someone says so first, as on Home and its card. */
+function LiveRun({ member: m, row }: { member: Member; row: Snap }) {
+  const { byId } = useMembers();
+  const me = useMe();
+  const run = row.agent;
+  if (
+    !run ||
+    !(run.state === "needs_you" || (run.state === "working" && !isStale(run)))
+  ) {
+    return null;
+  }
+  const owner = m.ownerId ? byId.get(m.ownerId) : undefined;
+  return (
+    <Fact label="Right now">
+      <AgentRun run={run} owner={ownerWord(owner, me?.member.id)} />
+    </Fact>
+  );
+}
+
+function AnswersFor({ member: m, self }: { member: Member; self: boolean }) {
+  const { list } = useMembers();
+  const agents = list.filter(
+    (a) => a.kind === "agent" && a.ownerId === m.id && !isAssistant(a)
+  );
+  if (agents.length === 0) {
+    return null;
+  }
+  return (
+    <Fact
+      label={
+        self ? "Agents you answer for" : `Agents ${firstName(m)} answers for`
+      }
+    >
+      <ul {...stylex.props(styles.agentList)}>
+        {agents.map((a) => (
+          <li key={a.id}>
+            <Link
+              to="/people/$handle"
+              params={{ handle: a.handle }}
+              {...stylex.props(styles.agentRow)}
+            >
+              <Avatar person={a} size={20} />
+              <span {...stylex.props(layout.truncate, layout.grow)}>
+                {a.name}
+              </span>
+              {a.agentProvider && (
+                <span {...stylex.props(styles.sub)}>
+                  {providerName(a.agentProvider)}
+                </span>
+              )}
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </Fact>
+  );
+}
+
+function WorksFor({ member: m }: { member: Member }) {
+  const { byId } = useMembers();
+  const owner = m.ownerId ? byId.get(m.ownerId) : undefined;
+  return (
+    <Fact label="Works for">
+      {owner ? (
+        <Link
+          to="/people/$handle"
+          params={{ handle: owner.handle }}
+          {...stylex.props(styles.ownerLink)}
+        >
+          <Avatar person={owner} size={20} />
+          {owner.name}
+        </Link>
+      ) : (
+        "The whole team"
+      )}
+      {m.agentProvider && !isAssistant(m) && (
+        <p {...stylex.props(styles.sub)}>
+          Runs on {providerName(m.agentProvider)}.{" "}
+          {owner ? firstName(owner) : "The team"} answers for what it does.
+        </p>
+      )}
+    </Fact>
+  );
+}
+
+function HoursSentence({ clock, who }: { clock: Clock; who: string }) {
+  if (!clock.hours || clock.inHours === null) {
+    return null;
+  }
+  const span = `${clock.hours.start}–${clock.hours.end}, ${daysPhrase(clock.workdays)}`;
+  const theirs = who === "you" ? "your" : `${who}’s`;
+  if (clock.inHours) {
+    return (
+      <>
+        Within {theirs} hours{" "}
+        <span {...stylex.props(styles.nowrap)}>({span}).</span>
+      </>
+    );
+  }
+  const subject = who === "you" ? "You’re" : `${who} is`;
+  return (
+    <>
+      {subject} off{clock.back ? ` until ${clock.back}` : ""}{" "}
+      <span {...stylex.props(styles.nowrap)}>({span}).</span>
+    </>
+  );
+}
+
+function daysPhrase(days: number[]) {
+  const set = [...new Set(days)].toSorted((a, b) => a - b);
+  if (set.length === 7) {
+    return "every day";
+  }
+  if (set.join(",") === "1,2,3,4,5") {
+    return "Mon–Fri";
+  }
+  return set.map((d) => DAY_NAMES[d]).join(", ");
+}
+
+function Fact({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <section {...stylex.props(styles.fact)}>
+      <h3 {...stylex.props(styles.factLabel)}>{label}</h3>
+      <div>{children}</div>
+    </section>
   );
 }
 
@@ -402,21 +661,21 @@ function NowList({
   title: string;
   empty: string;
   items?: {
-    key: number;
     number: number;
     title: string;
     meta?: string;
+    at?: string;
     golden?: boolean;
   }[];
 }) {
   return (
     <section {...stylex.props(styles.nowList)}>
-      <h3 {...stylex.props(styles.nowTitle)}>{title}</h3>
+      <h3 {...stylex.props(styles.factLabel)}>{title}</h3>
       {items === undefined && <Skeleton lines={2} />}
       {items?.length === 0 && <p {...stylex.props(layout.meta)}>{empty}</p>}
       <ul>
         {items?.map((item) => (
-          <li key={item.key}>
+          <li key={item.number}>
             <Link
               to="."
               search={(prev: Record<string, unknown>) => ({
@@ -426,13 +685,24 @@ function NowList({
               {...stylex.props(styles.nowRow)}
             >
               <span {...stylex.props(styles.number)}>#{item.number}</span>
-              {item.golden === true && (
-                <TicketIcon size={12} {...stylex.props(styles.gold)} />
-              )}
-              <span {...stylex.props(layout.truncate, layout.grow)}>
+              <span {...stylex.props(styles.nowTitle)}>
+                {item.golden === true && (
+                  <TicketIcon
+                    size={12}
+                    aria-label="Golden ticket"
+                    {...stylex.props(styles.gold, styles.inlineIcon)}
+                  />
+                )}
                 {item.title}
               </span>
-              {item.meta && <Badge>{item.meta}</Badge>}
+              {(item.meta !== undefined || item.at !== undefined) && (
+                <span {...stylex.props(styles.nowMeta)}>
+                  {item.meta && <Badge>{item.meta}</Badge>}
+                  {item.at && (
+                    <span {...stylex.props(styles.ago)}>{ago(item.at)}</span>
+                  )}
+                </span>
+              )}
             </Link>
           </li>
         ))}
@@ -440,47 +710,185 @@ function NowList({
     </section>
   );
 }
+
+const PHONE = "@media (max-width: 640px)";
+
 const styles = stylex.create({
   sections: { gap: space.x4 },
   grid: {
     display: "grid",
-    gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))",
-    gap: space.md,
+    gridTemplateColumns: {
+      default: "minmax(200px, 1.1fr) minmax(0, 2fr) 138px 128px",
+      [PHONE]: "minmax(0, 1fr) auto",
+    },
+    gridTemplateAreas: {
+      default: '"who now rhythm clock"',
+      [PHONE]: '"who clock" "now now"',
+    },
+    columnGap: space.x3,
+    rowGap: space.sm,
+    alignItems: "center",
   },
-  card: {
+  heads: {
+    display: { default: "grid", [PHONE]: "none" },
+    paddingInline: space.lg,
+    paddingBottom: space.sm,
+    fontSize: text.caption,
+    fontWeight: 500,
+    color: color.fgFaint,
+  },
+  roster: {
     display: "flex",
     flexDirection: "column",
-    gap: space.md,
-    height: "100%",
-    padding: space.lg,
+    borderTopWidth: 1,
+    borderTopStyle: "solid",
+    borderTopColor: color.line,
+  },
+  item: {
+    borderBottomWidth: 1,
+    borderBottomStyle: "solid",
+    borderBottomColor: color.line,
+  },
+  nestedItem: {},
+  row: {
+    position: "relative",
+    minHeight: 64,
+    paddingBlock: space.lg,
+    paddingInline: space.lg,
     borderRadius: radius.md,
-    backgroundColor: color.raised,
-    boxShadow: {
-      default: shadow.card,
-      ":hover": { default: null, [media.hover]: shadow.float },
+    backgroundColor: {
+      default: "transparent",
+      ":hover": { default: null, [media.hover]: color.surface },
     },
-    transitionProperty: "box-shadow",
+    transitionProperty: "background-color",
     transitionDuration: motion.fast,
   },
-  name: { fontSize: text.label, fontWeight: 600, color: color.fg },
-  sub: { fontSize: text.meta, color: color.fgMuted },
-  now: {
-    flexGrow: 1,
+  rowNested: {
+    minHeight: 44,
+    paddingTop: 0,
+    paddingBottom: space.lg,
+    paddingLeft: {
+      default: `calc(${space.lg} + 44px)`,
+      [PHONE]: `calc(${space.lg} + 20px)`,
+    },
+  },
+  whoHead: { gridArea: "who" },
+  nowHead: { gridArea: "now" },
+  who: {
+    gridArea: "who",
+    display: "flex",
+    alignItems: "center",
+    gap: space.lg,
+    minWidth: 0,
+  },
+  name: {
+    display: "block",
+    fontSize: text.label,
+    lineHeight: leading.label,
+    fontWeight: 600,
+    color: color.fg,
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    outline: "none",
+  },
+  // The whole row opens the person; links inside it sit above this layer.
+  stretch: {
+    "::after": {
+      content: '""',
+      position: "absolute",
+      inset: 0,
+      borderRadius: radius.md,
+      boxShadow: {
+        default: null,
+        ":focus-visible": `0 0 0 2px ${color.focus}`,
+      },
+    },
+  },
+  above: { position: "relative", zIndex: 1 },
+  sub: {
     fontSize: text.meta,
     lineHeight: leading.meta,
+    color: color.fgMuted,
+  },
+  now: {
+    gridArea: "now",
+    display: "flex",
+    flexDirection: "column",
+    minWidth: 0,
+    paddingLeft: { default: null, [PHONE]: 44 },
+  },
+  nowLine: {
+    fontSize: text.label,
+    lineHeight: leading.label,
     color: color.fg,
+  },
+  clamp: {
     display: "-webkit-box",
     WebkitLineClamp: 2,
     WebkitBoxOrient: "vertical",
     overflow: "hidden",
   },
-  nowLabel: { color: color.fgFaint, fontWeight: 500 },
-  foot: {
-    display: "flex",
-    flexWrap: "wrap",
-    gap: space.md,
+  quiet: { color: color.fgFaint },
+  number: {
+    fontFamily: font.mono,
     fontSize: 11.5,
-    color: color.fgFaint,
+    color: {
+      default: color.fgFaint,
+      ":hover": { default: null, [media.hover]: color.accentFg },
+    },
+    marginRight: space.xs,
+    flexShrink: 0,
+  },
+  gold: {
+    display: "inline-block",
+    color: color.goldFg,
+    flexShrink: 0,
+    verticalAlign: "-1px",
+  },
+  inlineIcon: { marginRight: space.xs },
+  rhythmCell: {
+    gridArea: "rhythm",
+    display: { default: "flex", [PHONE]: "none" },
+    alignItems: "center",
+  },
+  clock: {
+    gridArea: "clock",
+    textAlign: "right",
+    whiteSpace: "nowrap",
+  },
+  time: {
+    fontSize: text.label,
+    lineHeight: leading.label,
+    fontWeight: 500,
+    fontVariantNumeric: "tabular-nums",
+    color: color.fg,
+  },
+  place: { fontWeight: 400, color: color.fgMuted },
+  hoursLine: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "flex-end",
+    gap: space.sm,
+  },
+  hoursDot: {
+    width: 6,
+    height: 6,
+    borderRadius: radius.full,
+    backgroundColor: color.green,
+  },
+  alone: {
+    paddingInline: space.lg,
+    paddingTop: space.xl,
+    fontSize: text.label,
+    color: color.fgMuted,
+  },
+  link: {
+    color: color.accentFg,
+    textDecoration: {
+      default: "none",
+      ":hover": { default: null, [media.hover]: "underline" },
+    },
   },
   personSplit: {
     flexGrow: 1,
@@ -495,8 +903,9 @@ const styles = stylex.create({
   profile: {
     display: "flex",
     flexDirection: "column",
-    gap: space.lg,
-    padding: space.x3,
+    gap: space.xxl,
+    paddingBlock: space.x3,
+    paddingInline: { default: space.x3, [PHONE]: space.lg },
     overflowY: { default: "auto", "@media (max-width: 860px)": "visible" },
     borderRightWidth: { default: 1, "@media (max-width: 860px)": 0 },
     borderBottomWidth: { default: 0, "@media (max-width: 860px)": 1 },
@@ -505,20 +914,37 @@ const styles = stylex.create({
     borderStyle: "solid",
     borderColor: color.line,
   },
-  profileName: {
-    fontSize: text.title,
-    lineHeight: leading.title,
-    fontWeight: 600,
-  },
-  facts: { display: "flex", flexDirection: "column", gap: space.md },
-  fact: {
-    display: "flex",
-    flexDirection: "column",
-    gap: 2,
+  identity: { display: "flex", flexDirection: "column", gap: space.md },
+  handle: { fontSize: text.label, color: color.fgMuted },
+  sentence: {
     fontSize: text.label,
+    lineHeight: leading.label,
+    color: color.fgMuted,
+    textWrap: "pretty",
   },
+  nowrap: { whiteSpace: "nowrap" },
+  fact: { display: "flex", flexDirection: "column", gap: space.sm },
   factLabel: { fontSize: text.caption, fontWeight: 500, color: color.fgFaint },
-  link: {
+  agentList: { display: "flex", flexDirection: "column" },
+  agentRow: {
+    display: "flex",
+    alignItems: "center",
+    gap: space.md,
+    height: 32,
+    paddingInline: space.sm,
+    marginInline: -6,
+    borderRadius: radius.sm,
+    fontSize: text.label,
+    backgroundColor: {
+      default: "transparent",
+      ":hover": { default: null, [media.hover]: color.ui },
+    },
+  },
+  ownerLink: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: space.sm,
+    fontSize: text.label,
     color: color.accentFg,
     textDecoration: {
       default: "none",
@@ -535,6 +961,8 @@ const styles = stylex.create({
     color: color.fgMuted,
     backgroundColor: color.surface,
   },
+  askIcon: { flexShrink: 0, marginTop: 2 },
+  since: { fontSize: text.meta, color: color.fgFaint, marginTop: "auto" },
   personMain: {
     display: "flex",
     flexDirection: "column",
@@ -544,13 +972,13 @@ const styles = stylex.create({
   nowBlock: {
     display: "grid",
     gridTemplateColumns: {
-      default: "1fr 1fr",
-      "@media (max-width: 640px)": "1fr",
+      default: "minmax(0, 3fr) minmax(0, 2fr)",
+      [PHONE]: "minmax(0, 1fr)",
     },
-    gap: space.xl,
-    paddingInline: space.x3,
+    gap: space.x3,
+    paddingInline: { default: space.x3, [PHONE]: space.lg },
     paddingTop: space.x3,
-    paddingBottom: space.lg,
+    paddingBottom: space.xl,
     flexShrink: 0,
   },
   nowList: {
@@ -559,30 +987,46 @@ const styles = stylex.create({
     gap: space.sm,
     minWidth: 0,
   },
-  nowTitle: { fontSize: text.caption, fontWeight: 500, color: color.fgFaint },
   nowRow: {
     display: "flex",
-    alignItems: "center",
-    gap: space.sm,
-    height: 32,
+    alignItems: "baseline",
+    gap: space.md,
+    minHeight: 32,
+    paddingBlock: space.sm,
     paddingInline: space.sm,
     marginInline: -6,
     borderRadius: radius.sm,
     fontSize: text.label,
+    lineHeight: leading.label,
     backgroundColor: {
       default: "transparent",
       ":hover": { default: null, [media.hover]: color.ui },
     },
   },
-  number: {
-    fontFamily: font.mono,
-    fontSize: 11.5,
-    color: color.fgFaint,
-    flexShrink: 0,
+  nowTitle: {
+    flexGrow: 1,
+    minWidth: 0,
+    display: "-webkit-box",
+    WebkitLineClamp: 2,
+    WebkitBoxOrient: "vertical",
+    overflow: "hidden",
   },
-  gold: { color: color.goldFg, flexShrink: 0 },
+  nowMeta: {
+    display: "flex",
+    alignItems: "center",
+    gap: space.sm,
+    flexShrink: 0,
+    alignSelf: "center",
+  },
+  ago: {
+    fontSize: text.meta,
+    color: color.fgFaint,
+    fontVariantNumeric: "tabular-nums",
+    minWidth: 24,
+    textAlign: "right",
+  },
   feedTitle: {
-    paddingInline: space.x3,
+    paddingInline: { default: space.x3, [PHONE]: space.lg },
     fontSize: text.caption,
     fontWeight: 500,
     color: color.fgFaint,
