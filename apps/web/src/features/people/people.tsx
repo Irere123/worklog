@@ -3,7 +3,6 @@ import {
   ChatCircleTextIcon,
   ClockIcon,
   TicketIcon,
-  UsersIcon,
 } from "@phosphor-icons/react";
 import * as stylex from "@stylexjs/stylex";
 import { useMutation, useQuery } from "@tanstack/react-query";
@@ -63,7 +62,6 @@ export function PeopleList() {
     <>
       <PageHeader
         title="People"
-        icon={<UsersIcon size={16} />}
         subtitle={`${count(humans.length, "person", "people")} · ${count(agents.length, "agent", "agents")}`}
       />
       <Page>

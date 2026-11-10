@@ -2,7 +2,6 @@ import {
   BellIcon,
   BrainIcon,
   CalendarDotsIcon,
-  GearIcon,
   IdentificationBadgeIcon,
   KeyIcon,
   PaperPlaneRightIcon,
@@ -106,7 +105,7 @@ export function SettingsFrame({ children }: { children: ReactNode }) {
   const nav = useActiveInView();
   return (
     <>
-      <PageHeader title="Settings" icon={<GearIcon size={16} />} />
+      <PageHeader title="Settings" />
       <div {...stylex.props(styles.layout)}>
         <nav ref={nav} aria-label="Settings" {...stylex.props(styles.nav)}>
           {GROUPS.map((group) => (

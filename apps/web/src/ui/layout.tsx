@@ -140,10 +140,13 @@ const styles = stylex.create({
     color: color.fg,
     whiteSpace: "nowrap",
   },
+  // Facts about the page (a count, a budget, a board's description), never a tagline: it would
+  // say the same thing on every visit.
   subtitle: {
     display: { default: null, "@media (max-width: 640px)": "none" },
     fontSize: text.label,
-    color: color.fgMuted,
+    color: color.fgFaint,
+    fontVariantNumeric: "tabular-nums",
     overflow: "hidden",
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",

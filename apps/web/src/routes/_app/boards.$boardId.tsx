@@ -106,7 +106,6 @@ function BoardPage() {
     <>
       <PageHeader
         title={board.data.name}
-        icon={<KanbanIcon size={16} />}
         subtitle={board.data.description ?? undefined}
         actions={
           <>

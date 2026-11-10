@@ -7,7 +7,6 @@ import {
   KanbanIcon,
   ThumbsDownIcon,
   ThumbsUpIcon,
-  TrayIcon,
   XIcon,
 } from "@phosphor-icons/react";
 import * as stylex from "@stylexjs/stylex";
@@ -243,7 +242,6 @@ export function Inbox({
     <>
       <PageHeader
         title="Inbox"
-        icon={<TrayIcon size={16} />}
         subtitle={<Budget />}
         actions={
           <Segmented
@@ -394,15 +392,15 @@ function Budget() {
   const today = useQuery(q.attentionMetrics(1));
   const cap = me?.member.settings.notify?.dailyPushCap ?? 4;
   if (!today.data) {
-    return "Only what’s waiting on you.";
+    return null;
   }
   const sent = today.data.pushes;
   if (sent >= cap) {
-    return `Only what’s waiting on you · ${cap} pings sent today, so the rest waits for your brief`;
+    return `${cap} pings sent today, so the rest waits for your brief`;
   }
   return sent === 0
-    ? `Only what’s waiting on you · no pings yet today, ${cap} at most`
-    : `Only what’s waiting on you · pinged you ${sent} of ${cap} times today`;
+    ? `No pings yet today, ${cap} at most`
+    : `Pinged you ${sent} of ${cap} times today`;
 }
 
 type RowActions = {

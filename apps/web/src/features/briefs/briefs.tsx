@@ -49,8 +49,6 @@ export function Briefs({ selectedId }: { selectedId?: string }) {
     <>
       <PageHeader
         title="Briefs"
-        icon={<NewspaperIcon size={16} />}
-        subtitle="What happened, and what needs you, on a schedule."
         actions={
           <Menu
             align="end"

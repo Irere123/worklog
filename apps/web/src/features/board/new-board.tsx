@@ -36,7 +36,7 @@ export function NewBoard() {
   });
   return (
     <>
-      <PageHeader title="Boards" icon={<KanbanIcon size={16} />} />
+      <PageHeader title="Boards" />
       <Page width="narrow">
         <EmptyState
           icon={<KanbanIcon size={20} />}
