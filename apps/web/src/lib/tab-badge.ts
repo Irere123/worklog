@@ -1,8 +1,10 @@
 import { useEffect } from "react";
 
-// The logo's own lines, so the badged icon is the same mark with a count, not a different one.
-const LOGO =
-  '<rect width="32" height="32" rx="8" fill="#4f46e5"/><rect x="8" y="9" width="16" height="3" rx="1.5" fill="#fff"/><rect x="8" y="14.5" width="11" height="3" rx="1.5" fill="#fff" opacity=".8"/><rect x="8" y="20" width="6" height="3" rx="1.5" fill="#fbbf24"/>';
+import { markMarkup } from "#ui/logo-mark";
+
+// The logo's own geometry, so the badged icon is the same mark with a count, not a different one.
+// A tab draws it at 16px, so the cuts are sized for that.
+const LOGO = `<svg width="32" height="32" viewBox="0 0 100 100">${markMarkup(16)}</svg>`;
 
 /**
  * The tab says what needs you, the way a calendar's tab shows the date: the inbox count rides on

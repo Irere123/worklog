@@ -1,7 +1,7 @@
 import * as stylex from "@stylexjs/stylex";
 import type { ReactNode } from "react";
 
-import { Logo } from "#features/shell/logo";
+import { Logo } from "#ui/logo";
 import { color, leading, media, radius, space, text } from "#ui/tokens.stylex";
 
 export function AuthFrame({
@@ -18,7 +18,7 @@ export function AuthFrame({
   return (
     <main {...stylex.props(styles.page)}>
       <div {...stylex.props(styles.column)}>
-        <Logo size={36} />
+        <Logo size={36} draw />
         <div {...stylex.props(styles.card)}>
           <div {...stylex.props(styles.head)}>
             <h1 {...stylex.props(styles.title)}>{title}</h1>

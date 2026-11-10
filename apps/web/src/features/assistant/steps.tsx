@@ -37,8 +37,8 @@ import type { Schemas } from "#api/client";
 import { q } from "#api/queries";
 import { SourceGlyph } from "#features/activity/activity-line";
 import type { Member } from "#features/cards/card-bits";
-import { Logo } from "#features/shell/logo";
 import { ago } from "#lib/time";
+import { Logo } from "#ui/logo";
 import { Markdown } from "#ui/markdown";
 import {
   color,

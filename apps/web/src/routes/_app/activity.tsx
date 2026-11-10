@@ -15,10 +15,10 @@ import { q } from "#api/queries";
 import { SourceGlyph, sourceLabel } from "#features/activity/activity-line";
 import { DayRibbon } from "#features/activity/day-ribbon";
 import { Feed } from "#features/activity/feed";
-import { Logo } from "#features/shell/logo";
 import { Avatar } from "#ui/avatar";
 import { Input, Select } from "#ui/field";
 import { PageHeader } from "#ui/layout";
+import { Logo } from "#ui/logo";
 
 type ActivitySearch = { actor?: string; source?: string };
 

@@ -6,9 +6,8 @@ import { Link } from "@tanstack/react-router";
 import { q } from "#api/queries";
 import { AssistantFace, usePresence } from "#features/assistant/presence";
 import { Count, Dot } from "#ui/chip";
+import { Logo } from "#ui/logo";
 import { color, radius, space, text } from "#ui/tokens.stylex";
-
-import { Logo } from "./logo";
 
 /**
  * Narrow screens only: the sidebar folds into a drawer, and this bar keeps what a phone visit is

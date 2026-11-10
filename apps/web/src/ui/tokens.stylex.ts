@@ -26,6 +26,11 @@ export const color = stylex.defineVars({
   accentSubtle: "light-dark(oklch(0.962 0.022 268), oklch(0.26 0.06 268))",
   accentLine: "light-dark(oklch(0.85 0.07 268), oklch(0.4 0.1 268))",
 
+  // The mark's crayon navy and the purple at its edges. Dark mode lightens the ink, or the mark
+  // would vanish into the page.
+  brand: "light-dark(oklch(0.223 0.05 253), oklch(0.93 0.02 253))",
+  brandRim: "light-dark(oklch(0.28 0.083 307), oklch(0.62 0.12 307))",
+
   gold: "light-dark(oklch(0.78 0.15 82), oklch(0.8 0.14 82))",
   goldFg: "light-dark(oklch(0.5 0.11 70), oklch(0.85 0.12 85))",
   goldSubtle: "light-dark(oklch(0.975 0.04 90), oklch(0.25 0.045 80))",

@@ -33,6 +33,7 @@ import { useTabBadge } from "#lib/tab-badge";
 import { setTheme, useTheme } from "#lib/theme";
 import { Avatar } from "#ui/avatar";
 import { Count, Dot, Kbd } from "#ui/chip";
+import { Logo } from "#ui/logo";
 import { Menu, MenuItem, MenuLabel, MenuSeparator, Tooltip } from "#ui/overlay";
 import {
   color,
@@ -45,7 +46,6 @@ import {
   text,
 } from "#ui/tokens.stylex";
 
-import { Logo } from "./logo";
 import { PinStack } from "./pin-stack";
 import type { ShellDialog } from "./shell";
 
