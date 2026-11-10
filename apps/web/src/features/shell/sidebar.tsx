@@ -107,6 +107,7 @@ export function Sidebar({
         </Tooltip>
       </div>
 
+      {/* Yours first, where counts wait on you; then the team's; then the boards. */}
       <div {...stylex.props(styles.group)}>
         <NavItem to="/home" icon={HouseIcon}>
           Home
@@ -118,10 +119,16 @@ export function Sidebar({
         >
           Inbox
         </NavItem>
+        <AssistantItem />
+      </div>
+
+      <div {...stylex.props(styles.group)}>
+        <div {...stylex.props(styles.groupHead)}>
+          <span>Team</span>
+        </div>
         <NavItem to="/activity" icon={FootprintsIcon}>
           Activity
         </NavItem>
-        <AssistantItem />
         <NavItem to="/briefs" icon={NewspaperIcon}>
           Briefs
         </NavItem>
@@ -170,6 +177,7 @@ export function Sidebar({
               to="/boards/$boardId"
               params={{ boardId: board.id }}
               icon={KanbanIcon}
+              nested
             >
               {board.name}
             </NavItem>
@@ -179,11 +187,6 @@ export function Sidebar({
       <div {...stylex.props(styles.spacer)} />
       <PinStack />
 
-      <div {...stylex.props(styles.group)}>
-        <NavItem to="/settings" icon={GearIcon}>
-          Settings
-        </NavItem>
-      </div>
       <div {...stylex.props(styles.footer)}>
         {me.data && (
           <Link
@@ -195,6 +198,17 @@ export function Sidebar({
             <span {...stylex.props(styles.meName)}>{me.data.member.name}</span>
           </Link>
         )}
+        <Tooltip label="Settings" side="top">
+          <Link
+            to="/settings"
+            aria-label="Settings"
+            {...stylex.props(styles.footerAction)}
+          >
+            {({ isActive }) => (
+              <GearIcon size={16} weight={isActive ? "fill" : "regular"} />
+            )}
+          </Link>
+        </Tooltip>
         <Tooltip label={LIVE[live].label} side="top">
           <output {...stylex.props(styles.live)} aria-label={LIVE[live].label}>
             {/* Calm when all is well: only reconnecting moves. */}
@@ -247,16 +261,31 @@ function NavItem({
   icon,
   children,
   trailing,
+  nested = false,
   ...link
-}: LinkProps & { icon: Icon; children: ReactNode; trailing?: ReactNode }) {
+}: LinkProps & {
+  icon: Icon;
+  children: ReactNode;
+  trailing?: ReactNode;
+  /** A child of its section, like each board: a quieter icon, so the section's items lead. */
+  nested?: boolean;
+}) {
   const Glyph = icon;
   return (
     <Link {...link} {...stylex.props(styles.item)}>
       {({ isActive }) => (
         <>
           {/* Filled where you are, like a tab bar: the place reads from the icon as well as the row. */}
-          <span {...stylex.props(styles.itemIcon)}>
-            <Glyph size={16} weight={isActive ? "fill" : "regular"} />
+          <span
+            {...stylex.props(
+              styles.itemIcon,
+              nested && !isActive && styles.nestedIcon
+            )}
+          >
+            <Glyph
+              size={nested ? 14 : 16}
+              weight={isActive ? "fill" : "regular"}
+            />
           </span>
           <span {...stylex.props(styles.itemLabel)}>{children}</span>
           {trailing}
@@ -482,7 +511,13 @@ const styles = stylex.create({
     outline: { default: "none", ":focus-visible": `2px solid ${color.focus}` },
     outlineOffset: -2,
   },
-  itemIcon: { display: "grid", placeItems: "center", opacity: 0.9 },
+  itemIcon: {
+    display: "grid",
+    placeItems: "center",
+    width: 16,
+    opacity: 0.9,
+  },
+  nestedIcon: { color: color.fgFaint },
   itemLabel: {
     flexGrow: 1,
     overflow: "hidden",
@@ -519,6 +554,25 @@ const styles = stylex.create({
     overflow: "hidden",
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
+  },
+  footerAction: {
+    display: "grid",
+    placeItems: "center",
+    flexShrink: 0,
+    width: { default: 28, [TOUCH]: 40 },
+    height: { default: 28, [TOUCH]: 40 },
+    borderRadius: radius.sm,
+    color: {
+      default: color.fgMuted,
+      ":hover": { default: null, [media.hover]: color.fg },
+      ":is([data-status=active])": color.fg,
+    },
+    backgroundColor: {
+      default: "transparent",
+      ":hover": { default: null, [media.hover]: color.uiHover },
+      ":is([data-status=active])": color.uiActive,
+    },
+    outline: { default: "none", ":focus-visible": `2px solid ${color.focus}` },
   },
   live: {
     display: "grid",
