@@ -49,11 +49,12 @@ import {
 import { PinStack } from "./pin-stack";
 import type { ShellDialog } from "./shell";
 
-const LIVE: Record<
-  LiveStatus,
-  { tone: "green" | "amber" | "neutral"; label: string }
+// A working connection says nothing: the page updating is the signal. Only a broken one shows,
+// because then the page goes stale without looking any different.
+const BROKEN: Record<
+  Exclude<LiveStatus, "live">,
+  { tone: "amber" | "neutral"; label: string }
 > = {
-  live: { tone: "green", label: "Live: updates appear as they happen" },
   connecting: { tone: "amber", label: "Reconnecting…" },
   offline: { tone: "neutral", label: "Offline: refresh to reconnect" },
 };
@@ -209,12 +210,16 @@ export function Sidebar({
             )}
           </Link>
         </Tooltip>
-        <Tooltip label={LIVE[live].label} side="top">
-          <output {...stylex.props(styles.live)} aria-label={LIVE[live].label}>
-            {/* Calm when all is well: only reconnecting moves. */}
-            <Dot tone={LIVE[live].tone} pulse={live === "connecting"} />
-          </output>
-        </Tooltip>
+        {live !== "live" && (
+          <Tooltip label={BROKEN[live].label} side="top">
+            <output
+              {...stylex.props(styles.live)}
+              aria-label={BROKEN[live].label}
+            >
+              <Dot tone={BROKEN[live].tone} pulse={live === "connecting"} />
+            </output>
+          </Tooltip>
+        )}
       </div>
     </nav>
   );
