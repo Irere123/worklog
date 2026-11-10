@@ -17,7 +17,7 @@ import {
   NoteIcon,
   NotePencilIcon,
   PlusSquareIcon,
-  PulseIcon,
+  FootprintsIcon,
   ThumbsUpIcon,
   TrayIcon,
   UserFocusIcon,
@@ -335,7 +335,7 @@ function Thought({ step }: { step: Extract<Step, { kind: "thought" }> }) {
 const MEMORY_WRITES = new Set(["remember", "forget"]);
 
 const ICONS: Record<string, ComponentType<IconProps>> = {
-  search_activity: PulseIcon,
+  search_activity: FootprintsIcon,
   search_cards: MagnifyingGlassIcon,
   get_card: CardsIcon,
   work_snapshot: UserFocusIcon,

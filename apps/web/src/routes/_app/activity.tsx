@@ -1,6 +1,6 @@
 import {
   MagnifyingGlassIcon,
-  PulseIcon,
+  FootprintsIcon,
   StackIcon,
   UsersThreeIcon,
 } from "@phosphor-icons/react";
@@ -59,7 +59,7 @@ function ActivityPage() {
     <>
       <PageHeader
         title="Activity"
-        icon={<PulseIcon size={16} />}
+        icon={<FootprintsIcon size={16} />}
         subtitle="Everything the team and its agents did, newest first."
         actions={
           <>

@@ -9,7 +9,7 @@ import {
   NewspaperIcon,
   NotePencilIcon,
   PlusIcon,
-  PulseIcon,
+  FootprintsIcon,
   SignOutIcon,
   SunIcon,
   TrayIcon,
@@ -200,7 +200,7 @@ export function CommandPalette({
             Inbox
           </Item>
           <Item
-            icon={<PulseIcon size={15} />}
+            icon={<FootprintsIcon size={15} />}
             onSelect={go("/activity")}
             hint={<Kbd>G A</Kbd>}
           >

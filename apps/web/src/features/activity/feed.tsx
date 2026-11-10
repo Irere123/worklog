@@ -1,4 +1,4 @@
-import { ArrowUpIcon, PulseIcon } from "@phosphor-icons/react";
+import { ArrowUpIcon, FootprintsIcon } from "@phosphor-icons/react";
 import * as stylex from "@stylexjs/stylex";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { useVirtualizer } from "@tanstack/react-virtual";
@@ -151,7 +151,7 @@ export function Feed({
         {header !== undefined && (
           <div {...stylex.props(styles.header)}>{header}</div>
         )}
-        <EmptyState icon={<PulseIcon size={20} />} title="Nothing yet">
+        <EmptyState icon={<FootprintsIcon size={20} />} title="Nothing yet">
           {emptyText}
         </EmptyState>
       </div>

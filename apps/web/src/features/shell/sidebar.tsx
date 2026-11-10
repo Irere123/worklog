@@ -11,7 +11,7 @@ import {
   NewspaperIcon,
   NotePencilIcon,
   PlusIcon,
-  PulseIcon,
+  FootprintsIcon,
   RobotIcon,
   SignOutIcon,
   SunIcon,
@@ -118,7 +118,7 @@ export function Sidebar({
         >
           Inbox
         </NavItem>
-        <NavItem to="/activity" icon={PulseIcon}>
+        <NavItem to="/activity" icon={FootprintsIcon}>
           Activity
         </NavItem>
         <AssistantItem />
