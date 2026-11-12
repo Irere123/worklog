@@ -34,6 +34,16 @@ export function preloadPeople(client: QueryClient) {
   void client.query(q.teamNow(3)).catch(ignore);
 }
 
+export function preloadPerson(client: QueryClient, handle: string) {
+  void client.query(q.member(handle)).catch(ignore);
+  void client.query(q.now(handle, 7)).catch(ignore);
+  void client.query(q.teamNow(3)).catch(ignore);
+  void client
+    .query(q.recentActivities({ actor: handle, limit: 60 }))
+    .catch(ignore);
+  void client.infiniteQuery(q.activities({ actor: handle })).catch(ignore);
+}
+
 export function preloadBoard(client: QueryClient, board: string) {
   void client.query(q.cards({ board, stage: "active" })).catch(ignore);
   void client.query(q.cards({ board, stage: "triage" })).catch(ignore);

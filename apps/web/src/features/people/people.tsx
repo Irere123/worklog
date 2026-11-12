@@ -171,7 +171,7 @@ function PersonRow({
       <div
         {...stylex.props(styles.grid, styles.row, nested && styles.rowNested)}
       >
-        <div {...stylex.props(styles.who)}>
+        <div {...stylex.props(styles.who, nested && styles.whoNested)}>
           <Avatar person={m} size={nested ? 24 : 32} />
           <div {...stylex.props(layout.grow)}>
             <Link
@@ -188,14 +188,14 @@ function PersonRow({
             </p>
           </div>
         </div>
-        <div {...stylex.props(styles.now)}>
+        <div {...stylex.props(styles.now, nested && styles.nowNested)}>
           {pending ? (
             <Skeleton lines={1} height={12} />
           ) : (
             <NowCell member={m} snap={snap} />
           )}
         </div>
-        <div {...stylex.props(styles.rhythmCell, styles.above)}>
+        <div {...stylex.props(styles.rhythmCell, styles.above, styles.passTap)}>
           <RhythmStrip
             counts={snap?.rhythm ?? []}
             today={today}
@@ -258,8 +258,7 @@ function NowCell({ member: m, snap }: { member: Member; snap?: Snap }) {
   return (
     <>
       {current ? (
-        <p {...stylex.props(styles.nowLine, layout.truncate)}>
-          <CardLink number={current.number} />
+        <CardLink number={current.number}>
           {current.golden && (
             <TicketIcon
               size={12}
@@ -268,7 +267,7 @@ function NowCell({ member: m, snap }: { member: Member; snap?: Snap }) {
             />
           )}{" "}
           {current.title}
-        </p>
+        </CardLink>
       ) : (
         <p
           {...stylex.props(
@@ -285,14 +284,26 @@ function NowCell({ member: m, snap }: { member: Member; snap?: Snap }) {
   );
 }
 
-function CardLink({ number }: { number: number }) {
+function CardLink({
+  number,
+  children,
+}: {
+  number: number;
+  children: ReactNode;
+}) {
   return (
     <Link
       to="."
       search={(prev: Record<string, unknown>) => ({ ...prev, card: number })}
-      {...stylex.props(styles.number, styles.above)}
+      {...stylex.props(
+        styles.nowLine,
+        layout.truncate,
+        styles.cardLink,
+        styles.above
+      )}
     >
-      #{number}
+      <span {...stylex.props(styles.number)}>#{number}</span>
+      {children}
     </Link>
   );
 }
@@ -310,8 +321,7 @@ function ClockCell({ clock }: { clock: Clock }) {
             Working hours
           </>
         )}
-        {clock.inHours === false &&
-          (clock.back ? `Off · back ${clock.back}` : "Off")}
+        {clock.inHours === false && (clock.back ? `Back ${clock.back}` : "Off")}
       </p>
     </>
   );
@@ -767,10 +777,6 @@ const styles = stylex.create({
     minHeight: 44,
     paddingTop: 0,
     paddingBottom: space.lg,
-    paddingLeft: {
-      default: `calc(${space.lg} + 44px)`,
-      [PHONE]: `calc(${space.lg} + 20px)`,
-    },
   },
   whoHead: { gridArea: "who" },
   nowHead: { gridArea: "now" },
@@ -781,6 +787,8 @@ const styles = stylex.create({
     gap: space.lg,
     minWidth: 0,
   },
+  // Only the person cell indents, so an agent's other cells stay in their owner's columns.
+  whoNested: { paddingLeft: { default: 44, [PHONE]: 20 } },
   name: {
     display: "block",
     fontSize: text.label,
@@ -818,6 +826,7 @@ const styles = stylex.create({
     minWidth: 0,
     paddingLeft: { default: null, [PHONE]: 44 },
   },
+  nowNested: { paddingLeft: { default: null, [PHONE]: 64 } },
   nowLine: {
     fontSize: text.label,
     lineHeight: leading.label,
@@ -830,6 +839,18 @@ const styles = stylex.create({
     overflow: "hidden",
   },
   quiet: { color: color.fgFaint },
+  // Taller than its line so a thumb that lands just off the title still opens the card.
+  cardLink: {
+    display: "block",
+    paddingBlock: 4,
+    marginBlock: -4,
+    textDecoration: {
+      default: "none",
+      ":hover": { default: null, [media.hover]: "underline" },
+    },
+    textDecorationColor: color.fgFaint,
+    textUnderlineOffset: 3,
+  },
   number: {
     fontFamily: font.mono,
     fontSize: 11.5,
@@ -852,6 +873,8 @@ const styles = stylex.create({
     display: { default: "flex", [PHONE]: "none" },
     alignItems: "center",
   },
+  // Its tooltip needs hover, so on touch a tap opens the person, whose page shows the calendar.
+  passTap: { pointerEvents: { default: null, "@media (hover: none)": "none" } },
   clock: {
     gridArea: "clock",
     textAlign: "right",
@@ -968,12 +991,15 @@ const styles = stylex.create({
     flexDirection: "column",
     minHeight: 0,
     minWidth: 0,
+    containerType: "inline-size",
   },
   nowBlock: {
     display: "grid",
+    // The pane's width, not the window's: beside the sidebar and profile a laptop leaves it
+    // too narrow for titles next to their stage and date.
     gridTemplateColumns: {
       default: "minmax(0, 3fr) minmax(0, 2fr)",
-      [PHONE]: "minmax(0, 1fr)",
+      "@container (max-width: 680px)": "minmax(0, 1fr)",
     },
     gap: space.x3,
     paddingInline: { default: space.x3, [PHONE]: space.lg },

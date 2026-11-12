@@ -1,4 +1,6 @@
 import * as stylex from "@stylexjs/stylex";
+import { useState } from "react";
+import type { ComponentProps } from "react";
 
 import { VisuallyHidden } from "#ui/feedback";
 import { Tooltip } from "#ui/overlay";
@@ -66,7 +68,9 @@ export function RhythmStrip({
  * that happened. Days they don't work are hollow when empty, so a quiet weekend reads as one.
  */
 export function RhythmCalendar({ counts, today, workdays, name }: Props) {
+  const [picked, setPicked] = useState<number | null>(null);
   const days = daysOf(counts, today);
+  const pickedDay = days.find((d) => d.at.getTime() === picked);
   const weeks = weeksOf(days);
   const scale = Math.max(1, ...counts);
   const summary = summarize(
@@ -76,7 +80,19 @@ export function RhythmCalendar({ counts, today, workdays, name }: Props) {
   );
   return (
     <figure {...stylex.props(styles.figure)}>
-      <div aria-hidden {...stylex.props(styles.calendar)}>
+      {/* Touch has no hover, so a tap names the day in the caption, where the tooltip can't reach.
+          The calendar is hidden from assistive tech; the caption's summary speaks for it. */}
+      <div
+        aria-hidden
+        onClick={(event) => {
+          const at =
+            event.target instanceof HTMLElement
+              ? Number(event.target.dataset.at ?? Number.NaN)
+              : Number.NaN;
+          setPicked(Number.isNaN(at) || at === picked ? null : at);
+        }}
+        {...stylex.props(styles.calendar)}
+      >
         <div {...stylex.props(styles.column)}>
           <span {...stylex.props(styles.month)} />
           {WEEKDAY_LABELS.map((label) => (
@@ -96,6 +112,8 @@ export function RhythmCalendar({ counts, today, workdays, name }: Props) {
                     scale={scale}
                     off={!workdays.includes(d.weekday)}
                     large
+                    picked={d.at.getTime() === picked}
+                    data-at={d.at.getTime()}
                   />
                 </Tooltip>
               ) : (
@@ -109,7 +127,7 @@ export function RhythmCalendar({ counts, today, workdays, name }: Props) {
         ))}
       </div>
       <figcaption {...stylex.props(styles.caption)}>
-        <span>{summary}</span>
+        <span>{pickedDay ? dayLabel(pickedDay) : summary}</span>
         <span aria-hidden {...stylex.props(styles.legend)}>
           Less
           {LEVELS.map((level) => (
@@ -138,25 +156,31 @@ const WEEKDAY_LABELS = [
   { key: "sun", text: "" },
 ];
 
+// The rest are a tooltip trigger's handlers and ref; without them the tooltip never opens.
 function Square({
   day,
   scale,
   off,
   large = false,
+  picked = false,
+  ...rest
 }: {
   day: Day;
   scale: number;
   off: boolean;
   large?: boolean;
-}) {
+  picked?: boolean;
+} & Omit<ComponentProps<"span">, "className" | "style">) {
   const level = levelOf(day.count, scale);
   return (
     <span
+      {...rest}
       {...stylex.props(
         styles.square,
         large && styles.squareLg,
         levels[LEVELS[level] ?? "l0"],
-        level === 0 && off && styles.off
+        level === 0 && off && styles.off,
+        picked && styles.picked
       )}
     />
   );
@@ -254,6 +278,7 @@ const styles = stylex.create({
     backgroundColor: "transparent",
     boxShadow: `inset 0 0 0 1px ${color.line}`,
   },
+  picked: { outline: `2px solid ${color.focus}`, outlineOffset: 1 },
   blank: { display: "block", width: 12, height: 12 },
   figure: { display: "flex", flexDirection: "column", gap: space.md },
   calendar: { display: "flex", gap: 3 },
