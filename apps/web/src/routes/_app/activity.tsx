@@ -12,7 +12,7 @@ import { useState } from "react";
 import { preloadActivity } from "#api/preload";
 import { q } from "#api/queries";
 import { SourceGlyph, sourceLabel } from "#features/activity/activity-line";
-import { DayRibbon } from "#features/activity/day-ribbon";
+import { DayRibbon, useRibbon } from "#features/activity/day-ribbon";
 import { Feed } from "#features/activity/feed";
 import { Avatar } from "#ui/avatar";
 import { Input, Select } from "#ui/field";
@@ -48,6 +48,7 @@ function ActivityPage() {
   const source = Route.useSearch({ select: (s) => s.source });
   const navigate = useNavigate({ from: Route.fullPath });
   const members = useQuery(q.members());
+  const ribbon = useRibbon();
   const [text, setText] = useState("");
   const [term] = useDebouncedValue(text.trim(), { wait: 250 });
   const set = (patch: ActivitySearch) => {
@@ -114,8 +115,10 @@ function ActivityPage() {
       />
       <Feed
         filter={{ actor, source, q: term || undefined }}
+        headerPending={ribbon.recent.isPending}
         header={
           <DayRibbon
+            ribbon={ribbon}
             selected={actor}
             onSelect={(handle) => set({ actor: handle })}
           />

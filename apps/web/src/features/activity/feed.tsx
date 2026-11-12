@@ -27,6 +27,7 @@ export function Feed({
   hideActor = false,
   skip,
   header,
+  headerPending = false,
   emptyText = "Activity from connected tools, logs and agents appears here.",
 }: {
   filter: Omit<ActivityFilter, "before" | "limit">;
@@ -35,6 +36,8 @@ export function Feed({
   skip?: (activity: Activity) => boolean;
   /** Scrolls with the feed, above the first day. */
   header?: ReactNode;
+  /** Holds the skeleton until the header's data lands, so the list doesn't jump when it does. */
+  headerPending?: boolean;
   emptyText?: string;
 }) {
   const feed = useInfiniteQuery(q.activities(filter));
@@ -126,7 +129,7 @@ export function Feed({
     }
   }, [last, rows.length, feed]);
 
-  if (feed.isPending) {
+  if (feed.isPending || headerPending) {
     return (
       <div {...stylex.props(styles.pad)}>
         <Skeleton lines={8} height={36} />

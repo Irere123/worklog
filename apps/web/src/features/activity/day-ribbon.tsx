@@ -1,5 +1,5 @@
 import * as stylex from "@stylexjs/stylex";
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 
 import { q } from "#api/queries";
@@ -16,32 +16,43 @@ const HOUR = 3_600_000;
 const SPAN = 24 * HOUR;
 const LANES = 8;
 const LANE_HEIGHT = 24;
-// The heading, axis and padding around the lanes.
-const FRAME_HEIGHT = 68;
 
 type Lane = { member: Member; events: Activity[] };
 
-/**
- * The team's last day as lanes, one per person or agent, a tick for each thing they did: when work
- * happens and who's carrying it, at a glance, before reading a single line. A lane is a filter.
- */
-export function DayRibbon({
-  selected,
-  onSelect,
-}: {
-  /** Handle of the person the feed is narrowed to, if any. */
-  selected?: string;
-  onSelect: (handle: string | undefined) => void;
-}) {
+export type Ribbon = ReturnType<typeof useRibbon>;
+
+/** The ribbon's data, held by the page so the feed below can wait for it instead of jumping. */
+export function useRibbon() {
   // Held in state so the query key is stable; the window slides along every ten minutes.
   const [end, setEnd] = useState(() => Date.now());
   useEffect(() => {
     const timer = setInterval(() => setEnd(Date.now()), 10 * 60_000);
     return () => clearInterval(timer);
   }, []);
-  const since = ribbonSince(end);
-  const recent = useQuery(q.recentActivities({ since, limit: 500 }));
-  const { byId, list } = useMembers();
+  const recent = useQuery({
+    ...q.recentActivities({ since: ribbonSince(end), limit: 500 }),
+    // A slide shouldn't blank the lanes while the next window loads.
+    placeholderData: keepPreviousData,
+  });
+  return { end, recent };
+}
+
+/**
+ * The team's last day as lanes, one per person or agent, a tick for each thing they did: when work
+ * happens and who's carrying it, at a glance, before reading a single line. A lane is a filter.
+ */
+export function DayRibbon({
+  ribbon,
+  selected,
+  onSelect,
+}: {
+  ribbon: Ribbon;
+  /** Handle of the person the feed is narrowed to, if any. */
+  selected?: string;
+  onSelect: (handle: string | undefined) => void;
+}) {
+  const { end, recent } = ribbon;
+  const { byId } = useMembers();
 
   const lanes = useMemo(() => {
     const byActor = new Map<string, Activity[]>();
@@ -59,18 +70,6 @@ export function DayRibbon({
       .toSorted((a, b) => b.events.length - a.events.length);
   }, [recent.data, byId]);
 
-  if (recent.isPending) {
-    // Held open at about the size it will be, so the feed below doesn't jump when the lanes land.
-    const expected = Math.min(Math.max(list.length, 1), LANES);
-    return (
-      <div
-        aria-hidden
-        {...stylex.props(
-          styles.placeholder(expected * LANE_HEIGHT + FRAME_HEIGHT)
-        )}
-      />
-    );
-  }
   if (lanes.length === 0) {
     return null;
   }
@@ -184,7 +183,6 @@ function hourMarks(end: number) {
 }
 
 const styles = stylex.create({
-  placeholder: (height: number) => ({ height }),
   ribbon: {
     display: "flex",
     flexDirection: "column",

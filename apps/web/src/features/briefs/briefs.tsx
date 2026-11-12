@@ -72,7 +72,10 @@ export function Briefs({ selectedId }: { selectedId?: string }) {
         }
       />
       <div {...stylex.props(styles.split)}>
-        <nav aria-label="Briefs" {...stylex.props(styles.list)}>
+        <nav
+          aria-label="Briefs"
+          {...stylex.props(styles.list, briefs.isPending && styles.listPending)}
+        >
           {briefs.isPending && <Skeleton lines={5} height={40} />}
           {briefs.isError && <ErrorNote error={briefs.error} />}
           {list.map((brief) => (
@@ -244,6 +247,10 @@ const styles = stylex.create({
     borderLeftWidth: 0,
     borderStyle: "solid",
     borderColor: color.line,
+  },
+  // On a phone the reader sits under the list, so the list keeps its loaded height while empty.
+  listPending: {
+    minHeight: { default: null, "@media (max-width: 860px)": 168 },
   },
   item: {
     display: "flex",
