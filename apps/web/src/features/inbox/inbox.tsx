@@ -1184,7 +1184,7 @@ const styles = stylex.create({
   legend: {
     display: {
       default: "flex",
-      "@media (hover: none) and (pointer: coarse)": "none",
+      [media.touch]: "none",
     },
     flexWrap: "wrap",
     gap: space.lg,

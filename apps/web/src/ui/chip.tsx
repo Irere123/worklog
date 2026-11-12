@@ -2,7 +2,7 @@ import * as stylex from "@stylexjs/stylex";
 import type { StyleXStyles } from "@stylexjs/stylex";
 import type { ReactNode } from "react";
 
-import { color, font, radius, space, text } from "./tokens.stylex";
+import { color, font, media, radius, space, text } from "./tokens.stylex";
 
 export type Tone =
   | "neutral"
@@ -125,7 +125,7 @@ const styles = stylex.create({
   keys: {
     display: {
       default: "inline-flex",
-      "@media (hover: none) and (pointer: coarse)": "none",
+      [media.touch]: "none",
     },
     gap: space.xxs,
   },

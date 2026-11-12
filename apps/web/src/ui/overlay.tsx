@@ -23,7 +23,6 @@ import {
 
 // Base UI's 5px default lets a menu opened by the window's edge sit flush against it.
 const EDGE = 8;
-const TOUCH = "@media (hover: none) and (pointer: coarse)";
 
 /* Tooltip ---------------------------------------------------------------- */
 
@@ -431,7 +430,7 @@ const styles = stylex.create({
     outline: "none",
     color: color.fg,
     // Under 16px, iOS zooms the page to focus the field.
-    fontSize: { default: text.label, [TOUCH]: 16 },
+    fontSize: { default: text.label, [media.touch]: 16 },
     "::placeholder": { color: color.fgFaint },
   },
   list: {
@@ -681,7 +680,7 @@ export const surface = stylex.create({
     alignItems: "center",
     gap: space.md,
     // A finger needs the taller row; a pointer gets the denser list.
-    height: { default: 30, [TOUCH]: 40 },
+    height: { default: 30, [media.touch]: 40 },
     paddingInline: space.md,
     borderRadius: radius.xs,
     fontSize: text.label,

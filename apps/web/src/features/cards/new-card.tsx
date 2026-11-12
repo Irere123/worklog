@@ -11,7 +11,7 @@ import { Button } from "#ui/button";
 import { Kbd } from "#ui/chip";
 import { Input, Select, Switch, Textarea } from "#ui/field";
 import { Dialog } from "#ui/overlay";
-import { color, leading, space, text } from "#ui/tokens.stylex";
+import { color, leading, media, space, text } from "#ui/tokens.stylex";
 
 /** New cards always land in Maybe?, so someone decides where they go instead of the form. */
 export function NewCardDialog({
@@ -215,7 +215,7 @@ const styles = stylex.create({
     color: color.fgFaint,
     visibility: {
       default: null,
-      "@media (hover: none) and (pointer: coarse)": "hidden",
+      [media.touch]: "hidden",
     },
   },
 });

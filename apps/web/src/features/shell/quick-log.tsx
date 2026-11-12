@@ -304,7 +304,7 @@ const styles = stylex.create({
     color: color.fgFaint,
     visibility: {
       default: null,
-      "@media (hover: none) and (pointer: coarse)": "hidden",
+      [media.touch]: "hidden",
     },
   },
 });

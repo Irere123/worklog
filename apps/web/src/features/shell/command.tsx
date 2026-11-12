@@ -32,6 +32,7 @@ import {
   color,
   font,
   leading,
+  media,
   radius,
   shadow,
   space,
@@ -470,7 +471,7 @@ const styles = stylex.create({
   footer: {
     display: {
       default: "flex",
-      "@media (hover: none) and (pointer: coarse)": "none",
+      [media.touch]: "none",
     },
     gap: space.lg,
     paddingBlock: space.sm,

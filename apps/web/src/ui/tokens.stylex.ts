@@ -124,4 +124,6 @@ export const media = stylex.defineConsts({
   // Touch screens fake :hover on a tap and leave it stuck, so hover styles apply only where a
   // pointer really hovers; presses get :active instead.
   hover: "@media (hover: hover) and (pointer: fine)",
+  // A fingertip covers about 40px, so small controls grow their hit area here.
+  touch: "@media (hover: none) and (pointer: coarse)",
 });
