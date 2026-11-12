@@ -90,7 +90,7 @@ const styles = stylex.create({
     display: "flex",
     flexDirection: "column",
     gap: space.lg,
-    width: 320,
+    width: "min(320px, 100%)",
     textAlign: "left",
   },
 });

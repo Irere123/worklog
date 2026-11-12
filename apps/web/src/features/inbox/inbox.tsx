@@ -551,13 +551,15 @@ function Detail({
 
   return (
     <article {...stylex.props(styles.detail)}>
-      <div {...stylex.props(layout.row)}>
+      <div {...stylex.props(layout.row, styles.detailHead)}>
         <Badge tone={kind.tone} icon={kind.icon}>
           {kind.label}
         </Badge>
         {item.priority === "high" && <Badge tone="amber">High priority</Badge>}
-        <span {...stylex.props(layout.grow)} />
-        <span title={exactTime(item.createdAt)} {...stylex.props(layout.meta)}>
+        <span
+          title={exactTime(item.createdAt)}
+          {...stylex.props(layout.meta, styles.stamp)}
+        >
           {fromNow(item.createdAt)}
         </span>
       </div>
@@ -1034,6 +1036,9 @@ function useInboxActions(state: AttentionState) {
 }
 
 const styles = stylex.create({
+  // In a narrow pane the time drops to its own line rather than breaking a word a line.
+  detailHead: { flexWrap: "wrap", rowGap: space.xs },
+  stamp: { marginInlineStart: "auto", whiteSpace: "nowrap" },
   split: {
     flexGrow: 1,
     minHeight: 0,

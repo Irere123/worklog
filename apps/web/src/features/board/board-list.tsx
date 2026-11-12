@@ -364,6 +364,7 @@ const styles = stylex.create({
     display: "inline-flex",
     alignItems: "center",
     gap: space.xs,
+    minHeight: { default: null, [media.touch]: 32 },
     borderRadius: radius.xs,
     color: {
       default: "inherit",

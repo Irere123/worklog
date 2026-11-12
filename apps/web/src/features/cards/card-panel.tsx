@@ -486,9 +486,11 @@ function CardFields({ card, act }: { card: CardDetail; act: Act }) {
       </dd>
 
       <dt {...stylex.props(styles.fieldLabel)}>Added</dt>
-      <dd {...stylex.props(styles.fieldValue, layout.muted)}>
+      <dd {...stylex.props(styles.fieldValue, styles.sentence, layout.muted)}>
         {card.createdById && (
-          <Avatar person={byId.get(card.createdById)} size={16} />
+          <span {...stylex.props(styles.sentenceIcon)}>
+            <Avatar person={byId.get(card.createdById)} size={16} />
+          </span>
         )}
         <span title={exactTime(card.createdAt)}>
           {card.createdById
@@ -500,8 +502,8 @@ function CardFields({ card, act }: { card: CardDetail; act: Act }) {
       </dd>
 
       <dt {...stylex.props(styles.fieldLabel)}>Activity</dt>
-      <dd {...stylex.props(styles.fieldValue, layout.muted)}>
-        <ClockIcon size={13} />
+      <dd {...stylex.props(styles.fieldValue, styles.sentence, layout.muted)}>
+        <ClockIcon size={13} {...stylex.props(styles.sentenceIcon)} />
         <span title={exactTime(card.lastActiveAt)}>
           Last touched {fromNow(card.lastActiveAt)}
         </span>
@@ -1285,7 +1287,11 @@ const styles = stylex.create({
   }),
   fields: {
     display: "grid",
-    gridTemplateColumns: "96px 1fr",
+    // Narrower labels on a phone leave the values room for a line instead of a word.
+    gridTemplateColumns: {
+      default: "96px minmax(0, 1fr)",
+      "@media (max-width: 480px)": "72px minmax(0, 1fr)",
+    },
     columnGap: space.lg,
     rowGap: space.sm,
     // Top, not centre: a value that wraps (two assignees, the drift note) keeps its label on line one.
@@ -1307,13 +1313,13 @@ const styles = stylex.create({
   },
   // A sentence that may wrap keeps its icon on the first line instead of alone above it.
   sentence: { flexWrap: "nowrap", alignItems: "flex-start", paddingTop: 4 },
-  sentenceIcon: { flexShrink: 0, marginTop: 3 },
+  sentenceIcon: { display: "flex", flexShrink: 0, marginTop: 3 },
   warn: { color: color.amberFg },
   person: {
     display: "inline-flex",
     alignItems: "center",
     gap: space.sm,
-    height: 26,
+    height: { default: 26, [media.touch]: 32 },
     paddingInlineStart: 4,
     paddingInlineEnd: 2,
     borderRadius: radius.full,
@@ -1323,8 +1329,8 @@ const styles = stylex.create({
   remove: {
     display: "grid",
     placeItems: "center",
-    width: 20,
-    height: 20,
+    width: { default: 20, [media.touch]: 28 },
+    height: { default: 20, [media.touch]: 28 },
     borderRadius: "50%",
     color: {
       default: color.fgFaint,
@@ -1339,7 +1345,9 @@ const styles = stylex.create({
     display: "inline-flex",
     alignItems: "center",
     gap: space.xs,
-    height: 26,
+    height: { default: 26, [media.touch]: 32 },
+    minWidth: { default: null, [media.touch]: 32 },
+    justifyContent: "center",
     paddingInline: space.sm,
     borderRadius: radius.full,
     color: {

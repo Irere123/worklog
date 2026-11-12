@@ -165,6 +165,8 @@ const styles = stylex.create({
   grow: { flexGrow: 1, minWidth: 0, display: "flex", flexDirection: "column" },
   title: { flexGrow: 1, fontSize: text.label, fontWeight: 600 },
   count: {
+    flexShrink: 0,
+    whiteSpace: "nowrap",
     fontSize: text.meta,
     color: color.fgMuted,
     fontVariantNumeric: "tabular-nums",
@@ -172,8 +174,9 @@ const styles = stylex.create({
   close: {
     display: "grid",
     placeItems: "center",
-    width: 24,
-    height: 24,
+    flexShrink: 0,
+    width: { default: 24, [media.touch]: 36 },
+    height: { default: 24, [media.touch]: 36 },
     borderRadius: radius.sm,
     color: {
       default: color.fgFaint,
