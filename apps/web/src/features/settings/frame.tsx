@@ -170,13 +170,13 @@ export function SettingsPage({
   return (
     <div {...stylex.props(styles.page)}>
       <header {...stylex.props(styles.pageHead)}>
-        <div {...stylex.props(styles.grow)}>
-          <h2 {...stylex.props(styles.pageTitle)}>{title}</h2>
-          {isShown(description) && (
-            <p {...stylex.props(styles.pageDesc)}>{description}</p>
-          )}
-        </div>
-        {actions}
+        <h2 {...stylex.props(styles.pageTitle)}>{title}</h2>
+        {isShown(actions) && (
+          <div {...stylex.props(styles.pageActions)}>{actions}</div>
+        )}
+        {isShown(description) && (
+          <p {...stylex.props(styles.pageDesc)}>{description}</p>
+        )}
       </header>
       {children}
     </div>
@@ -237,8 +237,14 @@ export function Row({
   );
 }
 
+const NARROW = "@container (max-width: 460px)";
+
 export const settingsStyles = stylex.create({
-  list: { display: "flex", flexDirection: "column" },
+  list: {
+    display: "flex",
+    flexDirection: "column",
+    containerType: "inline-size",
+  },
   listRow: {
     display: "flex",
     alignItems: "center",
@@ -251,6 +257,20 @@ export const settingsStyles = stylex.create({
     borderTopColor: { default: color.line, ":first-child": "transparent" },
   },
   main: { flexGrow: 1, minWidth: 0 },
+  // For a row with several controls: in a narrow card they drop to a line of their own, right
+  // aligned, so the name and its details keep the width instead of a word a line.
+  rowWraps: { flexWrap: { default: null, [NARROW]: "wrap" } },
+  mainWraps: {
+    flexBasis: { default: null, [NARROW]: "calc(100% - 40px)" },
+    overflowWrap: "anywhere",
+  },
+  rowEnd: {
+    display: "flex",
+    alignItems: "center",
+    gap: space.sm,
+    flexShrink: 0,
+    marginInlineStart: { default: null, [NARROW]: "auto" },
+  },
   strong: { fontSize: text.label, fontWeight: 500, color: color.fg },
   sub: { fontSize: text.meta, lineHeight: leading.meta, color: color.fgMuted },
   mono: { fontFamily: "ui-monospace, monospace", fontSize: 12 },
@@ -334,7 +354,14 @@ const styles = stylex.create({
     paddingBottom: 96,
   },
   page: { display: "flex", flexDirection: "column", gap: space.xl },
-  pageHead: { display: "flex", alignItems: "flex-start", gap: space.lg },
+  // The description spans under the actions too: squeezed beside them on a phone, it reads a word a line.
+  pageHead: {
+    display: "grid",
+    gridTemplateColumns: "minmax(0, 1fr) auto",
+    columnGap: space.lg,
+    alignItems: "start",
+  },
+  pageActions: { display: "flex", alignItems: "center", gap: space.lg },
   grow: { flexGrow: 1, minWidth: 0 },
   pageTitle: {
     fontSize: text.title,
@@ -342,6 +369,8 @@ const styles = stylex.create({
     fontWeight: 600,
   },
   pageDesc: {
+    gridColumn: "1 / -1",
+    maxWidth: "72ch",
     marginTop: space.xs,
     fontSize: text.label,
     lineHeight: leading.label,

@@ -77,9 +77,14 @@ export function ApiKeys() {
         )}
         <ul {...stylex.props(settingsStyles.list)}>
           {tokens.data?.map((t) => (
-            <li key={t.id} {...stylex.props(settingsStyles.listRow)}>
+            <li
+              key={t.id}
+              {...stylex.props(settingsStyles.listRow, settingsStyles.rowWraps)}
+            >
               <KeyIcon size={15} {...stylex.props(styles.icon)} />
-              <div {...stylex.props(settingsStyles.main)}>
+              <div
+                {...stylex.props(settingsStyles.main, settingsStyles.mainWraps)}
+              >
                 <p {...stylex.props(settingsStyles.strong)}>
                   {t.name}
                   {inUse?.startsWith(t.prefix) === true && (
@@ -99,18 +104,20 @@ export function ApiKeys() {
                   {t.expiresAt ? ` · expires ${fromNow(t.expiresAt)}` : ""}
                 </p>
               </div>
-              {t.scopes.map((s) => (
-                <Badge key={s}>{s}</Badge>
-              ))}
-              <Tooltip label="Revoke">
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  aria-label={`Revoke ${t.name}`}
-                  icon={<TrashIcon size={14} />}
-                  onClick={() => setRevoking(t)}
-                />
-              </Tooltip>
+              <div {...stylex.props(settingsStyles.rowEnd)}>
+                {t.scopes.map((s) => (
+                  <Badge key={s}>{s}</Badge>
+                ))}
+                <Tooltip label="Revoke">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    aria-label={`Revoke ${t.name}`}
+                    icon={<TrashIcon size={14} />}
+                    onClick={() => setRevoking(t)}
+                  />
+                </Tooltip>
+              </div>
             </li>
           ))}
         </ul>

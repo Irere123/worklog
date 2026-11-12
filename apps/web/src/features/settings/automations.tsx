@@ -503,38 +503,45 @@ export function Delivery() {
         )}
         <ul {...stylex.props(settingsStyles.list)}>
           {targets.data?.map((t) => (
-            <li key={t.id} {...stylex.props(settingsStyles.listRow)}>
+            <li
+              key={t.id}
+              {...stylex.props(settingsStyles.listRow, settingsStyles.rowWraps)}
+            >
               <span {...stylex.props(styles.targetIcon)}>
                 {TARGET_ICONS[t.kind]}
               </span>
-              <div {...stylex.props(settingsStyles.main)}>
+              <div
+                {...stylex.props(settingsStyles.main, settingsStyles.mainWraps)}
+              >
                 <p {...stylex.props(settingsStyles.strong)}>{t.label}</p>
                 <p {...stylex.props(settingsStyles.sub)}>{t.address}</p>
               </div>
-              <Tooltip label="Click to switch">
-                <button type="button" onClick={() => toggle.mutate(t)}>
-                  <Badge tone={t.visibility === "team" ? "blue" : "neutral"}>
-                    {t.visibility === "team" ? "Team" : "Private"}
-                  </Badge>
-                </button>
-              </Tooltip>
-              <Button
-                size="sm"
-                variant="ghost"
-                busy={test.isPending && test.variables === t.id}
-                onClick={() => test.mutate(t.id)}
-              >
-                Send test
-              </Button>
-              <Tooltip label="Remove">
+              <div {...stylex.props(settingsStyles.rowEnd)}>
+                <Tooltip label="Click to switch">
+                  <button type="button" onClick={() => toggle.mutate(t)}>
+                    <Badge tone={t.visibility === "team" ? "blue" : "neutral"}>
+                      {t.visibility === "team" ? "Team" : "Private"}
+                    </Badge>
+                  </button>
+                </Tooltip>
                 <Button
                   size="sm"
                   variant="ghost"
-                  aria-label={`Remove ${t.label}`}
-                  icon={<TrashIcon size={14} />}
-                  onClick={() => remove.mutate(t.id)}
-                />
-              </Tooltip>
+                  busy={test.isPending && test.variables === t.id}
+                  onClick={() => test.mutate(t.id)}
+                >
+                  Send test
+                </Button>
+                <Tooltip label="Remove">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    aria-label={`Remove ${t.label}`}
+                    icon={<TrashIcon size={14} />}
+                    onClick={() => remove.mutate(t.id)}
+                  />
+                </Tooltip>
+              </div>
             </li>
           ))}
         </ul>
