@@ -188,7 +188,7 @@ The team version is only composed when there are team targets, and nothing is se
 
 `apps/web` is a client of the public API like any other: it has no server code of its own. The research behind its design is in [research/web-app-design.md](research/web-app-design.md), and its point of view, voice and editor's checklist are in [DESIGN.md](DESIGN.md).
 
-- **Stack.** TanStack Start in SPA mode, because every page sits behind sign-in and the server has nothing to render. TanStack Router, Query, Form, Hotkeys, Virtual and Pacer. StyleX for styles, Base UI for headless primitives, cmdk for ⌘K, sonner for toasts, Pragmatic drag and drop for the board, and Phosphor for icons, including the marks of the tools activity comes from.
+- **Stack.** TanStack Start in SPA mode, because every page sits behind sign-in and the server has nothing to render. TanStack Router, Query, Form, Hotkeys, Virtual and Pacer. StyleX for styles, Base UI for headless primitives, cmdk for ⌘K, sonner for toasts, Pragmatic drag and drop for the board, and Phosphor for icons. The tools activity comes from show their own logos in their own colours, drawn from `ui/product-mark.tsx`.
 - **One contract.** `bun run api:generate` writes `src/api/schema.d.ts` from the API's OpenAPI spec, and `openapi-fetch` calls the API through it. A renamed field fails the web app's typecheck, not a user's click. Query keys are rooted at the resource (`["cards", filter]`) in `src/api/queries.ts`.
 - **Sign-in.**
   - People sign in with Better Auth's magic link first, or with GitHub or Discord when the server has credentials for them, and get a session cookie. The page marks the method last used in that browser. The API also accepts Slack sign-in; the web app doesn't offer it.

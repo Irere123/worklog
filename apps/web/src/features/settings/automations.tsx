@@ -1,8 +1,6 @@
 import {
   CalendarDotsIcon,
-  ChatCircleIcon,
   EnvelopeSimpleIcon,
-  HashIcon,
   PaperPlaneRightIcon,
   PlusIcon,
   TrashIcon,
@@ -31,6 +29,7 @@ import {
   TimeSelect,
 } from "#ui/field";
 import { Dialog, Menu, MenuItem, Tooltip } from "#ui/overlay";
+import { ProductMark } from "#ui/product-mark";
 import { color, media, radius, space, text } from "#ui/tokens.stylex";
 
 import { Card, SettingsPage, settingsStyles } from "./frame";
@@ -395,8 +394,8 @@ function ScheduleEditor({
 
 const TARGET_ICONS: Record<Schemas["DeliveryTarget"]["kind"], ReactNode> = {
   email: <EnvelopeSimpleIcon size={14} />,
-  slack: <HashIcon size={14} />,
-  discord: <ChatCircleIcon size={14} />,
+  slack: <ProductMark product="slack" size={14} />,
+  discord: <ProductMark product="discord" size={14} />,
   webhook: <WebhooksLogoIcon size={14} />,
 };
 
@@ -466,13 +465,13 @@ export function Delivery() {
             Email
           </MenuItem>
           <MenuItem
-            icon={<HashIcon size={14} />}
+            icon={<ProductMark product="slack" size={14} />}
             onClick={() => setAdding("slack")}
           >
             Slack channel
           </MenuItem>
           <MenuItem
-            icon={<ChatCircleIcon size={14} />}
+            icon={<ProductMark product="discord" size={14} />}
             onClick={() => setAdding("discord")}
           >
             Discord channel

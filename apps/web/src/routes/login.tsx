@@ -1,10 +1,4 @@
-import {
-  DiscordLogoIcon,
-  EnvelopeSimpleIcon,
-  GithubLogoIcon,
-  KeyIcon,
-} from "@phosphor-icons/react";
-import type { Icon } from "@phosphor-icons/react";
+import { EnvelopeSimpleIcon, KeyIcon } from "@phosphor-icons/react";
 import * as stylex from "@stylexjs/stylex";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, createFileRoute, useNavigate } from "@tanstack/react-router";
@@ -19,6 +13,7 @@ import { Button } from "#ui/button";
 import { Badge } from "#ui/chip";
 import { ErrorNote } from "#ui/feedback";
 import { Field, Input } from "#ui/field";
+import { ProductMark } from "#ui/product-mark";
 import { color, space, text } from "#ui/tokens.stylex";
 
 type Search = { next?: string };
@@ -34,9 +29,9 @@ export const Route = createFileRoute("/login")({
 
 type Provider = "github" | "discord";
 
-const PROVIDERS: Record<Provider, { name: string; icon: Icon }> = {
-  github: { name: "GitHub", icon: GithubLogoIcon },
-  discord: { name: "Discord", icon: DiscordLogoIcon },
+const PROVIDERS: Record<Provider, string> = {
+  github: "GitHub",
+  discord: "Discord",
 };
 
 function Login() {
@@ -76,7 +71,7 @@ function Login() {
       setRedirecting(null);
       setError(
         new Error(
-          `We couldn’t reach ${PROVIDERS[provider].name}. Try again, or use your email.`
+          `We couldn’t reach ${PROVIDERS[provider]}. Try again, or use your email.`
         )
       );
     });
@@ -217,13 +212,13 @@ function Login() {
           <div {...stylex.props(authStyles.divider)}>or</div>
           <div {...stylex.props(authStyles.form)}>
             {providers.map((provider) => {
-              const { name, icon: ProviderIcon } = PROVIDERS[provider];
+              const name = PROVIDERS[provider];
               return (
                 <div key={provider} {...stylex.props(styles.provider)}>
                   <Button
                     busy={redirecting === provider}
                     disabled={redirecting !== null || busy}
-                    icon={<ProviderIcon size={16} weight="fill" />}
+                    icon={<ProductMark product={provider} size={16} />}
                     onClick={() => continueWith(provider)}
                     sx={authStyles.full}
                   >

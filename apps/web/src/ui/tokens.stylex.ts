@@ -55,6 +55,21 @@ export const color = stylex.defineVars({
   scrim: "light-dark(oklch(0.2 0.01 80 / 0.28), oklch(0 0 0 / 0.55))",
 });
 
+// Each tool's own colours, from its brand guidelines, so a mark reads as the product at a glance.
+// They hold in both themes; only GitHub's ink flips, as GitHub's own mark does.
+export const product = stylex.defineVars({
+  github: "light-dark(#1f2328, #f0f6fc)",
+  gitlabDeep: "#e24329",
+  gitlab: "#fc6d26",
+  gitlabLight: "#fca326",
+  gitea: "#609926",
+  slackRed: "#e01e5a",
+  slackBlue: "#36c5f0",
+  slackGreen: "#2eb67d",
+  slackYellow: "#ecb22e",
+  discord: "#5865f2",
+});
+
 export const font = stylex.defineVars({
   sans: '"Inter Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif',
   mono: '"Geist Mono Variable", ui-monospace, "SF Mono", Menlo, monospace',

@@ -3,13 +3,10 @@ import {
   ChatTextIcon,
   CodeIcon,
   CheckCircleIcon,
-  DiscordLogoIcon,
   GitBranchIcon,
   GitCommitIcon,
   GitMergeIcon,
   GitPullRequestIcon,
-  GithubLogoIcon,
-  GitlabLogoIcon,
   HourglassMediumIcon,
   KanbanIcon,
   LightbulbIcon,
@@ -19,7 +16,6 @@ import {
   RadioButtonIcon,
   RobotIcon,
   RocketLaunchIcon,
-  SlackLogoIcon,
   TagIcon,
   TicketIcon,
   TrophyIcon,
@@ -27,7 +23,6 @@ import {
   WarningCircleIcon,
   WebhooksLogoIcon,
 } from "@phosphor-icons/react";
-import type { Icon } from "@phosphor-icons/react";
 import * as stylex from "@stylexjs/stylex";
 import { Link } from "@tanstack/react-router";
 import type { ReactNode } from "react";
@@ -39,6 +34,7 @@ import { ago, exactTime } from "#lib/time";
 import { Avatar } from "#ui/avatar";
 import { Badge } from "#ui/chip";
 import type { Tone } from "#ui/chip";
+import { isProduct, ProductMark } from "#ui/product-mark";
 import { color, leading, media, radius, space, text } from "#ui/tokens.stylex";
 
 export type Activity = Schemas["Activity"];
@@ -62,19 +58,7 @@ const SOURCES: Record<string, string> = {
   api: "API",
 };
 
-// Worklog's own sources, agents and manual logs are words: a mark only helps where it is recognised.
-const MARKS: Record<string, Icon> = {
-  github: GithubLogoIcon,
-  gitlab: GitlabLogoIcon,
-  gitea: GitBranchIcon,
-  slack: SlackLogoIcon,
-  discord: DiscordLogoIcon,
-  webhook: WebhooksLogoIcon,
-};
-
-const IN_APP = new Set(["worklog", "api"]);
-
-/** The tool's own mark, or a generic one for code that pushes events itself. */
+/** The tool's own mark, or a generic one for webhooks and code that pushes events itself. */
 export function SourceGlyph({
   source,
   size = 16,
@@ -82,7 +66,10 @@ export function SourceGlyph({
   source: string;
   size?: number;
 }) {
-  const Mark = MARKS[source] ?? CodeIcon;
+  if (isProduct(source)) {
+    return <ProductMark product={source} size={size} />;
+  }
+  const Mark = source === "webhook" ? WebhooksLogoIcon : CodeIcon;
   return <Mark size={size} weight="fill" aria-hidden />;
 }
 
@@ -90,7 +77,9 @@ export function sourceLabel(source: string) {
   return SOURCES[source] ?? source;
 }
 
-/** The tool's own mark beside its name, in the text's color so a row of sources stays calm. */
+const IN_APP = new Set(["worklog", "api"]);
+
+/** The tool's own mark beside its name. Worklog's own sources and unknown ones are words alone: a mark only helps where it is recognised. */
 export function SourceName({
   source,
   size = 12,
@@ -98,10 +87,11 @@ export function SourceName({
   source: string;
   size?: number;
 }) {
-  const Mark = MARKS[source];
   return (
     <span {...stylex.props(styles.source)}>
-      {Mark && <Mark size={size} weight="fill" aria-hidden />}
+      {(isProduct(source) || source === "webhook") && (
+        <SourceGlyph source={source} size={size} />
+      )}
       {sourceLabel(source)}
     </span>
   );
