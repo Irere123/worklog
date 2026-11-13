@@ -110,7 +110,7 @@ function IdentityRow({ identity }: { identity: Identity }) {
         <p {...stylex.props(settingsStyles.strong)}>
           {name}
           {identity.isBot && (
-            <Badge icon={<RobotIcon size={11} />} sx={styles.bot}>
+            <Badge icon={<RobotIcon size={12} weight="fill" />} sx={styles.bot}>
               bot
             </Badge>
           )}

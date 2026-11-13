@@ -1,3 +1,14 @@
+import {
+  CheckCircleIcon,
+  CircleDashedIcon,
+  CircleHalfIcon,
+  ClockIcon,
+  MinusCircleIcon,
+  PauseCircleIcon,
+  QuestionIcon,
+  WarningCircleIcon,
+  XCircleIcon,
+} from "@phosphor-icons/react";
 import * as stylex from "@stylexjs/stylex";
 import type { StyleXStyles } from "@stylexjs/stylex";
 import type { ReactNode } from "react";
@@ -14,22 +25,61 @@ export type Tone =
   | "violet"
   | "blue";
 
+/** Where something stands. Each has its own shape, so a row of badges reads without colour. */
+export type Status =
+  | "idle"
+  | "maybe"
+  | "waiting"
+  | "working"
+  | "needs_you"
+  | "paused"
+  | "skipped"
+  | "done"
+  | "failed";
+
+const GLYPH_SIZE = 12;
+
+// Filled shapes in the label's own colour: a solid mark carries at 12px where an outline thins
+// out, and "not started" is the one hollow, dashed shape because nothing is there yet.
+const GLYPHS: Record<Status, ReactNode> = {
+  idle: <CircleDashedIcon size={GLYPH_SIZE} weight="bold" />,
+  maybe: <QuestionIcon size={GLYPH_SIZE} weight="fill" />,
+  waiting: <ClockIcon size={GLYPH_SIZE} weight="fill" />,
+  working: <CircleHalfIcon size={GLYPH_SIZE} weight="fill" />,
+  needs_you: <WarningCircleIcon size={GLYPH_SIZE} weight="fill" />,
+  paused: <PauseCircleIcon size={GLYPH_SIZE} weight="fill" />,
+  skipped: <MinusCircleIcon size={GLYPH_SIZE} weight="fill" />,
+  done: <CheckCircleIcon size={GLYPH_SIZE} weight="fill" />,
+  failed: <XCircleIcon size={GLYPH_SIZE} weight="fill" />,
+};
+
 export function Badge({
   tone = "neutral",
+  status,
   icon,
   children,
   sx,
   title,
 }: {
   tone?: Tone;
+  status?: Status;
   icon?: ReactNode;
   children?: ReactNode;
   sx?: StyleXStyles;
   title?: string;
 }) {
+  const glyph = icon ?? (status === undefined ? null : GLYPHS[status]);
   return (
-    <span title={title} {...stylex.props(styles.badge, tones[tone], sx)}>
-      {icon}
+    <span
+      title={title}
+      {...stylex.props(
+        styles.badge,
+        glyph !== null && styles.badgeGlyph,
+        tones[tone],
+        sx
+      )}
+    >
+      {glyph !== null && <span {...stylex.props(styles.glyph)}>{glyph}</span>}
       {children}
     </span>
   );
@@ -100,13 +150,16 @@ const styles = stylex.create({
     gap: space.xs,
     height: 20,
     paddingInline: space.sm,
-    borderRadius: radius.xs,
+    borderRadius: radius.sm,
     fontSize: text.meta,
     fontWeight: 500,
     lineHeight: 1,
     whiteSpace: "nowrap",
     flexShrink: 0,
   },
+  // A round glyph sits optically further in than a letter's straight edge.
+  badgeGlyph: { paddingInlineStart: space.xs },
+  glyph: { display: "inline-flex", flexShrink: 0 },
   dot: {
     display: "inline-block",
     width: 8,

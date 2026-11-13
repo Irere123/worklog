@@ -424,7 +424,9 @@ function MemberRows({
             {self && <Badge>You</Badge>}
             {/* Someone using Worklog through an API key has no account but is plainly here. */}
             {m.kind === "human" && !m.signedUp && !self && (
-              <Badge tone="amber">Invited</Badge>
+              <Badge tone="amber" status="waiting">
+                Invited
+              </Badge>
             )}
             {m.role !== "member" && (
               <Badge tone="accent">

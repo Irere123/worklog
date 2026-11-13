@@ -127,7 +127,7 @@ export function Briefs({ selectedId }: { selectedId?: string }) {
                       : "Weekly brief"}
                   </Badge>
                   {selected.composedBy !== "template" && (
-                    <Badge icon={<RobotIcon size={11} weight="fill" />}>
+                    <Badge icon={<RobotIcon size={12} weight="fill" />}>
                       Written by your assistant
                     </Badge>
                   )}

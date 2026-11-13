@@ -19,6 +19,7 @@ import { q } from "#api/queries";
 import {
   DueChip,
   hueOfColor,
+  STAGE_STATUS,
   STAGE_TONE,
   stageLabel,
   useMembers,
@@ -143,7 +144,7 @@ function WhereCell({ card }: { card: Card }) {
     );
   }
   return (
-    <Badge tone={STAGE_TONE[card.stage]}>
+    <Badge tone={STAGE_TONE[card.stage]} status={STAGE_STATUS[card.stage]}>
       {card.stage === "active"
         ? (card.columnName ?? "Active")
         : stageLabel(card.stage)}

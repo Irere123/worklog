@@ -21,7 +21,7 @@ import { SourceGlyph } from "#features/activity/activity-line";
 import { ago, agoPhrase, exactTime } from "#lib/time";
 import { Button } from "#ui/button";
 import { Badge, Dot } from "#ui/chip";
-import type { Tone } from "#ui/chip";
+import type { Status, Tone } from "#ui/chip";
 import { ErrorNote, Skeleton } from "#ui/feedback";
 import { Checkbox, Field, Input } from "#ui/field";
 import { Dialog, Tooltip } from "#ui/overlay";
@@ -33,12 +33,19 @@ import { WebhookConnectDialog } from "./webhook-connect";
 type Connector = Schemas["Connector"];
 type Connection = Schemas["Connection"];
 
-const STATUS: Record<Connection["status"], { label: string; tone: Tone }> = {
-  active: { label: "Connected", tone: "green" },
-  pending: { label: "Waiting for first event", tone: "amber" },
-  paused: { label: "Paused", tone: "neutral" },
-  suspended: { label: "Needs attention", tone: "red" },
-  revoked: { label: "Disconnected", tone: "red" },
+const STATUS: Record<
+  Connection["status"],
+  { label: string; tone: Tone; status: Status }
+> = {
+  active: { label: "Connected", tone: "green", status: "done" },
+  pending: {
+    label: "Waiting for first event",
+    tone: "amber",
+    status: "waiting",
+  },
+  paused: { label: "Paused", tone: "neutral", status: "paused" },
+  suspended: { label: "Needs attention", tone: "red", status: "needs_you" },
+  revoked: { label: "Disconnected", tone: "red", status: "failed" },
 };
 
 // Settings that hold several values; the rest are single strings.
@@ -104,7 +111,10 @@ export function Connections() {
                         : " · no events yet"}
                     </p>
                   </div>
-                  <Badge tone={STATUS[c.status].tone}>
+                  <Badge
+                    tone={STATUS[c.status].tone}
+                    status={STATUS[c.status].status}
+                  >
                     {STATUS[c.status].label}
                   </Badge>
                 </Link>
@@ -448,6 +458,12 @@ const SYNC_TONES: Record<Health["sync"][number]["state"], Tone> = {
   failed: "red",
 };
 
+const SYNC_STATUS: Record<Health["sync"][number]["state"], Status> = {
+  idle: "done",
+  running: "working",
+  failed: "failed",
+};
+
 const SYNC_LABELS: Record<Health["sync"][number]["state"], string> = {
   idle: "Up to date",
   running: "Syncing",
@@ -525,7 +541,9 @@ function HealthCard({
               : "Not synced yet")
           }
         >
-          <Badge tone={SYNC_TONES[s.state]}>{SYNC_LABELS[s.state]}</Badge>
+          <Badge tone={SYNC_TONES[s.state]} status={SYNC_STATUS[s.state]}>
+            {SYNC_LABELS[s.state]}
+          </Badge>
         </Row>
       ))}
     </Card>

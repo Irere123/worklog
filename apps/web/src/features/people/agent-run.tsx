@@ -1,21 +1,22 @@
 import type { Schemas } from "#api/client";
 import { ago, olderThan } from "#lib/time";
 import { Badge } from "#ui/chip";
-import type { Tone } from "#ui/chip";
+import type { Status, Tone } from "#ui/chip";
 
 export type Run = NonNullable<Schemas["TeamNow"][number]["agent"]>;
 
 const RUN: Record<
   Run["state"],
-  { tone: Tone; label: (owner?: string) => string }
+  { tone: Tone; status: Status; label: (owner?: string) => string }
 > = {
-  working: { tone: "blue", label: () => "Working" },
+  working: { tone: "blue", status: "working", label: () => "Working" },
   needs_you: {
     tone: "amber",
+    status: "needs_you",
     label: (owner) => (owner ? `Needs ${owner}` : "Needs a person"),
   },
-  finished: { tone: "green", label: () => "Finished" },
-  failed: { tone: "red", label: () => "Couldn’t finish" },
+  finished: { tone: "green", status: "done", label: () => "Finished" },
+  failed: { tone: "red", status: "failed", label: () => "Couldn’t finish" },
 };
 
 // An agent that says it's working but hasn't said anything for this long has probably stalled.
@@ -42,7 +43,10 @@ export function AgentRun({ run, owner }: { run: Run; owner?: string }) {
   const stale = isStale(run);
   return (
     <>
-      <Badge tone={stale ? "neutral" : look.tone}>
+      <Badge
+        tone={stale ? "neutral" : look.tone}
+        status={stale ? "waiting" : look.status}
+      >
         {stale ? `Quiet for ${ago(run.at)}` : look.label(owner)}
       </Badge>{" "}
       {run.title}

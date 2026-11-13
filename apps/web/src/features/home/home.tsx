@@ -321,7 +321,9 @@ function YourCards() {
                   </p>
                 </div>
                 {card.entropy?.postponingSoon === true && (
-                  <Badge tone="amber">Drifting</Badge>
+                  <Badge tone="amber" status="waiting">
+                    Drifting
+                  </Badge>
                 )}
                 <span {...stylex.props(styles.time)}>
                   {ago(card.lastActiveAt)}

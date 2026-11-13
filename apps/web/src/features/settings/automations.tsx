@@ -285,7 +285,10 @@ function RecentRuns({ id }: { id: string }) {
       <ul {...stylex.props(styles.runs)}>
         {runs.data?.slice(0, 6).map((r) => (
           <li key={r.id} {...stylex.props(styles.run)}>
-            <Badge tone={statusOf(r.status).tone}>
+            <Badge
+              tone={statusOf(r.status).tone}
+              status={statusOf(r.status).status}
+            >
               {statusOf(r.status).label}
             </Badge>
             <span {...stylex.props(styles.runText)}>

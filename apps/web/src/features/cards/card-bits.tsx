@@ -15,7 +15,7 @@ import { useMe } from "#features/auth/session";
 import { isStale, ownerWord } from "#features/people/agent-run";
 import { ago, shortDay } from "#lib/time";
 import { Avatar, AvatarStack } from "#ui/avatar";
-import type { Tone } from "#ui/chip";
+import type { Status, Tone } from "#ui/chip";
 import { addDays, localDay } from "#ui/date-picker";
 import {
   color,
@@ -277,6 +277,13 @@ export const STAGE_TONE: Record<Card["stage"], Tone> = {
   active: "blue",
   not_now: "neutral",
   done: "green",
+};
+
+export const STAGE_STATUS: Record<Card["stage"], Status> = {
+  triage: "maybe",
+  active: "working",
+  not_now: "paused",
+  done: "done",
 };
 
 export function stageLabel(stage: Card["stage"]) {

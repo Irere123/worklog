@@ -31,7 +31,12 @@ import { q } from "#api/queries";
 import { ActivityLine, foldRuns } from "#features/activity/activity-line";
 import { useMe } from "#features/auth/session";
 import { UNDO_MS } from "#features/cards/actions";
-import { STAGE_TONE, stageLabel, useMembers } from "#features/cards/card-bits";
+import {
+  STAGE_STATUS,
+  STAGE_TONE,
+  stageLabel,
+  useMembers,
+} from "#features/cards/card-bits";
 import { clip } from "#lib/text";
 import { ago, exactTime, fromNow } from "#lib/time";
 import { Avatar, AvatarStack } from "#ui/avatar";
@@ -765,7 +770,7 @@ function CardContext({
         <KanbanIcon size={14} {...stylex.props(styles.contextIcon)} />
         <span {...stylex.props(styles.contextNumber)}>#{number}</span>
         <span {...stylex.props(styles.contextTitle)}>{title}</span>
-        <Badge tone={STAGE_TONE[stage]}>
+        <Badge tone={STAGE_TONE[stage]} status={STAGE_STATUS[stage]}>
           {stage === "active" ? (columnName ?? "Active") : stageLabel(stage)}
         </Badge>
         {people.length > 0 && <AvatarStack people={people} size={20} />}

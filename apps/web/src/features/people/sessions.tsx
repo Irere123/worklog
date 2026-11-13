@@ -7,17 +7,25 @@ import type { Schemas } from "#api/client";
 import { q } from "#api/queries";
 import { ago, exactTime } from "#lib/time";
 import { Badge } from "#ui/chip";
-import type { Tone } from "#ui/chip";
+import type { Status, Tone } from "#ui/chip";
 import { Skeleton } from "#ui/feedback";
 import { color, leading, media, radius, space, text } from "#ui/tokens.stylex";
 
 type Activity = Schemas["Activity"];
 
-const STATES: Record<string, { label: string; tone: Tone; order: number }> = {
-  needs_you: { label: "Needs a decision", tone: "amber", order: 0 },
-  working: { label: "Working", tone: "blue", order: 1 },
-  failed: { label: "Couldn’t finish", tone: "red", order: 2 },
-  finished: { label: "Finished", tone: "green", order: 3 },
+const STATES: Record<
+  string,
+  { label: string; tone: Tone; status: Status; order: number }
+> = {
+  needs_you: {
+    label: "Needs a decision",
+    tone: "amber",
+    status: "needs_you",
+    order: 0,
+  },
+  working: { label: "Working", tone: "blue", status: "working", order: 1 },
+  failed: { label: "Couldn’t finish", tone: "red", status: "failed", order: 2 },
+  finished: { label: "Finished", tone: "green", status: "done", order: 3 },
 };
 
 type Session = { thread: string; latest: Activity; steps: number };
@@ -48,7 +56,11 @@ export function AgentSessions({ handle }: { handle: string }) {
           const card = /^#(?<n>\d+)\s/u.exec(latest.title)?.groups?.n;
           return (
             <li key={thread} {...stylex.props(styles.row)}>
-              {state && <Badge tone={state.tone}>{state.label}</Badge>}
+              {state && (
+                <Badge tone={state.tone} status={state.status}>
+                  {state.label}
+                </Badge>
+              )}
               <div {...stylex.props(styles.main)}>
                 <p {...stylex.props(styles.what)}>{latest.title}</p>
                 {latest.body && (

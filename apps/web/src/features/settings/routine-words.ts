@@ -1,7 +1,7 @@
 import type { Schemas } from "#api/client";
 import { clip } from "#lib/text";
 import { agoPhrase, upcoming } from "#lib/time";
-import type { Tone } from "#ui/chip";
+import type { Status, Tone } from "#ui/chip";
 
 type Automation = Schemas["Automation"];
 type Schedule = Automation["schedule"];
@@ -52,15 +52,17 @@ export const KINDS: Record<Kind, string> = {
   custom: "Custom routine",
 };
 
-const STATUS: Record<string, { label: string; tone: Tone }> = {
-  delivered: { label: "Delivered", tone: "green" },
-  quiet: { label: "Nothing to say", tone: "neutral" },
-  skipped: { label: "Skipped", tone: "neutral" },
-  failed: { label: "Failed", tone: "red" },
+type Look = { label: string; tone: Tone; status: Status };
+
+const STATUS: Record<string, Look> = {
+  delivered: { label: "Delivered", tone: "green", status: "done" },
+  quiet: { label: "Nothing to say", tone: "neutral", status: "skipped" },
+  skipped: { label: "Skipped", tone: "neutral", status: "skipped" },
+  failed: { label: "Failed", tone: "red", status: "failed" },
 };
 
-export function statusOf(status: string) {
-  return STATUS[status] ?? { label: status, tone: "neutral" as Tone };
+export function statusOf(status: string): Look {
+  return STATUS[status] ?? { label: status, tone: "neutral", status: "idle" };
 }
 
 /** When a routine next does something: running, off, due, or when it next runs. */

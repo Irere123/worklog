@@ -100,9 +100,9 @@ function RatedCard({ rated }: { rated: Rated }) {
             tone={rated.rating === "helpful" ? "green" : "red"}
             icon={
               rated.rating === "helpful" ? (
-                <ThumbsUpIcon size={11} />
+                <ThumbsUpIcon size={12} weight="fill" />
               ) : (
-                <ThumbsDownIcon size={11} />
+                <ThumbsDownIcon size={12} weight="fill" />
               )
             }
           >

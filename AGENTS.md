@@ -116,7 +116,7 @@ Read [docs/DESIGN.md](docs/DESIGN.md) before building a screen: it covers who Wo
 
 - **Styles are StyleX,** colocated at the bottom of each file and built from the tokens. Colours are `light-dark()` pairs; components never hard-code one.
 - **Hover goes behind `media.hover`** (`":hover": { default: null, [media.hover]: value }`): a tap on a phone otherwise leaves it stuck. Presses get `:active`.
-- **Icons are Phosphor,** imported with the `Icon` suffix (`TrayIcon`). The exception is a tool's own logo (GitHub, Slack…), which is `ProductMark` from `#ui/product-mark` in its real colours; add new tools there. No sparkles or purple to mean AI: show what the feature does.
+- **Icons are Phosphor,** imported with the `Icon` suffix (`TrayIcon`). The exception is a tool's own logo (GitHub, Slack…), which is `ProductMark` from `#ui/product-mark` in its real colours; add new tools there. A badge that says where something stands takes `status`, which gives it a filled glyph of its own shape. No sparkles or purple to mean AI: show what the feature does.
 - **Data goes through `#api/client` and `#api/queries`,** never a raw `fetch`. Writes are optimistic where a person would notice the wait, and roll back on error.
 - **Shareable state lives in the URL** (the open card, filters, tabs) through `validateSearch`.
 - **Every action has a keyboard path and a pointer path,** and every drag has a menu alternative.

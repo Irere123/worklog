@@ -33,7 +33,7 @@ import { useMembers } from "#features/cards/card-bits";
 import { ago, exactTime } from "#lib/time";
 import { Avatar } from "#ui/avatar";
 import { Badge } from "#ui/chip";
-import type { Tone } from "#ui/chip";
+import type { Status, Tone } from "#ui/chip";
 import { isProduct, ProductMark } from "#ui/product-mark";
 import { color, leading, media, radius, space, text } from "#ui/tokens.stylex";
 
@@ -165,11 +165,11 @@ export function lookOf(activity: Activity): Look {
   );
 }
 
-const STATE: Record<string, { label: string; tone: Tone }> = {
-  working: { label: "Working", tone: "blue" },
-  needs_you: { label: "Needs you", tone: "amber" },
-  finished: { label: "Finished", tone: "green" },
-  failed: { label: "Couldn’t finish", tone: "red" },
+const STATE: Record<string, { label: string; tone: Tone; status: Status }> = {
+  working: { label: "Working", tone: "blue", status: "working" },
+  needs_you: { label: "Needs you", tone: "amber", status: "needs_you" },
+  finished: { label: "Finished", tone: "green", status: "done" },
+  failed: { label: "Couldn’t finish", tone: "red", status: "failed" },
 };
 
 // What happened to a card when the event says nothing more than the card's own title.
@@ -395,7 +395,11 @@ function ActivityMeta({ activity }: { activity: Activity }) {
           <LockIcon size={10} /> Private
         </span>
       )}
-      {state && <Badge tone={state.tone}>{state.label}</Badge>}
+      {state && (
+        <Badge tone={state.tone} status={state.status}>
+          {state.label}
+        </Badge>
+      )}
     </div>
   );
 }
