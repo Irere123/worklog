@@ -36,7 +36,6 @@ import { Chat, PendingThread } from "./chat";
 import { Composer } from "./composer";
 import { AssistantFace, hasUnseenReply, usePresence } from "./presence";
 import type { Glance } from "./presence";
-import { Routines } from "./routines";
 import { useSuggestions } from "./suggestions";
 import { WaitingOnYou } from "./waiting";
 
@@ -280,7 +279,6 @@ export function NewChat({ ask }: { ask?: string }) {
           ))}
         </ul>
         <WaitingOnYou />
-        <Routines />
         <RecentConversations />
       </div>
     </div>
@@ -893,7 +891,7 @@ const styles = stylex.create({
     display: "flex",
     flexDirection: "column",
     alignItems: "center",
-    // "safe": once routines fill the page it scrolls from the top instead of clipping it.
+    // "safe": once what waits on you fills the page it scrolls from the top instead of clipping it.
     justifyContent: {
       default: "safe center",
       "@media (max-width: 640px)": "flex-start",

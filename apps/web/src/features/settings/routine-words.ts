@@ -1,6 +1,5 @@
 import type { Schemas } from "#api/client";
-import { clip } from "#lib/text";
-import { agoPhrase, upcoming } from "#lib/time";
+import { agoPhrase, upcomingShort } from "#lib/time";
 import type { Status, Tone } from "#ui/chip";
 
 type Automation = Schemas["Automation"];
@@ -65,43 +64,57 @@ export function statusOf(status: string): Look {
   return STATUS[status] ?? { label: status, tone: "neutral", status: "idle" };
 }
 
-/** When a routine next does something: running, off, due, or when it next runs. */
-export function routineWhen(a: Automation, running: boolean) {
-  const schedule = `${KINDS[a.kind]} · ${describeSchedule(a.schedule)}`;
-  if (running) {
-    return `${schedule} · running now`;
-  }
-  if (!a.enabled) {
-    return `${schedule} · off`;
-  }
-  if (a.nextRunAt === null) {
-    return schedule;
-  }
-  // Past due means the scheduler hasn't reached it yet; it runs on its next pass.
-  return Date.parse(a.nextRunAt) <= Date.now()
-    ? `${schedule} · due now`
-    : `${schedule} · next ${upcoming(a.nextRunAt)}`;
-}
+/** Where a routine stands, for the right of its row: what needs someone comes before the clock. */
+export type RoutineState =
+  | { kind: "running" }
+  | { kind: "failing"; label: string }
+  | { kind: "paused" }
+  | { kind: "next"; label: string }
+  | { kind: "unscheduled" };
 
-/** What a routine last came to: failures first, since those need someone; otherwise what it said. */
-export function routineLast(
-  a: Automation
-): { text: string; failing: boolean } | null {
+export function routineState(
+  a: Automation,
+  running: boolean,
+  timeZone?: string
+): RoutineState {
+  if (running) {
+    return { kind: "running" };
+  }
   if (a.failureCount > 0) {
     return {
-      text:
-        a.failureCount === 1
-          ? "Failed last time"
-          : `Failed ${a.failureCount} times in a row`,
-      failing: true,
+      kind: "failing",
+      label: a.failureCount === 1 ? "Failed" : `Failed ${a.failureCount} times`,
     };
   }
-  if (!a.lastResult) {
+  if (!a.enabled) {
+    return { kind: "paused" };
+  }
+  if (a.nextRunAt === null) {
+    return { kind: "unscheduled" };
+  }
+  // Past due means the scheduler hasn't reached it yet; it runs on its next pass.
+  return {
+    kind: "next",
+    label:
+      Date.parse(a.nextRunAt) <= Date.now()
+        ? "Due now"
+        : upcomingShort(a.nextRunAt, new Date(), timeZone),
+  };
+}
+
+/**
+ * How it went last time, in a few words: enough to trust it ran. What it said is in the thread it
+ * sent to, so the row doesn't repeat it.
+ */
+export function routineLast(a: Automation): string | null {
+  if (!a.lastResult || a.failureCount > 0) {
     return null;
   }
-  const said =
-    a.lastResult.status === "quiet"
-      ? "Had nothing worth saying"
-      : clip(a.lastResult.summary, 120);
-  return { text: `${said} · ${agoPhrase(a.lastResult.at)}`, failing: false };
+  const at = agoPhrase(a.lastResult.at);
+  const said: Record<string, string> = {
+    delivered: `sent ${at}`,
+    quiet: `nothing to say ${at}`,
+    skipped: `skipped ${at}`,
+  };
+  return said[a.lastResult.status] ?? null;
 }

@@ -39,7 +39,7 @@ The assistant and every agent follow the same rules, so their work reads as part
 - **Work shows where it happens.** An agent's run that names a card is one line on that card ("Atlas needs you: …"), edited in place, never a stream of posts. It shows only while the run is moving or waiting on someone.
 - **Every claim can be checked.** Opening a lookup lists what it found; a `#8` shows the card on hover.
 - **Its face says how it's doing.** The assistant's avatar in the sidebar breathes while it works, glances up when it wants your OK, and is still otherwise. There is no separate status light to learn. Resting on it says the current step in words ("Searching activity for “blocked”"); a dot marks an answer you haven't read. A teammate's question shows only as "Answering a teammate".
-- **Its work lives on its page, not in settings.** What it holds for your OK and the routines it runs on its own (when each runs next, what it said last, a switch) sit under the composer on the assistant's page.
+- **The assistant's page is for asking.** What it holds for your OK sits under the composer; the routines it runs on its own live in Settings → Automations, so the page doesn't turn into a control panel.
 - **One place for each control.** Send becomes Stop; actions sit under the reply, pinned on the latest one. Nothing animates on send, and only what arrives live moves in.
 
 ## Standards are code

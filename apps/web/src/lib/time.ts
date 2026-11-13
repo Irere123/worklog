@@ -17,7 +17,6 @@ const shortDate = new Intl.DateTimeFormat("en-GB", {
   month: "short",
 });
 const clock = new Intl.DateTimeFormat("en-GB", { timeStyle: "short" });
-const weekday = new Intl.DateTimeFormat("en-GB", { weekday: "long" });
 
 /** "now", "5m", "3h", "2d", then a date: compact enough for a meta line. */
 export function ago(iso: string, now = Date.now()) {
@@ -40,7 +39,11 @@ export function ago(iso: string, now = Date.now()) {
 /** "just now" or "5m ago": `ago` inside a sentence. */
 export function agoPhrase(iso: string, now = Date.now()) {
   const short = ago(iso, now);
-  return short === "now" ? "just now" : `${short} ago`;
+  if (short === "now") {
+    return "just now";
+  }
+  // Past a week `ago` gives a date, and "2 Nov ago" isn't English.
+  return Date.parse(iso) < now - 7 * DAY ? `on ${short}` : `${short} ago`;
 }
 
 /** "in 3 hours", "yesterday": for sentences rather than meta lines. */
@@ -75,15 +78,73 @@ export function dayLabel(iso: string, now = new Date()) {
   return dayFormat.format(date);
 }
 
-/** When something scheduled within the week happens: "at 08:30", "tomorrow at 08:30", "on Friday at 16:00". */
-export function upcoming(iso: string, now = new Date()) {
+/**
+ * When something scheduled within the week happens: "at 08:30", "tomorrow at 08:30", "on Friday
+ * at 16:00". A routine is set on its owner's clock, so pass their `timeZone`: the browser's can be
+ * another, and "Weekdays at 08:30 · next at 07:30" reads as a bug.
+ */
+export function upcoming(iso: string, now = new Date(), timeZone?: string) {
   const date = new Date(iso);
-  const at = `at ${clock.format(date)}`;
-  const days = Math.round((startOfDay(date) - startOfDay(now)) / DAY);
+  const at = `at ${zoned("clock", timeZone).format(date)}`;
+  const days = daysApart(now, date, timeZone);
   if (days <= 0) {
     return at;
   }
-  return days === 1 ? `tomorrow ${at}` : `on ${weekday.format(date)} ${at}`;
+  return days === 1
+    ? `tomorrow ${at}`
+    : `on ${zoned("weekday", timeZone).format(date)} ${at}`;
+}
+
+/** "12:30", "Tomorrow 02:00", "Mon 08:30", then a date: `upcoming` for a right-hand column. */
+export function upcomingShort(
+  iso: string,
+  now = new Date(),
+  timeZone?: string
+) {
+  const date = new Date(iso);
+  const at = zoned("clock", timeZone).format(date);
+  const days = daysApart(now, date, timeZone);
+  if (days <= 0) {
+    return at;
+  }
+  if (days === 1) {
+    return `Tomorrow ${at}`;
+  }
+  return days < 7
+    ? `${zoned("day", timeZone).format(date)} ${at}`
+    : zoned("date", timeZone).format(date);
+}
+
+const ZONED = {
+  clock: { timeStyle: "short" },
+  weekday: { weekday: "long" },
+  day: { weekday: "short" },
+  date: { day: "numeric", month: "short" },
+  // en-CA writes 2026-11-16, which parses back as that calendar day.
+  key: { year: "numeric", month: "2-digit", day: "2-digit" },
+} satisfies Record<string, Intl.DateTimeFormatOptions>;
+
+const zonedCache = new Map<string, Intl.DateTimeFormat>();
+
+function zoned(kind: keyof typeof ZONED, timeZone: string | undefined) {
+  const id = `${kind}|${timeZone ?? ""}`;
+  let f = zonedCache.get(id);
+  if (!f) {
+    const locale = kind === "key" ? "en-CA" : "en-GB";
+    try {
+      f = new Intl.DateTimeFormat(locale, { ...ZONED[kind], timeZone });
+    } catch {
+      // A zone the browser doesn't know falls back to its own rather than breaking the page.
+      f = new Intl.DateTimeFormat(locale, ZONED[kind]);
+    }
+    zonedCache.set(id, f);
+  }
+  return f;
+}
+
+function daysApart(from: Date, to: Date, timeZone: string | undefined) {
+  const day = (d: Date) => Date.parse(zoned("key", timeZone).format(d));
+  return Math.round((day(to) - day(from)) / DAY);
 }
 
 function startOfDay(d: Date) {

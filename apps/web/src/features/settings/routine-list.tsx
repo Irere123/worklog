@@ -1,25 +1,55 @@
-import { PlayIcon } from "@phosphor-icons/react";
+import {
+  ArchiveIcon,
+  BellSimpleIcon,
+  CalendarCheckIcon,
+  DotsThreeIcon,
+  PauseIcon,
+  PencilSimpleIcon,
+  PlayIcon,
+  RepeatIcon,
+  StackIcon,
+  SunHorizonIcon,
+} from "@phosphor-icons/react";
 import * as stylex from "@stylexjs/stylex";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import type { ReactNode } from "react";
 import { toast } from "sonner";
 
 import type { Schemas } from "#api/client";
 import { api, unwrap } from "#api/client";
 import { q } from "#api/queries";
 import { AssistantFace, usePresence } from "#features/assistant/presence";
+import { useMe } from "#features/auth/session";
 import { Button } from "#ui/button";
-import { Switch } from "#ui/field";
-import { Tooltip } from "#ui/overlay";
-import { color, leading, radius, space, text } from "#ui/tokens.stylex";
+import { Badge } from "#ui/chip";
+import { Menu, MenuItem, MenuSeparator } from "#ui/overlay";
+import { color, leading, media, radius, space, text } from "#ui/tokens.stylex";
 
-import { routineLast, routineWhen, statusOf } from "./routine-words";
+import {
+  describeSchedule,
+  KINDS,
+  routineLast,
+  routineState,
+  statusOf,
+} from "./routine-words";
+import type { RoutineState } from "./routine-words";
 
 type Automation = Schemas["Automation"];
 
+const KIND_ICONS: Record<Automation["kind"], ReactNode> = {
+  "brief.daily": <SunHorizonIcon size={16} />,
+  "brief.weekly": <CalendarCheckIcon size={16} />,
+  digest: <StackIcon size={16} />,
+  check: <BellSimpleIcon size={16} />,
+  consolidate: <ArchiveIcon size={16} />,
+  custom: <RepeatIcon size={16} />,
+};
+
 /**
- * A person's routines, the same wherever they're listed: what each is, when it next runs, what it
- * came to last time, a switch, and Run now. Upkeep (the check, the memory tidy) comes last, after
- * what the assistant does for them. The caller frames it and owns the editor.
+ * A person's routines read as what's coming up: soonest first, each with the clock it next runs
+ * at, and paused ones last. A row is something it does for them, not a setting, so pausing and
+ * running now sit in its menu rather than a switch on every line. Upkeep (the check, the memory
+ * tidy) comes after what it does for them. The caller frames it and owns the editor.
  */
 export function RoutineList({
   routines,
@@ -29,69 +59,119 @@ export function RoutineList({
   onEdit: (routine: Automation) => void;
 }) {
   const { agent, presence } = usePresence();
+  const zone = useMe()?.member.timezone ?? undefined;
   const { toggle, run } = useRoutineActions();
   const running = new Set(
     presence?.working.flatMap((w) =>
       w.kind === "routine" ? [w.automationId] : []
     )
   );
-  const rows = routines.toSorted((a, b) => Number(a.upkeep) - Number(b.upkeep));
+  const rows = routines.toSorted(
+    (a, b) =>
+      Number(a.upkeep) - Number(b.upkeep) ||
+      Number(!a.enabled) - Number(!b.enabled) ||
+      (a.nextRunAt ?? "~").localeCompare(b.nextRunAt ?? "~")
+  );
   return (
     <ul {...stylex.props(styles.list)}>
       {rows.map((a) => {
-        const busy = running.has(a.id);
+        const state = routineState(a, running.has(a.id), zone);
         const last = routineLast(a);
         return (
           <li key={a.id} {...stylex.props(styles.row)}>
-            <Switch
-              checked={a.enabled}
-              onCheckedChange={() => toggle.mutate(a)}
-              label={`${a.name} runs on its own`}
-            />
             <button
               type="button"
               onClick={() => onEdit(a)}
               {...stylex.props(styles.main)}
             >
-              <span {...stylex.props(styles.name, !a.enabled && styles.off)}>
-                {a.name}
+              <span
+                title={KINDS[a.kind]}
+                {...stylex.props(styles.tile, !a.enabled && styles.tileOff)}
+              >
+                {KIND_ICONS[a.kind]}
               </span>
-              <span {...stylex.props(styles.sub)}>{routineWhen(a, busy)}</span>
-              {last && (
-                <span
-                  {...stylex.props(
-                    styles.sub,
-                    styles.last,
-                    last.failing && styles.failing
-                  )}
-                >
-                  {last.text}
+              <span {...stylex.props(styles.words)}>
+                <span {...stylex.props(styles.name, !a.enabled && styles.off)}>
+                  {a.name}
                 </span>
-              )}
+                <span {...stylex.props(styles.sub)}>
+                  {describeSchedule(a.schedule)}
+                  {last && ` · ${last}`}
+                </span>
+              </span>
+              <Where state={state} agent={agent} />
             </button>
-            {busy ? (
-              <Tooltip label="Running now">
-                <span {...stylex.props(styles.slot)}>
-                  <AssistantFace agent={agent} state="working" size={18} />
-                </span>
-              </Tooltip>
-            ) : (
-              <Tooltip label="Run now">
+            <Menu
+              align="end"
+              trigger={
                 <Button
                   size="sm"
                   variant="ghost"
-                  aria-label={`Run ${a.name} now`}
-                  icon={<PlayIcon size={14} />}
+                  aria-label={`${a.name} options`}
+                  icon={<DotsThreeIcon size={16} weight="bold" />}
                   busy={run.isPending && run.variables?.id === a.id}
-                  onClick={() => run.mutate(a)}
+                  sx={styles.more}
                 />
-              </Tooltip>
-            )}
+              }
+            >
+              <MenuItem
+                icon={<PlayIcon size={14} />}
+                disabled={state.kind === "running"}
+                onClick={() => run.mutate(a)}
+              >
+                Run now
+              </MenuItem>
+              <MenuItem
+                icon={
+                  a.enabled ? <PauseIcon size={14} /> : <PlayIcon size={14} />
+                }
+                onClick={() => toggle.mutate(a)}
+              >
+                {a.enabled ? "Pause" : "Resume"}
+              </MenuItem>
+              <MenuSeparator />
+              <MenuItem
+                icon={<PencilSimpleIcon size={14} />}
+                onClick={() => onEdit(a)}
+              >
+                Edit…
+              </MenuItem>
+            </Menu>
           </li>
         );
       })}
     </ul>
   );
+}
+
+function Where({
+  state,
+  agent,
+}: {
+  state: RoutineState;
+  agent: ReturnType<typeof usePresence>["agent"];
+}) {
+  if (state.kind === "running") {
+    return (
+      <span {...stylex.props(styles.when)}>
+        <AssistantFace agent={agent} state="working" size={16} />
+        Running
+      </span>
+    );
+  }
+  if (state.kind === "failing") {
+    return (
+      <Badge tone="red" status="failed">
+        {state.label}
+      </Badge>
+    );
+  }
+  if (state.kind === "paused") {
+    return <Badge status="paused">Paused</Badge>;
+  }
+  return state.kind === "next" ? (
+    <span {...stylex.props(styles.when)}>{state.label}</span>
+  ) : null;
 }
 
 // The switch answers at once and steps back if the server refuses; a run says how it went.
@@ -153,51 +233,80 @@ const styles = stylex.create({
   row: {
     display: "flex",
     alignItems: "center",
-    gap: space.lg,
-    paddingBlock: space.md,
-    paddingInline: space.lg,
+    gap: space.xs,
+    paddingInlineEnd: space.md,
     borderTopWidth: { default: 1, ":first-child": 0 },
     borderTopStyle: "solid",
     borderTopColor: color.line,
+    backgroundColor: {
+      default: "transparent",
+      ":hover": { default: null, [media.hover]: color.surface },
+    },
   },
   main: {
     display: "flex",
-    flexDirection: "column",
-    alignItems: "flex-start",
-    gap: space.xxs,
+    alignItems: "center",
+    gap: space.lg,
     flexGrow: 1,
     minWidth: 0,
-    padding: 0,
+    paddingBlock: space.md,
+    paddingInlineStart: space.lg,
+    paddingInlineEnd: space.xs,
     borderWidth: 0,
-    borderRadius: radius.sm,
     textAlign: "start",
     color: "inherit",
     backgroundColor: "transparent",
     cursor: "pointer",
     font: "inherit",
     outline: { default: "none", ":focus-visible": `2px solid ${color.focus}` },
-    outlineOffset: 2,
+    outlineOffset: -2,
+  },
+  tile: {
+    display: "inline-grid",
+    placeItems: "center",
+    flexShrink: 0,
+    width: 32,
+    height: 32,
+    borderRadius: radius.md,
+    color: color.fgMuted,
+    backgroundColor: color.ui,
+    boxShadow: `inset 0 0 0 1px ${color.line}`,
+  },
+  tileOff: { color: color.fgFaint, backgroundColor: "transparent" },
+  words: {
+    display: "flex",
+    flexDirection: "column",
+    flexGrow: 1,
+    minWidth: 0,
   },
   name: {
     fontSize: text.label,
     lineHeight: leading.label,
     fontWeight: 500,
     color: color.fg,
-  },
-  off: { color: color.fgMuted },
-  // When it runs is the line people come for, so a phone wraps it rather than cutting it off.
-  sub: {
-    maxWidth: "100%",
-    fontSize: text.meta,
-    lineHeight: leading.meta,
-    color: color.fgMuted,
-  },
-  last: {
     overflow: "hidden",
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
-    color: color.fgFaint,
   },
-  failing: { color: color.redFg },
-  slot: { display: "inline-grid", placeItems: "center", width: 28, height: 28 },
+  off: { color: color.fgMuted },
+  sub: {
+    fontSize: text.meta,
+    lineHeight: leading.meta,
+    color: color.fgMuted,
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+  },
+  when: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: space.xs,
+    flexShrink: 0,
+    fontSize: text.meta,
+    lineHeight: leading.meta,
+    color: color.fgMuted,
+    fontVariantNumeric: "tabular-nums",
+    whiteSpace: "nowrap",
+  },
+  more: { flexShrink: 0, color: color.fgFaint },
 });

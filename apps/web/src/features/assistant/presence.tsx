@@ -32,9 +32,10 @@ export function usePresence() {
   const agent = list.find(
     (m) => m.agentProvider === "worklog" && m.ownerId === me?.member.id
   );
+  const zone = me?.member.timezone ?? undefined;
   const glance = useMemo(
-    () => (data ? describePresence(data, byId) : null),
-    [data, byId]
+    () => (data ? describePresence(data, byId, zone) : null),
+    [data, byId, zone]
   );
   return { agent, presence: data, state: data?.state ?? "idle", glance };
 }
@@ -46,6 +47,7 @@ export function usePresence() {
 export function describePresence(
   presence: Presence,
   people: Map<string, Member>,
+  timeZone?: string,
   now = new Date()
 ): Glance {
   const [first, ...rest] = presence.working;
@@ -80,7 +82,7 @@ export function describePresence(
   }
   return {
     line: presence.next
-      ? `Quiet. ${presence.next.name} ${upcoming(presence.next.at, now)}`
+      ? `Quiet. ${presence.next.name} ${upcoming(presence.next.at, now, timeZone)}`
       : "Quiet. Ask it anything",
     conversationId: null,
   };

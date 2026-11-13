@@ -46,7 +46,7 @@ export function Automations() {
   return (
     <SettingsPage
       title="Automations"
-      description="Routines your assistant runs on a schedule: briefs, digests, check-ins and your own. Quiet runs send nothing. They're also on your assistant's page."
+      description="Routines your assistant runs on a schedule: briefs, digests, check-ins and your own. Quiet runs send nothing."
       actions={
         <Button
           size="sm"
