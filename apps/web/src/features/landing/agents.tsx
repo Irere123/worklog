@@ -47,8 +47,8 @@ export function Agents() {
             <h3 {...stylex.props(type.tileTitle)}>Ask anyone’s assistant</h3>
             <p {...stylex.props(type.tileCopy)}>
               Teammates ask it about your work while you’re away. It answers
-              from the record, shows what it checked, and keeps private things
-              private.
+              from the record, shows what it checked, and sees only what the
+              person asking may see.
             </p>
           </figcaption>
         </figure>
@@ -179,6 +179,19 @@ function Ask() {
             ))}
           </p>
         </Collapse>
+        <Collapse open={shown.mood === "done"}>
+          <span {...stylex.props(styles.sources)}>
+            <span {...stylex.props(styles.source)}>
+              <KanbanIcon size={12} />
+              <span {...stylex.props(styles.mono)}>#4</span> SMS fallback when
+              the receiving clinic is offline
+            </span>
+            <span {...stylex.props(styles.source)}>
+              <MagnifyingGlassIcon size={12} />
+              Activity · 4 results
+            </span>
+          </span>
+        </Collapse>
       </div>
     </div>
   );
@@ -196,7 +209,7 @@ const MOODS: Record<Phase, Mood> = {
 const DOING: Record<Phase, string> = {
   working: "is drafting the rollback plan",
   asking: "needs you",
-  allowed: "moved it to Doing",
+  allowed: "starts Saturday at 02:00",
 };
 
 type ApproveState = {
@@ -409,7 +422,9 @@ const styles = stylex.create({
     gap: space.md,
     height: 48,
     paddingInline: space.lg,
-    borderBottom: `1px solid ${color.line}`,
+    borderBottomWidth: 1,
+    borderBottomStyle: "solid",
+    borderBottomColor: color.line,
   },
   panelTitle: {
     fontWeight: 600,
@@ -467,6 +482,26 @@ const styles = stylex.create({
     fontSize: text.copy,
     lineHeight: "22px",
   },
+  sources: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: space.sm,
+  },
+  source: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: space.xs,
+    maxWidth: "100%",
+    height: 26,
+    paddingInline: space.md,
+    borderRadius: radius.full,
+    boxShadow: `inset 0 0 0 1px ${color.line}`,
+    fontSize: text.meta,
+    color: color.fgMuted,
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+  },
   ref: {
     paddingInline: 3,
     borderRadius: radius.xs,
@@ -484,7 +519,9 @@ const styles = stylex.create({
     gap: space.sm,
     height: 48,
     paddingInline: space.lg,
-    borderBottom: `1px solid ${color.line}`,
+    borderBottomWidth: 1,
+    borderBottomStyle: "solid",
+    borderBottomColor: color.line,
   },
   faint: {
     color: color.fgFaint,

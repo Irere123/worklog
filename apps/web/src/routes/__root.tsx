@@ -50,6 +50,19 @@ export const Route = createRootRouteWithContext<RouterContext>()({
         name: "description",
         content: "What your team and its agents are working on.",
       },
+      // The shell is the only HTML a link preview sees, whichever page was shared, so the card
+      // lives here. Relative: a self-hosted server doesn't know its public address at build time.
+      { property: "og:title", content: "Worklog · Your team’s logbook" },
+      {
+        property: "og:description",
+        content:
+          "GitHub, Slack, Discord and your agents write it as they work. See what needs you, and ask anyone’s assistant.",
+      },
+      { property: "og:type", content: "website" },
+      { property: "og:image", content: "/og.png" },
+      { property: "og:image:width", content: "1200" },
+      { property: "og:image:height", content: "630" },
+      { name: "twitter:card", content: "summary_large_image" },
     ],
     links: [
       { rel: "manifest", href: "/manifest.webmanifest" },

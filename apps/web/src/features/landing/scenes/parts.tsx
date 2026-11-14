@@ -64,7 +64,9 @@ export const parts = stylex.create({
     gap: space.md,
     height: 48,
     paddingInline: space.xxl,
-    borderBottom: `1px solid ${color.line}`,
+    borderBottomWidth: 1,
+    borderBottomStyle: "solid",
+    borderBottomColor: color.line,
     whiteSpace: "nowrap",
   },
   headerTitle: {

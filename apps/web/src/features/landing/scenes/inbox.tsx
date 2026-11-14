@@ -1,7 +1,6 @@
 import {
   ArrowCounterClockwiseIcon,
   AlarmIcon,
-  ChatsCircleIcon,
   CheckIcon,
   CircleHalfIcon,
   KanbanIcon,
@@ -197,9 +196,6 @@ function Decision() {
         <span {...stylex.props(styles.quiet)}>
           <XIcon size={13} /> Dismiss <kbd {...stylex.props(styles.key)}>X</kbd>
         </span>
-        <span {...stylex.props(styles.ask)}>
-          <ChatsCircleIcon size={14} /> Ask your assistant
-        </span>
       </span>
       <span {...stylex.props(styles.label)}>On the card</span>
       <span {...stylex.props(styles.card)}>
@@ -336,7 +332,9 @@ const styles = stylex.create({
     flexShrink: 0,
     paddingBlock: space.md,
     paddingInline: space.sm,
-    borderRight: `1px solid ${color.line}`,
+    borderRightWidth: 1,
+    borderRightStyle: "solid",
+    borderRightColor: color.line,
   },
   group: {
     display: "block",
@@ -452,7 +450,9 @@ const styles = stylex.create({
     gap: space.md,
     marginTop: space.xl,
     paddingBottom: space.xl,
-    borderBottom: `1px solid ${color.line}`,
+    borderBottomWidth: 1,
+    borderBottomStyle: "solid",
+    borderBottomColor: color.line,
   },
   key: {
     display: "inline-grid",
@@ -469,16 +469,10 @@ const styles = stylex.create({
   },
   quiet: {
     display: "inline-flex",
+    whiteSpace: "nowrap",
     alignItems: "center",
     gap: space.sm,
     paddingInline: space.sm,
-    color: color.fgMuted,
-  },
-  ask: {
-    display: "inline-flex",
-    alignItems: "center",
-    gap: space.sm,
-    marginLeft: "auto",
     color: color.fgMuted,
   },
   label: {

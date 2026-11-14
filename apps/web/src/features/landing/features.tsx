@@ -283,7 +283,11 @@ function Golden({ on }: { on: boolean }) {
   return (
     <div {...stylex.props(styles.card, styles.golden, on && styles.goldenOn)}>
       <span {...stylex.props(styles.cardTop)}>
-        <span {...stylex.props(styles.mono, styles.numberChip)}>#1</span>
+        <span
+          {...stylex.props(styles.mono, styles.numberChip, styles.numberGolden)}
+        >
+          #1
+        </span>
         <TicketIcon size={16} weight="fill" {...stylex.props(styles.ticket)} />
       </span>
       <span {...stylex.props(styles.cardTitle)}>
@@ -466,7 +470,10 @@ const styles = stylex.create({
   art: {
     display: "grid",
     placeItems: "center",
-    height: 200,
+    height: {
+      default: 200,
+      "@media (max-width: 600px)": 156,
+    },
     paddingInline: space.xl,
   },
   words: {
@@ -474,7 +481,10 @@ const styles = stylex.create({
     flexDirection: "column",
     gap: space.xs,
     paddingTop: space.xs,
-    paddingBottom: space.xxl,
+    paddingBottom: {
+      default: space.xxl,
+      "@media (max-width: 600px)": space.xl,
+    },
     paddingInline: space.xxl,
   },
   title: {
@@ -675,8 +685,9 @@ const styles = stylex.create({
   drift: {
     opacity: 1,
   },
+  // Faded enough to read as drifting, not so far that its words stop being legible.
   driftOn: {
-    opacity: 0.45,
+    opacity: 0.72,
     transform: "translateY(6px) scale(0.985)",
     transitionDuration: "2400ms",
     transitionDelay: "500ms",
@@ -695,6 +706,9 @@ const styles = stylex.create({
     backgroundColor: "light-dark(oklch(0 0 0 / 0.05), oklch(1 0 0 / 0.08))",
     fontSize: text.meta,
     color: color.fgMuted,
+  },
+  numberGolden: {
+    color: color.goldFg,
   },
   countdown: {
     display: "inline-flex",

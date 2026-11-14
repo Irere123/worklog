@@ -4,6 +4,7 @@ import { color } from "#ui/tokens.stylex";
 
 import { Agents } from "./agents";
 import { Closing, Footer } from "./closing";
+import { Faq } from "./faq";
 import { Features } from "./features";
 import { Hero } from "./hero";
 import { Nav } from "./nav";
@@ -28,6 +29,7 @@ export function Landing({ setupOpen }: { setupOpen: boolean }) {
         <Sources />
         <Open />
         <Principles />
+        <Faq />
         <Closing setupOpen={setupOpen} />
       </main>
       <Footer setupOpen={setupOpen} />

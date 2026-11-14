@@ -194,7 +194,9 @@ const styles = stylex.create({
     gap: space.md,
     height: 38,
     paddingInline: space.lg,
-    borderBottom: "1px solid oklch(1 0 0 / 0.08)",
+    borderBottomWidth: 1,
+    borderBottomStyle: "solid",
+    borderBottomColor: "oklch(1 0 0 / 0.08)",
   },
   light: {
     width: 12,

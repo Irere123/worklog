@@ -432,7 +432,7 @@ const styles = stylex.create({
     boxShadow: `0 0 0 1px ${color.gold}, 0 2px 8px light-dark(oklch(0.78 0.15 82 / 0.3), oklch(0 0 0 / 0.3))`,
   },
   drifting: {
-    opacity: 0.55,
+    opacity: 0.72,
   },
   tileTop: {
     display: "flex",

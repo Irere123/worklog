@@ -12,9 +12,9 @@ export const SOURCE = "https://github.com/Irere123/worklog";
 
 const ENDINGS = [
   "that writes itself.",
-  "for people and agents.",
+  "without the status meetings.",
   "that knows what needs you.",
-  "open to every tool.",
+  "for people and agents.",
 ];
 
 const TURN = 3200;

@@ -17,9 +17,6 @@ export const Route = createFileRoute("/")({
     meta: [
       { title: "Worklog · Your team’s logbook" },
       { name: "description", content: DESCRIPTION },
-      { property: "og:title", content: "Worklog · Your team’s logbook" },
-      { property: "og:description", content: DESCRIPTION },
-      { property: "og:type", content: "website" },
     ],
     links: [
       {

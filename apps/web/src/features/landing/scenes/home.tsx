@@ -231,7 +231,9 @@ const styles = stylex.create({
     // A border rather than text-decoration: the rolling digit is its own box, which an
     // underline wouldn't cross.
     paddingBottom: 1,
-    borderBottom: `1px solid ${color.lineStrong}`,
+    borderBottomWidth: 1,
+    borderBottomStyle: "solid",
+    borderBottomColor: color.lineStrong,
   },
   composer: {
     display: "flex",
