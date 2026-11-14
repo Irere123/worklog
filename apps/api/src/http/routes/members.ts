@@ -47,7 +47,12 @@ export const memberRoutes = router()
           ? await getPersonalAgent(ctx.db, { ownerId: me.id })
           : null;
       const workspace = await getWorkspaceById(ctx.db, { id: me.workspaceId });
-      return respond(c, MeResponse, { member: me, workspace, assistant }, 200);
+      return respond(
+        c,
+        MeResponse,
+        { member: me, workspace, assistant, ai: ctx.models !== null },
+        200
+      );
     }
   )
   .openapi(

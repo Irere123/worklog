@@ -29,6 +29,7 @@ import {
   sessionRoutes,
   setupRoutes,
 } from "./http/routes/setup";
+import { transcriptionRoutes } from "./http/routes/transcriptions";
 import { workRoutes } from "./http/routes/work";
 import { traceRequests } from "./http/trace";
 import { webAppRoutes } from "./http/web";
@@ -144,6 +145,7 @@ export function createApp(ctx: AppContext) {
     .route("/", attentionRoutes)
     .route("/", briefRoutes)
     .route("/", agentRoutes)
+    .route("/", transcriptionRoutes)
     .route("/", memoryRoutes)
     .route("/", deliveryRoutes)
     .route("/", automationRoutes)

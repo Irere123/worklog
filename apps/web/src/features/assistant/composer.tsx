@@ -1,5 +1,6 @@
 import {
   ArrowUpIcon,
+  CircleNotchIcon,
   LockSimpleIcon,
   MicrophoneIcon,
   StopIcon,
@@ -23,6 +24,7 @@ import {
 } from "#ui/tokens.stylex";
 
 import { useDictation } from "./dictation";
+import type { DictationPhase } from "./dictation";
 
 /**
  * Where a question to the assistant is written: it grows with the text, sends on Enter, and while
@@ -70,27 +72,36 @@ export function Composer({
   useEffect(() => {
     focusOnArrival();
   }, []);
-  // What was in the box when dictation started; what's heard is written after it.
-  const before = useRef("");
-  const dictation = useDictation((heard) => {
-    setValue(before.current ? `${before.current} ${heard}` : heard);
+  // Told by whatever changes it (a keystroke, a send, dictation starting or ending), so the
+  // parent hears in the same update rather than a render later from an effect.
+  const draft = (inBox: string, dictating: boolean) =>
+    onDrafting?.(inBox.trim() !== "" || dictating);
+  const mic = useRef<HTMLButtonElement>(null);
+  const dictation = useDictation({
+    value,
+    onChange: setValue,
+    meter: mic,
+    onEnd: (said) => draft(said, false),
   });
-  // "#" picks a card, as in comments; the reply's "#8" then opens it.
-  const refs = useCardRefs({ value, onChange: setValue });
-  const trimmed = value.trim();
-  const send = () => {
-    dictation.cancel();
-    if (trimmed) {
-      onSend(trimmed);
-      setValue("");
-    }
+  const dictating = dictation.phase !== "idle";
+  const write = (next: string) => {
+    setValue(next);
+    draft(next, dictating);
   };
-  const drafting = trimmed !== "" || dictation.listening;
-  const tellDrafting = useEffectEvent((now: boolean) => onDrafting?.(now));
-  useEffect(() => {
-    tellDrafting(drafting);
-  }, [drafting]);
-  const stopping = busy && !trimmed && onStop !== undefined;
+  // "#" picks a card, as in comments; the reply's "#8" then opens it.
+  const refs = useCardRefs({ value, onChange: write });
+  const trimmed = value.trim();
+  // Sending mid-dictation sends the last words too, once they're written down.
+  const send = () =>
+    dictation.finish((said) => {
+      const message = said.trim();
+      if (message) {
+        onSend(message);
+        setValue("");
+      }
+      onDrafting?.(false);
+    });
+  const stopping = busy && !trimmed && !dictating && onStop !== undefined;
   return (
     <form
       onSubmit={(event) => {
@@ -103,14 +114,14 @@ export function Composer({
         ref={ref}
         rows={1}
         aria-label={label}
-        placeholder={placeholderFor(dictation.listening, busy, placeholder)}
+        placeholder={placeholderFor(dictation.phase, busy, placeholder)}
         value={value}
         enterKeyHint="send"
         onChange={(e) => {
           if (!value && e.target.value) {
             onStartTyping?.();
           }
-          setValue(e.target.value);
+          write(e.target.value);
         }}
         onKeyDown={(e) => {
           if (refs.onKeyDown(e)) {
@@ -120,7 +131,7 @@ export function Composer({
             e.key === "ArrowUp" && !value ? recall?.() : undefined;
           if (previous) {
             e.preventDefault();
-            setValue(previous);
+            write(previous);
           }
           if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
             e.preventDefault();
@@ -137,26 +148,37 @@ export function Composer({
       <div {...stylex.props(styles.bar)}>
         <div {...stylex.props(styles.context)}>{context}</div>
         {dictation.supported && (
-          <Tooltip label={dictation.listening ? "Stop dictating" : "Dictate"}>
+          <Tooltip label={MIC_LABEL[dictation.phase]}>
             <button
+              ref={mic}
               type="button"
-              aria-label={dictation.listening ? "Stop dictating" : "Dictate"}
-              aria-pressed={dictation.listening}
+              aria-label={MIC_LABEL[dictation.phase]}
+              aria-pressed={dictation.phase === "listening"}
+              aria-busy={dictation.phase === "transcribing" || undefined}
+              disabled={dictation.phase === "transcribing"}
               onClick={() => {
-                if (dictation.listening) {
+                if (dictation.phase === "listening") {
                   dictation.stop();
                 } else {
-                  before.current = value.trim();
-                  dictation.start();
+                  if (dictation.start()) {
+                    draft(value, true);
+                  }
                   ref.current?.focus();
                 }
               }}
-              {...stylex.props(styles.mic, dictation.listening && styles.micOn)}
+              {...stylex.props(
+                styles.mic,
+                dictation.phase === "listening" && styles.micOn
+              )}
             >
-              <MicrophoneIcon
-                size={15}
-                weight={dictation.listening ? "fill" : "regular"}
-              />
+              {dictation.phase === "transcribing" ? (
+                <CircleNotchIcon size={15} {...stylex.props(styles.spin)} />
+              ) : (
+                <MicrophoneIcon
+                  size={15}
+                  weight={dictation.phase === "listening" ? "fill" : "regular"}
+                />
+              )}
             </button>
           </Tooltip>
         )}
@@ -176,7 +198,7 @@ export function Composer({
             <button
               type="submit"
               aria-label={busy ? "Steer the reply" : "Send"}
-              disabled={!trimmed}
+              disabled={!trimmed && !dictating}
               {...stylex.props(styles.send)}
             >
               <ArrowUpIcon size={15} weight="bold" />
@@ -188,9 +210,18 @@ export function Composer({
   );
 }
 
-function placeholderFor(listening: boolean, busy: boolean, idle: string) {
-  if (listening) {
+const MIC_LABEL: Record<DictationPhase, string> = {
+  idle: "Dictate",
+  listening: "Stop dictating",
+  transcribing: "Writing down what you said",
+};
+
+function placeholderFor(phase: DictationPhase, busy: boolean, idle: string) {
+  if (phase === "listening") {
     return "Listening…";
+  }
+  if (phase === "transcribing") {
+    return "Writing it down…";
   }
   return busy ? "Send to steer the reply…" : idle;
 }
@@ -218,6 +249,10 @@ export function ComposerHint({ busy }: { busy: boolean }) {
     </p>
   );
 }
+
+const spin = stylex.keyframes({
+  to: { transform: "rotate(360deg)" },
+});
 
 const styles = stylex.create({
   box: {
@@ -298,14 +333,22 @@ const styles = stylex.create({
       default: "transparent",
       ":hover": { default: null, [media.hover]: color.ui },
     },
-    cursor: "pointer",
-    transform: { default: null, ":active": "scale(0.95)" },
+    cursor: { default: "pointer", ":disabled": "default" },
+    transform: { default: null, ":active:not(:disabled)": "scale(0.95)" },
     transitionProperty: "transform",
     transitionDuration: motion.fast,
   },
   micOn: {
     color: color.redFg,
     backgroundColor: color.redSubtle,
+    // `--level` is how loudly it hears you, set by dictation each frame: the ring is your voice.
+    boxShadow: `0 0 0 calc(var(--level, 0) * 6px) ${color.redSubtle}`,
+  },
+  spin: {
+    animationName: spin,
+    animationDuration: "800ms",
+    animationTimingFunction: "linear",
+    animationIterationCount: "infinite",
   },
   send: {
     display: "inline-flex",

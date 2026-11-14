@@ -997,6 +997,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/transcriptions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Turn dictated speech into text
+         * @description The recording is the raw body, typed by its `Content-Type`. The text comes back with the workspace's own names (people, boards, repos, cards) spelled right. 503 when the server has no model; dictate with the browser's own recognition then.
+         */
+        post: operations["transcription.create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/memories": {
         parameters: {
             query?: never;
@@ -2128,6 +2148,10 @@ export interface components {
              */
             savedAt: string | null;
         };
+        Transcript: {
+            /** @description What was said, with the workspace's own names spelled right. Empty when nothing was. */
+            text: string;
+        };
         Memory: {
             id: string;
             /** @enum {string} */
@@ -2693,6 +2717,8 @@ export interface operations {
                         member: components["schemas"]["Member"];
                         workspace: components["schemas"]["Workspace"];
                         assistant: components["schemas"]["Member"] & (Record<string, never> | null);
+                        /** @description Whether this server has a model. Without one, AI features fall back: dictation uses the browser's own recognition, briefs use templates. */
+                        ai: boolean;
                     };
                 };
             };
@@ -6447,6 +6473,79 @@ export interface operations {
             };
             /** @description Not found */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    "transcription.create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "audio/webm": string;
+                "audio/ogg": string;
+                "audio/mp4": string;
+                "audio/mpeg": string;
+                "audio/wav": string;
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Transcript"];
+                };
+            };
+            /** @description Invalid request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid credentials */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Recording too long */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description No model on this server */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };

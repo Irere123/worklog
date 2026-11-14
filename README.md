@@ -72,6 +72,6 @@ Telemetry is optional too. Set `TINYBIRD_TOKEN` to send traces, logs and errors 
 - [x] Web app: home, inbox, board, activity, assistant, briefs, people and settings ([design brief](docs/research/web-app-design.md))
 - [ ] Mobile app (Expo) with push notifications
 - [ ] MCP server, so coding agents can read the board and log work natively
-- [ ] Voice logs in the mobile app (the web app already dictates logs and questions where the browser can), generated TypeScript SDK
+- [ ] Voice logs in the mobile app (the web app already dictates logs, comments and questions), generated TypeScript SDK
 
 Inspired by [Fizzy](https://fizzy.do), [OpenCode](https://github.com/anomalyco/opencode), [OpenClaw](https://github.com/openclaw/openclaw) and [Cursor](https://cursor.com).

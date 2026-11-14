@@ -40,6 +40,8 @@ export const TIMEOUTS = {
   chat: { totalMs: 120_000, stepMs: 60_000 },
   background: { totalMs: 90_000, stepMs: 60_000 },
   quick: { totalMs: 30_000 },
+  // Someone is waiting to read what they said: past this, the words as heard will do.
+  dictation: { totalMs: 6000 },
 } as const;
 
 // Conversations are append-only with stable instructions and tools, so every turn can read the previous ones from cache.

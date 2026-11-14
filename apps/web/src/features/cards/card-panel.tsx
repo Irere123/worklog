@@ -946,11 +946,11 @@ function Composer({ number }: { number: number }) {
   const [body, setBody] = useState("");
   const client = useQueryClient();
   const send = useMutation({
-    mutationFn: async () =>
+    mutationFn: async (said: string) =>
       await unwrap(
         api.POST("/v1/cards/{number}/comments", {
           params: { path: { number } },
-          body: { body: body.trim() },
+          body: { body: said },
         })
       ),
     onSuccess: () => {
@@ -962,16 +962,14 @@ function Composer({ number }: { number: number }) {
   });
   const refs = useCardRefs({ value: body, onChange: setBody, exclude: number });
   const touch = useTouch();
-  const before = useRef("");
-  const dictation = useDictation((heard) => {
-    setBody(before.current ? `${before.current} ${heard}` : heard);
-  });
-  const submit = () => {
-    dictation.cancel();
-    if (body.trim() && !send.isPending) {
-      send.mutate();
-    }
-  };
+  const dictation = useDictation({ value: body, onChange: setBody });
+  // Commenting mid-dictation posts the last words too, once they're written down.
+  const submit = () =>
+    dictation.finish((said) => {
+      if (said.trim() && !send.isPending) {
+        send.mutate(said.trim());
+      }
+    });
   return (
     <div {...stylex.props(styles.composer)}>
       {refs.list && <div {...stylex.props(styles.refsAbove)}>{refs.list}</div>}
@@ -997,23 +995,29 @@ function Composer({ number }: { number: number }) {
       />
       <div {...stylex.props(styles.send)}>
         {dictation.supported && (
-          <Tooltip label={dictation.listening ? "Stop dictating" : "Dictate"}>
+          <Tooltip
+            label={
+              dictation.phase === "listening" ? "Stop dictating" : "Dictate"
+            }
+          >
             <Button
-              variant={dictation.listening ? "secondary" : "ghost"}
+              variant={dictation.phase === "idle" ? "ghost" : "secondary"}
               size="sm"
-              aria-label={dictation.listening ? "Stop dictating" : "Dictate"}
-              aria-pressed={dictation.listening}
+              aria-label={
+                dictation.phase === "listening" ? "Stop dictating" : "Dictate"
+              }
+              aria-pressed={dictation.phase === "listening"}
+              busy={dictation.phase === "transcribing"}
               icon={
                 <MicrophoneIcon
                   size={14}
-                  weight={dictation.listening ? "fill" : "regular"}
+                  weight={dictation.phase === "listening" ? "fill" : "regular"}
                 />
               }
               onClick={() => {
-                if (dictation.listening) {
+                if (dictation.phase === "listening") {
                   dictation.stop();
                 } else {
-                  before.current = body.trim();
                   dictation.start();
                 }
               }}
@@ -1025,7 +1029,7 @@ function Composer({ number }: { number: number }) {
           size="sm"
           onClick={submit}
           busy={send.isPending}
-          disabled={!body.trim()}
+          disabled={!body.trim() && dictation.phase === "idle"}
         >
           Comment
         </Button>

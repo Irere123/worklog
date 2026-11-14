@@ -65,6 +65,9 @@ const Env = z.object({
   OPENROUTER_API_KEY: z.string().optional(),
   WORKLOG_MODEL: z.string().default("anthropic/claude-opus-5.5"),
   WORKLOG_FAST_MODEL: z.string().default("anthropic/claude-haiku-5.5"),
+  // Dictation's speech-to-text, through OpenRouter's transcription API. The fast model then fixes
+  // the workspace's own names in what it heard, so a cheap model here is as accurate as a dear one.
+  WORKLOG_TRANSCRIBE_MODEL: z.string().default("openai/whisper-large-v3-turbo"),
 
   // Mail goes via Resend if RESEND_API_KEY is set, else SMTP if SMTP_URL is set, else the console.
   RESEND_API_KEY: z.string().optional(),

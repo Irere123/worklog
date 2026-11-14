@@ -7,6 +7,7 @@ import consolidate from "./prompts/consolidate.md" with { type: "text" };
 import constitution from "./prompts/constitution.md" with { type: "text" };
 import conversation from "./prompts/conversation.md" with { type: "text" };
 import custom from "./prompts/custom.md" with { type: "text" };
+import dictation from "./prompts/dictation.md" with { type: "text" };
 import helper from "./prompts/helper.md" with { type: "text" };
 import learn from "./prompts/learn.md" with { type: "text" };
 import log from "./prompts/log.md" with { type: "text" };
@@ -27,6 +28,7 @@ const PROMPTS = {
   consolidate,
   conversation,
   custom,
+  dictation,
   helper,
   learn,
   log,

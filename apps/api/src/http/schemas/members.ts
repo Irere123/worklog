@@ -186,6 +186,10 @@ export const MeResponse = z.object({
   member: MemberResponse,
   workspace: Workspace,
   assistant: MemberResponse.nullable(),
+  ai: z.boolean().openapi({
+    description:
+      "Whether this server has a model. Without one, AI features fall back: dictation uses the browser's own recognition, briefs use templates.",
+  }),
 });
 
 export const SetupRequest = z.object({

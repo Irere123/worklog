@@ -55,12 +55,15 @@ export function QuickLog({
   const [card, setCard] = useState("");
   const [visibility, setVisibility] = useState<"team" | "private">("team");
   const client = useQueryClient();
-  // Spoken entries are marked as such, so their wording is read as dictation, not typing.
-  const [spoken, setSpoken] = useState(false);
-  const before = useRef("");
-  const dictation = useDictation((heard) => {
-    setSpoken(true);
-    setDraft(before.current ? `${before.current} ${heard}` : heard);
+  // Spoken entries are marked as such, so their wording is read as dictation, not typing. A ref,
+  // since logging mid-dictation sends in the same tick the last words land, before a re-render.
+  const spoken = useRef(false);
+  const dictation = useDictation({
+    value: draft,
+    onChange: (next) => {
+      spoken.current = true;
+      setDraft(next);
+    },
   });
 
   const reset = () => {
@@ -68,19 +71,19 @@ export function QuickLog({
     setKind("entry");
     setCard("");
     setVisibility("team");
-    setSpoken(false);
+    spoken.current = false;
     dictation.cancel();
   };
 
   const log = useMutation({
-    mutationFn: async () =>
+    mutationFn: async (said: string) =>
       await unwrap(
         api.POST("/v1/logs", {
           body: {
-            text: draft.trim(),
+            text: said,
             kind,
             visibility,
-            via: spoken ? "voice" : "text",
+            via: spoken.current ? "voice" : "text",
             cardNumber: card ? Number(card.replace("#", "")) : undefined,
           },
         })
@@ -95,11 +98,13 @@ export function QuickLog({
     onError: (error) => toast.error(error.message),
   });
 
-  const submit = () => {
-    if (draft.trim() && !log.isPending) {
-      log.mutate();
-    }
-  };
+  // Logging mid-dictation logs the last words too, once they're written down.
+  const submit = () =>
+    dictation.finish((said) => {
+      if (said.trim() && !log.isPending) {
+        log.mutate(said.trim());
+      }
+    });
 
   return (
     <Dialog
@@ -123,7 +128,7 @@ export function QuickLog({
             variant="primary"
             onClick={submit}
             busy={log.isPending}
-            disabled={!draft.trim()}
+            disabled={!draft.trim() && dictation.phase === "idle"}
           >
             Log it
           </Button>
@@ -193,24 +198,24 @@ export function QuickLog({
           {dictation.supported && (
             <Button
               size="sm"
-              variant={dictation.listening ? "secondary" : "ghost"}
-              aria-pressed={dictation.listening}
+              variant={dictation.phase === "idle" ? "ghost" : "secondary"}
+              aria-pressed={dictation.phase === "listening"}
+              busy={dictation.phase === "transcribing"}
               icon={
                 <MicrophoneIcon
                   size={14}
-                  weight={dictation.listening ? "fill" : "regular"}
+                  weight={dictation.phase === "listening" ? "fill" : "regular"}
                 />
               }
               onClick={() => {
-                if (dictation.listening) {
+                if (dictation.phase === "listening") {
                   dictation.stop();
                 } else {
-                  before.current = draft.trim();
                   dictation.start();
                 }
               }}
             >
-              {dictation.listening ? "Stop" : "Dictate"}
+              {dictation.phase === "listening" ? "Stop" : "Dictate"}
             </Button>
           )}
           <span {...stylex.props(styles.spacer)} />
