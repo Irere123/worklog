@@ -36,9 +36,10 @@ import { Chat, PendingThread } from "./chat";
 import { Composer } from "./composer";
 import {
   AssistantFace,
-  WRITING_STEP,
+  busyConversations,
   hasUnseenReply,
   usePresence,
+  usePresenceOf,
 } from "./presence";
 import type { Glance } from "./presence";
 import { useSuggestions } from "./suggestions";
@@ -50,19 +51,7 @@ const FILTER_FROM = 8;
 export function Conversations({ children }: { children: ReactNode }) {
   const list = useQuery({ ...q.conversations(), select: notBeingDeleted });
   const { byId } = useMembers();
-  const { presence } = usePresence();
-  const busy = new Map(
-    presence?.working.flatMap((w) =>
-      w.kind === "reply"
-        ? [
-            [
-              w.conversationId,
-              w.step?.tool === WRITING_STEP ? "writing" : "thinking",
-            ] as const,
-          ]
-        : []
-    )
-  );
+  const busy = usePresenceOf(busyConversations) ?? {};
   const [filter, setFilter] = useState("");
   const term = filter.trim().toLowerCase();
   const shown = (list.data ?? []).filter(
@@ -141,7 +130,7 @@ export function Conversations({ children }: { children: ReactNode }) {
                     >
                       {titleOf(c, owner?.name)}
                     </span>
-                    <ItemStatus conversation={c} mood={busy.get(c.id)} />
+                    <ItemStatus conversation={c} mood={busy[c.id]} />
                   </Link>
                 );
               })}

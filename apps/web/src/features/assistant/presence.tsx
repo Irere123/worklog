@@ -20,8 +20,35 @@ type RoutineKind = Schemas["Automation"]["kind"];
 export type Glance = { line: string; conversationId: string | null };
 
 /**
- * The member's own assistant and what it's doing. Every caller shares one presence query, which
- * the event stream keeps current.
+ * One slice of the assistant's presence. The query is shared and the event stream keeps it
+ * current; the slice is compared deeply, so a caller re-renders only when its part changes, not
+ * on every step the assistant takes. `select` must be a stable function (declared at module level).
+ */
+export function usePresenceOf<T>(select: (presence: Presence) => T) {
+  return useQuery({ ...q.presence(), select }).data;
+}
+
+/** The conversations the assistant is answering right now, each with how its ghost looks. */
+export function busyConversations(presence: Presence) {
+  const busy: Partial<Record<string, Mood>> = {};
+  for (const work of presence.working) {
+    if (work.kind === "reply") {
+      busy[work.conversationId] = moodOfWork(work);
+    }
+  }
+  return busy;
+}
+
+/** The routines running right now, by id. */
+export function runningRoutines(presence: Presence) {
+  return presence.working.flatMap((work) =>
+    work.kind === "routine" ? [work.automationId] : []
+  );
+}
+
+/**
+ * The member's own assistant and what it's doing, for the places that show all of it: its face
+ * and the line that says what it's up to.
  */
 export function usePresence() {
   const me = useMe();
@@ -143,7 +170,7 @@ const ROUTINE_WORDS: Record<RoutineKind, string | null> = {
 };
 
 /** The step the server records once the reply's text starts to flow (agent/loop.ts). */
-export const WRITING_STEP = "writing";
+const WRITING_STEP = "writing";
 
 /**
  * How the assistant looks for what presence says: writing once its words flow, thinking while it
@@ -151,13 +178,17 @@ export const WRITING_STEP = "writing";
  */
 export function moodOf(presence: Presence | undefined): Mood {
   const state = presence?.state ?? "idle";
-  if (state === "working") {
-    const first = presence?.working[0];
-    return first?.kind === "reply" && first.step?.tool === WRITING_STEP
-      ? "writing"
-      : "thinking";
+  const first = presence?.working[0];
+  if (state === "working" && first) {
+    return moodOfWork(first);
   }
-  return state;
+  return state === "working" ? "thinking" : state;
+}
+
+function moodOfWork(work: Working): Mood {
+  return work.kind === "reply" && work.step?.tool === WRITING_STEP
+    ? "writing"
+    : "thinking";
 }
 
 /**

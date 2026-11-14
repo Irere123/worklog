@@ -18,7 +18,11 @@ import { toast } from "sonner";
 import type { Schemas } from "#api/client";
 import { api, unwrap } from "#api/client";
 import { q } from "#api/queries";
-import { AssistantFace, usePresence } from "#features/assistant/presence";
+import {
+  AssistantFace,
+  runningRoutines,
+  usePresenceOf,
+} from "#features/assistant/presence";
 import { useMe } from "#features/auth/session";
 import { Button } from "#ui/button";
 import { Badge } from "#ui/chip";
@@ -58,14 +62,9 @@ export function RoutineList({
   routines: Automation[];
   onEdit: (routine: Automation) => void;
 }) {
-  const { presence } = usePresence();
+  const running = usePresenceOf(runningRoutines) ?? [];
   const zone = useMe()?.member.timezone ?? undefined;
   const { toggle, run } = useRoutineActions();
-  const running = new Set(
-    presence?.working.flatMap((w) =>
-      w.kind === "routine" ? [w.automationId] : []
-    )
-  );
   const rows = routines.toSorted(
     (a, b) =>
       Number(a.upkeep) - Number(b.upkeep) ||
@@ -75,7 +74,7 @@ export function RoutineList({
   return (
     <ul {...stylex.props(styles.list)}>
       {rows.map((a) => {
-        const state = routineState(a, running.has(a.id), zone);
+        const state = routineState(a, running.includes(a.id), zone);
         const last = routineLast(a);
         return (
           <li key={a.id} {...stylex.props(styles.row)}>

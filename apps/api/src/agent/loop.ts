@@ -647,21 +647,24 @@ export async function askStream(
   try {
     // What the person already read stays in the record when they stop the reply.
     let written = "";
-    // Text before and after a tool call are separate paragraphs, not one run-on sentence.
-    let afterTool = false;
+    // What the stream sent last. Words after nothing or after a tool open a new stretch of
+    // writing: presence says so once, and the record starts a new paragraph rather than running
+    // two sentences together.
+    let last: "nothing" | "text" | "tool" = "nothing";
     const result = streamText({
       model: ctx.models.main,
       ...params,
       abortSignal: signal,
       onChunk: ({ chunk }) => {
         if (chunk.type === "text-delta") {
-          if (afterTool || !written) {
+          if (last !== "text") {
             step({ tool: WRITING_STEP, input: {} });
           }
-          written += afterTool && written ? `\n\n${chunk.text}` : chunk.text;
-          afterTool = false;
+          written +=
+            last === "tool" && written ? `\n\n${chunk.text}` : chunk.text;
+          last = "text";
         } else if (chunk.type.startsWith("tool-")) {
-          afterTool = true;
+          last = "tool";
         }
       },
       onAbort: async () => {

@@ -98,12 +98,26 @@ export function Chat({
   const transport = useTransport(conversation.id);
   const initial = useMemo(() => toUi(stored), [stored]);
 
+  // The reply that just came in whole, for the moment its ghost looks pleased. Set by the finish
+  // itself, so a stopped, failed or interrupted reply never looks done.
+  const [landed, setLanded] = useState<string | null>(null);
+  useEffect(() => {
+    const timer =
+      landed === null
+        ? undefined
+        : setTimeout(() => setLanded(null), LANDED_MS);
+    return () => clearTimeout(timer);
+  }, [landed]);
+
   const chat = useChat<ChatMessage>({
     id: conversation.id,
     messages: initial,
     transport,
     throttle: 40,
-    onFinish: ({ message }) => {
+    onFinish: ({ message, isAbort, isDisconnect, isError }) => {
+      if (!isAbort && !isDisconnect && !isError) {
+        setLanded(message.id);
+      }
       void client.invalidateQueries({ queryKey: ["conversations"] });
       // A long answer finished while the person looked elsewhere: tell them, if they asked for
       // desktop alerts (the helper stays quiet when the tab is in view or alerts are off).
@@ -184,6 +198,7 @@ export function Chat({
             ratings={ratings}
             rateable={(id) => storedIds.has(id) && !teammate}
             busy={busy}
+            landed={landed}
             took={timer.took}
             askAgain={send}
           />
@@ -488,6 +503,7 @@ function Messages({
   ratings,
   rateable,
   busy,
+  landed,
   took,
   askAgain,
 }: {
@@ -498,6 +514,7 @@ function Messages({
   ratings: Map<string, string | null>;
   rateable: (id: string) => boolean;
   busy: boolean;
+  landed: string | null;
   took: ReadonlyMap<number, number>;
   askAgain: (question: string) => void;
 }) {
@@ -542,6 +559,7 @@ function Messages({
           rateable={rateable(message.id)}
           streaming={busy && i === lastIndex}
           latest={i === lastIndex}
+          landed={landed === message.id}
           seconds={took.get(i)}
           onAskAgain={retry}
         />
@@ -792,6 +810,7 @@ function Reply({
   rateable,
   streaming,
   latest,
+  landed,
   seconds,
   onAskAgain,
 }: {
@@ -803,11 +822,11 @@ function Reply({
   rateable: boolean;
   streaming: boolean;
   latest: boolean;
+  landed: boolean;
   seconds?: number;
   onAskAgain?: () => void;
 }) {
   const value = textOf(message);
-  const finished = useJustFinished(streaming);
   const live = liveSteps(message.parts);
   const steps = live.length > 0 ? live : (message.metadata?.steps ?? []);
   return (
@@ -821,7 +840,7 @@ function Reply({
       <AgentLine
         name={name}
         at={message.metadata?.createdAt}
-        mood={replyMood(streaming, latest, value, finished)}
+        mood={replyMood(streaming, latest, value, landed)}
       />
       <div {...stylex.props(styles.replyBody)}>
         <WorkLog
@@ -1115,33 +1134,19 @@ function replyMood(
   streaming: boolean,
   latest: boolean,
   said: string,
-  finished: boolean
+  landed: boolean
 ): Mood | undefined {
   if (streaming) {
     return said ? "writing" : "thinking";
   }
-  if (finished) {
+  if (landed) {
     return "done";
   }
   return latest ? "idle" : undefined;
 }
 
-/** True for a few seconds after `active` goes from on to off: long enough to see it land. */
-function useJustFinished(active: boolean) {
-  const [finished, setFinished] = useState(false);
-  const [was, setWas] = useState(active);
-  if (was !== active) {
-    setWas(active);
-    setFinished(!active);
-  }
-  useEffect(() => {
-    const timer = finished
-      ? setTimeout(() => setFinished(false), 2400)
-      : undefined;
-    return () => clearTimeout(timer);
-  }, [finished]);
-  return finished;
-}
+// Long enough to see the answer land, short enough that it's not still celebrating as you read.
+const LANDED_MS = 2400;
 
 const styles = stylex.create({
   chat: {
