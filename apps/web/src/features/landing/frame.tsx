@@ -218,10 +218,13 @@ export function Cursor({
 export function Plate({
   src,
   choices,
+  priority = false,
   children,
   sx,
 }: {
   src: string;
+  /** Near the top of the page: fetch the shown wallpaper first, rather than when scrolled to. */
+  priority?: boolean;
   /** Every wallpaper it may show, laid in place up front so a change crossfades instead of cutting. */
   choices?: string[];
   children: ReactNode;
@@ -235,7 +238,8 @@ export function Plate({
           src={each}
           alt=""
           decoding="async"
-          loading="lazy"
+          loading={priority && each === src ? "eager" : "lazy"}
+          fetchPriority={priority && each === src ? "high" : "auto"}
           {...stylex.props(styles.plateImage, each !== src && styles.plateAway)}
         />
       ))}

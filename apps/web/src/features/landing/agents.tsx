@@ -41,7 +41,9 @@ export function Agents() {
       <div {...stylex.props(styles.pair)}>
         <figure {...stylex.props(styles.card)}>
           <Plate src={ink} sx={styles.plate}>
-            <Ask />
+            <div aria-hidden {...stylex.props(styles.picture)}>
+              <Ask />
+            </div>
           </Plate>
           <figcaption {...stylex.props(styles.caption)}>
             <h3 {...stylex.props(type.tileTitle)}>Ask anyone’s assistant</h3>
@@ -54,7 +56,9 @@ export function Agents() {
         </figure>
         <figure {...stylex.props(styles.card)}>
           <Plate src={sage} sx={styles.plate}>
-            <Approve />
+            <div aria-hidden {...stylex.props(styles.picture)}>
+              <Approve />
+            </div>
           </Plate>
           <figcaption {...stylex.props(styles.caption)}>
             <h3 {...stylex.props(type.tileTitle)}>
@@ -389,6 +393,11 @@ const styles = stylex.create({
       default: 40,
       "@media (max-width: 640px)": space.xl,
     },
+  },
+  picture: {
+    display: "flex",
+    justifyContent: "center",
+    width: "100%",
   },
   caption: {
     display: "flex",

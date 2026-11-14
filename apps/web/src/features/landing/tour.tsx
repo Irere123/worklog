@@ -89,6 +89,9 @@ export function Tour() {
   const inView = useInView(ref);
   const reduced = useReducedMotion();
   const [index, setIndex] = useState(0);
+  // Wallpapers mount as the tour reaches them, plus the next one so its change can crossfade: a
+  // first visit fetches two, not five. Once mounted they stay, so the loop back fades too.
+  const [reached, setReached] = useState(0);
   const [round, setRound] = useState(0);
   const [paused, setPaused] = useState(false);
   const chapter = CHAPTERS.at(index) ?? HOME;
@@ -96,7 +99,9 @@ export function Tour() {
   const holding = paused || !inView;
 
   function go(next: number) {
-    setIndex((next + CHAPTERS.length) % CHAPTERS.length);
+    const to = (next + CHAPTERS.length) % CHAPTERS.length;
+    setReached((now) => Math.max(now, to));
+    setIndex(to);
     setRound((now) => now + 1);
   }
 
@@ -107,8 +112,14 @@ export function Tour() {
       {...stylex.props(page.wide, styles.tour)}
     >
       <div ref={ref}>
-        <Plate src={chapter.plate} choices={PLATES} sx={styles.plate}>
-          <div {...stylex.props(styles.stage)}>
+        <Plate
+          src={chapter.plate}
+          choices={PLATES.slice(0, reached + 2)}
+          priority
+          sx={styles.plate}
+        >
+          {/* A picture of the app: the caption below says what it shows, in words. */}
+          <div aria-hidden {...stylex.props(styles.stage)}>
             {CHAPTERS.map((each, at) =>
               at === index ? (
                 <div

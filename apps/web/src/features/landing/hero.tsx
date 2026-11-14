@@ -110,6 +110,11 @@ const styles = stylex.create({
     textAlign: "center",
   },
   badge: {
+    outline: {
+      default: "none",
+      ":focus-visible": `2px solid ${color.focus}`,
+    },
+    outlineOffset: 3,
     display: "inline-flex",
     alignItems: "center",
     gap: space.sm,
