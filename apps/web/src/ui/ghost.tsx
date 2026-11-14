@@ -1,5 +1,4 @@
 import * as stylex from "@stylexjs/stylex";
-import type { StyleXStyles } from "@stylexjs/stylex";
 import { useId } from "react";
 
 import { color, motion } from "./tokens.stylex";
@@ -50,9 +49,6 @@ export function Ghost({
       {...stylex.props(styles.svg, !tinted && styles.pageInk)}
     >
       <defs>
-        <clipPath id={`${id}-skirt`}>
-          <path d={SKIRT} />
-        </clipPath>
         <radialGradient id={`${id}-shadow`}>
           <stop offset="0" {...stylex.props(styles.shadowCore)} />
           <stop offset="1" {...stylex.props(styles.shadowEdge)} />
@@ -89,10 +85,10 @@ export function Ghost({
         fill={`url(#${id}-shadow)`}
         {...stylex.props(styles.shadow, styles.looping, shadows[mood], halt)}
       />
-      <g {...stylex.props(styles.part, styles.looping, floats[mood], halt)}>
+      <g {...stylex.props(styles.looping, floats[mood], halt)}>
         <g
           {...stylex.props(
-            styles.part,
+            styles.figure,
             styles.looping,
             styles.body,
             bodies[mood],
@@ -101,38 +97,12 @@ export function Ghost({
           )}
         >
           <path d={BODY} {...stylex.props(styles.ink)} />
-          <g clipPath={`url(#${id}-skirt)`}>
-            {detailed && (
-              <g transform="translate(0 0.75)">
-                <Hem
-                  mood={mood}
-                  detailed={detailed}
-                  still={still}
-                  sx={styles.ink}
-                />
-                <Hem
-                  mood={mood}
-                  detailed={detailed}
-                  still={still}
-                  sx={styles.underside}
-                />
-              </g>
-            )}
-            <Hem
-              mood={mood}
-              detailed={detailed}
-              still={still}
-              sx={styles.ink}
-            />
-            {detailed && (
-              <Hem
-                mood={mood}
-                detailed={detailed}
-                still={still}
-                fill={`url(#${id}-shade)`}
-              />
-            )}
-          </g>
+          <Hem
+            mood={mood}
+            detailed={detailed}
+            still={still}
+            shade={detailed ? `url(#${id}-shade)` : undefined}
+          />
           {detailed && <path d={BODY} fill={`url(#${id}-shade)`} />}
           <g {...stylex.props(styles.eyes, looks[mood])}>
             <Eyes mood={mood} detailed={detailed} still={still} />
@@ -149,43 +119,100 @@ export function Ghost({
 const BODY =
   "M7.4 11.6a8.6 8.6 0 0 1 17.2 0c0 4.6.3 8 1 11.2v.8H6.4v-.8c.7-3.2 1-6.6 1-11.2Z";
 
-// The hem's outline below where the body stops, so the scallops keep the body's flare.
-const SKIRT =
-  "M7.3 17c-.2 2.6-.4 4-.9 5.6l-.7 4.4h20.6l-.7-4.4c-.5-1.6-.7-3-.9-5.6Z";
+// The hem is a row of lobes, each its own shape that stretches and gathers a beat behind the one
+// beside it, so the cloth ripples without morphing a path (which Safari can't animate). Sliding
+// a strip under a clip did that too, but the clip cut lobes off flat at both sides. Each lobe
+// hangs from a little inside the body, so a gathered one never opens a gap at the seam.
+const HEM_TOP = 22.6;
+// Where the body's bottom edge is: a lobe's shading starts there, not overlapping the body's own.
+const SEAM = 23.6;
 
-// Four scallops across the body, plus two spare: the strip slides one lobe on a loop under the
-// skirt's clip, so the hem ripples without morphing a path (which Safari can't animate). At icon
-// sizes four turn into a fringe, so a small ghost has three deeper ones.
+// Four lobes across the body; at icon sizes four turn into a fringe, so a small ghost has three
+// deeper ones.
 const HEM = {
-  large: `M6.4 19v4.2${" c.3 0 .8 1.9 2.4 1.9s2.1-1.9 2.4-1.9".repeat(6)}V19Z`,
-  small: `M6.4 19v4${" c.4 0 1.1 2.3 3.2 2.3s2.8-2.3 3.2-2.3".repeat(5)}V19Z`,
+  large: lobes({
+    width: 4.8,
+    top: 23.2,
+    curve: "c.3 0 .8 1.9 2.4 1.9s2.1-1.9 2.4-1.9",
+  }),
+  small: lobes({
+    width: 6.4,
+    top: 23,
+    curve: "c.4 0 1.1 2.3 3.2 2.3s2.8-2.3 3.2-2.3",
+  }),
 };
+
+function lobes({
+  width,
+  top,
+  curve,
+}: {
+  width: number;
+  top: number;
+  curve: string;
+}) {
+  const left = 6.4;
+  const count = Math.round(19.2 / width);
+  return Array.from({ length: count }, (_, i) => {
+    const x = (left + width * i).toFixed(1);
+    return {
+      d: `M${x} ${HEM_TOP}V${top}${curve}V${HEM_TOP}Z`,
+      shaded: `M${x} ${SEAM}V${top}${curve}V${SEAM}Z`,
+    };
+  });
+}
+
+// The wave's period in each mood, a whole fraction of the body's own loop so the two stay in step:
+// half the float, half the lean, half the hop, half the pencil's line. An error lets it hang.
+const WAVES: Record<Mood, number | null> = {
+  idle: 1.6,
+  listening: 1.1,
+  thinking: 3.2,
+  writing: 0.9,
+  waiting: 1.2,
+  done: 1.6,
+  error: null,
+};
+
+// How far each lobe's swing runs ahead of the one to its left, as a share of the wave.
+const LAG = 0.3;
 
 function Hem({
   mood,
   detailed,
   still,
-  sx,
-  fill,
+  shade,
 }: {
   mood: Mood;
   detailed: boolean;
   still: boolean;
-  sx?: StyleXStyles;
-  fill?: string;
+  /** The shading's fill, on a ghost big enough to show it; with it comes the hem's underside. */
+  shade?: string;
 }) {
+  const halt = still && styles.halt;
+  const wave = WAVES[mood];
   return (
-    <path
-      d={detailed ? HEM.large : HEM.small}
-      fill={fill}
-      {...stylex.props(
-        styles.hem,
-        !detailed && styles.hemSmall,
-        hems[mood],
-        still && styles.halt,
-        sx
-      )}
-    />
+    <g {...stylex.props(styles.trail, trails[mood], halt)}>
+      {(detailed ? HEM.large : HEM.small).map((lobe, i) => (
+        <g
+          key={lobe.d}
+          {...stylex.props(
+            styles.lobe,
+            wave === null ? styles.halt : styles.wave(wave, i),
+            halt
+          )}
+        >
+          {shade && (
+            <g transform="translate(0 0.75)">
+              <path d={lobe.d} {...stylex.props(styles.ink)} />
+              <path d={lobe.d} {...stylex.props(styles.underside)} />
+            </g>
+          )}
+          <path d={lobe.d} {...stylex.props(styles.ink)} />
+          {shade && <path d={lobe.shaded} fill={shade} />}
+        </g>
+      ))}
+    </g>
   );
 }
 
@@ -325,14 +352,35 @@ const shadowFloat = stylex.keyframes({
   "50%": { transform: "scaleX(0.8)", opacity: 0.55 },
 });
 
+// A lobe draws out, swings, gathers and swings back, so its tip rolls the way cloth does.
 const ripple = stylex.keyframes({
-  from: { transform: "translateX(0)" },
-  to: { transform: "translateX(-4.8px)" },
+  "0%, 100%": { transform: "scaleY(1.12) skewX(0deg)" },
+  "25%": { transform: "scaleY(0.92) skewX(-7deg)" },
+  "50%": { transform: "scaleY(0.74) skewX(0deg)" },
+  "75%": { transform: "scaleY(0.92) skewX(7deg)" },
 });
 
-const rippleSmall = stylex.keyframes({
-  from: { transform: "translateX(0)" },
-  to: { transform: "translateX(-6.4px)" },
+// The hem follows the float a beat late: drawn out while the ghost rises, gathered as it sinks.
+const drag = stylex.keyframes({
+  "0%, 50%, 100%": { transform: "scaleY(1)" },
+  "30%": { transform: "scaleY(1.12)" },
+  "80%": { transform: "scaleY(0.9)" },
+});
+
+// The hop's follow-through: gathered in the crouch, trailing on the way up, bunched on landing.
+const hopDrag = stylex.keyframes({
+  "0%, 58%, 100%": { transform: "scaleY(1)" },
+  "62%": { transform: "scaleY(0.85)" },
+  "70%": { transform: "scaleY(1.3)" },
+  "78%": { transform: "scaleY(0.8)" },
+  "85%": { transform: "scaleY(1.08)" },
+});
+
+// The lean's follow-through: the hem swings past the body and back a beat after it.
+const swing = stylex.keyframes({
+  "0%, 50%, 100%": { transform: "skewX(0deg)" },
+  "25%": { transform: "skewX(5deg)" },
+  "75%": { transform: "skewX(-5deg)" },
 });
 
 const blink = stylex.keyframes({
@@ -437,6 +485,9 @@ const styles = stylex.create({
   },
   // Rotations and scales turn about the part itself, not the corner of the drawing.
   part: { transformBox: "fill-box", transformOrigin: "50% 100%" },
+  // The figure turns about fixed points in the drawing (here the hem's foot) rather than its own
+  // box, which the moving hem resizes every frame and would set the pivot drifting.
+  figure: { transformBox: "view-box", transformOrigin: "16px 25px" },
   ink: { fill: "currentColor" },
   // The hem's underside, a shade darker in either theme, so the cloth has a thickness.
   underside: { fill: color.fold },
@@ -465,13 +516,24 @@ const styles = stylex.create({
     transformBox: "fill-box",
     transformOrigin: "center",
   },
-  hem: {
-    animationName: { default: ripple, [REDUCED]: "none" },
-    animationDuration: "1.8s",
-    animationTimingFunction: "linear",
+  // Drawn out and gathered from where it hangs, so the seam with the body never moves.
+  trail: {
+    transformBox: "view-box",
+    transformOrigin: "16px 22.6px",
+    animationTimingFunction: motion.inOut,
     animationIterationCount: "infinite",
   },
-  hemSmall: { animationName: { default: rippleSmall, [REDUCED]: "none" } },
+  lobe: {
+    transformBox: "fill-box",
+    transformOrigin: "50% 0%",
+    animationName: { default: ripple, [REDUCED]: "none" },
+    animationTimingFunction: motion.inOut,
+    animationIterationCount: "infinite",
+  },
+  wave: (seconds: number, lobe: number) => ({
+    animationDuration: `${seconds}s`,
+    animationDelay: `${(-seconds * LAG * lobe).toFixed(2)}s`,
+  }),
   eyes: {
     fill: color.bg,
     transformBox: "fill-box",
@@ -603,7 +665,8 @@ const shadows = stylex.create({
 const bodies = stylex.create({
   idle: {},
   listening: {
-    transformOrigin: "50% 0%",
+    // The crown of the head, so it stays put while the hem swings out.
+    transformOrigin: "16px 3px",
     transform: { default: null, [REDUCED]: "rotate(-5deg)" },
     animationName: { default: lean, [REDUCED]: "none" },
     animationDuration: "2.2s",
@@ -629,15 +692,27 @@ const bodies = stylex.create({
   },
 });
 
-// Listening and writing ripple the hem faster, like it's hurrying; an error lets it hang still.
-const hems = stylex.create({
-  idle: {},
-  listening: { animationDuration: "1.3s" },
-  thinking: { animationDuration: "2.6s" },
-  writing: { animationDuration: "1.1s" },
-  waiting: {},
-  done: {},
-  error: { animationName: "none" },
+const dragging = {
+  animationName: { default: drag, [REDUCED]: "none" },
+  animationDuration: "3.2s",
+} as const;
+
+// The hem's follow-through takes the body's own loop and length, so it lands with it.
+const trails = stylex.create({
+  idle: dragging,
+  listening: {
+    animationName: { default: swing, [REDUCED]: "none" },
+    animationDuration: "2.2s",
+  },
+  thinking: dragging,
+  writing: dragging,
+  waiting: {
+    animationName: { default: hopDrag, [REDUCED]: "none" },
+    animationDuration: "2.4s",
+    animationTimingFunction: "ease-out",
+  },
+  done: dragging,
+  error: {},
 });
 
 // Where it looks: at you while listening or waiting, up and away while thinking, down at the
