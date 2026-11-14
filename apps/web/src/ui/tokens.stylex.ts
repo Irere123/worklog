@@ -53,6 +53,13 @@ export const color = stylex.defineVars({
 
   focus: "light-dark(oklch(0.6 0.19 268), oklch(0.7 0.16 268))",
   scrim: "light-dark(oklch(0.2 0.01 80 / 0.28), oklch(0 0 0 / 0.55))",
+
+  // Light falls on the ghost from above in either theme; its cloth folds a shade darker beneath,
+  // and its shadow darkens the floor even on a dark page, where a light shadow would glow.
+  sheen: "light-dark(oklch(1 0 0 / 0.12), oklch(1 0 0 / 0.12))",
+  shade: "light-dark(oklch(0 0 0 / 0.1), oklch(0 0 0 / 0.1))",
+  fold: "light-dark(oklch(0 0 0 / 0.28), oklch(0 0 0 / 0.14))",
+  castShadow: "light-dark(oklch(0.235 0.009 75 / 0.2), oklch(0 0 0 / 0.6))",
 });
 
 // Each tool's own colours, from its brand guidelines, so a mark reads as the product at a glance.
