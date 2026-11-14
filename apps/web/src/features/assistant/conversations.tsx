@@ -21,20 +21,25 @@ import { ApiError, api, unwrap } from "#api/client";
 import { q } from "#api/queries";
 import { useMe } from "#features/auth/session";
 import { useMembers } from "#features/cards/card-bits";
-import type { Member } from "#features/cards/card-bits";
 import { ago, recencyLabel } from "#lib/time";
 import { Avatar } from "#ui/avatar";
 import { Button } from "#ui/button";
 import { Dot } from "#ui/chip";
 import { EmptyState, ErrorNote, Skeleton, VisuallyHidden } from "#ui/feedback";
 import { Input } from "#ui/field";
+import type { Mood } from "#ui/ghost";
 import { PageHeader } from "#ui/layout";
 import { Menu, MenuItem, Tooltip } from "#ui/overlay";
 import { color, leading, media, radius, space, text } from "#ui/tokens.stylex";
 
 import { Chat, PendingThread } from "./chat";
 import { Composer } from "./composer";
-import { AssistantFace, hasUnseenReply, usePresence } from "./presence";
+import {
+  AssistantFace,
+  WRITING_STEP,
+  hasUnseenReply,
+  usePresence,
+} from "./presence";
 import type { Glance } from "./presence";
 import { useSuggestions } from "./suggestions";
 import { WaitingOnYou } from "./waiting";
@@ -45,10 +50,17 @@ const FILTER_FROM = 8;
 export function Conversations({ children }: { children: ReactNode }) {
   const list = useQuery({ ...q.conversations(), select: notBeingDeleted });
   const { byId } = useMembers();
-  const { agent: mine, presence } = usePresence();
-  const busy = new Set(
+  const { presence } = usePresence();
+  const busy = new Map(
     presence?.working.flatMap((w) =>
-      w.kind === "reply" ? [w.conversationId] : []
+      w.kind === "reply"
+        ? [
+            [
+              w.conversationId,
+              w.step?.tool === WRITING_STEP ? "writing" : "thinking",
+            ] as const,
+          ]
+        : []
     )
   );
   const [filter, setFilter] = useState("");
@@ -129,11 +141,7 @@ export function Conversations({ children }: { children: ReactNode }) {
                     >
                       {titleOf(c, owner?.name)}
                     </span>
-                    <ItemStatus
-                      conversation={c}
-                      working={busy.has(c.id)}
-                      agent={mine}
-                    />
+                    <ItemStatus conversation={c} mood={busy.get(c.id)} />
                   </Link>
                 );
               })}
@@ -189,7 +197,9 @@ export function NewChat({ ask }: { ask?: string }) {
   const navigate = useNavigate();
   const started = useRef(false);
   const me = useMe();
-  const { agent: mine, state, glance } = usePresence();
+  const { agent: mine, mood, glance } = usePresence();
+  // While you type (or dictate) it's listening; that's the one thing presence can't know.
+  const [drafting, setDrafting] = useState(false);
   const conversations = useQuery(q.conversations());
   const open = useMutation({
     mutationFn: async (question: string) => {
@@ -232,7 +242,7 @@ export function NewChat({ ask }: { ask?: string }) {
     return (
       <>
         <PageHeader title={asking} />
-        <PendingThread question={asking} agent={mine} />
+        <PendingThread question={asking} />
       </>
     );
   }
@@ -241,7 +251,12 @@ export function NewChat({ ask }: { ask?: string }) {
     <div {...stylex.props(styles.empty)}>
       <div {...stylex.props(styles.emptyColumn)}>
         <div {...stylex.props(styles.emptyHead)}>
-          {mine && <AssistantFace agent={mine} state={state} size={40} />}
+          {mine && (
+            <AssistantFace
+              mood={drafting && mood === "idle" ? "listening" : mood}
+              size={56}
+            />
+          )}
           <h1 {...stylex.props(styles.emptyTitle)}>
             {firstName
               ? `What can I find for you, ${firstName}?`
@@ -262,6 +277,7 @@ export function NewChat({ ask }: { ask?: string }) {
           label="Message your assistant"
           placeholder="Ask anything about your team’s work…"
           context={<span>Sees your work and your team’s</span>}
+          onDrafting={setDrafting}
           onSend={(question) => open.mutate(question)}
         />
         <ul {...stylex.props(styles.starters)}>
@@ -308,22 +324,20 @@ function StatusLine({ glance }: { glance: Glance }) {
 // not yet read, otherwise how long ago it moved.
 function ItemStatus({
   conversation,
-  working,
-  agent,
+  mood,
 }: {
   conversation: {
     updatedAt: string;
     repliedAt: string | null;
     seenAt: string | null;
   };
-  working: boolean;
-  agent: Member | undefined;
+  mood?: Mood;
 }) {
-  if (working) {
+  if (mood) {
     return (
       <span {...stylex.props(styles.itemTime)}>
         <VisuallyHidden>Answering</VisuallyHidden>
-        <AssistantFace agent={agent} state="working" size={14} />
+        <AssistantFace mood={mood} size={14} />
       </span>
     );
   }
@@ -365,7 +379,7 @@ function RecentConversations() {
           >
             {titleOf(c)}
           </span>
-          <ItemStatus conversation={c} working={false} agent={undefined} />
+          <ItemStatus conversation={c} />
         </Link>
       ))}
     </nav>

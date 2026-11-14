@@ -1,4 +1,3 @@
-import * as stylex from "@stylexjs/stylex";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 
@@ -8,14 +7,13 @@ import { useMe } from "#features/auth/session";
 import { useMembers } from "#features/cards/card-bits";
 import type { Member } from "#features/cards/card-bits";
 import { upcoming } from "#lib/time";
-import { Avatar } from "#ui/avatar";
-import { color, motion } from "#ui/tokens.stylex";
+import { Ghost } from "#ui/ghost";
+import type { Mood } from "#ui/ghost";
 
 import { describe } from "./tool-words";
 
 export type Presence = Schemas["AssistantPresence"];
 type Working = Presence["working"][number];
-type State = Presence["state"];
 type RoutineKind = Schemas["Automation"]["kind"];
 
 /** What a glance at the assistant says, and the conversation it's about when there is one. */
@@ -37,7 +35,12 @@ export function usePresence() {
     () => (data ? describePresence(data, byId, zone) : null),
     [data, byId, zone]
   );
-  return { agent, presence: data, state: data?.state ?? "idle", glance };
+  return {
+    agent,
+    presence: data,
+    mood: moodOf(data),
+    glance,
+  };
 }
 
 /**
@@ -105,6 +108,9 @@ function doing(work: Working, people: Map<string, Member>) {
       return ROUTINE_WORDS[work.routine] ?? `Running “${work.name}”`;
     }
     case "reply": {
+      if (work.step?.tool === WRITING_STEP) {
+        return "Writing a reply";
+      }
       return work.step
         ? describe(
             {
@@ -136,80 +142,37 @@ const ROUTINE_WORDS: Record<RoutineKind, string | null> = {
   custom: null,
 };
 
+/** The step the server records once the reply's text starts to flow (agent/loop.ts). */
+export const WRITING_STEP = "writing";
+
 /**
- * The assistant's face, which says how it's doing the way a colleague's would: still when idle,
- * breathing while it works, looking up when it wants your OK. Motion carries the state, so there's
- * no separate light to learn; with reduced motion a ring says "working" instead.
+ * How the assistant looks for what presence says: writing once its words flow, thinking while it
+ * looks things up or runs a routine, waiting when it needs your OK, pleased with an unread answer.
  */
-export function AssistantFace({
-  agent,
-  state,
-  size = 16,
-}: {
-  agent: Member | undefined;
-  state: State;
-  size?: number;
-}) {
-  return (
-    <span
-      {...stylex.props(
-        styles.face,
-        state === "working" && styles.working,
-        state === "waiting" && styles.waiting
-      )}
-    >
-      <Avatar person={agent} size={size} />
-    </span>
-  );
+export function moodOf(presence: Presence | undefined): Mood {
+  const state = presence?.state ?? "idle";
+  if (state === "working") {
+    const first = presence?.working[0];
+    return first?.kind === "reply" && first.step?.tool === WRITING_STEP
+      ? "writing"
+      : "thinking";
+  }
+  return state;
 }
 
-// Transform only, so the compositor runs it without repainting the sidebar every frame.
-const breathe = stylex.keyframes({
-  "0%, 100%": { transform: "scale(1)" },
-  "50%": { transform: "scale(1.12)" },
-});
-
-// A small lift and settle every few seconds, like someone glancing up from their desk.
-const lookUp = stylex.keyframes({
-  "0%, 70%, 100%": { transform: "translateY(0)" },
-  "78%": { transform: "translateY(-2px)" },
-  "86%": { transform: "translateY(0)" },
-  "92%": { transform: "translateY(-1px)" },
-});
-
-const styles = stylex.create({
-  face: {
-    display: "inline-flex",
-    // The agent avatar's own corners, so the reduced-motion ring follows its shape.
-    borderRadius: "28%",
-    transformOrigin: "50% 60%",
-    outlineWidth: 1.5,
-    outlineStyle: "solid",
-    outlineOffset: 1,
-    outlineColor: "transparent",
-    transitionProperty: "outline-color",
-    transitionDuration: motion.slow,
-  },
-  working: {
-    animationName: {
-      default: breathe,
-      "@media (prefers-reduced-motion: reduce)": "none",
-    },
-    animationDuration: "1.6s",
-    animationTimingFunction: motion.inOut,
-    animationIterationCount: "infinite",
-    outlineColor: {
-      default: "transparent",
-      "@media (prefers-reduced-motion: reduce)": color.accent,
-    },
-  },
-  waiting: {
-    animationName: {
-      default: lookUp,
-      "@media (prefers-reduced-motion: reduce)": "none",
-    },
-    animationDuration: "3.2s",
-    animationTimingFunction: "ease-out",
-    animationIterationCount: "infinite",
-  },
-});
+/**
+ * The assistant's face, which says how it's doing the way a colleague's would. Motion carries the
+ * state, so there's no separate light to learn; a page that knows more than presence (you're
+ * typing, the reply failed) passes its own `mood`.
+ */
+export function AssistantFace({
+  mood,
+  size = 16,
+  label,
+}: {
+  mood: Mood;
+  size?: number;
+  label?: string;
+}) {
+  return <Ghost mood={mood} size={size} label={label} />;
+}

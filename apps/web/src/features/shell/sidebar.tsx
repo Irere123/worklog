@@ -231,7 +231,7 @@ export function Sidebar({
  * read.
  */
 function AssistantItem() {
-  const { agent, presence, state, glance } = usePresence();
+  const { agent, presence, mood, glance } = usePresence();
   const line = glance?.line;
   const waiting = presence?.waiting ?? 0;
   const unseen = presence?.done.length ?? 0;
@@ -250,7 +250,7 @@ function AssistantItem() {
       >
         <span {...stylex.props(styles.itemIcon)}>
           {agent ? (
-            <AssistantFace agent={agent} state={state} size={16} />
+            <AssistantFace mood={mood} size={16} />
           ) : (
             <ChatsCircleIcon size={16} />
           )}

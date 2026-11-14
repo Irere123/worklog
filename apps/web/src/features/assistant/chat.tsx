@@ -35,9 +35,10 @@ import { NewCardDialog } from "#features/cards/new-card";
 import { showDesktopAlert } from "#lib/desktop-alerts";
 import { clip } from "#lib/text";
 import { clockTime, dayKey, dayLabel, exactTime } from "#lib/time";
-import { Avatar } from "#ui/avatar";
 import { Button } from "#ui/button";
 import { VisuallyHidden, useDelayed } from "#ui/feedback";
+import { Ghost } from "#ui/ghost";
+import type { Mood } from "#ui/ghost";
 import { StreamingMarkdown } from "#ui/markdown";
 import { Popover, Tooltip } from "#ui/overlay";
 import {
@@ -177,7 +178,6 @@ export function Chat({
           )}
           <Messages
             messages={chat.messages}
-            agent={agent}
             agentName={agentName}
             people={byId}
             conversationId={conversation.id}
@@ -187,7 +187,7 @@ export function Chat({
             took={timer.took}
             askAgain={send}
           />
-          {waiting && <Waiting agent={agent} name={agentName} />}
+          {waiting && <Waiting name={agentName} />}
           {failed && (
             <Failed
               message={chat.error?.message}
@@ -447,13 +447,7 @@ function ignore() {
  * A question on its way, drawn as the conversation will be, while the server opens it: the
  * thread, the assistant's line and the composer are all where they'll be when it arrives.
  */
-export function PendingThread({
-  question,
-  agent,
-}: {
-  question: string;
-  agent?: Member;
-}) {
+export function PendingThread({ question }: { question: string }) {
   return (
     <div {...stylex.props(styles.chat)}>
       <div {...stylex.props(styles.scroll)}>
@@ -461,7 +455,7 @@ export function PendingThread({
           <div {...stylex.props(styles.user)}>
             <div {...stylex.props(styles.userBubble)}>{question}</div>
           </div>
-          <Waiting agent={agent} name="Your assistant" />
+          <Waiting name="Your assistant" />
         </div>
       </div>
       <Dock
@@ -488,7 +482,6 @@ function responseStatus(busy: boolean, messageCount: number) {
 
 function Messages({
   messages,
-  agent,
   agentName,
   people,
   conversationId,
@@ -499,7 +492,6 @@ function Messages({
   askAgain,
 }: {
   messages: ChatMessage[];
-  agent?: Member;
   agentName: string;
   people: Map<string, Member>;
   conversationId: string;
@@ -543,7 +535,6 @@ function Messages({
         <AssistantReply
           key={message.id}
           message={message}
-          agent={agent}
           name={agentName}
           people={people}
           conversationId={conversationId}
@@ -648,6 +639,7 @@ function Failed({
 }) {
   return (
     <div {...stylex.props(styles.failed)} role="alert">
+      <Ghost mood="error" size={20} />
       <span>
         {message && message.length < 160
           ? message
@@ -683,7 +675,7 @@ function Welcome({
     : suggestions;
   return (
     <div {...stylex.props(styles.welcome)}>
-      {agent && <Avatar person={agent} size={40} />}
+      {agent && <Ghost size={48} />}
       <h2 {...stylex.props(styles.welcomeTitle)}>
         {teammate
           ? `${first ?? "Their"}’s assistant`
@@ -711,12 +703,12 @@ function Welcome({
   );
 }
 
-function Waiting({ agent, name }: { agent?: Member; name: string }) {
+function Waiting({ name }: { name: string }) {
   // Shown only if nothing has arrived after a moment, so a quick reply never flashes it.
   const shown = useDelayed(300);
   return (
     <div {...stylex.props(styles.reply)}>
-      <AgentLine agent={agent} name={name} />
+      <AgentLine name={name} mood="thinking" />
       {shown && <span {...stylex.props(styles.waiting)}>Thinking…</span>}
     </div>
   );
@@ -724,20 +716,18 @@ function Waiting({ agent, name }: { agent?: Member; name: string }) {
 
 /** Who is answering and when, as a log line reads: the agent's face, its name, the time. */
 function AgentLine({
-  agent,
   name,
   at,
+  mood,
 }: {
-  agent?: Member;
   name: string;
   at?: string;
+  /** Only the reply that's live moves; an earlier one holds still. */
+  mood?: Mood;
 }) {
   return (
     <div {...stylex.props(styles.agentLine)}>
-      <Avatar
-        person={agent ?? { id: "assistant", name: "Assistant", kind: "agent" }}
-        size={18}
-      />
+      <Ghost mood={mood ?? "idle"} still={mood === undefined} size={20} />
       <span {...stylex.props(styles.agentName)}>{name}</span>
       {at && (
         <time
@@ -795,7 +785,6 @@ function textOf(message: ChatMessage) {
 
 function Reply({
   message,
-  agent,
   name,
   people,
   conversationId,
@@ -807,7 +796,6 @@ function Reply({
   onAskAgain,
 }: {
   message: ChatMessage;
-  agent?: Member;
   name: string;
   people: Map<string, Member>;
   conversationId: string;
@@ -819,6 +807,7 @@ function Reply({
   onAskAgain?: () => void;
 }) {
   const value = textOf(message);
+  const finished = useJustFinished(streaming);
   const live = liveSteps(message.parts);
   const steps = live.length > 0 ? live : (message.metadata?.steps ?? []);
   return (
@@ -829,7 +818,11 @@ function Reply({
       )}
       aria-busy={streaming}
     >
-      <AgentLine agent={agent} name={name} at={message.metadata?.createdAt} />
+      <AgentLine
+        name={name}
+        at={message.metadata?.createdAt}
+        mood={replyMood(streaming, latest, value, finished)}
+      />
       <div {...stylex.props(styles.replyBody)}>
         <WorkLog
           steps={steps}
@@ -1113,6 +1106,42 @@ const rise = stylex.keyframes({
 });
 
 const COLUMN = 720;
+
+/**
+ * The live reply's ghost: thinking until its words start, writing while they come, pleased for a
+ * moment once they're done. Earlier replies get no mood and hold still.
+ */
+function replyMood(
+  streaming: boolean,
+  latest: boolean,
+  said: string,
+  finished: boolean
+): Mood | undefined {
+  if (streaming) {
+    return said ? "writing" : "thinking";
+  }
+  if (finished) {
+    return "done";
+  }
+  return latest ? "idle" : undefined;
+}
+
+/** True for a few seconds after `active` goes from on to off: long enough to see it land. */
+function useJustFinished(active: boolean) {
+  const [finished, setFinished] = useState(false);
+  const [was, setWas] = useState(active);
+  if (was !== active) {
+    setWas(active);
+    setFinished(!active);
+  }
+  useEffect(() => {
+    const timer = finished
+      ? setTimeout(() => setFinished(false), 2400)
+      : undefined;
+    return () => clearTimeout(timer);
+  }, [finished]);
+  return finished;
+}
 
 const styles = stylex.create({
   chat: {

@@ -1752,6 +1752,70 @@ describe("presence", () => {
     });
   });
 
+  test("a streamed reply shows as writing once its words start", async () => {
+    const owner = await env.workspace();
+    const gate = { open: false };
+    const model = new MockLanguageModelV4({
+      // oxlint-disable-next-line require-await -- fulfils the async LanguageModel contract
+      doStream: async () => {
+        const parts: any[] = [
+          { type: "stream-start", warnings: [] },
+          { type: "text-start", id: "t" },
+          { type: "text-delta", id: "t", delta: "Nothing is " },
+        ];
+        return {
+          stream: new ReadableStream({
+            async pull(controller) {
+              const next = parts.shift();
+              if (next !== undefined) {
+                controller.enqueue(next);
+                return;
+              }
+              while (!gate.open) {
+                await Bun.sleep(5);
+              }
+              controller.enqueue({
+                type: "text-delta",
+                id: "t",
+                delta: "blocked.",
+              });
+              controller.enqueue({ type: "text-end", id: "t" });
+              controller.enqueue({
+                type: "finish",
+                finishReason: { unified: "stop", raw: undefined },
+                usage: testUsage,
+              });
+              controller.close();
+            },
+          }),
+        };
+      },
+    });
+    env.ctx.models = { main: model, fast: model };
+    const { id } = (
+      await env.call("POST", "/v1/conversations", { token: owner.token })
+    ).body.conversation;
+    const streamed = (async () => {
+      const res = await env.app.request(`/v1/conversations/${id}/chat`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          authorization: `Bearer ${owner.token}`,
+        },
+        body: JSON.stringify({ message: "What's blocked?" }),
+      });
+      return await res.text();
+    })();
+    expect(
+      await toldWhen(owner, (p) => p.working[0]?.step?.tool === "writing")
+    ).toMatchObject({
+      state: "working",
+      working: [{ kind: "reply", conversationId: id, step: { input: {} } }],
+    });
+    gate.open = true;
+    await streamed;
+  });
+
   test("a teammate's question shows only that one is being answered", async () => {
     const owner = await env.workspace();
     const sam = await env.teammate(owner.token, "Sam");

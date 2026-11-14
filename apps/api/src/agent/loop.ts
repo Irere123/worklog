@@ -57,7 +57,7 @@ import {
 import type { Channel } from "./instructions";
 import { memoryChanges, memoryPage } from "./memory";
 import { CACHED, TIMEOUTS } from "./models";
-import { reportingSteps, turnPresence } from "./presence";
+import { WRITING_STEP, reportingSteps, turnPresence } from "./presence";
 import type { ReportStep } from "./presence";
 import { assistantTools } from "./tools";
 
@@ -655,6 +655,9 @@ export async function askStream(
       abortSignal: signal,
       onChunk: ({ chunk }) => {
         if (chunk.type === "text-delta") {
+          if (afterTool || !written) {
+            step({ tool: WRITING_STEP, input: {} });
+          }
           written += afterTool && written ? `\n\n${chunk.text}` : chunk.text;
           afterTool = false;
         } else if (chunk.type.startsWith("tool-")) {

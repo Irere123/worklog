@@ -58,7 +58,7 @@ export function RoutineList({
   routines: Automation[];
   onEdit: (routine: Automation) => void;
 }) {
-  const { agent, presence } = usePresence();
+  const { presence } = usePresence();
   const zone = useMe()?.member.timezone ?? undefined;
   const { toggle, run } = useRoutineActions();
   const running = new Set(
@@ -99,7 +99,7 @@ export function RoutineList({
                   {last && ` · ${last}`}
                 </span>
               </span>
-              <Where state={state} agent={agent} />
+              <Where state={state} />
             </button>
             <Menu
               align="end"
@@ -144,17 +144,11 @@ export function RoutineList({
   );
 }
 
-function Where({
-  state,
-  agent,
-}: {
-  state: RoutineState;
-  agent: ReturnType<typeof usePresence>["agent"];
-}) {
+function Where({ state }: { state: RoutineState }) {
   if (state.kind === "running") {
     return (
       <span {...stylex.props(styles.when)}>
-        <AssistantFace agent={agent} state="working" size={16} />
+        <AssistantFace mood="thinking" size={16} />
         Running
       </span>
     );

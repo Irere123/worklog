@@ -24,7 +24,7 @@ export function MobileBar({
   const me = useQuery(q.me());
   const attention = useQuery(q.attention("open"));
   const waiting = attention.data?.length ?? 0;
-  const { agent, state, glance, presence } = usePresence();
+  const { mood, glance, presence } = usePresence();
   const line = glance?.line;
   const unseen = (presence?.done.length ?? 0) > 0;
   return (
@@ -56,7 +56,7 @@ export function MobileBar({
         aria-label={line ? `Assistant: ${line}` : "Assistant"}
         {...stylex.props(styles.icon, styles.inbox)}
       >
-        <AssistantFace agent={agent} state={state} size={20} />
+        <AssistantFace mood={mood} size={20} />
         {unseen && (
           <span {...stylex.props(styles.dot)}>
             <Dot tone="accent" />

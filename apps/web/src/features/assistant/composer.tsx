@@ -37,6 +37,7 @@ export function Composer({
   onSend,
   onStop,
   onStartTyping,
+  onDrafting,
   inputRef,
   recall,
 }: {
@@ -50,6 +51,8 @@ export function Composer({
   onStop?: () => void;
   /** The first keystroke in an empty box: a message is on its way. */
   onStartTyping?: () => void;
+  /** Whether there's something in the box, typed or being dictated, for a face that listens. */
+  onDrafting?: (drafting: boolean) => void;
   /** For a page that focuses the box from a shortcut. */
   inputRef?: RefObject<HTMLTextAreaElement | null>;
   /** The last thing sent, for ↑ in an empty box: ask it again, or fix it first. */
@@ -82,6 +85,11 @@ export function Composer({
       setValue("");
     }
   };
+  const drafting = trimmed !== "" || dictation.listening;
+  const tellDrafting = useEffectEvent((now: boolean) => onDrafting?.(now));
+  useEffect(() => {
+    tellDrafting(drafting);
+  }, [drafting]);
   const stopping = busy && !trimmed && onStop !== undefined;
   return (
     <form

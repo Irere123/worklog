@@ -125,6 +125,12 @@ export async function assistantPresence(
 }
 
 /**
+ * The step a turn reports when its reply's words start to flow, after any lookups, so the owner's
+ * view can tell writing from still looking things up. Not a tool: no tool has this name.
+ */
+export const WRITING_STEP = "writing";
+
+/**
  * Presence for one turn, reported to the assistant's owner: that it started, each step it takes,
  * and that it ended. Only the end is waited for: presence is a courtesy, the answer is the work,
  * and a tool shouldn't start late so a sidebar can say it started.
