@@ -28,9 +28,6 @@ import { eric } from "./team";
  * product at its real size, and does one small thing as the grid scrolls in.
  */
 export function Features() {
-  const ref = useRef<HTMLDivElement>(null);
-  const shown = useInView(ref, { margin: "0px 0px -15% 0px", once: true });
-
   return (
     <section id="features" {...stylex.props(page.wide, page.section)}>
       <div {...stylex.props(page.intro)}>
@@ -44,12 +41,11 @@ export function Features() {
           filters it, credits it and shows each person what’s theirs.
         </p>
       </div>
-      <div ref={ref} {...stylex.props(styles.grid)}>
+      <div {...stylex.props(styles.grid)}>
         <Tile
           title="Connect in a click"
           copy="GitHub and Slack install in one step and bring their recent history with them."
           at={0}
-          on={shown}
         >
           {(on) => <Marks on={on} />}
         </Tile>
@@ -57,7 +53,6 @@ export function Features() {
           title="Noise left out"
           copy="Bot comments, CI pings and duplicates never reach the stream."
           at={1}
-          on={shown}
         >
           {(on) => <Noise on={on} />}
         </Tile>
@@ -65,7 +60,6 @@ export function Features() {
           title="One person, every handle"
           copy="GitHub, Slack and Discord names resolve to the teammate behind them."
           at={2}
-          on={shown}
         >
           {(on) => <Handles on={on} />}
         </Tile>
@@ -73,7 +67,6 @@ export function Features() {
           title="Golden tickets"
           copy="Mark the one card that matters instead of ranking all of them."
           at={3}
-          on={shown}
         >
           {(on) => <Golden on={on} />}
         </Tile>
@@ -81,7 +74,6 @@ export function Features() {
           title="Cards drift"
           copy="Cards nobody touches fade to Not now instead of rotting on the board."
           at={4}
-          on={shown}
         >
           {(on) => <Drift on={on} />}
         </Tile>
@@ -89,7 +81,6 @@ export function Features() {
           title="Stamped when it’s done"
           copy="Closing a card stamps it, so finished looks finished."
           at={5}
-          on={shown}
         >
           {(on) => <Stamp on={on} />}
         </Tile>
@@ -97,15 +88,13 @@ export function Features() {
           title="A budget for pings"
           copy="Only what’s blocked on you interrupts, up to a limit you set. The rest waits for your brief."
           at={6}
-          on={shown}
         >
           {(on) => <Budget on={on} />}
         </Tile>
         <Tile
           title="Log it in a sentence"
-          copy="A call, a decision, a fix off the radar. Type it or say it; names come out spelled right."
+          copy="A call, a decision, a fix off the radar. Type it or say it: dictation knows your team’s names."
           at={7}
-          on={shown}
         >
           {(on) => <QuickLog on={on} />}
         </Tile>
@@ -113,7 +102,6 @@ export function Features() {
           title="Private stays private"
           copy="Teammates, and their assistants, only ever see what you shared with the team."
           at={8}
-          on={shown}
         >
           {(on) => <Privacy on={on} />}
         </Tile>
@@ -121,15 +109,13 @@ export function Features() {
           title="Every action has a key"
           copy="J and K to move, E to finish, H to snooze. ⌘K finds anything."
           at={9}
-          on={shown}
         >
           {(on) => <Keys on={on} />}
         </Tile>
         <Tile
           title="The tab knows"
-          copy="The browser tab carries what needs you, the way a calendar’s shows the date."
+          copy="The browser tab carries what needs you, the way a calendar’s icon shows the date."
           at={10}
-          on={shown}
         >
           {(on) => <BrowserTab on={on} />}
         </Tile>
@@ -138,7 +124,6 @@ export function Features() {
           badge="Opt-in"
           copy="Add a model key for the assistant and written briefs. Without one, templates and rules do the job."
           at={11}
-          on={shown}
         >
           {(on) => <ModelKey on={on} />}
         </Tile>
@@ -152,24 +137,27 @@ function Tile({
   copy,
   badge,
   at,
-  on,
   children,
 }: {
   title: string;
   copy: string;
   badge?: string;
   at: number;
-  on: boolean;
   children: (on: boolean) => ReactNode;
 }) {
-  // Tiles take their turn in reading order, so the grid settles as one wave rather than at once.
+  // Each tile watches itself: a whole grid is never a quarter on screen on a phone. Tiles that
+  // arrive together still take turns across the row, so a row settles as one wave.
+  const ref = useRef<HTMLElement>(null);
+  const on = useInView(ref, { margin: "0px 0px -10% 0px", once: true });
   const [turn, setTurn] = useState(false);
   useEffect(() => {
-    const timer = on ? setTimeout(() => setTurn(true), at * 110) : undefined;
+    const timer = on
+      ? setTimeout(() => setTurn(true), (at % 3) * 110)
+      : undefined;
     return () => clearTimeout(timer);
   }, [on, at]);
   return (
-    <article {...stylex.props(styles.tile)}>
+    <article ref={ref} {...stylex.props(styles.tile)}>
       <div aria-hidden {...stylex.props(styles.art)}>
         {children(turn)}
       </div>
@@ -187,7 +175,6 @@ function Tile({
 const PRODUCTS: { product: Product; name: string; connected: boolean }[] = [
   { product: "github", name: "GitHub", connected: true },
   { product: "slack", name: "Slack", connected: true },
-  { product: "discord", name: "Discord", connected: false },
 ];
 
 function Marks({ on }: { on: boolean }) {
@@ -436,7 +423,7 @@ function ModelKey({ on }: { on: boolean }) {
       <KeyIcon size={14} {...stylex.props(styles.keyIcon)} />
       <span {...stylex.props(styles.keyText)}>OPENROUTER_API_KEY</span>
       <span {...stylex.props(styles.keyState, on && styles.keyStateOn)}>
-        Optional
+        {on ? "Added" : "Not set"}
       </span>
     </div>
   );
@@ -462,7 +449,9 @@ const styles = stylex.create({
     flexDirection: "column",
     overflow: "hidden",
     borderRadius: 18,
-    backgroundColor: "light-dark(oklch(0.958 0.004 80), oklch(0.205 0.005 80))",
+    backgroundColor: "light-dark(oklch(0.958 0.004 80), oklch(0.215 0.005 80))",
+    // In the dark a surface a step up isn't edge enough; a hairline carries it, as in the app.
+    boxShadow: "inset 0 0 0 1px light-dark(transparent, oklch(1 0 0 / 0.06))",
   },
   delay: (ms: number) => ({
     transitionDelay: `${ms}ms`,
@@ -538,7 +527,7 @@ const styles = stylex.create({
     borderRadius: radius.full,
     backgroundColor: color.green,
     color: color.fgOnSolid,
-    boxShadow: `0 0 0 2px light-dark(oklch(0.958 0.004 80), oklch(0.205 0.005 80))`,
+    boxShadow: `0 0 0 2px light-dark(oklch(0.958 0.004 80), oklch(0.215 0.005 80))`,
     opacity: 0,
     transform: "scale(0.4)",
     transitionProperty: "opacity, transform",
@@ -675,7 +664,7 @@ const styles = stylex.create({
     transform: "rotate(-2deg)",
   },
   goldenOn: {
-    backgroundColor: "light-dark(oklch(0.95 0.08 88), oklch(0.32 0.06 85))",
+    backgroundColor: "light-dark(oklch(0.95 0.08 88), oklch(0.4 0.085 84))",
     boxShadow: `0 0 0 1px ${color.gold}, 0 8px 20px light-dark(oklch(0.78 0.15 82 / 0.35), oklch(0 0 0 / 0.35))`,
     transform: "rotate(-2deg) translateY(-3px)",
   },

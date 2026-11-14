@@ -428,7 +428,7 @@ const styles = stylex.create({
   },
   golden: {
     backgroundImage:
-      "linear-gradient(160deg, light-dark(oklch(0.97 0.06 92), oklch(0.32 0.06 85)), light-dark(oklch(0.93 0.09 85), oklch(0.27 0.05 80)))",
+      "linear-gradient(160deg, light-dark(oklch(0.97 0.06 92), oklch(0.4 0.085 86)), light-dark(oklch(0.93 0.09 85), oklch(0.34 0.075 80)))",
     boxShadow: `0 0 0 1px ${color.gold}, 0 2px 8px light-dark(oklch(0.78 0.15 82 / 0.3), oklch(0 0 0 / 0.3))`,
   },
   drifting: {

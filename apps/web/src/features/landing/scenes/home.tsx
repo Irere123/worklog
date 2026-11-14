@@ -40,7 +40,7 @@ const END: State = { ...START, arrived: true };
 
 /**
  * Home: a new assignment arrives while you look, the count that waits on you rolls from three
- * to four, and you open the one decision that matters, which is where the Inbox chapter begins.
+ * to four, and you open it, which is where the Inbox chapter begins.
  */
 export function HomeScene({ play, paused, still }: SceneProps) {
   const root = useRef<HTMLDivElement>(null);
@@ -52,10 +52,10 @@ export function HomeScene({ play, paused, still }: SceneProps) {
       await a.wait(1400);
       set({ arrived: true });
       await a.wait(2200);
-      const decision = pointAt(root.current, "decision", 0.62, 0.55);
-      set({ shown: decision !== null });
+      const assigned = pointAt(root.current, "assigned", 0.62, 0.55);
+      set({ shown: assigned !== null });
       await a.wait(200);
-      set({ cursor: decision ?? START.cursor });
+      set({ cursor: assigned ?? START.cursor });
       await a.wait(760);
       set({ hover: true });
       await a.wait(700);
@@ -109,6 +109,8 @@ export function HomeScene({ play, paused, still }: SceneProps) {
 
           <Collapse open={s.arrived}>
             <Row
+              target="assigned"
+              hover={s.hover}
               who={<Avatar person={jean} size={24} />}
               title={
                 <>
@@ -123,8 +125,6 @@ export function HomeScene({ play, paused, still }: SceneProps) {
             />
           </Collapse>
           <Row
-            target="decision"
-            hover={s.hover}
             who={<Avatar person={atlas} size={24} />}
             title="Atlas needs you: Postgres 18 upgrade plan ready, approve the maintenance window?"
             why="Agent needs a decision"

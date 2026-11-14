@@ -8,7 +8,7 @@ import type { Theme } from "#lib/theme";
 import { Logo } from "#ui/logo";
 import { color, media, motion, radius, space, text } from "#ui/tokens.stylex";
 
-import { SOURCE } from "./hero";
+import { DEPLOY, SOURCE } from "./hero";
 import { cta, page, type } from "./styles";
 
 /** The last ask, then the way around. */
@@ -23,8 +23,8 @@ export function Closing({ setupOpen }: { setupOpen: boolean }) {
         {setupOpen ? "Set up your workspace" : "Sign in to Worklog"}
       </Link>
       <p {...stylex.props(styles.fine)}>
-        Self-host with Docker · Works without an AI key · On the web and your
-        phone
+        A few minutes with Docker Compose, and your team’s tools start writing
+        it.
       </p>
     </section>
   );
@@ -43,9 +43,11 @@ const COLUMNS = [
   {
     title: "Developers",
     links: [
-      { label: "API reference", href: "/docs" },
       { label: "Connectors", href: `${SOURCE}/blob/main/docs/CONNECTORS.md` },
-      { label: "Deploying", href: `${SOURCE}/blob/main/docs/DEPLOY.md` },
+      {
+        label: "Architecture",
+        href: `${SOURCE}/blob/main/docs/ARCHITECTURE.md`,
+      },
       { label: "Source on GitHub", href: SOURCE },
     ],
   },
@@ -93,6 +95,12 @@ export function Footer({ setupOpen }: { setupOpen: boolean }) {
           <Link to="/login" {...stylex.props(styles.link)}>
             Sign in
           </Link>
+          <a href={DEPLOY} {...stylex.props(styles.link)}>
+            Host your own
+          </a>
+          <a href="/docs" {...stylex.props(styles.link)}>
+            API reference
+          </a>
         </nav>
       </div>
       <div {...stylex.props(styles.bottom)}>

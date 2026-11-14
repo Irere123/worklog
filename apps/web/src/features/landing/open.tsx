@@ -61,7 +61,6 @@ export function Open() {
             <li {...stylex.props(styles.chip)}>OpenAPI 3.1</li>
             <li {...stylex.props(styles.chip)}>Self-host with Docker</li>
             <li {...stylex.props(styles.chip)}>Postgres and Bun</li>
-            <li {...stylex.props(styles.chip)}>Works without AI</li>
           </ul>
         </div>
 
@@ -136,7 +135,9 @@ const styles = stylex.create({
       "@media (max-width: 640px)": space.xl,
     },
     borderRadius: 24,
-    backgroundColor: "light-dark(oklch(0.958 0.004 80), oklch(0.205 0.005 80))",
+    backgroundColor: "light-dark(oklch(0.958 0.004 80), oklch(0.215 0.005 80))",
+    // In the dark a surface a step up isn't edge enough; a hairline carries it, as in the app.
+    boxShadow: "inset 0 0 0 1px light-dark(transparent, oklch(1 0 0 / 0.06))",
   },
   words: {
     display: "flex",
@@ -185,7 +186,7 @@ const styles = stylex.create({
     borderRadius: `${radius.lg} ${radius.lg} 0 0`,
     backgroundColor: "oklch(0.2 0.006 80)",
     boxShadow:
-      "0 0 0 1px oklch(0 0 0 / 0.2), 0 24px 48px light-dark(oklch(0.2 0.02 60 / 0.22), oklch(0 0 0 / 0.5))",
+      "0 0 0 1px light-dark(oklch(0 0 0 / 0.2), oklch(1 0 0 / 0.12)), 0 24px 48px light-dark(oklch(0.2 0.02 60 / 0.22), oklch(0 0 0 / 0.5))",
     color: "oklch(0.9 0.004 80)",
   },
   termBar: {
@@ -256,8 +257,10 @@ const styles = stylex.create({
   },
   line: {
     position: "absolute",
+    // Straddles the terminal's edge, half over the panel, so it reads as arriving from outside.
     right: {
-      default: -40,
+      default: -150,
+      "@media (max-width: 1100px)": -40,
       "@media (max-width: 860px)": 0,
     },
     left: {

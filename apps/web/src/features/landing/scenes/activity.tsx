@@ -12,7 +12,7 @@ import type { ReactNode } from "react";
 import { AppWindow } from "#features/landing/frame";
 import { Collapse, Roll } from "#features/landing/motion";
 import { useScript } from "#features/landing/script";
-import { atlas, eric, grace, jean } from "#features/landing/team";
+import { atlas, eric, grace, jean, scout } from "#features/landing/team";
 import { Avatar } from "#ui/avatar";
 import { ProductMark } from "#ui/product-mark";
 import { color, font, radius, space, text } from "#ui/tokens.stylex";
@@ -170,6 +170,32 @@ export function ActivityScene({ play, paused, still }: SceneProps) {
             detail="Finished the prototype · Opened #209 for review"
             when="7:30"
             agent
+          />
+          <Line
+            source={<ProductMark product="github" size={16} />}
+            who={grace.name}
+            person={grace}
+            card={2}
+            title="Agree on FHIR R4 profile for referral bundles"
+            detail="Reviewed #208 FHIR bundle mapping · Approved"
+            when="7:12"
+          />
+          <Line
+            source={<Avatar person={scout} size={22} />}
+            who={scout.name}
+            card={14}
+            title="Nightly sync stalls on the Huye server"
+            detail="Found the stall: a lock held past midnight · Asked Eric to look"
+            when="6:40"
+            agent
+          />
+          <Line
+            source={<ProductMark product="slack" size={16} />}
+            who={jean.name}
+            person={jean}
+            title="in #referrals"
+            detail="“Kicking off the district turnaround numbers this week.”"
+            when="6:05"
           />
         </div>
       </div>

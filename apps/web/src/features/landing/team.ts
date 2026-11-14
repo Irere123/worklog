@@ -1,5 +1,6 @@
 // The demo team the seed script creates, so the landing page shows the same people, agents and
-// cards someone meets after `bun run seed`.
+// cards someone meets after `bun run seed`. Agents' ids are the seed's own, because an agent's
+// face and colour are drawn from its id: Atlas looks here as it does in the app.
 
 export const ada = {
   id: "ada",
@@ -26,13 +27,13 @@ export const eric = {
 };
 
 export const atlas = {
-  id: "agent_atlas",
+  id: "3LUIF461vTZrJkTQofhs4YbCY3y",
   name: "Atlas",
   kind: "agent",
 };
 
 export const scout = {
-  id: "agent_scout",
+  id: "3LUIF4rjEv7U8Bf1YwRx9Ec39VD",
   name: "Scout",
   kind: "agent",
 };

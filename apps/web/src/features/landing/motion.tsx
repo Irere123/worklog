@@ -42,10 +42,13 @@ export function Collapse({
 export function Roll({ value }: { value: string | number }) {
   const [shown, setShown] = useState({ now: value, before: value, turn: 0 });
   const last = useRef(value);
+  // Once the old value has left, it leaves the layout too, so the slot is the new value's width.
+  const [gone, setGone] = useState(false);
   useEffect(() => {
     if (last.current === value) {
       return;
     }
+    setGone(false);
     setShown((current) => ({
       now: value,
       before: last.current,
@@ -55,10 +58,11 @@ export function Roll({ value }: { value: string | number }) {
   }, [value]);
   return (
     <span {...stylex.props(styles.roll)}>
-      {shown.turn > 0 && (
+      {shown.turn > 0 && !gone && (
         <span
           key={`out-${shown.turn}`}
           aria-hidden
+          onAnimationEnd={() => setGone(true)}
           {...stylex.props(styles.rollItem, styles.rollOut)}
         >
           {shown.before}
@@ -124,7 +128,8 @@ const styles = stylex.create({
   },
   rollItem: {
     gridArea: "1 / 1",
-    textAlign: "center",
+    textAlign: "start",
+    whiteSpace: "nowrap",
   },
   rollIn: {
     animationName: rise,

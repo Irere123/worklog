@@ -2,7 +2,6 @@ import { PauseIcon, PlayIcon } from "@phosphor-icons/react";
 import * as stylex from "@stylexjs/stylex";
 import { useRef, useState } from "react";
 import type { ComponentType } from "react";
-import { preload } from "react-dom";
 
 import { color, media, motion, radius, space, text } from "#ui/tokens.stylex";
 
@@ -78,7 +77,7 @@ const CHAPTERS: Chapter[] = [
   },
 ];
 
-// Every plate is fetched up front, so a chapter never opens on a blank wallpaper.
+// Every chapter's wallpaper is laid in the plate from the start, so a change crossfades.
 const PLATES = [ink, ticket, sage, sky, clay];
 
 /**
@@ -86,9 +85,6 @@ const PLATES = [ink, ticket, sage, sky, clay];
  * a short scene and hands over to the next; the tabs jump, and Pause holds the scene where it is.
  */
 export function Tour() {
-  for (const src of PLATES) {
-    preload(src, { as: "image", fetchPriority: "low" });
-  }
   const ref = useRef<HTMLDivElement>(null);
   const inView = useInView(ref);
   const reduced = useReducedMotion();
@@ -111,7 +107,7 @@ export function Tour() {
       {...stylex.props(page.wide, styles.tour)}
     >
       <div ref={ref}>
-        <Plate src={chapter.plate} sx={styles.plate}>
+        <Plate src={chapter.plate} choices={PLATES} sx={styles.plate}>
           <div {...stylex.props(styles.stage)}>
             {CHAPTERS.map((each, at) =>
               at === index ? (
@@ -186,11 +182,6 @@ const fill = stylex.keyframes({
   to: { transform: "scaleX(1)" },
 });
 
-const enter = stylex.keyframes({
-  from: { opacity: 0, transform: "translateY(8px)" },
-  to: { opacity: 1, transform: "none" },
-});
-
 const styles = stylex.create({
   tour: {
     marginTop: {
@@ -226,10 +217,6 @@ const styles = stylex.create({
   },
   scene: {
     height: "100%",
-    animationName: enter,
-    animationDuration: "420ms",
-    animationTimingFunction: "cubic-bezier(0.25, 0.8, 0.25, 1)",
-    // The window inside fills the scene; its own children set the size.
     display: "grid",
   },
   caption: {

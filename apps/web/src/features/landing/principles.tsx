@@ -1,9 +1,8 @@
-import { TrayIcon } from "@phosphor-icons/react";
 import * as stylex from "@stylexjs/stylex";
 import type { ReactNode } from "react";
 
 import { Avatar } from "#ui/avatar";
-import { ProductMark } from "#ui/product-mark";
+import { Ghost } from "#ui/ghost";
 import { color, font, radius, space, text } from "#ui/tokens.stylex";
 
 import { page, type } from "./styles";
@@ -22,31 +21,32 @@ export function Principles() {
       <div {...stylex.props(styles.grid)}>
         <Principle
           name="Honest"
-          words="Every line is something that happened, with a source, a person or agent, and a time. Nothing is made up to fill a screen."
+          words="Every line is something that happened, with a source and a time. An agent’s work says so, and names the person answerable for it."
         >
           <span {...stylex.props(styles.logLine)}>
-            <ProductMark product="github" size={14} />
-            <Avatar person={eric} size={16} />
-            <span {...stylex.props(styles.strong)}>Eric</span>
+            <Avatar person={atlas} size={16} />
+            <span {...stylex.props(styles.strong)}>Atlas</span>
+            <span {...stylex.props(styles.forWhom)}>for Jean</span>
             <span {...stylex.props(styles.ellipsis)}>
-              merged <span {...stylex.props(styles.mono)}>#212</span>
+              opened <span {...stylex.props(styles.mono)}>#209</span>
             </span>
-            <span {...stylex.props(styles.when)}>9:51</span>
+            <span {...stylex.props(styles.when)}>Sat 7:30</span>
           </span>
         </Principle>
         <Principle
           name="Calm"
-          words="Only attention is counted: one number, on your inbox. Everything else waits quietly for your brief."
+          words="Only attention is counted, and when nothing needs you it says so. Everything else waits for your brief."
         >
           <span {...stylex.props(styles.nav)}>
-            <TrayIcon size={15} weight="fill" />
-            <span {...stylex.props(styles.grow)}>Inbox</span>
-            <span {...stylex.props(styles.count)}>3</span>
+            <Ghost size={18} still />
+            <span {...stylex.props(styles.grow)}>
+              Nothing needs you. Your brief comes at 8:00.
+            </span>
           </span>
         </Principle>
         <Principle
           name="Human"
-          words="People appear as their faces and in their own words. Each agent has a face of its own, and a person answerable for it."
+          words="People appear as their faces and in their own words. Agents get faces too, square ones, so nobody mistakes them for people."
         >
           <span {...stylex.props(styles.faces)}>
             {[ada, jean, grace, eric].map((person) => (
@@ -100,7 +100,9 @@ const styles = stylex.create({
     gap: space.md,
     padding: space.x3,
     borderRadius: 18,
-    backgroundColor: "light-dark(oklch(0.958 0.004 80), oklch(0.205 0.005 80))",
+    backgroundColor: "light-dark(oklch(0.958 0.004 80), oklch(0.215 0.005 80))",
+    // In the dark a surface a step up isn't edge enough; a hairline carries it, as in the app.
+    boxShadow: "inset 0 0 0 1px light-dark(transparent, oklch(1 0 0 / 0.06))",
   },
   name: {
     margin: 0,
@@ -137,6 +139,13 @@ const styles = stylex.create({
   },
   strong: {
     fontWeight: 600,
+  },
+  forWhom: {
+    paddingInline: space.sm,
+    borderRadius: radius.full,
+    backgroundColor: color.ui,
+    fontSize: text.caption,
+    color: color.fgMuted,
   },
   ellipsis: {
     overflow: "hidden",

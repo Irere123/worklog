@@ -72,7 +72,7 @@ export function Agents() {
 }
 
 const ANSWER =
-  "Yes. Atlas finished the prototype on Saturday and opened a pull request for review. Ada approved queueing messages until the clinic is back; testing waits on Eric’s review of #4.";
+  "Yes. Atlas finished the prototype on Saturday and opened a pull request for review. Jean approved queueing messages until the clinic is back; testing waits on Eric’s review of #4.";
 
 type AskState = {
   asked: boolean;
@@ -82,11 +82,11 @@ type AskState = {
   typed: number;
 };
 
-// The question is already on screen: the scene opens on a thread, not a blank panel.
+// The question is asked and the lookup under way: the first frame is already a working assistant.
 const ASK_START: AskState = {
   asked: true,
-  mood: "idle",
-  steps: 0,
+  mood: "thinking",
+  steps: 1,
   folded: false,
   typed: 0,
 };
@@ -108,9 +108,7 @@ function Ask() {
 
   useScript(
     async (a) => {
-      await a.wait(900);
-      set({ mood: "thinking", steps: 1 });
-      await a.wait(900);
+      await a.wait(1000);
       set({ steps: 2 });
       await a.wait(900);
       set({ folded: true, mood: "writing" });
@@ -135,8 +133,8 @@ function Ask() {
     <div ref={ref} {...stylex.props(styles.panel)}>
       <div {...stylex.props(styles.panelHead)}>
         <Ghost mood={shown.mood} size={22} />
-        <span {...stylex.props(styles.panelTitle)}>Ada’s assistant</span>
-        <span {...stylex.props(styles.away)}>Ada is away until Thursday</span>
+        <span {...stylex.props(styles.panelTitle)}>Jean’s assistant</span>
+        <span {...stylex.props(styles.away)}>Jean is away until Thursday</span>
       </div>
       <div {...stylex.props(styles.thread)}>
         <Collapse open={shown.asked}>
@@ -333,7 +331,7 @@ function Approve() {
           <Avatar person={atlas} size={16} />
           <span>
             <span {...stylex.props(styles.strong)}>Atlas</span> Drafted the
-            rollback plan · snapshot restore, about 12 min
+            rollback plan · snapshot restore, about 12 min
           </span>
           <span {...stylex.props(styles.when)}>8:10</span>
         </span>
@@ -377,7 +375,9 @@ const styles = stylex.create({
     margin: 0,
     overflow: "hidden",
     borderRadius: 20,
-    backgroundColor: "light-dark(oklch(0.958 0.004 80), oklch(0.205 0.005 80))",
+    backgroundColor: "light-dark(oklch(0.958 0.004 80), oklch(0.215 0.005 80))",
+    // In the dark a surface a step up isn't edge enough; a hairline carries it, as in the app.
+    boxShadow: "inset 0 0 0 1px light-dark(transparent, oklch(1 0 0 / 0.06))",
   },
   plate: {
     height: 380,

@@ -2,7 +2,6 @@ import {
   ArrowCounterClockwiseIcon,
   AlarmIcon,
   CheckIcon,
-  CircleHalfIcon,
   KanbanIcon,
   XIcon,
 } from "@phosphor-icons/react";
@@ -14,7 +13,7 @@ import { AppWindow, Cursor } from "#features/landing/frame";
 import { Collapse, Roll } from "#features/landing/motion";
 import { pointAt, useScript } from "#features/landing/script";
 import type { Point } from "#features/landing/script";
-import { atlas, grace, jean } from "#features/landing/team";
+import { atlas, eric, grace, jean } from "#features/landing/team";
 import { Avatar } from "#ui/avatar";
 import { color, font, radius, space, text } from "#ui/tokens.stylex";
 
@@ -40,9 +39,9 @@ const START: State = {
 const END: State = { ...START, done: true, toast: true };
 
 /**
- * Inbox: the decision Home pointed at is open. You mark it done; it leaves the list, the count
- * drops, and the next thing that needs you is already selected. There's no confirmation step:
- * the toast offers Undo instead.
+ * Inbox: the assignment that arrived on Home is open. You mark it done; it leaves the list, the
+ * count drops, and the next item is already selected. There's no confirmation step: the toast
+ * offers Undo instead. The agent's decision waits in its own group for the Agents section.
  */
 export function InboxScene({ play, paused, still }: SceneProps) {
   const root = useRef<HTMLDivElement>(null);
@@ -96,32 +95,32 @@ export function InboxScene({ play, paused, still }: SceneProps) {
         />
         <div {...stylex.props(styles.split)}>
           <div {...stylex.props(styles.list)}>
+            <Group label="Needs a decision" count={1} />
+            <Item
+              who={<Avatar person={atlas} size={26} />}
+              title="Atlas needs you: Postgres 18 upgrade plan ready, approve the maintenance window?"
+              why="Agent needs a decision"
+              tone="amber"
+              when="8:12"
+              on={false}
+            />
             <Collapse open={!s.done} from="none">
-              <Group label="Needs a decision" count={1} />
+              <Group label="For you" count={1} />
               <Item
-                who={<Avatar person={atlas} size={26} />}
-                title="Atlas needs you: Postgres 18 upgrade plan ready, approve the maintenance window?"
-                why="Agent needs a decision"
-                tone="amber"
-                when="8:12"
+                who={<Avatar person={jean} size={26} />}
+                title={
+                  <>
+                    Jean Habimana assigned you <CardNumber>8</CardNumber> Track
+                    referral turnaround per district
+                  </>
+                }
+                why="Assigned to you"
+                tone="blue"
+                when="9:40"
                 on={!s.done}
               />
             </Collapse>
-            <Group label="For you" count={1} />
-            <Item
-              who={<Avatar person={jean} size={26} />}
-              title={
-                <>
-                  Jean Habimana assigned you <CardNumber>8</CardNumber> Track
-                  referral turnaround per district
-                </>
-              }
-              why="Assigned to you"
-              tone="blue"
-              when="9:40"
-              on={s.done}
-            />
-            <Group label="Updates" count={1} />
+            <Group label="Updates" count={3} />
             <Item
               who={<Avatar person={grace} size={26} />}
               title={
@@ -132,16 +131,41 @@ export function InboxScene({ play, paused, still }: SceneProps) {
               }
               why="Card you follow"
               when="Yesterday"
+              on={s.done}
+            />
+            <Item
+              who={<Avatar person={atlas} size={26} />}
+              title={
+                <>
+                  Atlas finished <CardNumber>4</CardNumber> SMS fallback when
+                  the receiving clinic is offline
+                </>
+              }
+              why="Agent finished"
+              tone="green"
+              when="Sat"
+              on={false}
+            />
+            <Item
+              who={<Avatar person={eric} size={26} />}
+              title={
+                <>
+                  Eric Nkurunziza closed <CardNumber>1</CardNumber> Referral
+                  form loses attachments
+                </>
+              }
+              why="Card you follow"
+              when="Fri"
               on={false}
             />
           </div>
 
           <div {...stylex.props(styles.detail)}>
             <div {...stylex.props(styles.page, s.done && styles.pageGone)}>
-              <Decision />
+              <Assignment />
             </div>
             <div {...stylex.props(styles.page, !s.done && styles.pageWaiting)}>
-              <Assignment />
+              <Comment />
             </div>
           </div>
         </div>
@@ -164,28 +188,26 @@ export function InboxScene({ play, paused, still }: SceneProps) {
   );
 }
 
-function Decision() {
+function Comment() {
   return (
     <>
       <span {...stylex.props(styles.badges)}>
-        <Pill tone="amber">Agent needs a decision</Pill>
-        <Pill tone="neutral">High priority</Pill>
+        <Pill tone="neutral">Card you follow</Pill>
       </span>
       <span {...stylex.props(styles.title)}>
-        Atlas needs you: Postgres 18 upgrade plan ready, approve the maintenance
-        window?
+        New comments on #2 Agree on FHIR R4 profile for referral bundles
       </span>
       <span {...stylex.props(styles.byline)}>
-        <Avatar person={atlas} size={18} />
-        <span {...stylex.props(parts.strong)}>Atlas</span>
-        <span {...stylex.props(parts.muted)}>· Coding agent</span>
+        <Avatar person={grace} size={18} />
+        <span {...stylex.props(parts.strong)}>Grace Uwase</span>
+        <span {...stylex.props(parts.muted)}>· 2 comments</span>
       </span>
       <span {...stylex.props(styles.quote)}>
-        Proposed: Saturday 02:00 to 03:00 CAT. Rollback is a snapshot restore,
-        about 12 minutes.
+        I kept the profile to the five fields the district hospitals already
+        send. Ready for your review.
       </span>
       <span {...stylex.props(styles.actions)}>
-        <span data-target="done" {...stylex.props(parts.control)}>
+        <span {...stylex.props(parts.control)}>
           <CheckIcon size={14} /> Done{" "}
           <kbd {...stylex.props(styles.key)}>E</kbd>
         </span>
@@ -193,18 +215,15 @@ function Decision() {
           <AlarmIcon size={14} /> Snooze{" "}
           <kbd {...stylex.props(styles.key)}>H</kbd>
         </span>
-        <span {...stylex.props(styles.quiet)}>
-          <XIcon size={13} /> Dismiss <kbd {...stylex.props(styles.key)}>X</kbd>
-        </span>
       </span>
       <span {...stylex.props(styles.label)}>On the card</span>
       <span {...stylex.props(styles.card)}>
         <KanbanIcon size={14} {...stylex.props(parts.faint)} />
-        <CardNumber>16</CardNumber>
-        <span {...stylex.props(styles.grow)}>Upgrade Postgres to 18</span>
-        <Pill tone="blue">
-          <CircleHalfIcon size={12} weight="fill" /> Doing
-        </Pill>
+        <CardNumber>2</CardNumber>
+        <span {...stylex.props(styles.grow)}>
+          Agree on FHIR R4 profile for referral bundles
+        </span>
+        <Pill tone="amber">Review</Pill>
       </span>
     </>
   );
@@ -229,7 +248,7 @@ function Assignment() {
         Can you own this?
       </span>
       <span {...stylex.props(styles.actions)}>
-        <span {...stylex.props(parts.control)}>
+        <span data-target="done" {...stylex.props(parts.control)}>
           <CheckIcon size={14} /> Done{" "}
           <kbd {...stylex.props(styles.key)}>E</kbd>
         </span>
@@ -237,6 +256,18 @@ function Assignment() {
           <AlarmIcon size={14} /> Snooze{" "}
           <kbd {...stylex.props(styles.key)}>H</kbd>
         </span>
+        <span {...stylex.props(styles.quiet)}>
+          <XIcon size={13} /> Dismiss <kbd {...stylex.props(styles.key)}>X</kbd>
+        </span>
+      </span>
+      <span {...stylex.props(styles.label)}>On the card</span>
+      <span {...stylex.props(styles.card)}>
+        <KanbanIcon size={14} {...stylex.props(parts.faint)} />
+        <CardNumber>8</CardNumber>
+        <span {...stylex.props(styles.grow)}>
+          Track referral turnaround per district
+        </span>
+        <Pill tone="neutral">Maybe?</Pill>
       </span>
     </>
   );
@@ -261,7 +292,7 @@ function Item({
   who: ReactNode;
   title: ReactNode;
   why: string;
-  tone?: "amber" | "blue";
+  tone?: "amber" | "blue" | "green";
   when: string;
   on: boolean;
 }) {
@@ -274,7 +305,8 @@ function Item({
           {...stylex.props(
             styles.why,
             tone === "amber" && styles.whyAmber,
-            tone === "blue" && styles.whyBlue
+            tone === "blue" && styles.whyBlue,
+            tone === "green" && styles.whyGreen
           )}
         >
           {why}
@@ -380,6 +412,9 @@ const styles = stylex.create({
   },
   whyBlue: {
     color: color.blueFg,
+  },
+  whyGreen: {
+    color: color.greenFg,
   },
   when: {
     flexShrink: 0,

@@ -43,14 +43,17 @@ export function Nav({ setupOpen }: { setupOpen: boolean }) {
         ))}
       </ul>
       <div {...stylex.props(styles.end)}>
-        <Link to="/login" {...stylex.props(styles.link, styles.signIn)}>
-          Sign in
-        </Link>
+        {/* One way in: a fresh server is set up, any other is signed in to. */}
+        {setupOpen && (
+          <Link to="/login" {...stylex.props(styles.link, styles.signIn)}>
+            Sign in
+          </Link>
+        )}
         <Link
           to={setupOpen ? "/setup" : "/login"}
           {...stylex.props(cta.base, cta.small, cta.primary)}
         >
-          {setupOpen ? "Get started" : "Open Worklog"}
+          {setupOpen ? "Get started" : "Sign in"}
         </Link>
       </div>
     </nav>

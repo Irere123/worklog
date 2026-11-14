@@ -136,7 +136,7 @@ const styles = stylex.create({
     display: "flex",
     flexDirection: "column",
     gap: space.md,
-    maxWidth: 1104,
+    maxWidth: 1056,
     marginInline: "auto",
   },
   viewport: {
@@ -173,12 +173,14 @@ const styles = stylex.create({
     padding: space.lg,
     paddingTop: space.lg,
     borderRadius: 16,
-    backgroundColor: "light-dark(oklch(0.958 0.004 80), oklch(0.205 0.005 80))",
+    backgroundColor: "light-dark(oklch(0.958 0.004 80), oklch(0.215 0.005 80))",
+    // In the dark a surface a step up isn't edge enough; a hairline carries it, as in the app.
+    boxShadow: "inset 0 0 0 1px light-dark(transparent, oklch(1 0 0 / 0.06))",
     color: color.fgMuted,
   },
   mark: {
     display: "flex",
-    marginBottom: "auto",
+    marginBottom: space.xxl,
   },
   name: {
     fontSize: text.copy,

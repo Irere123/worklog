@@ -137,7 +137,9 @@ export function AppWindow({
           )}
         </span>
       </div>
-      <div {...stylex.props(styles.pane)}>{children}</div>
+      <div {...stylex.props(styles.pane)}>
+        <div {...stylex.props(styles.page)}>{children}</div>
+      </div>
       {overlay}
     </div>
   );
@@ -215,22 +217,28 @@ export function Cursor({
 /** A wallpaper for a product shot to sit on: grain and colour, like a desktop behind a window. */
 export function Plate({
   src,
+  choices,
   children,
   sx,
 }: {
   src: string;
+  /** Every wallpaper it may show, laid in place up front so a change crossfades instead of cutting. */
+  choices?: string[];
   children: ReactNode;
   sx?: StyleXStyles;
 }) {
   return (
     <div {...stylex.props(styles.plate, sx)}>
-      <img
-        src={src}
-        alt=""
-        decoding="async"
-        loading="lazy"
-        {...stylex.props(styles.plateImage)}
-      />
+      {(choices ?? [src]).map((each) => (
+        <img
+          key={each}
+          src={each}
+          alt=""
+          decoding="async"
+          loading="lazy"
+          {...stylex.props(styles.plateImage, each !== src && styles.plateAway)}
+        />
+      ))}
       {children}
     </div>
   );
@@ -435,6 +443,16 @@ const styles = stylex.create({
     },
     boxShadow: `0 0 0 1px ${color.line}`,
   },
+  // A new chapter changes only the page: the window and its sidebar stay solid, as in the app.
+  page: {
+    height: "100%",
+    animationName: stylex.keyframes({
+      from: { opacity: 0, transform: "translateY(8px)" },
+      to: { opacity: 1, transform: "none" },
+    }),
+    animationDuration: "360ms",
+    animationTimingFunction: "cubic-bezier(0.25, 0.8, 0.25, 1)",
+  },
   cursor: {
     position: "absolute",
     top: 0,
@@ -491,5 +509,11 @@ const styles = stylex.create({
     width: "100%",
     height: "100%",
     objectFit: "cover",
+    transitionProperty: "opacity",
+    transitionDuration: "700ms",
+    transitionTimingFunction: "ease",
+  },
+  plateAway: {
+    opacity: 0,
   },
 });
