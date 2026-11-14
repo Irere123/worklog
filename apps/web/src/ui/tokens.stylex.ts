@@ -80,6 +80,8 @@ export const product = stylex.defineVars({
 export const font = stylex.defineVars({
   sans: '"Inter Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif',
   mono: '"Geist Mono Variable", ui-monospace, "SF Mono", Menlo, monospace',
+  // Only the landing page's headlines; the app itself stays in one family.
+  display: '"Newsreader Variable", ui-serif, Georgia, serif',
 });
 
 export const text = stylex.defineVars({
