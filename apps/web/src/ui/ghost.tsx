@@ -13,7 +13,7 @@ export type Mood =
   | "error";
 
 /**
- * The assistant as a small ghost whose pose and motion say what it's doing, the way a colleague's
+ * An agent as a small ghost whose pose and motion say what it's doing, the way a colleague's
  * face would. It's drawn in the page's ink, so it's dark on light and light on dark with no
  * variant to pick. With reduced motion nothing moves, but each mood keeps its own pose (eyes,
  * colour, the pencil or the curl), so the state still reads.
@@ -22,12 +22,15 @@ export function Ghost({
   mood = "idle",
   size = 16,
   still = false,
+  tinted = false,
   label,
 }: {
   mood?: Mood;
   size?: number;
   /** Holds the pose without moving: for an old reply in a thread, where only the latest lives. */
   still?: boolean;
+  /** Takes the colour of the text around it, for a ghost inside a coloured badge. */
+  tinted?: boolean;
   /** Spoken to screen readers; leave it off where the state is printed beside the ghost. */
   label?: string;
 }) {
@@ -40,7 +43,7 @@ export function Ghost({
       role={label === undefined ? undefined : "img"}
       aria-label={label}
       aria-hidden={label === undefined}
-      {...stylex.props(styles.svg)}
+      {...stylex.props(styles.svg, !tinted && styles.pageInk)}
     >
       <ellipse
         cx="16"
@@ -62,7 +65,16 @@ export function Ghost({
           still && styles.halt
         )}
       >
-        <g {...stylex.props(styles.part, styles.looping, bodies[mood])}>
+        <g
+          {...stylex.props(
+            styles.part,
+            styles.looping,
+            styles.body,
+            bodies[mood],
+            mood === "thinking" && styles.faded,
+            still && styles.halt
+          )}
+        >
           <defs>
             <clipPath id={clip}>
               <rect x="5" y="18" width="22" height="12" />
@@ -70,7 +82,7 @@ export function Ghost({
           </defs>
           <path
             d="M5.7 13a10.3 10.3 0 0 1 20.6 0L27 22H5Z"
-            {...stylex.props(styles.ink, mood === "thinking" && styles.faded)}
+            {...stylex.props(styles.ink)}
           />
           <g clipPath={`url(#${clip})`}>
             <path
@@ -78,7 +90,6 @@ export function Ghost({
               {...stylex.props(
                 styles.ink,
                 styles.hem,
-                mood === "thinking" && styles.faded,
                 hems[mood],
                 still && styles.halt
               )}
@@ -91,11 +102,13 @@ export function Ghost({
         {mood === "thinking" && (
           <path
             d="M27.3 4.6a1.5 1.5 0 1 1-1.2-2.4 2.5 2.5 0 0 1 2.9 2.9"
-            {...stylex.props(styles.stroke, styles.fadedLine, styles.curl)}
+            {...stylex.props(styles.stroke, styles.faded, styles.curl)}
           />
         )}
         {mood === "done" && (
-          <g {...stylex.props(styles.stroke, styles.shine)}>
+          <g
+            {...stylex.props(styles.stroke, styles.shine, still && styles.halt)}
+          >
             <path d="M26.2 4.4l1.4-1.6" />
             <path d="M28 6.8h2" />
             <path d="M23.6 2.8v-1.8" />
@@ -227,6 +240,7 @@ const REDUCED = "@media (prefers-reduced-motion: reduce)";
 
 const styles = stylex.create({
   svg: { display: "block", flexShrink: 0, overflow: "visible" },
+  pageInk: { color: color.fg },
   halt: { animationName: "none" },
   looping: {
     animationTimingFunction: motion.inOut,
@@ -234,22 +248,20 @@ const styles = stylex.create({
   },
   // Rotations and scales turn about the part itself, not the corner of the drawing.
   part: { transformBox: "fill-box", transformOrigin: "50% 100%" },
-  ink: {
-    fill: color.fg,
-    transitionProperty: "fill",
-    transitionDuration: motion.slow,
-  },
-  faded: { fill: color.fgFaint },
-  fadedLine: { stroke: color.fgFaint },
+  ink: { fill: "currentColor" },
+  body: { transitionProperty: "opacity", transitionDuration: motion.slow },
+  // Faded as a whole rather than path by path, where the body and hem overlap and would show a
+  // darker seam; 0.58 lands on fgFaint against the page in both themes.
+  faded: { opacity: 0.58 },
   stroke: {
     fill: "none",
-    stroke: color.fg,
+    stroke: "currentColor",
     strokeWidth: 1.3,
     strokeLinecap: "round",
     strokeLinejoin: "round",
   },
   shadow: {
-    fill: color.fg,
+    fill: "currentColor",
     fillOpacity: 0.13,
     transformBox: "fill-box",
     transformOrigin: "center",

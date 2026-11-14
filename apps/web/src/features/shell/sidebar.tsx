@@ -12,7 +12,6 @@ import {
   NotePencilIcon,
   PlusIcon,
   FootprintsIcon,
-  RobotIcon,
   SignOutIcon,
   SunIcon,
   TrayIcon,
@@ -352,7 +351,7 @@ function WorkspaceMenu({
         Keyboard shortcuts
       </MenuItem>
       <MenuItem
-        icon={<RobotIcon size={14} />}
+        icon={<UsersIcon size={14} />}
         onClick={() => {
           void navigate({ to: "/settings" });
         }}

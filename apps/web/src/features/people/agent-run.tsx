@@ -1,23 +1,60 @@
 import type { Schemas } from "#api/client";
 import { ago, olderThan } from "#lib/time";
 import { Badge } from "#ui/chip";
-import type { Status, Tone } from "#ui/chip";
+import type { Tone } from "#ui/chip";
+import { Ghost } from "#ui/ghost";
+import type { Mood } from "#ui/ghost";
 
 export type Run = NonNullable<Schemas["TeamNow"][number]["agent"]>;
 
 const RUN: Record<
   Run["state"],
-  { tone: Tone; status: Status; label: (owner?: string) => string }
+  { tone: Tone; label: (owner?: string) => string }
 > = {
-  working: { tone: "blue", status: "working", label: () => "Working" },
+  working: { tone: "blue", label: () => "Working" },
   needs_you: {
     tone: "amber",
-    status: "needs_you",
     label: (owner) => (owner ? `Needs ${owner}` : "Needs a person"),
   },
-  finished: { tone: "green", status: "done", label: () => "Finished" },
-  failed: { tone: "red", status: "failed", label: () => "Couldn’t finish" },
+  finished: { tone: "green", label: () => "Finished" },
+  failed: { tone: "red", label: () => "Couldn’t finish" },
 };
+
+const MOODS: Record<string, Mood> = {
+  working: "thinking",
+  needs_you: "waiting",
+  finished: "done",
+  failed: "error",
+};
+
+/** How an agent's ghost looks for where its run stands; anything unknown is idle. */
+export function runMood(state: string | null | undefined): Mood {
+  return MOODS[state ?? ""] ?? "idle";
+}
+
+/**
+ * Where an agent's run stands as a ghost inside a coloured badge. Only runs still in play move:
+ * a finished or failed one is history, and a dozen ghosts bobbing down a list is noise.
+ */
+export function RunBadge({
+  state,
+  tone,
+  children,
+}: {
+  state: string | null | undefined;
+  tone: Tone;
+  children: string;
+}) {
+  const live = state === "working" || state === "needs_you";
+  return (
+    <Badge
+      tone={tone}
+      icon={<Ghost mood={runMood(state)} size={14} still={!live} tinted />}
+    >
+      {children}
+    </Badge>
+  );
+}
 
 // An agent that says it's working but hasn't said anything for this long has probably stalled.
 const STALE_MS = 2 * 3_600_000;
@@ -43,12 +80,12 @@ export function AgentRun({ run, owner }: { run: Run; owner?: string }) {
   const stale = isStale(run);
   return (
     <>
-      <Badge
+      <RunBadge
+        state={stale ? undefined : run.state}
         tone={stale ? "neutral" : look.tone}
-        status={stale ? "waiting" : look.status}
       >
         {stale ? `Quiet for ${ago(run.at)}` : look.label(owner)}
-      </Badge>{" "}
+      </RunBadge>{" "}
       {run.title}
     </>
   );

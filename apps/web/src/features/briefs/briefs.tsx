@@ -1,9 +1,4 @@
-import {
-  CaretDownIcon,
-  NewspaperIcon,
-  PlusIcon,
-  RobotIcon,
-} from "@phosphor-icons/react";
+import { CaretDownIcon, NewspaperIcon, PlusIcon } from "@phosphor-icons/react";
 import * as stylex from "@stylexjs/stylex";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
@@ -15,6 +10,7 @@ import { exactTime, shortDay } from "#lib/time";
 import { Button } from "#ui/button";
 import { Badge } from "#ui/chip";
 import { EmptyState, ErrorNote, Skeleton } from "#ui/feedback";
+import { Ghost } from "#ui/ghost";
 import { PageHeader, layout } from "#ui/layout";
 import { Markdown } from "#ui/markdown";
 import { Menu, MenuItem } from "#ui/overlay";
@@ -127,7 +123,7 @@ export function Briefs({ selectedId }: { selectedId?: string }) {
                       : "Weekly brief"}
                   </Badge>
                   {selected.composedBy !== "template" && (
-                    <Badge icon={<RobotIcon size={12} weight="fill" />}>
+                    <Badge icon={<Ghost size={14} still tinted />}>
                       Written by your assistant
                     </Badge>
                   )}

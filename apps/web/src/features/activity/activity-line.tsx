@@ -12,9 +12,7 @@ import {
   LightbulbIcon,
   LockIcon,
   NotePencilIcon,
-  ProhibitIcon,
   RadioButtonIcon,
-  RobotIcon,
   RocketLaunchIcon,
   TagIcon,
   TicketIcon,
@@ -30,10 +28,12 @@ import { useState } from "react";
 
 import type { Schemas } from "#api/client";
 import { useMembers } from "#features/cards/card-bits";
+import { runMood } from "#features/people/agent-run";
 import { ago, exactTime } from "#lib/time";
 import { Avatar } from "#ui/avatar";
 import { Badge } from "#ui/chip";
-import type { Status, Tone } from "#ui/chip";
+import type { Tone } from "#ui/chip";
+import { Ghost } from "#ui/ghost";
 import { isProduct, ProductMark } from "#ui/product-mark";
 import { color, leading, media, radius, space, text } from "#ui/tokens.stylex";
 
@@ -103,17 +103,13 @@ type Look = { icon: ReactNode; tone: Tone };
 export function lookOf(activity: Activity): Look {
   const { kind } = activity;
   const size = 14;
-  if (activity.agentState === "needs_you") {
-    return { icon: <WarningCircleIcon size={size} />, tone: "amber" };
-  }
-  if (activity.agentState === "failed") {
-    return { icon: <ProhibitIcon size={size} />, tone: "red" };
-  }
-  if (activity.agentState === "finished") {
-    return { icon: <CheckCircleIcon size={size} />, tone: "green" };
-  }
-  if (activity.agentState === "working" || kind.startsWith("agent.")) {
-    return { icon: <RobotIcon size={size} />, tone: "blue" };
+  if (activity.agentState || kind.startsWith("agent.")) {
+    const state = activity.agentState ?? "working";
+    // Still: the feed is history, and only the run's badge elsewhere moves while it's live.
+    return {
+      icon: <Ghost mood={runMood(state)} size={size + 2} still tinted />,
+      tone: STATE[state]?.tone ?? "blue",
+    };
   }
   const table: [RegExp, Look][] = [
     [/merged/u, { icon: <GitMergeIcon size={size} />, tone: "violet" }],
@@ -165,11 +161,11 @@ export function lookOf(activity: Activity): Look {
   );
 }
 
-const STATE: Record<string, { label: string; tone: Tone; status: Status }> = {
-  working: { label: "Working", tone: "blue", status: "working" },
-  needs_you: { label: "Needs you", tone: "amber", status: "needs_you" },
-  finished: { label: "Finished", tone: "green", status: "done" },
-  failed: { label: "Couldn’t finish", tone: "red", status: "failed" },
+const STATE: Record<string, { label: string; tone: Tone }> = {
+  working: { label: "Working", tone: "blue" },
+  needs_you: { label: "Needs you", tone: "amber" },
+  finished: { label: "Finished", tone: "green" },
+  failed: { label: "Couldn’t finish", tone: "red" },
 };
 
 // What happened to a card when the event says nothing more than the card's own title.
@@ -395,11 +391,8 @@ function ActivityMeta({ activity }: { activity: Activity }) {
           <LockIcon size={10} /> Private
         </span>
       )}
-      {state && (
-        <Badge tone={state.tone} status={state.status}>
-          {state.label}
-        </Badge>
-      )}
+      {/* The line's ghost already shows the state; the badge only puts it in words. */}
+      {state && <Badge tone={state.tone}>{state.label}</Badge>}
     </div>
   );
 }

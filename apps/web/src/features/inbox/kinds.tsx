@@ -2,7 +2,6 @@ import {
   AlarmIcon,
   ChatCenteredDotsIcon,
   KanbanIcon,
-  RobotIcon,
   TrayIcon,
   UserPlusIcon,
   WarningCircleIcon,
@@ -10,21 +9,23 @@ import {
 import type { ReactNode } from "react";
 
 import type { Tone } from "#ui/chip";
+import { Ghost } from "#ui/ghost";
 
 const KINDS: Record<string, { label: string; icon: ReactNode; tone: Tone }> = {
   "agent.needs_you": {
     label: "Agent needs a decision",
-    icon: <RobotIcon size={13} weight="fill" />,
+    // The one agent item still waiting on someone, so the one whose ghost moves.
+    icon: <Ghost mood="waiting" size={14} tinted />,
     tone: "amber",
   },
   "agent.failed": {
     label: "Agent couldn’t finish",
-    icon: <RobotIcon size={13} weight="fill" />,
+    icon: <Ghost mood="error" size={14} still tinted />,
     tone: "red",
   },
   "agent.finished": {
     label: "Agent finished",
-    icon: <RobotIcon size={13} weight="fill" />,
+    icon: <Ghost mood="done" size={14} still tinted />,
     tone: "green",
   },
   "assistant.approval": {

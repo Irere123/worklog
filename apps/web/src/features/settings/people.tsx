@@ -2,7 +2,6 @@ import {
   CopyIcon,
   KeyIcon,
   PlusIcon,
-  RobotIcon,
   TrashIcon,
   UserPlusIcon,
 } from "@phosphor-icons/react";
@@ -22,6 +21,7 @@ import { Button } from "#ui/button";
 import { Badge } from "#ui/chip";
 import { EmptyState, Skeleton } from "#ui/feedback";
 import { Checkbox, Field, Input, Select } from "#ui/field";
+import { Ghost } from "#ui/ghost";
 import { Dialog, Tooltip } from "#ui/overlay";
 import { color, radius, space, text } from "#ui/tokens.stylex";
 
@@ -348,7 +348,7 @@ export function Members() {
           <>
             <Button
               size="sm"
-              icon={<RobotIcon size={14} />}
+              icon={<Ghost size={14} still tinted />}
               onClick={() => setAdding("agent")}
             >
               Add agent

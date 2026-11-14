@@ -2,12 +2,14 @@ import * as stylex from "@stylexjs/stylex";
 import { useState } from "react";
 
 import { VisuallyHidden } from "./feedback";
+import { Ghost } from "./ghost";
 import { color, font } from "./tokens.stylex";
 
 type Person = {
   id: string;
   name: string;
   kind?: string;
+  agentProvider?: string | null;
   avatarUrl?: string | null;
 };
 
@@ -28,7 +30,8 @@ export function initials(name: string) {
 
 /**
  * People are circles and agents are rounded squares with a face of their own, so a glance at any
- * list tells who is human: agents never pass as people, even with a picture.
+ * list tells who is human: agents never pass as people, even with a picture. Your own assistant
+ * wears the ghost it has everywhere else.
  */
 export function Avatar({
   person,
@@ -80,7 +83,13 @@ export function Avatar({
           {...stylex.props(styles.picture)}
         />
       ) : (
-        <Mark agent={agent} name={person.name} size={size} seed={person.id} />
+        <Mark
+          agent={agent}
+          assistant={person.agentProvider === "worklog"}
+          name={person.name}
+          size={size}
+          seed={person.id}
+        />
       )}
       {labelled && (
         <VisuallyHidden>
@@ -118,15 +127,20 @@ export function AvatarStack({
 
 function Mark({
   agent,
+  assistant,
   name,
   size,
   seed,
 }: {
   agent: boolean;
+  assistant: boolean;
   name: string;
   size: number;
   seed: string;
 }) {
+  if (assistant) {
+    return <Ghost size={Math.round(size * 0.78)} still tinted />;
+  }
   return agent ? (
     <AgentFace seed={seed} size={Math.round(size * 0.86)} />
   ) : (

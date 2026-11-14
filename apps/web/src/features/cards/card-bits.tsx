@@ -17,6 +17,7 @@ import { ago, shortDay } from "#lib/time";
 import { Avatar, AvatarStack } from "#ui/avatar";
 import type { Status, Tone } from "#ui/chip";
 import { addDays, localDay } from "#ui/date-picker";
+import { Ghost } from "#ui/ghost";
 import {
   color,
   font,
@@ -198,7 +199,10 @@ export function CardRun({ number, full }: { number: number; full?: boolean }) {
   const who = ownerWord(owner, me?.member.id) ?? "a person";
   return (
     <p {...stylex.props(styles.run, full === true && styles.runFull)}>
-      <Avatar person={agent} size={full === true ? 16 : 14} />
+      <Ghost
+        mood={waiting ? "waiting" : "thinking"}
+        size={full === true ? 16 : 14}
+      />
       <span {...stylex.props(full !== true && styles.runText)}>
         <span {...stylex.props(styles.runName)}>{agent.name}</span>{" "}
         {waiting ? (
