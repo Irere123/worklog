@@ -7,8 +7,6 @@ import {
 } from "react";
 import type { RefObject } from "react";
 
-import { useTheme } from "#lib/theme";
-
 /**
  * The landing page's demos are scripts: a list of beats that set state and wait. A script stops
  * where it is when someone presses Pause, and is dropped mid-beat when its demo unmounts, so
@@ -122,26 +120,6 @@ export function useReducedMotion() {
     () => matchMedia(REDUCED).matches,
     () => false
   );
-}
-
-const DARK = "(prefers-color-scheme: dark)";
-
-/**
- * Whether the page is showing dark, from the theme a visitor picked or, on "system", their
- * device. For pictures, which can't follow a light-dark() colour on their own.
- */
-export function useDark() {
-  const theme = useTheme();
-  const system = useSyncExternalStore(
-    (change) => {
-      const query = matchMedia(DARK);
-      query.addEventListener("change", change);
-      return () => query.removeEventListener("change", change);
-    },
-    () => matchMedia(DARK).matches,
-    () => false
-  );
-  return theme === "system" ? system : theme === "dark";
 }
 
 export type Point = { x: number; y: number };

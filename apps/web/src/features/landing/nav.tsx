@@ -19,7 +19,6 @@ import { SOURCE } from "./links";
 import { NavMenu } from "./menus";
 import type { NavItem } from "./menus";
 import { cta } from "./styles";
-import { ThemeToggle } from "./theme-toggle";
 
 // Full paths, so the bar works the same from the pricing page as from the front page.
 const LINKS = [
@@ -143,7 +142,6 @@ export function Nav({ setupOpen }: { setupOpen: boolean }) {
         </li>
       </ul>
       <div {...stylex.props(styles.end)}>
-        <ThemeToggle />
         <a
           href={SOURCE}
           {...stylex.props(styles.quietLink, styles.desktopOnly)}

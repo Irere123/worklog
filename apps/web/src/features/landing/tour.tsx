@@ -16,16 +16,11 @@ import clay from "./plates/clay.webp";
 import ink from "./plates/ink.webp";
 import sage from "./plates/sage.webp";
 import sky from "./plates/sky.webp";
-import activityDark from "./plates/thumbs/activity-dark.webp";
-import activityLight from "./plates/thumbs/activity-light.webp";
-import boardDark from "./plates/thumbs/board-dark.webp";
-import boardLight from "./plates/thumbs/board-light.webp";
-import briefsDark from "./plates/thumbs/briefs-dark.webp";
-import briefsLight from "./plates/thumbs/briefs-light.webp";
-import homeDark from "./plates/thumbs/home-dark.webp";
-import homeLight from "./plates/thumbs/home-light.webp";
-import inboxDark from "./plates/thumbs/inbox-dark.webp";
-import inboxLight from "./plates/thumbs/inbox-light.webp";
+import activityThumb from "./plates/thumbs/activity.webp";
+import boardThumb from "./plates/thumbs/board.webp";
+import briefsThumb from "./plates/thumbs/briefs.webp";
+import homeThumb from "./plates/thumbs/home.webp";
+import inboxThumb from "./plates/thumbs/inbox.webp";
 import ticket from "./plates/ticket.webp";
 import { ActivityScene } from "./scenes/activity";
 import { BoardScene } from "./scenes/board";
@@ -33,7 +28,7 @@ import { BriefsScene } from "./scenes/briefs";
 import { HomeScene } from "./scenes/home";
 import { InboxScene } from "./scenes/inbox";
 import type { SceneProps } from "./scenes/parts";
-import { useDark, useInView, useReducedMotion } from "./script";
+import { useInView, useReducedMotion } from "./script";
 import { page } from "./styles";
 
 type Chapter = {
@@ -41,7 +36,7 @@ type Chapter = {
   label: string;
   caption: string;
   plate: string;
-  thumb: { light: string; dark: string };
+  thumb: string;
   duration: number;
   Scene: ComponentType<SceneProps>;
 };
@@ -51,7 +46,7 @@ const HOME: Chapter = {
   label: "Home",
   caption: "What needs you today, and what moved while you were away.",
   plate: ink,
-  thumb: { light: homeLight, dark: homeDark },
+  thumb: homeThumb,
   duration: 8000,
   Scene: HomeScene,
 };
@@ -63,7 +58,7 @@ const CHAPTERS: Chapter[] = [
     label: "Inbox",
     caption: "Only what’s blocked on you, each with why it’s there.",
     plate: ticket,
-    thumb: { light: inboxLight, dark: inboxDark },
+    thumb: inboxThumb,
     duration: 7500,
     Scene: InboxScene,
   },
@@ -73,7 +68,7 @@ const CHAPTERS: Chapter[] = [
     caption:
       "Golden tickets instead of priorities. Cards nobody touches drift away.",
     plate: sage,
-    thumb: { light: boardLight, dark: boardDark },
+    thumb: boardThumb,
     duration: 8000,
     Scene: BoardScene,
   },
@@ -83,7 +78,7 @@ const CHAPTERS: Chapter[] = [
     caption:
       "GitHub, Slack, Discord and agents in one stream, with the noise left out.",
     plate: sky,
-    thumb: { light: activityLight, dark: activityDark },
+    thumb: activityThumb,
     duration: 8500,
     Scene: ActivityScene,
   },
@@ -93,7 +88,7 @@ const CHAPTERS: Chapter[] = [
     caption:
       "A morning brief and a weekly wrap, by email, Slack, Discord or webhook.",
     plate: clay,
-    thumb: { light: briefsLight, dark: briefsDark },
+    thumb: briefsThumb,
     duration: 8000,
     Scene: BriefsScene,
   },
@@ -122,7 +117,6 @@ export function Tour() {
   const stage = useRef<HTMLDivElement>(null);
   const inView = useInView(ref);
   const reduced = useReducedMotion();
-  const dark = useDark();
   const [shown, setShown] = useState<Shown>({ index: 0, round: 0, from: 1 });
   const [leaving, setLeaving] = useState<Shown | null>(null);
   // Wallpapers mount as the tour reaches them, plus the next one so its change can crossfade: a
@@ -268,7 +262,7 @@ export function Tour() {
             )}
           >
             <img
-              src={dark ? each.thumb.dark : each.thumb.light}
+              src={each.thumb}
               alt=""
               width={320}
               height={200}
