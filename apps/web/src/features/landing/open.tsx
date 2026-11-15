@@ -1,11 +1,9 @@
 import { LightbulbIcon } from "@phosphor-icons/react";
 import * as stylex from "@stylexjs/stylex";
-import { useRef, useState } from "react";
 
 import { Avatar } from "#ui/avatar";
 import { color, font, radius, space, text } from "#ui/tokens.stylex";
 
-import { useInView, useReducedMotion, useScript } from "./script";
 import { page, type } from "./styles";
 import { ada } from "./team";
 
@@ -15,40 +13,11 @@ const COMMAND = `curl $WORKLOG/v1/logs \\
   -d '{"kind":"decision",
     "text":"Agreed on FHIR R4 for referrals"}'`;
 
-type State = { typed: number; answered: boolean; logged: boolean };
-
-const START: State = { typed: 0, answered: false, logged: false };
-const END: State = { typed: COMMAND.length, answered: true, logged: true };
-
 /**
  * The server is the product: one contract for every client. A command in a terminal becomes a line
  * in the team's record, which is the whole of the integration story.
  */
 export function Open() {
-  const ref = useRef<HTMLDivElement>(null);
-  const inView = useInView(ref);
-  const reduced = useReducedMotion();
-  const [s, setS] = useState(START);
-  const set = (next: Partial<State>) => setS((now) => ({ ...now, ...next }));
-
-  useScript(
-    async (a) => {
-      await a.wait(500);
-      for (let typed = 0; typed <= COMMAND.length; typed += 3) {
-        set({ typed });
-        // oxlint-disable-next-line no-await-in-loop -- typed a few characters at a time
-        await a.wait(16);
-      }
-      set({ typed: COMMAND.length });
-      await a.wait(500);
-      set({ answered: true });
-      await a.wait(700);
-      set({ logged: true });
-    },
-    { running: inView && !reduced, paused: false }
-  );
-
-  const shown = reduced ? END : s;
   return (
     <section id="open" {...stylex.props(page.wide, page.section)}>
       <div {...stylex.props(page.tile, styles.panel)}>
@@ -66,7 +35,7 @@ export function Open() {
           </ul>
         </div>
 
-        <div ref={ref} aria-hidden {...stylex.props(styles.scene)}>
+        <div aria-hidden {...stylex.props(styles.scene)}>
           <div {...stylex.props(styles.terminal)}>
             <div {...stylex.props(styles.termBar)}>
               <span {...stylex.props(styles.light, styles.close)} />
@@ -76,21 +45,15 @@ export function Open() {
             </div>
             <pre {...stylex.props(styles.code)}>
               <span {...stylex.props(styles.prompt)}>$ </span>
-              {COMMAND.slice(0, shown.typed)}
-              {!shown.answered && <span {...stylex.props(styles.cursor)} />}
+              {COMMAND}
               {"\n"}
-              <span
-                {...stylex.props(
-                  styles.reply,
-                  shown.answered && styles.replyOn
-                )}
-              >
+              <span {...stylex.props(styles.reply)}>
                 <span {...stylex.props(styles.ok)}>201</span> Created · log_7Qe2
               </span>
             </pre>
           </div>
 
-          <div {...stylex.props(styles.line, shown.logged && styles.lineOn)}>
+          <div {...stylex.props(styles.line)}>
             <span {...stylex.props(styles.kind)}>
               <LightbulbIcon size={14} weight="fill" />
             </span>
@@ -224,21 +187,8 @@ const styles = stylex.create({
   dim: {
     color: "oklch(0.62 0.006 80)",
   },
-  cursor: {
-    display: "inline-block",
-    width: "1ch",
-    height: "1.2em",
-    verticalAlign: "text-bottom",
-    backgroundColor: "oklch(0.9 0.004 80 / 0.7)",
-  },
   reply: {
-    opacity: 0,
-    transitionProperty: "opacity",
-    transitionDuration: "300ms",
     color: "oklch(0.72 0.006 80)",
-  },
-  replyOn: {
-    opacity: 1,
   },
   ok: {
     color: "oklch(0.78 0.14 152)",
@@ -272,15 +222,6 @@ const styles = stylex.create({
     fontSize: text.label,
     lineHeight: "20px",
     textAlign: "start",
-    opacity: 0,
-    transform: "translateY(16px)",
-    transitionProperty: "opacity, transform",
-    transitionDuration: "700ms",
-    transitionTimingFunction: "cubic-bezier(0.25, 0.8, 0.25, 1)",
-  },
-  lineOn: {
-    opacity: 1,
-    transform: "none",
   },
   kind: {
     display: "grid",
