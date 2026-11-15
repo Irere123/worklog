@@ -21,7 +21,7 @@ import { color, font, radius, shadow, space, text } from "#ui/tokens.stylex";
 
 import { Intro } from "./intro";
 import { useInView, useReducedMotion } from "./script";
-import { page, reveal, type } from "./styles";
+import { page, type } from "./styles";
 import { eric } from "./team";
 
 /**
@@ -152,14 +152,7 @@ function Tile({
   return (
     <article
       ref={ref}
-      {...stylex.props(
-        page.tile,
-        styles.tile,
-        wide && styles.wide,
-        reveal.line,
-        reveal.delay(150 + (at % 3) * 50),
-        (on || reduced) && reveal.on
-      )}
+      {...stylex.props(page.tile, styles.tile, wide && styles.wide)}
     >
       <div aria-hidden {...stylex.props(styles.art)}>
         {children(turn || reduced)}

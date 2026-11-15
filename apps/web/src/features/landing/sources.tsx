@@ -6,15 +6,13 @@ import {
   WebhooksLogoIcon,
 } from "@phosphor-icons/react";
 import * as stylex from "@stylexjs/stylex";
-import { useRef } from "react";
 import type { ReactNode } from "react";
 
 import { Ghost } from "#ui/ghost";
 import { ProductMark } from "#ui/product-mark";
 import { color, media, space, text } from "#ui/tokens.stylex";
 
-import { useReveal } from "./script";
-import { page, reveal, type } from "./styles";
+import { page, type } from "./styles";
 
 type Source = { name: string; brings: string; mark: ReactNode };
 
@@ -81,35 +79,16 @@ const PEOPLE: Source[] = [
 
 /** Where the record comes from, drifting past in two rows like a ticker. */
 export function Sources() {
-  const ref = useRef<HTMLElement>(null);
-  const on = useReveal(ref);
   return (
     <section
-      ref={ref}
       aria-labelledby="sources"
       {...stylex.props(page.wide, page.section)}
     >
-      <p
-        id="sources"
-        {...stylex.props(
-          type.lede,
-          styles.lede,
-          reveal.line,
-          reveal.delay(50),
-          on && reveal.on
-        )}
-      >
+      <p id="sources" {...stylex.props(type.lede, styles.lede)}>
         Code, chat, agents and a sentence from you. Every source becomes one
         line, credited to whoever did it.
       </p>
-      <div
-        {...stylex.props(
-          styles.rows,
-          reveal.line,
-          reveal.delay(150),
-          on && reveal.on
-        )}
-      >
+      <div {...stylex.props(styles.rows)}>
         <Row items={TOOLS} />
         <Row items={PEOPLE} reverse />
       </div>

@@ -1,7 +1,6 @@
 import { CheckCircleIcon } from "@phosphor-icons/react";
 import * as stylex from "@stylexjs/stylex";
 import { Link } from "@tanstack/react-router";
-import { useRef } from "react";
 
 import { color, media, motion, radius, shadow, space } from "#ui/tokens.stylex";
 
@@ -9,10 +8,9 @@ import { Questions } from "./faq";
 import { DEPLOY, SOURCE } from "./links";
 import { AI, OPEN, PRICING } from "./questions";
 import type { Question } from "./questions";
-import { useReveal } from "./script";
 import { Site } from "./site";
 import { useStart } from "./start";
-import { cta, page, reveal, type } from "./styles";
+import { cta, page, type } from "./styles";
 
 type Plan = {
   name: string;
@@ -81,8 +79,6 @@ const BEFORE: Question[] = [...PRICING, OPEN[1], AI[1]].filter(
  */
 export function Pricing() {
   const start = useStart();
-  const cards = useRef<HTMLDivElement>(null);
-  const on = useReveal(cards);
   return (
     <Site>
       <header {...stylex.props(page.wide, styles.head)}>
@@ -93,16 +89,7 @@ export function Pricing() {
         </p>
       </header>
 
-      <div
-        ref={cards}
-        {...stylex.props(
-          page.wide,
-          styles.plans,
-          reveal.line,
-          reveal.delay(100),
-          on && reveal.on
-        )}
-      >
+      <div {...stylex.props(page.wide, styles.plans)}>
         <PlanCard plan={FREE} to={start} />
         <PlanCard plan={TEAM} to={start} />
         <PlanCard plan={SELF} href={DEPLOY} />

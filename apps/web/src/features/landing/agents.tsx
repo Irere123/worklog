@@ -20,15 +20,9 @@ import { Intro } from "./intro";
 import { Collapse, Roll } from "./motion";
 import ink from "./plates/ink.webp";
 import sage from "./plates/sage.webp";
-import {
-  pointAt,
-  useInView,
-  useReducedMotion,
-  useReveal,
-  useScript,
-} from "./script";
+import { pointAt, useInView, useReducedMotion, useScript } from "./script";
 import type { Point } from "./script";
-import { page, reveal, type } from "./styles";
+import { page, type } from "./styles";
 import { ada, atlas, grace, jean } from "./team";
 
 /**
@@ -36,24 +30,14 @@ import { ada, atlas, grace, jean } from "./team";
  * a card and asks before it changes what others will see.
  */
 export function Agents() {
-  const pair = useRef<HTMLDivElement>(null);
-  const on = useReveal(pair);
   return (
     <section id="agents" {...stylex.props(page.wide, page.section)}>
       <Intro
         title="Agents on the team."
         lede="Everyone gets an assistant that knows their work. Coding agents report like teammates, and ask before they act."
       />
-      <div ref={pair} {...stylex.props(styles.pair)}>
-        <figure
-          {...stylex.props(
-            page.tile,
-            styles.card,
-            reveal.line,
-            reveal.delay(100),
-            on && reveal.on
-          )}
-        >
+      <div {...stylex.props(styles.pair)}>
+        <figure {...stylex.props(page.tile, styles.card)}>
           <Plate src={ink} sx={styles.plate}>
             <div aria-hidden {...stylex.props(styles.picture)}>
               <Ask />
@@ -68,15 +52,7 @@ export function Agents() {
             </p>
           </figcaption>
         </figure>
-        <figure
-          {...stylex.props(
-            page.tile,
-            styles.card,
-            reveal.line,
-            reveal.delay(150),
-            on && reveal.on
-          )}
-        >
+        <figure {...stylex.props(page.tile, styles.card)}>
           <Plate src={sage} sx={styles.plate}>
             <div aria-hidden {...stylex.props(styles.picture)}>
               <Approve />

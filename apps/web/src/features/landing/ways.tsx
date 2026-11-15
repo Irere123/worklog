@@ -7,14 +7,12 @@ import {
 import type { Icon } from "@phosphor-icons/react";
 import * as stylex from "@stylexjs/stylex";
 import { Link } from "@tanstack/react-router";
-import { useRef } from "react";
 
 import { color, media, motion, radius, shadow, space } from "#ui/tokens.stylex";
 
 import { DEPLOY } from "./links";
-import { useReveal } from "./script";
 import { useStart } from "./start";
-import { page, reveal, type } from "./styles";
+import { page, type } from "./styles";
 
 /**
  * Where Worklog runs, as resurf's card shows where its library lives: one panel, the two homes
@@ -22,23 +20,18 @@ import { page, reveal, type } from "./styles";
  */
 export function Ways() {
   const start = useStart();
-  const panel = useRef<HTMLDivElement>(null);
-  const on = useReveal(panel);
-  const rise = (ms: number) => [reveal.line, reveal.delay(ms), on && reveal.on];
   return (
     <section id="ways" {...stylex.props(page.wide, page.section)}>
-      <div ref={panel} {...stylex.props(page.tile, styles.panel, rise(0))}>
+      <div {...stylex.props(page.tile, styles.panel)}>
         <div {...stylex.props(styles.words)}>
-          <h2 {...stylex.props(type.heading, rise(50))}>
-            Ours to run, or yours.
-          </h2>
-          <p {...stylex.props(type.lede, rise(100))}>
+          <h2 {...stylex.props(type.heading)}>Ours to run, or yours.</h2>
+          <p {...stylex.props(type.lede)}>
             Start on Worklog Cloud with an email address, or run the same
             open-source code on your own server. Your team works the same either
             way.
           </p>
         </div>
-        <div {...stylex.props(styles.options, rise(180))}>
+        <div {...stylex.props(styles.options)}>
           <Option
             icon={CloudIcon}
             title="Worklog Cloud"

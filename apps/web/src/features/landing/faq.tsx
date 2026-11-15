@@ -1,14 +1,12 @@
 import { PlusIcon } from "@phosphor-icons/react";
 import * as stylex from "@stylexjs/stylex";
-import { useRef } from "react";
 
 import { color, font, media, motion, radius, space } from "#ui/tokens.stylex";
 
 import { Intro } from "./intro";
 import { AI, OPEN, PRIVACY } from "./questions";
 import type { Question } from "./questions";
-import { useReveal } from "./script";
-import { page, reveal } from "./styles";
+import { page } from "./styles";
 
 // The five a team asks first; the rest wait on the FAQ page.
 const FIRST: Question[] = [OPEN[0], OPEN[1], AI[0], AI[2], PRIVACY[0]].filter(
@@ -17,20 +15,10 @@ const FIRST: Question[] = [OPEN[0], OPEN[1], AI[0], AI[2], PRIVACY[0]].filter(
 
 /** The questions a team asks before it sets anything up, answered in a line or two each. */
 export function Faq() {
-  const list = useRef<HTMLDivElement>(null);
-  const on = useReveal(list);
   return (
     <section {...stylex.props(page.narrow, page.section)}>
       <Intro title="Before you start." />
-      <div
-        ref={list}
-        {...stylex.props(
-          styles.column,
-          reveal.line,
-          reveal.delay(150),
-          on && reveal.on
-        )}
-      >
+      <div {...stylex.props(styles.column)}>
         <Questions items={FIRST} />
         <a href="/faq" {...stylex.props(styles.more)}>
           More questions, answered

@@ -5,8 +5,8 @@ import { useRef, useState } from "react";
 import { Avatar } from "#ui/avatar";
 import { color, font, radius, space, text } from "#ui/tokens.stylex";
 
-import { useInView, useReducedMotion, useReveal, useScript } from "./script";
-import { page, reveal, type } from "./styles";
+import { useInView, useReducedMotion, useScript } from "./script";
+import { page, type } from "./styles";
 import { ada } from "./team";
 
 // Broken at its own flags and fields, so a narrow terminal never has to split a word.
@@ -48,23 +48,18 @@ export function Open() {
     { running: inView && !reduced, paused: false }
   );
 
-  const panel = useRef<HTMLDivElement>(null);
-  const on = useReveal(panel);
-  const rise = (ms: number) => [reveal.line, reveal.delay(ms), on && reveal.on];
   const shown = reduced ? END : s;
   return (
     <section id="open" {...stylex.props(page.wide, page.section)}>
-      <div ref={panel} {...stylex.props(page.tile, styles.panel, rise(0))}>
+      <div {...stylex.props(page.tile, styles.panel)}>
         <div {...stylex.props(styles.words)}>
-          <h2 {...stylex.props(type.heading, rise(50))}>
-            Open source, open API.
-          </h2>
-          <p {...stylex.props(type.lede, rise(100))}>
+          <h2 {...stylex.props(type.heading)}>Open source, open API.</h2>
+          <p {...stylex.props(type.lede)}>
             Every line of Worklog is on GitHub. One OpenAPI contract and a
             resumable event stream serve the web app, your scripts and your
             agents alike.
           </p>
-          <ul {...stylex.props(styles.chips, rise(180))}>
+          <ul {...stylex.props(styles.chips)}>
             <li {...stylex.props(styles.chip)}>OpenAPI 3.1</li>
             <li {...stylex.props(styles.chip)}>Resumable event stream</li>
           </ul>

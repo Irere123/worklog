@@ -2,7 +2,6 @@ import { DesktopIcon, MoonIcon, SunIcon } from "@phosphor-icons/react";
 import type { Icon } from "@phosphor-icons/react";
 import * as stylex from "@stylexjs/stylex";
 import { Link } from "@tanstack/react-router";
-import { useRef } from "react";
 
 import { setTheme, useTheme } from "#lib/theme";
 import type { Theme } from "#lib/theme";
@@ -10,32 +9,20 @@ import { Logo } from "#ui/logo";
 import { color, media, motion, radius, space } from "#ui/tokens.stylex";
 
 import { DEPLOY, SOURCE, doc } from "./links";
-import { useReveal } from "./script";
 import { useStart } from "./start";
-import { cta, page, reveal, type } from "./styles";
+import { cta, page, type } from "./styles";
 
 /** The last ask, then the way around. */
 export function Closing() {
   const start = useStart();
-  const ref = useRef<HTMLElement>(null);
-  const on = useReveal(ref);
-  const rise = (ms: number) => [reveal.line, reveal.delay(ms), on && reveal.on];
   return (
-    <section
-      ref={ref}
-      {...stylex.props(page.wide, page.section, styles.closing)}
-    >
-      <h2 {...stylex.props(type.heading, rise(50))}>
-        Start your team’s logbook.
-      </h2>
-      <Link
-        to={start}
-        {...stylex.props(cta.base, cta.primary, styles.action, rise(200))}
-      >
+    <section {...stylex.props(page.wide, page.section, styles.closing)}>
+      <h2 {...stylex.props(type.heading)}>Start your team’s logbook.</h2>
+      <Link to={start} {...stylex.props(cta.base, cta.primary, styles.action)}>
         <Logo size={16} tinted />
         Start free
       </Link>
-      <ul {...stylex.props(styles.fine, rise(250))}>
+      <ul {...stylex.props(styles.fine)}>
         <li>Free for up to 3 people</li>
         <li aria-hidden {...stylex.props(styles.sep)}>
           ·

@@ -192,36 +192,3 @@ export const cta = stylex.create({
     fontSize: 12,
   },
 });
-
-/**
- * A section's words arrive as resurf's do: each line sharpens out of a blur as it rises into
- * place, a beat after the one above. `on` starts the play; until then the lines wait, unseen.
- */
-const rise = stylex.keyframes({
-  from: {
-    opacity: 0,
-    filter: "blur(10px)",
-    transform: "translateY(10px)",
-  },
-  to: {
-    opacity: 1,
-    filter: "none",
-    transform: "none",
-  },
-});
-
-export const reveal = stylex.create({
-  line: {
-    animationName: rise,
-    animationDuration: "600ms",
-    animationTimingFunction: "ease-out",
-    animationFillMode: "both",
-    animationPlayState: "paused",
-  },
-  on: {
-    animationPlayState: "running",
-  },
-  delay: (ms: number) => ({
-    animationDelay: `${ms}ms`,
-  }),
-});

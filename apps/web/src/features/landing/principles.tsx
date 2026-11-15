@@ -1,5 +1,4 @@
 import * as stylex from "@stylexjs/stylex";
-import { useRef } from "react";
 import type { ReactNode } from "react";
 
 import { Avatar } from "#ui/avatar";
@@ -7,8 +6,7 @@ import { Ghost } from "#ui/ghost";
 import { color, font, radius, shadow, space, text } from "#ui/tokens.stylex";
 
 import { Intro } from "./intro";
-import { useReveal } from "./script";
-import { page, reveal, type } from "./styles";
+import { page, type } from "./styles";
 import { ada, atlas, eric, grace, jean, scout } from "./team";
 
 /**
@@ -16,20 +14,10 @@ import { ada, atlas, eric, grace, jean, scout } from "./team";
  * small piece of the product that keeps it.
  */
 export function Principles() {
-  const grid = useRef<HTMLDivElement>(null);
-  const on = useReveal(grid);
   return (
     <section {...stylex.props(page.narrow, page.section)}>
       <Intro title="Honest, calm and human." />
-      <div
-        ref={grid}
-        {...stylex.props(
-          styles.grid,
-          reveal.line,
-          reveal.delay(150),
-          on && reveal.on
-        )}
-      >
+      <div {...stylex.props(styles.grid)}>
         <Principle
           name="Honest"
           words="Every line is something that happened, with a source and a time. An agent’s work says so, and names the person answerable for it."

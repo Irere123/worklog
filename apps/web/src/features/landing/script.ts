@@ -110,15 +110,6 @@ export function useInView<T extends Element>(
   return inView;
 }
 
-/**
- * Whether a section's words should play their entrance: once it is a little way on screen, or at
- * once with reduced motion, where an entrance held back would leave the words unseen.
- */
-export function useReveal<T extends Element>(ref: RefObject<T | null>) {
-  const seen = useInView(ref, { margin: "0px 0px -8% 0px", once: true });
-  return useReducedMotion() || seen;
-}
-
 const REDUCED = "(prefers-reduced-motion: reduce)";
 
 export function useReducedMotion() {
