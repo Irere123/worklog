@@ -1,11 +1,4 @@
-import {
-  HourglassMediumIcon,
-  LightbulbIcon,
-  LockSimpleIcon,
-  MicrophoneIcon,
-  TicketIcon,
-  UsersThreeIcon,
-} from "@phosphor-icons/react";
+import { HourglassMediumIcon, TicketIcon } from "@phosphor-icons/react";
 import * as stylex from "@stylexjs/stylex";
 import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
@@ -24,9 +17,9 @@ import { atlas, grace, jean } from "./team";
 type Person = typeof jean | typeof atlas;
 
 /**
- * What Worklog does, one tile each: what needs you, the stream, the brief and the board lead,
- * then two smaller promises. Every tile holds an object from the product at its real size, and
- * shows its point in its first frame; motion only adds to it.
+ * What Worklog does, one tile each: what needs you, the stream, the brief and the board. Every
+ * tile holds an object from the product at its real size, and shows its point in its first
+ * frame; motion only adds to it.
  */
 export function Features() {
   return (
@@ -72,22 +65,6 @@ export function Features() {
         >
           {(on) => <Board on={on} />}
         </Tile>
-        <Tile
-          size="half"
-          title="Log it in a sentence"
-          copy="A call, a decision, a fix off the radar. Type it or say it: dictation knows your team’s names."
-          at={6}
-        >
-          {(on) => <QuickLog on={on} />}
-        </Tile>
-        <Tile
-          size="half"
-          title="Private stays private"
-          copy="Teammates, and their assistants, only ever see what you shared with the team."
-          at={7}
-        >
-          {(on) => <Privacy on={on} />}
-        </Tile>
       </div>
     </section>
   );
@@ -104,8 +81,8 @@ function Tile({
   title: string;
   copy: string;
   badge?: string;
-  /** A third of the row, two thirds for a lead, or half for a closing pair. */
-  size?: "third" | "wide" | "half";
+  /** A third of the row, or two thirds for a lead. */
+  size?: "third" | "wide";
   at: number;
   children: (on: boolean) => ReactNode;
 }) {
@@ -373,42 +350,6 @@ function Budget() {
   );
 }
 
-function QuickLog({ on }: { on: boolean }) {
-  return (
-    <div {...stylex.props(styles.log)}>
-      <span {...stylex.props(styles.logField)}>
-        <span {...stylex.props(styles.logText)}>
-          Agreed on FHIR R4 for referrals
-          <span {...stylex.props(styles.caret, on && styles.caretOn)} />
-        </span>
-        <MicrophoneIcon size={15} weight="fill" {...stylex.props(styles.mic)} />
-      </span>
-      <span {...stylex.props(styles.logFoot)}>
-        <span {...stylex.props(styles.kind)}>
-          <LightbulbIcon size={12} weight="fill" /> Decision
-        </span>
-        <span {...stylex.props(styles.hint)}>
-          Press <kbd {...stylex.props(styles.kbd)}>L</kbd> anywhere
-        </span>
-      </span>
-    </div>
-  );
-}
-
-function Privacy({ on }: { on: boolean }) {
-  return (
-    <div {...stylex.props(styles.segmented)}>
-      <span {...stylex.props(styles.thumb, on && styles.thumbOn)} />
-      <span {...stylex.props(styles.option, !on && styles.optionOn)}>
-        <UsersThreeIcon size={14} /> Team
-      </span>
-      <span {...stylex.props(styles.option, on && styles.optionOn)}>
-        <LockSimpleIcon size={14} weight="fill" /> Only me
-      </span>
-    </div>
-  );
-}
-
 const ARRIVE = "cubic-bezier(0.25, 0.8, 0.25, 1)";
 
 const styles = stylex.create({
@@ -438,12 +379,6 @@ const styles = stylex.create({
       default: "span 4",
       "@media (max-width: 960px)": "span 2",
       "@media (max-width: 600px)": "span 1",
-    },
-  },
-  half: {
-    gridColumn: {
-      default: "span 3",
-      "@media (max-width: 960px)": "span 1",
     },
   },
   board: {
@@ -522,50 +457,6 @@ const styles = stylex.create({
   },
   badge: {
     marginLeft: "auto",
-  },
-  row: {
-    display: "flex",
-    gap: space.md,
-  },
-  app: {
-    position: "relative",
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: space.sm,
-    width: 76,
-    height: 76,
-    borderRadius: 14,
-    backgroundColor: color.raised,
-    boxShadow: shadow.object,
-  },
-  appName: {
-    fontSize: text.caption,
-    fontWeight: 500,
-    color: color.fgMuted,
-  },
-  check: {
-    position: "absolute",
-    top: -5,
-    right: -5,
-    display: "grid",
-    placeItems: "center",
-    width: 18,
-    height: 18,
-    borderRadius: radius.full,
-    backgroundColor: color.green,
-    color: color.fgOnSolid,
-    boxShadow: `0 0 0 2px oklch(0.958 0.004 80)`,
-    opacity: 0,
-    transform: "scale(0.4)",
-    transitionProperty: "opacity, transform",
-    transitionDuration: "380ms",
-    transitionTimingFunction: "cubic-bezier(0.34, 1.4, 0.64, 1)",
-  },
-  checkOn: {
-    opacity: 1,
-    transform: "none",
   },
   mono: {
     fontFamily: font.mono,
@@ -739,127 +630,6 @@ const styles = stylex.create({
     fontSize: text.meta,
     color: color.fgMuted,
   },
-  log: {
-    display: "flex",
-    flexDirection: "column",
-    gap: space.sm,
-    width: "100%",
-    maxWidth: 260,
-  },
-  logField: {
-    display: "flex",
-    alignItems: "center",
-    gap: space.md,
-    minHeight: 40,
-    paddingInline: space.lg,
-    borderRadius: radius.md,
-    backgroundColor: color.raised,
-    boxShadow: `0 0 0 1px ${color.lineUi}`,
-    fontSize: text.label,
-  },
-  logText: {
-    flexGrow: 1,
-  },
-  caret: {
-    display: "inline-block",
-    width: 1.5,
-    height: 15,
-    marginLeft: 1,
-    verticalAlign: "-2px",
-    backgroundColor: color.accent,
-    opacity: 0,
-  },
-  caretOn: {
-    animationName: stylex.keyframes({
-      "0%, 49%": { opacity: 1 },
-      "50%, 100%": { opacity: 0 },
-    }),
-    animationDuration: "1s",
-    animationIterationCount: 4,
-  },
-  mic: {
-    flexShrink: 0,
-    color: color.fgMuted,
-  },
-  logFoot: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  kind: {
-    display: "inline-flex",
-    alignItems: "center",
-    gap: space.xs,
-    height: 24,
-    paddingInline: space.md,
-    borderRadius: radius.full,
-    backgroundColor: color.goldSubtle,
-    color: color.goldFg,
-    fontSize: text.meta,
-    fontWeight: 500,
-  },
-  hint: {
-    display: "inline-flex",
-    alignItems: "center",
-    gap: space.xs,
-    fontSize: text.meta,
-    color: color.fgMuted,
-  },
-  kbd: {
-    display: "inline-grid",
-    placeItems: "center",
-    minWidth: 20,
-    height: 20,
-    borderRadius: radius.xs,
-    backgroundColor: color.raised,
-    boxShadow: shadow.object,
-    fontFamily: font.mono,
-    fontSize: text.caption,
-    color: color.fgMuted,
-  },
-  segmented: {
-    position: "relative",
-    display: "grid",
-    gridTemplateColumns: "1fr 1fr",
-    width: 220,
-    padding: 3,
-    borderRadius: radius.full,
-    backgroundColor: "oklch(0.912 0.005 80)",
-  },
-  thumb: {
-    position: "absolute",
-    top: 3,
-    bottom: 3,
-    left: 3,
-    width: "calc(50% - 3px)",
-    borderRadius: radius.full,
-    backgroundColor: color.raised,
-    boxShadow: "0 1px 3px oklch(0.2 0.01 80 / 0.12)",
-    transitionProperty: "transform",
-    transitionDuration: "520ms",
-    transitionDelay: "600ms",
-    transitionTimingFunction: "cubic-bezier(0.45, 0, 0.1, 1)",
-  },
-  thumbOn: {
-    transform: "translateX(100%)",
-  },
-  option: {
-    position: "relative",
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: space.sm,
-    height: 34,
-    fontSize: text.label,
-    fontWeight: 500,
-    color: color.fgMuted,
-    transitionProperty: "color",
-    transitionDuration: "300ms",
-    transitionDelay: "700ms",
-  },
-  optionOn: {
-    color: color.fg,
-  },
   needs: {
     display: "flex",
     flexDirection: {
@@ -919,14 +689,14 @@ const styles = stylex.create({
     whiteSpace: "nowrap",
     textOverflow: "ellipsis",
   },
+  amber: { color: color.amberFg },
+  blue: { color: color.blueFg },
+  violet: { color: color.violetFg },
   why: {
     fontSize: text.caption,
     lineHeight: "15px",
     fontWeight: 500,
   },
-  amber: { color: color.amberFg },
-  blue: { color: color.blueFg },
-  violet: { color: color.violetFg },
   stream: {
     display: "flex",
     flexDirection: "column",
