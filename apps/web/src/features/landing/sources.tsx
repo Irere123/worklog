@@ -82,9 +82,12 @@ export function Sources() {
   return (
     <section aria-labelledby="sources" {...stylex.props(page.section)}>
       <p id="sources" {...stylex.props(page.narrow, type.lede, styles.lede)}>
-        Code, chat, agents and a sentence from you.
-        <br />
-        Every source becomes one line, credited to whoever did it.
+        <span {...stylex.props(styles.line)}>
+          Code, chat, agents and a sentence from you.
+        </span>
+        <span {...stylex.props(styles.line)}>
+          Every source becomes one line, credited to whoever did it.
+        </span>
       </p>
       <div {...stylex.props(styles.rows)}>
         <Row items={TOOLS} />
@@ -131,6 +134,10 @@ const styles = stylex.create({
     textAlign: "center",
     marginBottom: space.x5,
     color: color.fgMuted,
+  },
+  line: {
+    display: "block",
+    textWrap: "balance",
   },
   rows: {
     display: "flex",

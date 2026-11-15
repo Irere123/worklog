@@ -27,7 +27,7 @@ export function Principles() {
             <Avatar person={atlas} size={16} />
             <span {...stylex.props(styles.strong)}>Atlas</span>
             <span {...stylex.props(styles.forWhom)}>for Jean</span>
-            <span {...stylex.props(styles.ellipsis)}>
+            <span {...stylex.props(styles.ellipsis, styles.muted)}>
               opened <span {...stylex.props(styles.mono)}>#209</span>
             </span>
             <span {...stylex.props(styles.when)}>Sat 7:30</span>
@@ -40,7 +40,7 @@ export function Principles() {
           <span {...stylex.props(styles.nav)}>
             <Ghost size={18} still />
             <span {...stylex.props(styles.grow)}>
-              Nothing needs you. Your brief comes at 8:00.
+              Nothing needs you right now.
             </span>
           </span>
         </Principle>
@@ -145,6 +145,9 @@ const styles = stylex.create({
     borderRadius: radius.full,
     backgroundColor: color.ui,
     fontSize: text.caption,
+    color: color.fgMuted,
+  },
+  muted: {
     color: color.fgMuted,
   },
   ellipsis: {
