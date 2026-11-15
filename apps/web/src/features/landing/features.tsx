@@ -1,8 +1,6 @@
 import {
-  ArrowBendDownRightIcon,
   CheckIcon,
   HourglassMediumIcon,
-  KeyIcon,
   LightbulbIcon,
   LockSimpleIcon,
   MicrophoneIcon,
@@ -13,8 +11,6 @@ import * as stylex from "@stylexjs/stylex";
 import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 
-import { Avatar } from "#ui/avatar";
-import { Logo } from "#ui/logo";
 import { ProductMark } from "#ui/product-mark";
 import type { Product } from "#ui/product-mark";
 import { color, font, radius, shadow, space, text } from "#ui/tokens.stylex";
@@ -22,7 +18,6 @@ import { color, font, radius, shadow, space, text } from "#ui/tokens.stylex";
 import { Intro } from "./intro";
 import { useInView, useReducedMotion } from "./script";
 import { page, type } from "./styles";
-import { eric } from "./team";
 
 /**
  * The small things that make Worklog itself, one tile each. Every tile holds one object from the
@@ -51,69 +46,32 @@ export function Features() {
           {(on) => <Board on={on} />}
         </Tile>
         <Tile
-          title="Noise left out"
-          copy="Bot comments, CI pings and duplicates never reach the stream."
+          title="A budget for pings"
+          copy="Only what’s blocked on you interrupts, up to a limit you set. The rest waits for your brief."
           at={2}
         >
-          {(on) => <Noise on={on} />}
+          {(on) => <Budget on={on} />}
         </Tile>
         <Tile
           title="Connect in a click"
-          copy="GitHub and Slack install in one step and bring their recent history with them."
+          copy="GitHub and Slack install in one step and bring their recent history. Bot noise never reaches the stream."
           at={3}
         >
           {(on) => <Marks on={on} />}
         </Tile>
         <Tile
-          title="One person, every handle"
-          copy="GitHub, Slack and Discord names resolve to the teammate behind them."
-          at={4}
-        >
-          {(on) => <Handles on={on} />}
-        </Tile>
-        <Tile
-          title="A budget for pings"
-          copy="Only what’s blocked on you interrupts, up to a limit you set. The rest waits for your brief."
-          at={5}
-        >
-          {(on) => <Budget on={on} />}
-        </Tile>
-        <Tile
           title="Log it in a sentence"
           copy="A call, a decision, a fix off the radar. Type it or say it: dictation knows your team’s names."
-          at={6}
+          at={4}
         >
           {(on) => <QuickLog on={on} />}
         </Tile>
         <Tile
           title="Private stays private"
           copy="Teammates, and their assistants, only ever see what you shared with the team."
-          at={7}
+          at={5}
         >
           {(on) => <Privacy on={on} />}
-        </Tile>
-        <Tile
-          title="Every action has a key"
-          copy="J and K to move, E to finish, H to snooze. ⌘K finds anything."
-          at={8}
-        >
-          {(on) => <Keys on={on} />}
-        </Tile>
-        <Tile
-          title="The tab knows"
-          copy="The browser tab carries what needs you, the way a calendar’s icon shows the date."
-          at={9}
-        >
-          {(on) => <BrowserTab on={on} />}
-        </Tile>
-        <Tile
-          wide
-          title="AI if you want it"
-          badge="Opt-in"
-          copy="Worklog runs whole without a model. With one, the assistant answers, and briefs are written rather than filled in."
-          at={10}
-        >
-          {(on) => <ModelKey on={on} />}
         </Tile>
       </div>
     </section>
@@ -195,71 +153,6 @@ function Marks({ on }: { on: boolean }) {
           )}
         </span>
       ))}
-    </div>
-  );
-}
-
-function Noise({ on }: { on: boolean }) {
-  return (
-    <div {...stylex.props(styles.stack)}>
-      <span {...stylex.props(styles.mini, styles.noise)}>
-        <ProductMark product="github" size={14} />
-        <span {...stylex.props(styles.miniText)}>
-          dependabot bumped axios
-          <span
-            {...stylex.props(
-              styles.strike,
-              on && styles.strikeOn,
-              styles.delay(500)
-            )}
-          />
-        </span>
-      </span>
-      <span {...stylex.props(styles.mini, styles.noise)}>
-        <ProductMark product="github" size={14} />
-        <span {...stylex.props(styles.miniText)}>
-          CI passed on main
-          <span
-            {...stylex.props(
-              styles.strike,
-              on && styles.strikeOn,
-              styles.delay(750)
-            )}
-          />
-        </span>
-      </span>
-      <span {...stylex.props(styles.mini, styles.kept)}>
-        <Avatar person={eric} size={16} />
-        <span {...stylex.props(styles.miniText)}>
-          Eric merged <span {...stylex.props(styles.mono)}>#212</span>
-        </span>
-      </span>
-    </div>
-  );
-}
-
-function Handles({ on }: { on: boolean }) {
-  return (
-    <div {...stylex.props(styles.handles)}>
-      <div {...stylex.props(styles.handleList)}>
-        <span {...stylex.props(styles.handle)}>
-          <ProductMark product="github" size={13} /> eric-nk
-        </span>
-        <span {...stylex.props(styles.handle)}>
-          <ProductMark product="slack" size={13} /> Eric N.
-        </span>
-        <span {...stylex.props(styles.handle)}>
-          <ProductMark product="discord" size={13} /> ericn
-        </span>
-      </div>
-      <ArrowBendDownRightIcon
-        size={18}
-        {...stylex.props(styles.arrow, on && styles.arrowOn)}
-      />
-      <span {...stylex.props(styles.person, on && styles.personOn)}>
-        <Avatar person={eric} size={40} />
-        <span {...stylex.props(styles.personName)}>Eric</span>
-      </span>
     </div>
   );
 }
@@ -423,73 +316,6 @@ function Privacy({ on }: { on: boolean }) {
   );
 }
 
-function Keys({ on }: { on: boolean }) {
-  return (
-    <div {...stylex.props(styles.row)}>
-      {["J", "K", "E", "H"].map((key) => (
-        <kbd
-          key={key}
-          {...stylex.props(
-            styles.cap,
-            key === "E" && on && styles.capPressed,
-            styles.delay(700)
-          )}
-        >
-          {key}
-        </kbd>
-      ))}
-    </div>
-  );
-}
-
-function BrowserTab({ on }: { on: boolean }) {
-  return (
-    <div {...stylex.props(styles.tabStrip)}>
-      <span {...stylex.props(styles.tab)}>
-        <span {...stylex.props(styles.favicon)}>
-          <Logo size={16} />
-          <span
-            {...stylex.props(styles.faviconCount, on && styles.faviconCountOn)}
-          >
-            3
-          </span>
-        </span>
-        <span {...stylex.props(styles.tabTitle)}>Inbox · Worklog</span>
-      </span>
-      <span {...stylex.props(styles.tab, styles.tabBehind)}>
-        <span {...stylex.props(styles.tabTitle)}>Pull requests</span>
-      </span>
-    </div>
-  );
-}
-
-function ModelKey({ on }: { on: boolean }) {
-  return (
-    <div {...stylex.props(styles.modes)}>
-      <div {...stylex.props(styles.mode)}>
-        <span {...stylex.props(styles.modeHead)}>Without a key</span>
-        <span {...stylex.props(styles.modeLine)}>
-          Briefs from templates and rules
-        </span>
-        <span {...stylex.props(styles.modeLine)}>
-          Inbox, board and stream as they are
-        </span>
-      </div>
-      <div {...stylex.props(styles.mode, on && styles.modeOn)}>
-        <span {...stylex.props(styles.modeHead)}>
-          <KeyIcon size={13} weight="fill" /> With a model key
-        </span>
-        <span {...stylex.props(styles.modeLine)}>
-          The assistant answers questions
-        </span>
-        <span {...stylex.props(styles.modeLine)}>
-          Briefs written in sentences
-        </span>
-      </div>
-    </div>
-  );
-}
-
 const ARRIVE = "cubic-bezier(0.25, 0.8, 0.25, 1)";
 
 const styles = stylex.create({
@@ -553,47 +379,6 @@ const styles = stylex.create({
   dotGreen: { backgroundColor: color.green },
   fluid: {
     width: "auto",
-  },
-  modes: {
-    display: "grid",
-    gridTemplateColumns: {
-      default: "1fr 1fr",
-      "@media (max-width: 600px)": "1fr",
-    },
-    gap: space.lg,
-    width: "100%",
-    maxWidth: 560,
-  },
-  mode: {
-    display: "flex",
-    flexDirection: "column",
-    gap: space.xs,
-    padding: space.lg,
-    borderRadius: radius.lg,
-    backgroundColor: color.raised,
-    boxShadow: shadow.object,
-    textAlign: "start",
-    transitionProperty: "box-shadow, background-color",
-    transitionDuration: "500ms",
-    transitionDelay: "500ms",
-  },
-  modeOn: {
-    backgroundColor: color.goldSubtle,
-    boxShadow: `0 0 0 1px ${color.gold}`,
-  },
-  modeHead: {
-    display: "inline-flex",
-    alignItems: "center",
-    gap: space.xs,
-    marginBottom: space.xs,
-    fontSize: text.label,
-    fontWeight: 600,
-    whiteSpace: "nowrap",
-  },
-  modeLine: {
-    fontSize: text.meta,
-    lineHeight: "17px",
-    color: color.fgMuted,
   },
   delay: (ms: number) => ({
     transitionDelay: `${ms}ms`,
@@ -675,112 +460,9 @@ const styles = stylex.create({
     opacity: 1,
     transform: "none",
   },
-  stack: {
-    display: "flex",
-    flexDirection: "column",
-    gap: space.sm,
-    width: "100%",
-    maxWidth: 240,
-  },
-  mini: {
-    position: "relative",
-    display: "flex",
-    alignItems: "center",
-    gap: space.md,
-    height: 34,
-    paddingInline: space.lg,
-    borderRadius: radius.md,
-    backgroundColor: color.raised,
-    boxShadow: shadow.object,
-    fontSize: text.label,
-    whiteSpace: "nowrap",
-  },
-  miniText: {
-    position: "relative",
-    overflow: "hidden",
-    textOverflow: "ellipsis",
-  },
-  noise: {
-    color: color.fgMuted,
-  },
-  kept: {
-    color: color.fg,
-    fontWeight: 500,
-  },
-  strike: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    top: "55%",
-    height: 1,
-    backgroundColor: color.fgMuted,
-    transformOrigin: "left",
-    transform: "scaleX(0)",
-    transitionProperty: "transform",
-    transitionDuration: "420ms",
-    transitionTimingFunction: "cubic-bezier(0.45, 0, 0.1, 1)",
-  },
-  strikeOn: {
-    transform: "scaleX(1)",
-  },
   mono: {
     fontFamily: font.mono,
     fontWeight: 400,
-  },
-  handles: {
-    display: "flex",
-    alignItems: "center",
-    gap: space.lg,
-  },
-  handleList: {
-    display: "flex",
-    flexDirection: "column",
-    gap: space.sm,
-  },
-  handle: {
-    display: "inline-flex",
-    alignItems: "center",
-    gap: space.sm,
-    height: 28,
-    paddingInline: space.md,
-    borderRadius: radius.full,
-    backgroundColor: color.raised,
-    boxShadow: shadow.object,
-    fontSize: text.meta,
-    fontWeight: 500,
-  },
-  arrow: {
-    color: color.fgFaint,
-    opacity: 0,
-    transform: "translateX(-6px)",
-    transitionProperty: "opacity, transform",
-    transitionDuration: "500ms",
-    transitionDelay: "400ms",
-    transitionTimingFunction: ARRIVE,
-  },
-  arrowOn: {
-    opacity: 1,
-    transform: "none",
-  },
-  person: {
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    gap: space.xs,
-    opacity: 0,
-    transform: "scale(0.9)",
-    transitionProperty: "opacity, transform",
-    transitionDuration: "560ms",
-    transitionDelay: "650ms",
-    transitionTimingFunction: ARRIVE,
-  },
-  personOn: {
-    opacity: 1,
-    transform: "none",
-  },
-  personName: {
-    fontSize: text.meta,
-    fontWeight: 600,
   },
   card: {
     position: "relative",
@@ -1071,83 +753,5 @@ const styles = stylex.create({
   },
   optionOn: {
     color: color.fg,
-  },
-  cap: {
-    display: "grid",
-    placeItems: "center",
-    width: 52,
-    height: 52,
-    borderRadius: 12,
-    backgroundColor: color.raised,
-    boxShadow: `0 0 0 1px ${color.line}, 0 3px 0 light-dark(oklch(0.88 0.005 80), oklch(0.13 0.004 80))`,
-    fontFamily: font.sans,
-    fontSize: 18,
-    fontWeight: 500,
-    color: color.fg,
-    transitionProperty: "transform, box-shadow",
-    transitionDuration: "140ms",
-  },
-  capPressed: {
-    transform: "translateY(2px)",
-    boxShadow: `0 0 0 1px ${color.line}, 0 1px 0 light-dark(oklch(0.88 0.005 80), oklch(0.13 0.004 80))`,
-  },
-  tabStrip: {
-    display: "flex",
-    alignItems: "flex-end",
-    width: "100%",
-    maxWidth: 280,
-    padding: space.md,
-    borderRadius: radius.lg,
-    backgroundColor: "light-dark(oklch(0.912 0.005 80), oklch(0.15 0.004 80))",
-  },
-  tab: {
-    display: "flex",
-    alignItems: "center",
-    gap: space.lg,
-    height: 38,
-    paddingInline: space.lg,
-    borderRadius: radius.md,
-    backgroundColor: color.raised,
-    fontSize: text.label,
-    fontWeight: 500,
-    whiteSpace: "nowrap",
-  },
-  tabBehind: {
-    backgroundColor: "transparent",
-    color: color.fgMuted,
-    fontWeight: 400,
-  },
-  tabTitle: {
-    overflow: "hidden",
-    textOverflow: "ellipsis",
-  },
-  favicon: {
-    position: "relative",
-    display: "flex",
-  },
-  faviconCount: {
-    position: "absolute",
-    top: -6,
-    right: -6,
-    display: "grid",
-    placeItems: "center",
-    minWidth: 14,
-    height: 14,
-    borderRadius: radius.full,
-    backgroundColor: color.red,
-    color: color.fgOnSolid,
-    fontSize: 9,
-    fontWeight: 600,
-    boxShadow: `0 0 0 1.5px ${color.raised}`,
-    opacity: 0,
-    transform: "scale(0.4)",
-    transitionProperty: "opacity, transform",
-    transitionDuration: "380ms",
-    transitionDelay: "700ms",
-    transitionTimingFunction: "cubic-bezier(0.34, 1.4, 0.64, 1)",
-  },
-  faviconCountOn: {
-    opacity: 1,
-    transform: "none",
   },
 });
