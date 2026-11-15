@@ -7,6 +7,7 @@ import {
   Scripts,
   createRootRouteWithContext,
 } from "@tanstack/react-router";
+import { Suspense, lazy } from "react";
 import type { ReactNode } from "react";
 import { Toaster } from "sonner";
 
@@ -99,6 +100,15 @@ export const Route = createRootRouteWithContext<RouterContext>()({
   notFoundComponent: NotFound,
 });
 
+// Agentation's toolbar, for pointing at the screen while giving feedback in development. Loaded
+// only there, so a production build never includes it.
+const Feedback = import.meta.env.DEV
+  ? lazy(async () => {
+      const { Agentation } = await import("agentation");
+      return { default: Agentation };
+    })
+  : null;
+
 function Root() {
   return (
     <Document>
@@ -111,6 +121,11 @@ function Root() {
         toastOptions={{ className: "wl-toast" }}
         theme="system"
       />
+      {Feedback && (
+        <Suspense fallback={null}>
+          <Feedback />
+        </Suspense>
+      )}
     </Document>
   );
 }
