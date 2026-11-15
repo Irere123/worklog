@@ -61,7 +61,6 @@ export function Open() {
           </p>
           <ul {...stylex.props(styles.chips)}>
             <li {...stylex.props(styles.chip)}>OpenAPI 3.1</li>
-            <li {...stylex.props(styles.chip)}>Self-host with Docker</li>
             <li {...stylex.props(styles.chip)}>Postgres and Bun</li>
           </ul>
         </div>
