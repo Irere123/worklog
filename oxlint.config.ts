@@ -68,10 +68,10 @@ export default defineConfig({
       rules: { "no-console": "off" },
     },
     {
-      files: ["apps/web/**"],
+      files: ["apps/web/**", "apps/api/src/emails/**"],
       rules: {
-        // StyleX convention: each file's \`stylex.create\` sits below its components, which
-        // read the styles only when they render, long after the module has loaded.
+        // StyleX convention, kept by the email templates too: each file's styles sit below its
+        // components, which read them only when they render, long after the module has loaded.
         "no-use-before-define": [
           "error",
           { functions: false, classes: true, variables: false },

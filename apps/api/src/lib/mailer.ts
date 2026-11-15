@@ -1,6 +1,12 @@
 import type { Config } from "#config";
 
-export type Email = { to: string; subject: string; text: string; html: string };
+export type Email = {
+  to: string;
+  subject: string;
+  text: string;
+  html: string;
+  headers?: Record<string, string>;
+};
 
 export type Mailer = {
   readonly kind: string;
@@ -36,6 +42,7 @@ function resendMailer(apiKey: string, from: string): Mailer {
           subject: email.subject,
           text: email.text,
           html: email.html,
+          headers: email.headers,
         }),
       });
       if (!res.ok) {

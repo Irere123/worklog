@@ -16,11 +16,10 @@ import type { TargetRow } from "#db/queries/delivery-targets";
 import { listIdentities } from "#db/queries/identities";
 import type { Member } from "#db/queries/members";
 import type { TargetKind, Visibility } from "#db/schema";
+import { briefEmail } from "#emails";
 import { handleProviderError } from "#ingest/lifecycle";
 import { badRequest, notFound } from "#lib/errors";
 import { generateId } from "#lib/ids";
-
-import { toEmailHtml } from "./sanitize";
 
 export type Outgoing = {
   subject: string;
@@ -289,12 +288,13 @@ async function asBot(
 async function sendTo(ctx: AppContext, target: TargetRow, message: Outgoing) {
   switch (target.kind) {
     case "email": {
-      const html = await toEmailHtml(message.markdown);
       await ctx.mailer.send({
         to: target.address,
-        subject: message.subject,
-        text: message.markdown,
-        html,
+        ...(await briefEmail({
+          subject: message.subject,
+          markdown: message.markdown,
+          home: ctx.config.PUBLIC_URL,
+        })),
       });
       return;
     }

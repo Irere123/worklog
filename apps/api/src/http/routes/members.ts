@@ -4,6 +4,7 @@ import type { AppContext } from "#context";
 import { listActiveTokens } from "#db/queries/api-tokens";
 import { getPersonalAgent, listMembers } from "#db/queries/members";
 import { getWorkspaceById } from "#db/queries/workspaces";
+import { inviteEmail } from "#emails";
 import {
   body,
   errors,
@@ -229,13 +230,14 @@ async function sendInvite(
   inviter: string,
   workspace: string
 ) {
-  const url = ctx.config.PUBLIC_URL;
   try {
     await ctx.mailer.send({
       to,
-      subject: `${inviter} invited you to ${workspace} on Worklog`,
-      text: `${inviter} added you to ${workspace} on Worklog. Sign in with this email address (or a GitHub, Discord or Slack account that uses it) at ${url} to join.`,
-      html: `<p>${inviter} added you to <b>${workspace}</b> on Worklog.</p><p><a href="${url}">Sign in</a> with this email address (or a GitHub, Discord or Slack account that uses it) to join.</p>`,
+      ...(await inviteEmail({
+        inviter,
+        workspace,
+        home: ctx.config.PUBLIC_URL,
+      })),
     });
   } catch (error) {
     log.error("members: invite email failed", { error });

@@ -5,6 +5,7 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { bearer, magicLink } from "better-auth/plugins";
 
 import type { Config } from "#config";
+import { signInEmail } from "#emails";
 import { log } from "#telemetry/log";
 
 import { generateId } from "./ids";
@@ -90,7 +91,7 @@ export function createAuth(
       magicLink({
         // Not awaited: response timing must not reveal whether the address exists.
         sendMagicLink: ({ email, url }) => {
-          void sendSignInLink(mailer, email, url);
+          void sendSignInLink(mailer, { email, url, home: config.PUBLIC_URL });
         },
       }),
       bearer(),
@@ -107,14 +108,12 @@ function oauthApp(
   return clientId && clientSecret ? { clientId, clientSecret } : null;
 }
 
-async function sendSignInLink(mailer: Mailer, email: string, url: string) {
+async function sendSignInLink(
+  mailer: Mailer,
+  link: { email: string; url: string; home: string }
+) {
   try {
-    await mailer.send({
-      to: email,
-      subject: "Your Worklog sign-in link",
-      text: `Sign in to Worklog: ${url}\n\nThe link expires in 5 minutes. If you didn't ask for it, ignore this email.`,
-      html: `<p><a href="${url}">Sign in to Worklog</a></p><p>The link expires in 5 minutes. If you didn't ask for it, ignore this email.</p>`,
-    });
+    await mailer.send({ to: link.email, ...(await signInEmail(link)) });
   } catch (error) {
     log.error("auth: magic link email failed", { error });
   }

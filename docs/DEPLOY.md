@@ -80,6 +80,15 @@ docker compose -f compose.yaml -f compose.https.yaml up -d
 - **Backups:** a compressed `pg_dump` every day into `./backups`, kept 14 days (`BACKUP_*` in `.env`). Copy them off the machine too. To restore one into a fresh stack: `docker compose up -d postgres`, then `docker compose exec -T postgres pg_restore -U worklog -d worklog --clean --if-exists < backups/worklog-….dump`, then `docker compose up -d`.
 - **Logs:** `docker compose logs -f api worker`. Each container's log is capped at five 10 MB files.
 
+## Email that reaches the inbox
+
+Worklog sends sign-in links, invites and briefs. The templates already do their part: a written plain-text twin, no images or tracking, a `List-Unsubscribe` header on scheduled mail. Most of what decides spam or inbox is the domain, though:
+
+- **Send from your own domain.** Set `MAIL_FROM` to an address on a domain you control, such as `Worklog <worklog@mail.example.com>`. A subdomain keeps Worklog's reputation apart from your team's own mail.
+- **Verify it with your provider.** Resend (or your SMTP provider) gives you SPF and DKIM records to add to DNS; mail isn't signed until they're live.
+- **Add a DMARC record,** at least `v=DMARC1; p=none; rua=mailto:you@example.com` on `_dmarc.<domain>`. Gmail and Yahoo reject bulk mail without one.
+- **Check one.** Send yourself a sign-in link and open "Show original" in Gmail: SPF, DKIM and DMARC should all say `PASS`.
+
 ## Building the images yourself
 
 From the repo root, since the lockfile is there:

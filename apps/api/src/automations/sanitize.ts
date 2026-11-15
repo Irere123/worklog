@@ -1,5 +1,3 @@
-import { Marked } from "marked";
-
 // Model-written text from untrusted inputs is an exfiltration channel (EchoLeak pattern: image or link URLs carrying secrets).
 // Drop images, keep a link only if its exact URL appeared in the source data (or is ours), escape raw HTML.
 export function sanitizeMarkdown(
@@ -54,14 +52,3 @@ export const escapeHtml = (s: string) =>
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;");
-
-const emailMarkdown = new Marked({
-  renderer: {
-    html: ({ text }) => escapeHtml(text),
-    image: ({ text }) => escapeHtml(text),
-  },
-});
-
-export async function toEmailHtml(markdown: string): Promise<string> {
-  return await emailMarkdown.parse(markdown);
-}

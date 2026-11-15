@@ -64,6 +64,7 @@ apps/api/src/
   automations/   scheduled routines, briefs, delivery
   agent/         all model work: loop, generate, prompts/, tools/, memory/
   jobs/          Graphile Worker tasks and cron
+  emails/        React Email templates: sign-in, invite, brief
   db/            schema, queries/ (one file per area), transact
   lib/           shared helpers and Better Auth
   events.ts      the event bus
@@ -90,6 +91,7 @@ apps/web/src/
 | an assistant tool | `agent/tools/<name>.ts`, registered in `agent/tools.ts` |
 | a connector | `connectors/<name>.ts`, registered in `connectors.ts` |
 | a background task | `jobs/tasks.ts` |
+| an email | `emails/<name>.tsx` on `Layout`, with a written text part, exported from `emails.ts` |
 | an environment variable | `config.ts` and `apps/api/.env.example` |
 | a web page | `apps/web/src/routes/<path>.tsx` rendering a component from `apps/web/src/features/<surface>/` |
 | a web query | a factory in `apps/web/src/api/queries.ts`, keyed by resource |

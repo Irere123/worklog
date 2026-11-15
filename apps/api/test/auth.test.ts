@@ -17,7 +17,22 @@ beforeEach(() => {
 
 const mailbox = () => (env.ctx.mailer as ConsoleMailer).sent;
 
+// Sign-in links and invites are sent without awaiting, so a test waits for the one it reads.
+async function mailTo(address: string, sentAfter = 0) {
+  for (let tries = 0; tries < 100; tries += 1) {
+    const mail = mailbox()
+      .slice(sentAfter)
+      .findLast((m) => m.to === address);
+    if (mail) {
+      return mail;
+    }
+    await Bun.sleep(10);
+  }
+  throw new Error(`No email reached ${address}`);
+}
+
 async function signIn(email: string) {
+  const before = mailbox().length;
   const start = await env.app.request("/api/auth/sign-in/magic-link", {
     method: "POST",
     headers: {
@@ -27,9 +42,7 @@ async function signIn(email: string) {
     body: JSON.stringify({ email, callbackURL: "/" }),
   });
   expect(start.status).toBe(200);
-  // The email is sent without awaiting (timing safety)
-  await Bun.sleep(20);
-  const mail = mailbox().findLast((m) => m.to === email)!;
+  const mail = await mailTo(email, before);
   const link = new URL(/https?:\/\/\S+/u.exec(mail.text)![0]);
   const verify = await env.app.request(link.pathname + link.search);
   const token = verify.headers.get("set-auth-token");
@@ -103,11 +116,7 @@ describe("signing in", () => {
       invited: true,
       member: { signedUp: false },
     });
-    expect(
-      mailbox().some(
-        (m) => m.to === "Sam@Example.com" && m.subject.includes("Invites Co")
-      )
-    ).toBe(true);
+    expect((await mailTo("Sam@Example.com")).subject).toContain("Invites Co");
 
     const token = await signIn("sam@example.com");
     const session = (await env.call("GET", "/v1/session", { token })).body;
@@ -116,6 +125,27 @@ describe("signing in", () => {
     ]);
     const me = (await env.call("GET", "/v1/me", { token })).body;
     expect(me.member).toMatchObject({ name: "Sam", signedUp: true });
+  });
+
+  test("an invite shows names as text, never as markup", async () => {
+    const owner = await env.workspace("<img src=x> Co");
+    await env.call("POST", "/v1/members", {
+      token: owner.token,
+      body: { kind: "human", name: "Rae", email: "rae@example.com" },
+    });
+    const mail = await mailTo("rae@example.com");
+    expect(mail.html).toContain("&lt;img src=x&gt; Co");
+    expect(mail.html).not.toContain("<img");
+  });
+
+  test("each sign-in email starts its own thread, so a fresh link isn't buried under old ones", async () => {
+    await signIn("thread@example.com");
+    await signIn("thread@example.com");
+    const [first, second] = mailbox()
+      .filter((m) => m.to === "thread@example.com")
+      .map((m) => m.headers?.["X-Entity-Ref-ID"]);
+    expect(first).toBeTruthy();
+    expect(first).not.toBe(second);
   });
 
   test("people in several workspaces choose one per request", async () => {
