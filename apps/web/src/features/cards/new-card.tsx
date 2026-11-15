@@ -7,6 +7,7 @@ import { toast } from "sonner";
 
 import { api, unwrap } from "#api/client";
 import { q } from "#api/queries";
+import { STARTER } from "#features/board/new-board";
 import { Button } from "#ui/button";
 import { Kbd } from "#ui/chip";
 import { Input, Select, Switch, Textarea } from "#ui/field";
@@ -33,33 +34,48 @@ export function NewCardDialog({
   const [title, setTitle] = useState(initial?.title ?? "");
   const [body, setBody] = useState(initial?.body ?? "");
   const [golden, setGolden] = useState(false);
+  const [boardName, setBoardName] = useState("");
   const client = useQueryClient();
   const navigate = useNavigate();
 
-  const boardId =
-    picked ??
-    onBoard?.params.boardId ??
-    boards.data?.find((b) => !b.archived)?.id ??
-    "";
+  const live = (boards.data ?? []).filter((b) => !b.archived);
+  // A new workspace has no board yet: the first card names one rather than leaving an empty
+  // picker and a button that never wakes.
+  const firstBoard = boards.isSuccess && live.length === 0;
+  const boardId = picked ?? onBoard?.params.boardId ?? live[0]?.id ?? "";
+  const ready = Boolean(
+    title.trim() && (firstBoard ? boardName.trim() : boardId)
+  );
   const close = () => {
     setPicked(null);
     onClose();
   };
 
   const create = useMutation({
-    mutationFn: async () =>
-      await unwrap(
+    mutationFn: async () => {
+      let target = boardId;
+      if (firstBoard) {
+        const board = await unwrap(
+          api.POST("/v1/boards", {
+            body: { name: boardName.trim(), columns: STARTER },
+          })
+        );
+        target = board.id;
+      }
+      return await unwrap(
         api.POST("/v1/cards", {
           body: {
-            boardId,
+            boardId: target,
             title: title.trim(),
             body: body.trim() || undefined,
             golden,
           },
         })
-      ),
+      );
+    },
     onSuccess: (card) => {
       void client.invalidateQueries({ queryKey: ["cards"] });
+      void client.invalidateQueries({ queryKey: ["boards"] });
       toast.success(`Added #${card.number} to Maybe?`, {
         action: {
           label: "Open",
@@ -75,13 +91,14 @@ export function NewCardDialog({
       setTitle("");
       setBody("");
       setGolden(false);
+      setBoardName("");
       close();
     },
     onError: (error) => toast.error(error.message),
   });
 
   const submit = () => {
-    if (title.trim() && boardId && !create.isPending) {
+    if (ready && !create.isPending) {
       create.mutate();
     }
   };
@@ -107,7 +124,7 @@ export function NewCardDialog({
             variant="primary"
             onClick={submit}
             busy={create.isPending}
-            disabled={!title.trim() || !boardId}
+            disabled={!ready}
           >
             Add card
           </Button>
@@ -143,19 +160,33 @@ export function NewCardDialog({
           sx={styles.desc}
         />
         <div {...stylex.props(styles.row)}>
-          <Select
-            label="Board"
-            value={boardId}
-            onValueChange={setPicked}
-            sx={styles.board}
-            options={(boards.data ?? [])
-              .filter((b) => !b.archived)
-              .map((b) => ({
+          {firstBoard ? (
+            <Input
+              aria-label="Board name"
+              placeholder="Name its board, like Platform"
+              value={boardName}
+              onChange={(e) => setBoardName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  submit();
+                }
+              }}
+              sx={styles.board}
+            />
+          ) : (
+            <Select
+              label="Board"
+              value={boardId}
+              onValueChange={setPicked}
+              sx={styles.board}
+              options={live.map((b) => ({
                 value: b.id,
                 label: b.name,
                 icon: <KanbanIcon size={14} />,
               }))}
-          />
+            />
+          )}
           {/* oxlint-disable-next-line jsx-a11y/label-has-associated-control -- Switch renders Base UI's hidden checkbox inside this label, which the rule can't see */}
           <label {...stylex.props(styles.golden)}>
             <TicketIcon size={14} />

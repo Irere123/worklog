@@ -13,7 +13,7 @@ import { Field, Input } from "#ui/field";
 import { Page, PageHeader } from "#ui/layout";
 import { space } from "#ui/tokens.stylex";
 
-const STARTER = ["Investigating", "In progress", "Review"];
+export const STARTER = ["Investigating", "In progress", "Review"];
 
 export function NewBoard() {
   const [name, setName] = useState("");
