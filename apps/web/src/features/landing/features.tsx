@@ -43,87 +43,75 @@ export function Features() {
       </div>
       <div {...stylex.props(styles.grid)}>
         <Tile
-          title="Connect in a click"
-          copy="GitHub and Slack install in one step and bring their recent history with them."
+          wide
+          title="A board that stays honest"
+          copy="A golden ticket marks the one card that matters, instead of ranking them all. Cards nobody touches drift to Not now, and finished ones are stamped."
           at={0}
         >
-          {(on) => <Marks on={on} />}
+          {(on) => <Board on={on} />}
         </Tile>
         <Tile
           title="Noise left out"
           copy="Bot comments, CI pings and duplicates never reach the stream."
-          at={1}
+          at={2}
         >
           {(on) => <Noise on={on} />}
         </Tile>
         <Tile
+          title="Connect in a click"
+          copy="GitHub and Slack install in one step and bring their recent history with them."
+          at={3}
+        >
+          {(on) => <Marks on={on} />}
+        </Tile>
+        <Tile
           title="One person, every handle"
           copy="GitHub, Slack and Discord names resolve to the teammate behind them."
-          at={2}
+          at={4}
         >
           {(on) => <Handles on={on} />}
         </Tile>
         <Tile
-          title="Golden tickets"
-          copy="Mark the one card that matters instead of ranking all of them."
-          at={3}
-        >
-          {(on) => <Golden on={on} />}
-        </Tile>
-        <Tile
-          title="Cards drift"
-          copy="Cards nobody touches fade to Not now instead of rotting on the board."
-          at={4}
-        >
-          {(on) => <Drift on={on} />}
-        </Tile>
-        <Tile
-          title="Stamped when it’s done"
-          copy="Closing a card stamps it, so finished looks finished."
-          at={5}
-        >
-          {(on) => <Stamp on={on} />}
-        </Tile>
-        <Tile
           title="A budget for pings"
           copy="Only what’s blocked on you interrupts, up to a limit you set. The rest waits for your brief."
-          at={6}
+          at={5}
         >
           {(on) => <Budget on={on} />}
         </Tile>
         <Tile
           title="Log it in a sentence"
           copy="A call, a decision, a fix off the radar. Type it or say it: dictation knows your team’s names."
-          at={7}
+          at={6}
         >
           {(on) => <QuickLog on={on} />}
         </Tile>
         <Tile
           title="Private stays private"
           copy="Teammates, and their assistants, only ever see what you shared with the team."
-          at={8}
+          at={7}
         >
           {(on) => <Privacy on={on} />}
         </Tile>
         <Tile
           title="Every action has a key"
           copy="J and K to move, E to finish, H to snooze. ⌘K finds anything."
-          at={9}
+          at={8}
         >
           {(on) => <Keys on={on} />}
         </Tile>
         <Tile
           title="The tab knows"
           copy="The browser tab carries what needs you, the way a calendar’s icon shows the date."
-          at={10}
+          at={9}
         >
           {(on) => <BrowserTab on={on} />}
         </Tile>
         <Tile
+          wide
           title="AI if you want it"
           badge="Opt-in"
-          copy="Add a model key for the assistant and written briefs. Without one, templates and rules do the job."
-          at={11}
+          copy="Worklog runs whole without a model. Add an OpenRouter key and the assistant answers, and briefs are written rather than filled in."
+          at={10}
         >
           {(on) => <ModelKey on={on} />}
         </Tile>
@@ -136,12 +124,15 @@ function Tile({
   title,
   copy,
   badge,
+  wide = false,
   at,
   children,
 }: {
   title: string;
   copy: string;
   badge?: string;
+  /** Two columns: the grid's lead tile, and the one that answers it at the foot. */
+  wide?: boolean;
   at: number;
   children: (on: boolean) => ReactNode;
 }) {
@@ -157,7 +148,7 @@ function Tile({
     return () => clearTimeout(timer);
   }, [on, at]);
   return (
-    <article ref={ref} {...stylex.props(styles.tile)}>
+    <article ref={ref} {...stylex.props(styles.tile, wide && styles.wide)}>
       <div aria-hidden {...stylex.props(styles.art)}>
         {children(turn)}
       </div>
@@ -266,9 +257,44 @@ function Handles({ on }: { on: boolean }) {
   );
 }
 
-function Golden({ on }: { on: boolean }) {
+function Board({ on }: { on: boolean }) {
   return (
-    <div {...stylex.props(styles.card, styles.golden, on && styles.goldenOn)}>
+    <div {...stylex.props(styles.board)}>
+      <div {...stylex.props(styles.boardColumn, styles.boardMaybe)}>
+        <span {...stylex.props(styles.boardHead)}>
+          <span {...stylex.props(styles.boardDot, styles.dotViolet)} />
+          Maybe?
+        </span>
+        <Drift on={on} fluid />
+      </div>
+      <div {...stylex.props(styles.boardColumn)}>
+        <span {...stylex.props(styles.boardHead)}>
+          <span {...stylex.props(styles.boardDot, styles.dotBlue)} />
+          In progress
+        </span>
+        <Golden on={on} fluid />
+      </div>
+      <div {...stylex.props(styles.boardColumn)}>
+        <span {...stylex.props(styles.boardHead)}>
+          <span {...stylex.props(styles.boardDot, styles.dotGreen)} />
+          Done
+        </span>
+        <Stamp on={on} fluid />
+      </div>
+    </div>
+  );
+}
+
+function Golden({ on, fluid = false }: { on: boolean; fluid?: boolean }) {
+  return (
+    <div
+      {...stylex.props(
+        styles.card,
+        fluid && styles.fluid,
+        styles.golden,
+        on && styles.goldenOn
+      )}
+    >
       <span {...stylex.props(styles.cardTop)}>
         <span
           {...stylex.props(styles.mono, styles.numberChip, styles.numberGolden)}
@@ -284,9 +310,16 @@ function Golden({ on }: { on: boolean }) {
   );
 }
 
-function Drift({ on }: { on: boolean }) {
+function Drift({ on, fluid = false }: { on: boolean; fluid?: boolean }) {
   return (
-    <div {...stylex.props(styles.card, styles.drift, on && styles.driftOn)}>
+    <div
+      {...stylex.props(
+        styles.card,
+        fluid && styles.fluid,
+        styles.drift,
+        on && styles.driftOn
+      )}
+    >
       <span {...stylex.props(styles.cardTop)}>
         <span {...stylex.props(styles.mono, styles.numberChip)}>#9</span>
         <span {...stylex.props(styles.countdown)}>
@@ -300,14 +333,14 @@ function Drift({ on }: { on: boolean }) {
   );
 }
 
-function Stamp({ on }: { on: boolean }) {
+function Stamp({ on, fluid = false }: { on: boolean; fluid?: boolean }) {
   return (
-    <div {...stylex.props(styles.card)}>
+    <div {...stylex.props(styles.card, fluid && styles.fluid)}>
       <span {...stylex.props(styles.cardTop)}>
         <span {...stylex.props(styles.mono, styles.numberChip)}>#12</span>
       </span>
       <span {...stylex.props(styles.cardTitle, styles.stamped)}>
-        Search referrals by national ID
+        Search by national ID
       </span>
       <span {...stylex.props(styles.stamp, on && styles.stampOn)}>
         <span {...stylex.props(styles.stampWord)}>Done</span>
@@ -419,12 +452,27 @@ function BrowserTab({ on }: { on: boolean }) {
 
 function ModelKey({ on }: { on: boolean }) {
   return (
-    <div {...stylex.props(styles.keyField)}>
-      <KeyIcon size={14} {...stylex.props(styles.keyIcon)} />
-      <span {...stylex.props(styles.keyText)}>OPENROUTER_API_KEY</span>
-      <span {...stylex.props(styles.keyState, on && styles.keyStateOn)}>
-        {on ? "Added" : "Not set"}
-      </span>
+    <div {...stylex.props(styles.modes)}>
+      <div {...stylex.props(styles.mode)}>
+        <span {...stylex.props(styles.modeHead)}>Without a key</span>
+        <span {...stylex.props(styles.modeLine)}>
+          Briefs from templates and rules
+        </span>
+        <span {...stylex.props(styles.modeLine)}>
+          Inbox, board and stream as they are
+        </span>
+      </div>
+      <div {...stylex.props(styles.mode, on && styles.modeOn)}>
+        <span {...stylex.props(styles.modeHead)}>
+          <KeyIcon size={13} weight="fill" /> With OPENROUTER_API_KEY
+        </span>
+        <span {...stylex.props(styles.modeLine)}>
+          The assistant answers, for you and about you
+        </span>
+        <span {...stylex.props(styles.modeLine)}>
+          Briefs written in sentences
+        </span>
+      </div>
     </div>
   );
 }
@@ -453,15 +501,113 @@ const styles = stylex.create({
     // In the dark a surface a step up isn't edge enough; a hairline carries it, as in the app.
     boxShadow: "inset 0 0 0 1px light-dark(transparent, oklch(1 0 0 / 0.06))",
   },
+  wide: {
+    gridColumn: {
+      default: "span 2",
+      "@media (max-width: 600px)": "auto",
+    },
+  },
+  board: {
+    display: "flex",
+    gap: space.lg,
+    width: "100%",
+    maxWidth: 640,
+  },
+  boardColumn: {
+    display: "flex",
+    flexDirection: "column",
+    gap: space.md,
+    flexGrow: 1,
+    flexBasis: 0,
+    minWidth: 0,
+  },
+  // A phone keeps two columns of the board, so no card's words are cut.
+  boardMaybe: {
+    display: {
+      default: "flex",
+      "@media (max-width: 600px)": "none",
+    },
+  },
+  boardHead: {
+    display: "flex",
+    alignItems: "center",
+    gap: space.sm,
+    paddingInline: space.xs,
+    fontSize: text.meta,
+    fontWeight: 600,
+    color: color.fg,
+  },
+  boardDot: {
+    width: 8,
+    height: 8,
+    borderRadius: radius.full,
+  },
+  dotViolet: { backgroundColor: color.violet },
+  dotBlue: { backgroundColor: color.blue },
+  dotGreen: { backgroundColor: color.green },
+  fluid: {
+    width: "auto",
+  },
+  modes: {
+    display: "grid",
+    gridTemplateColumns: {
+      default: "1fr 1fr",
+      "@media (max-width: 600px)": "1fr",
+    },
+    gap: space.md,
+    width: "100%",
+    maxWidth: 560,
+  },
+  mode: {
+    display: "flex",
+    flexDirection: "column",
+    gap: space.xs,
+    padding: space.lg,
+    borderRadius: radius.lg,
+    backgroundColor: color.raised,
+    boxShadow: `0 0 0 1px ${color.line}`,
+    textAlign: "start",
+    transitionProperty: "box-shadow, background-color",
+    transitionDuration: "500ms",
+    transitionDelay: "500ms",
+  },
+  modeOn: {
+    backgroundColor: color.goldSubtle,
+    boxShadow: `0 0 0 1px ${color.gold}`,
+  },
+  modeHead: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: space.xs,
+    marginBottom: space.xs,
+    fontSize: text.label,
+    fontWeight: 600,
+    whiteSpace: "nowrap",
+  },
+  modeLine: {
+    fontSize: text.meta,
+    lineHeight: "17px",
+    color: color.fgMuted,
+  },
   delay: (ms: number) => ({
     transitionDelay: `${ms}ms`,
   }),
   art: {
     display: "grid",
     placeItems: "center",
+    // A phone gives each picture the height it needs, from a floor, so a taller one (the AI
+    // tile's two panels) never runs into its own title.
     height: {
       default: 200,
+      "@media (max-width: 600px)": "auto",
+    },
+    minHeight: {
+      default: 0,
       "@media (max-width: 600px)": 156,
+    },
+    paddingBlock: {
+      default: 0,
+      "@media (max-width: 600px)": space.x3,
     },
     paddingInline: space.xl,
   },
@@ -984,42 +1130,5 @@ const styles = stylex.create({
   faviconCountOn: {
     opacity: 1,
     transform: "none",
-  },
-  keyField: {
-    display: "flex",
-    alignItems: "center",
-    gap: space.md,
-    width: "100%",
-    maxWidth: 270,
-    height: 40,
-    paddingInline: space.lg,
-    borderRadius: radius.md,
-    backgroundColor: color.raised,
-    boxShadow: `0 0 0 1px ${color.lineUi}`,
-  },
-  keyIcon: {
-    color: color.fgFaint,
-    flexShrink: 0,
-  },
-  keyText: {
-    flexGrow: 1,
-    fontFamily: font.mono,
-    fontSize: text.meta,
-    color: color.fgMuted,
-  },
-  keyState: {
-    paddingInline: space.sm,
-    borderRadius: radius.xs,
-    fontSize: text.caption,
-    fontWeight: 500,
-    color: color.fgMuted,
-    backgroundColor: color.ui,
-    transitionProperty: "background-color, color",
-    transitionDuration: "400ms",
-    transitionDelay: "600ms",
-  },
-  keyStateOn: {
-    backgroundColor: color.greenSubtle,
-    color: color.greenFg,
   },
 });

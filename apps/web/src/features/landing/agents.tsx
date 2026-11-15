@@ -150,14 +150,19 @@ function Ask() {
         <Collapse open={shown.steps > 0 && !shown.folded}>
           <div {...stylex.props(styles.steps)}>
             <span {...stylex.props(styles.step)}>
-              <MagnifyingGlassIcon size={13} />
+              <MagnifyingGlassIcon
+                size={13}
+                {...stylex.props(styles.stepIcon)}
+              />
               Searched activity for “SMS fallback” · 4 results
             </span>
             <Collapse open={shown.steps > 1}>
               <span {...stylex.props(styles.step)}>
-                <KanbanIcon size={13} />
-                Read <span {...stylex.props(styles.mono)}>#4</span> SMS fallback
-                when the receiving clinic is offline
+                <KanbanIcon size={13} {...stylex.props(styles.stepIcon)} />
+                <span>
+                  Read <span {...stylex.props(styles.mono)}>#4</span> SMS
+                  fallback when the receiving clinic is offline
+                </span>
               </span>
             </Collapse>
           </div>
@@ -473,10 +478,15 @@ const styles = stylex.create({
   },
   step: {
     display: "flex",
-    alignItems: "center",
+    alignItems: "flex-start",
     gap: space.sm,
     fontSize: text.meta,
     color: color.fgMuted,
+  },
+  // Sits on the step's first line when its words wrap.
+  stepIcon: {
+    flexShrink: 0,
+    marginTop: 2,
   },
   folded: {
     display: "inline-flex",
