@@ -27,6 +27,11 @@ beforeAll(async () => {
     path.join(dist, "index.html"),
     "<!doctype html><title>Worklog · Your team’s logbook</title>"
   );
+  mkdirSync(path.join(dist, "pricing"));
+  writeFileSync(
+    path.join(dist, "pricing", "index.html"),
+    "<!doctype html><title>Pricing · Worklog</title>"
+  );
   writeFileSync(path.join(dist, "assets", "app-abc123.js"), script);
   writeFileSync(
     path.join(dist, "assets", "inter-abc123.woff2"),
@@ -113,12 +118,18 @@ describe("serving the web app", () => {
     expect(missing.headers.get("content-type")).toContain("application/json");
   });
 
-  test("the front page is served as the build prerendered it, never cached", async () => {
+  test("prerendered pages are served as the build made them, never cached", async () => {
     const app = webApp();
     const front = await app.request("/");
     expect(front.status).toBe(200);
     expect(front.headers.get("cache-control")).toBe("no-cache");
     expect(await front.text()).toContain("Your team’s logbook");
+
+    // Another prerendered page answers with or without its trailing slash.
+    for (const url of ["/pricing", "/pricing/"]) {
+      const pricing = await app.request(url);
+      expect(await pricing.text()).toContain("Pricing · Worklog");
+    }
 
     // Every other route is still the shell, which routes in the browser.
     const home = await app.request("/home");

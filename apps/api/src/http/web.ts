@@ -57,21 +57,26 @@ export function webAppRoutes(dist: string) {
     if (API_PATH.test(c.req.path)) {
       return await c.notFound();
     }
-    const wanted = path.resolve(root, `.${decoded(c.req.path)}`);
+    const name = decoded(c.req.path);
+    const wanted = name === null ? null : path.resolve(root, `.${name}`);
     // Only files inside the build: `..` in a path must not reach the rest of the disk.
-    const asset = wanted.startsWith(root + path.sep)
-      ? await load(wanted)
-      : null;
+    const asset =
+      wanted !== null && wanted.startsWith(root + path.sep)
+        ? await load(wanted)
+        : null;
     if (asset) {
       if (c.req.path.startsWith("/assets/")) {
         c.header("cache-control", IMMUTABLE);
       }
       return send(c, asset);
     }
-    // A page the build prerendered (the front page) is its folder's index.html. Like the shell,
-    // it names this build's hashed assets, so it's never served from a cache.
-    const inside = wanted === root || wanted.startsWith(root + path.sep);
-    if (inside && c.req.path.endsWith("/")) {
+    // A page the build prerendered (the front page, pricing…) is its folder's index.html, asked
+    // for as /pricing or /pricing/ alike. Like the shell, it names this build's hashed assets, so
+    // it's never served from a cache.
+    if (
+      wanted !== null &&
+      (wanted === root || wanted.startsWith(root + path.sep))
+    ) {
       const page = await load(path.join(wanted, "index.html"));
       if (page) {
         c.header("cache-control", "no-cache");
@@ -93,12 +98,12 @@ export function webAppRoutes(dist: string) {
   });
 }
 
-// A malformed escape (`%E0%A4%A`) names no file; it gets the shell like any unknown path.
+// A malformed escape (`%E0%A4%A`) names no file or page; it gets the shell like any unknown path.
 function decoded(pathname: string) {
   try {
     return decodeURIComponent(pathname);
   } catch {
-    return "/";
+    return null;
   }
 }
 
