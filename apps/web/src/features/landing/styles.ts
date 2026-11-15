@@ -37,6 +37,12 @@ export const page = stylex.create({
       default: 160,
       "@media (max-width: 640px)": 104,
     },
+    // A nav link lands with the heading a comfortable step under the sticky bar, not a whole
+    // section's padding below it.
+    scrollMarginTop: {
+      default: -80,
+      "@media (max-width: 640px)": -40,
+    },
   },
   intro: {
     display: "flex",

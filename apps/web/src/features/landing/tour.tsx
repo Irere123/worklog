@@ -195,6 +195,8 @@ const fill = stylex.keyframes({
 
 const styles = stylex.create({
   tour: {
+    // Clears the sticky nav, so "Tour" lands on the whole wallpaper.
+    scrollMarginTop: 76,
     marginTop: {
       default: 72,
       "@media (max-width: 640px)": 48,
