@@ -86,13 +86,12 @@ function Principle({
 const styles = stylex.create({
   grid: {
     display: "grid",
+    // minmax(0, …): a line that won't wrap must not widen its own card past the others.
     gridTemplateColumns: {
-      default: "repeat(3, 1fr)",
+      default: "repeat(3, minmax(0, 1fr))",
       "@media (max-width: 860px)": "1fr",
     },
     gap: space.md,
-    maxWidth: 960,
-    marginInline: "auto",
   },
   card: {
     display: "flex",

@@ -23,8 +23,10 @@ export function Closing({ setupOpen }: { setupOpen: boolean }) {
         {setupOpen ? "Set up your workspace" : "Sign in to Worklog"}
       </Link>
       <p {...stylex.props(styles.fine)}>
-        A few minutes with Docker Compose, and your team’s tools start writing
-        it.
+        Running your own?{" "}
+        <a href={DEPLOY} {...stylex.props(styles.fineLink)}>
+          It takes a few minutes with Docker Compose.
+        </a>
       </p>
     </section>
   );
@@ -63,8 +65,8 @@ export function Footer({ setupOpen }: { setupOpen: boolean }) {
             Worklog
           </span>
           <p {...stylex.props(styles.tagline)}>
-            Your team’s logbook. The tools and agents write it; everyone can
-            read it.
+            A shared record of what your team and its agents did, and of what
+            needs whom.
           </p>
         </div>
         {COLUMNS.map((column) => (
@@ -157,6 +159,17 @@ const styles = stylex.create({
     fontSize: text.label,
     color: color.fgMuted,
     textWrap: "balance",
+  },
+  fineLink: {
+    color: color.fg,
+    textDecorationLine: "underline",
+    textDecorationColor: color.lineStrong,
+    textUnderlineOffset: 3,
+    outline: {
+      default: "none",
+      ":focus-visible": `2px solid ${color.focus}`,
+    },
+    outlineOffset: 2,
   },
   footer: {
     marginTop: 140,

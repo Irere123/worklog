@@ -13,7 +13,7 @@ import { AppWindow, Cursor } from "#features/landing/frame";
 import { Collapse, Roll } from "#features/landing/motion";
 import { pointAt, useScript } from "#features/landing/script";
 import type { Point } from "#features/landing/script";
-import { atlas, eric, grace, jean } from "#features/landing/team";
+import { atlas, eric, grace, jean, scout } from "#features/landing/team";
 import { Avatar } from "#ui/avatar";
 import { color, font, radius, space, text } from "#ui/tokens.stylex";
 
@@ -120,7 +120,7 @@ export function InboxScene({ play, paused, still }: SceneProps) {
                 on={!s.done}
               />
             </Collapse>
-            <Group label="Updates" count={3} />
+            <Group label="Updates" count={4} />
             <Item
               who={<Avatar person={grace} size={26} />}
               title={
@@ -156,6 +156,19 @@ export function InboxScene({ play, paused, still }: SceneProps) {
               }
               why="Card you follow"
               when="Fri"
+              on={false}
+            />
+            <Item
+              who={<Avatar person={scout} size={26} />}
+              title={
+                <>
+                  Scout found why <CardNumber>14</CardNumber> Nightly sync
+                  stalls on the Huye server
+                </>
+              }
+              why="Agent finished"
+              tone="green"
+              when="Thu"
               on={false}
             />
           </div>

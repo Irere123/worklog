@@ -115,7 +115,7 @@ export function BoardScene({ play, paused, still }: SceneProps) {
             <span {...stylex.props(styles.notNowLabel)}>Not now</span>
           </div>
 
-          <Column name="Maybe?" hue="violet" count={3} narrowHidden>
+          <Column name="Maybe?" hue="violet" count={2} narrowHidden>
             <Tile
               number={8}
               title="Track referral turnaround per district"

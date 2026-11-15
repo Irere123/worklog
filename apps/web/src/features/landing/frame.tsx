@@ -423,8 +423,8 @@ const styles = stylex.create({
   },
   mobileCount: {
     position: "absolute",
-    top: -7,
-    right: -10,
+    top: -6,
+    right: -8,
     boxShadow: `0 0 0 2px ${color.sidebar}`,
   },
   pane: {

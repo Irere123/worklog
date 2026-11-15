@@ -19,7 +19,7 @@ import { ProductMark } from "#ui/product-mark";
 import type { Product } from "#ui/product-mark";
 import { color, font, radius, space, text } from "#ui/tokens.stylex";
 
-import { useInView } from "./script";
+import { useInView, useReducedMotion } from "./script";
 import { page, type } from "./styles";
 import { eric } from "./team";
 
@@ -141,6 +141,8 @@ function Tile({
   const ref = useRef<HTMLElement>(null);
   const on = useInView(ref, { margin: "0px 0px -10% 0px", once: true });
   const [turn, setTurn] = useState(false);
+  // With reduced motion every tile is simply finished: nothing waits to be scrolled to.
+  const reduced = useReducedMotion();
   useEffect(() => {
     const timer = on
       ? setTimeout(() => setTurn(true), (at % 3) * 110)
@@ -150,7 +152,7 @@ function Tile({
   return (
     <article ref={ref} {...stylex.props(styles.tile, wide && styles.wide)}>
       <div aria-hidden {...stylex.props(styles.art)}>
-        {children(turn)}
+        {children(turn || reduced)}
       </div>
       <div {...stylex.props(styles.words)}>
         <h3 {...stylex.props(type.tileTitle, styles.title)}>
@@ -390,7 +392,9 @@ function QuickLog({ on }: { on: boolean }) {
         <span {...stylex.props(styles.kind)}>
           <LightbulbIcon size={12} weight="fill" /> Decision
         </span>
-        <kbd {...stylex.props(styles.kbd)}>L</kbd>
+        <span {...stylex.props(styles.hint)}>
+          Press <kbd {...stylex.props(styles.kbd)}>L</kbd> anywhere
+        </span>
       </span>
     </div>
   );
@@ -464,10 +468,10 @@ function ModelKey({ on }: { on: boolean }) {
       </div>
       <div {...stylex.props(styles.mode, on && styles.modeOn)}>
         <span {...stylex.props(styles.modeHead)}>
-          <KeyIcon size={13} weight="fill" /> With OPENROUTER_API_KEY
+          <KeyIcon size={13} weight="fill" /> With a model key
         </span>
         <span {...stylex.props(styles.modeLine)}>
-          The assistant answers, for you and about you
+          The assistant answers questions
         </span>
         <span {...stylex.props(styles.modeLine)}>
           Briefs written in sentences
@@ -926,7 +930,7 @@ const styles = stylex.create({
   segment: {
     height: 6,
     borderRadius: radius.full,
-    backgroundColor: color.ui,
+    backgroundColor: color.lineUi,
     transitionProperty: "background-color",
     transitionDuration: "300ms",
   },
@@ -995,6 +999,13 @@ const styles = stylex.create({
     color: color.goldFg,
     fontSize: text.meta,
     fontWeight: 500,
+  },
+  hint: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: space.xs,
+    fontSize: text.meta,
+    color: color.fgMuted,
   },
   kbd: {
     display: "inline-grid",
@@ -1076,9 +1087,8 @@ const styles = stylex.create({
     alignItems: "flex-end",
     width: "100%",
     maxWidth: 280,
-    paddingTop: space.md,
-    paddingInline: space.md,
-    borderRadius: `${radius.lg} ${radius.lg} 0 0`,
+    padding: space.md,
+    borderRadius: radius.lg,
     backgroundColor: "light-dark(oklch(0.912 0.005 80), oklch(0.15 0.004 80))",
   },
   tab: {
@@ -1087,7 +1097,7 @@ const styles = stylex.create({
     gap: space.md,
     height: 38,
     paddingInline: space.lg,
-    borderRadius: `${radius.md} ${radius.md} 0 0`,
+    borderRadius: radius.md,
     backgroundColor: color.raised,
     fontSize: text.label,
     fontWeight: 500,

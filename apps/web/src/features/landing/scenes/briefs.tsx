@@ -266,7 +266,8 @@ const styles = stylex.create({
     bottom: 64,
     flexDirection: "column",
     gap: space.md,
-    width: 280,
+    // Narrow enough to end before the brief's text column: it covers the sidebar, never words.
+    width: 236,
     padding: space.lg,
     borderRadius: radius.lg,
     backgroundColor: color.raised,

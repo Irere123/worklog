@@ -235,8 +235,12 @@ const styles = stylex.create({
     borderBottomStyle: "solid",
     borderBottomColor: color.lineStrong,
   },
+  // On a phone the composer gives its room to what needs you, the point of the page.
   composer: {
-    display: "flex",
+    display: {
+      default: "flex",
+      "@media (max-width: 719px)": "none",
+    },
     flexDirection: "column",
     gap: space.lg,
     marginTop: space.x3,

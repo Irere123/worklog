@@ -167,7 +167,7 @@ export function ActivityScene({ play, paused, still }: SceneProps) {
             who={atlas.name}
             card={4}
             title="SMS fallback when the receiving clinic is offline"
-            detail="Finished the prototype · Opened #209 for review"
+            detail="Answered Eric’s review comments on #209"
             when="7:30"
             agent
           />
@@ -238,7 +238,7 @@ function Line({
           {card !== undefined && (
             <CardNumber sx={styles.number}>{card}</CardNumber>
           )}
-          <span {...stylex.props(parts.ellipsis)}>{title}</span>
+          <span {...stylex.props(styles.title)}>{title}</span>
         </span>
         <span {...stylex.props(styles.detail)}>{detail}</span>
       </span>
@@ -351,12 +351,25 @@ const styles = stylex.create({
     flexGrow: 1,
     minWidth: 0,
   },
+  // A phone lets a line's title wrap rather than cutting it to a few letters.
   head: {
     display: "flex",
+    flexWrap: {
+      default: "nowrap",
+      "@media (max-width: 719px)": "wrap",
+    },
     alignItems: "center",
-    gap: space.sm,
+    columnGap: space.sm,
     minWidth: 0,
-    whiteSpace: "nowrap",
+    whiteSpace: {
+      default: "nowrap",
+      "@media (max-width: 719px)": "normal",
+    },
+  },
+  title: {
+    minWidth: 0,
+    overflow: "hidden",
+    textOverflow: "ellipsis",
   },
   number: {
     fontSize: text.label,

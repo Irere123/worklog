@@ -138,7 +138,7 @@ function Ask() {
       <div {...stylex.props(styles.panelHead)}>
         <Ghost mood={shown.mood} size={22} />
         <span {...stylex.props(styles.panelTitle)}>Jean’s assistant</span>
-        <span {...stylex.props(styles.away)}>Jean is away until Thursday</span>
+        <span {...stylex.props(styles.away)}>Jean is out until 15:00</span>
       </div>
       <div {...stylex.props(styles.thread)}>
         <Collapse open={shown.asked}>
@@ -190,8 +190,7 @@ function Ask() {
           <span {...stylex.props(styles.sources)}>
             <span {...stylex.props(styles.source)}>
               <KanbanIcon size={12} />
-              <span {...stylex.props(styles.mono)}>#4</span> SMS fallback when
-              the receiving clinic is offline
+              <span {...stylex.props(styles.mono)}>#4</span> SMS fallback
             </span>
             <span {...stylex.props(styles.source)}>
               <MagnifyingGlassIcon size={12} />
@@ -340,17 +339,9 @@ function Approve() {
           <Avatar person={atlas} size={16} />
           <span>
             <span {...stylex.props(styles.strong)}>Atlas</span> Drafted the
-            rollback plan · snapshot restore, about 12 min
+            rollback plan · snapshot restore, about 12 min
           </span>
           <span {...stylex.props(styles.when)}>8:10</span>
-        </span>
-        <span {...stylex.props(styles.logLine)}>
-          <Avatar person={jean} size={16} />
-          <span>
-            <span {...stylex.props(styles.strong)}>Jean Habimana</span> Assigned
-            to Atlas · Moved to Investigating
-          </span>
-          <span {...stylex.props(styles.when)}>Fri</span>
         </span>
         <span {...stylex.props(styles.logLine)}>
           <Avatar person={jean} size={16} />
@@ -389,7 +380,11 @@ const styles = stylex.create({
     boxShadow: "inset 0 0 0 1px light-dark(transparent, oklch(1 0 0 / 0.06))",
   },
   plate: {
-    height: 380,
+    // Sized to what the two windows hold once they've played, so neither ends on a blank third.
+    height: {
+      default: 340,
+      "@media (max-width: 640px)": 360,
+    },
     borderRadius: 0,
     display: "flex",
     justifyContent: "center",
@@ -442,7 +437,11 @@ const styles = stylex.create({
   },
   panelTitle: {
     fontWeight: 600,
-    whiteSpace: "nowrap",
+    // A phone wraps a card's title rather than cutting the number that matters.
+    whiteSpace: {
+      default: "nowrap",
+      "@media (max-width: 640px)": "normal",
+    },
     overflow: "hidden",
     textOverflow: "ellipsis",
   },

@@ -80,7 +80,10 @@ const PEOPLE: Source[] = [
 /** Where the record comes from, drifting past in two rows like a ticker. */
 export function Sources() {
   return (
-    <section aria-labelledby="sources" {...stylex.props(page.section)}>
+    <section
+      aria-labelledby="sources"
+      {...stylex.props(page.section, styles.section)}
+    >
       <p id="sources" {...stylex.props(page.narrow, type.lede, styles.lede)}>
         <span {...stylex.props(styles.line)}>
           Code, chat, agents and a sentence from you.
@@ -134,6 +137,13 @@ const styles = stylex.create({
     textAlign: "center",
     marginBottom: space.x5,
     color: color.fgMuted,
+  },
+  // A ticker between two full sections needs less air than a section of its own.
+  section: {
+    paddingTop: {
+      default: 112,
+      "@media (max-width: 640px)": 80,
+    },
   },
   line: {
     display: "block",

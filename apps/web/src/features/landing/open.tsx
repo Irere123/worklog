@@ -9,9 +9,11 @@ import { useInView, useReducedMotion, useScript } from "./script";
 import { page, type } from "./styles";
 import { ada } from "./team";
 
-const COMMAND = `curl -X POST $WORKLOG/v1/logs \\
+// Broken at its own flags and fields, so a narrow terminal never has to split a word.
+const COMMAND = `curl $WORKLOG/v1/logs \\
   -H "authorization: Bearer $KEY" \\
-  -d '{"text":"Agreed on FHIR R4 for referrals","kind":"decision"}'`;
+  -d '{"kind":"decision",
+    "text":"Agreed on FHIR R4 for referrals"}'`;
 
 type State = { typed: number; answered: boolean; logged: boolean };
 
@@ -92,7 +94,6 @@ export function Open() {
                 )}
               >
                 <span {...stylex.props(styles.ok)}>201</span> Created · log_7Qe2
-                recorded for Ada Mukamana
               </span>
             </pre>
           </div>
@@ -223,11 +224,11 @@ const styles = stylex.create({
     fontFamily: font.mono,
     fontSize: {
       default: 13,
-      "@media (max-width: 640px)": 11,
+      "@media (max-width: 640px)": 10,
     },
     lineHeight: 1.7,
     whiteSpace: "pre-wrap",
-    wordBreak: "break-all",
+    overflowWrap: "normal",
     textAlign: "start",
   },
   prompt: {
@@ -259,7 +260,7 @@ const styles = stylex.create({
     position: "absolute",
     // Straddles the terminal's edge, half over the panel, so it reads as arriving from outside.
     right: {
-      default: -150,
+      default: -110,
       "@media (max-width: 1100px)": -40,
       "@media (max-width: 860px)": 0,
     },
@@ -272,7 +273,7 @@ const styles = stylex.create({
     alignItems: "flex-start",
     gap: space.lg,
     width: {
-      default: 420,
+      default: 360,
       "@media (max-width: 860px)": "auto",
     },
     padding: space.lg,
