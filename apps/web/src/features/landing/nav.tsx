@@ -1,4 +1,4 @@
-import { ListIcon, XIcon } from "@phosphor-icons/react";
+import { GithubLogoIcon, ListIcon, XIcon } from "@phosphor-icons/react";
 import * as stylex from "@stylexjs/stylex";
 import { Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { Logo } from "#ui/logo";
 import { color, media, motion, radius, shadow, space } from "#ui/tokens.stylex";
 
+import { SOURCE } from "./hero";
 import { cta } from "./styles";
 
 const LINKS = [
@@ -59,16 +60,15 @@ export function Nav({ setupOpen }: { setupOpen: boolean }) {
     return () => window.removeEventListener("keydown", close);
   }, [open]);
 
+  // A fresh server starts with setting up its first workspace; any other starts at sign-in.
   const to = setupOpen ? "/setup" : "/login";
-  const label = setupOpen ? "Get started" : "Sign in";
 
   return (
     <nav aria-label="Worklog" {...stylex.props(styles.bar)}>
       <div aria-hidden {...stylex.props(styles.blur)} />
       <div aria-hidden {...stylex.props(styles.fade)} />
-      <a href="#top" aria-label="Worklog" {...stylex.props(styles.brand)}>
-        <Logo size={20} />
-        <span>Worklog</span>
+      <a href="#top" {...stylex.props(styles.brand)}>
+        <Logo size={22} />
       </a>
       <ul {...stylex.props(styles.links)}>
         <li
@@ -98,6 +98,19 @@ export function Nav({ setupOpen }: { setupOpen: boolean }) {
         ))}
       </ul>
       <div {...stylex.props(styles.end)}>
+        <a
+          href={SOURCE}
+          aria-label="Worklog on GitHub"
+          {...stylex.props(styles.quietLink, styles.desktopOnly)}
+        >
+          <GithubLogoIcon size={16} weight="fill" />
+        </a>
+        <Link
+          to="/login"
+          {...stylex.props(styles.quietLink, styles.desktopOnly)}
+        >
+          Sign in
+        </Link>
         <Link
           to={to}
           {...stylex.props(
@@ -107,7 +120,7 @@ export function Nav({ setupOpen }: { setupOpen: boolean }) {
             styles.desktopOnly
           )}
         >
-          {label}
+          Get started
         </Link>
         <button
           type="button"
@@ -132,11 +145,21 @@ export function Nav({ setupOpen }: { setupOpen: boolean }) {
               {link.label}
             </a>
           ))}
+          <a
+            href={SOURCE}
+            onClick={() => setOpen(false)}
+            {...stylex.props(styles.menuLink)}
+          >
+            GitHub
+          </a>
+          <Link to="/login" {...stylex.props(styles.menuLink)}>
+            Sign in
+          </Link>
           <Link
             to={to}
             {...stylex.props(cta.base, cta.primary, styles.menuAction)}
           >
-            {setupOpen ? "Set up your workspace" : "Sign in to Worklog"}
+            Get started
           </Link>
         </div>
       )}
@@ -271,6 +294,27 @@ const styles = stylex.create({
     alignItems: "center",
     gap: space.xs,
     justifySelf: "end",
+  },
+  quietLink: {
+    alignItems: "center",
+    height: 28,
+    paddingInline: 10,
+    borderRadius: radius.md,
+    color: {
+      default:
+        "light-dark(oklch(0.22 0.01 80 / 0.7), oklch(0.94 0.004 80 / 0.7))",
+      ":hover": { default: null, [media.hover]: color.fg },
+    },
+    fontSize: 13,
+    fontWeight: 500,
+    textDecoration: "none",
+    transitionProperty: "color",
+    transitionDuration: "200ms",
+    outline: {
+      default: "none",
+      ":focus-visible": `2px solid ${color.focus}`,
+    },
+    outlineOffset: 1,
   },
   quiet: {
     backgroundColor: {

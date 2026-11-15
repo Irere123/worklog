@@ -31,18 +31,22 @@ export function Closing({ setupOpen }: { setupOpen: boolean }) {
         {...stylex.props(cta.base, cta.primary, styles.action, rise(200))}
       >
         <Logo size={16} tinted />
-        {setupOpen ? "Set up your workspace" : "Sign in to Worklog"}
+        Get started
       </Link>
       <ul {...stylex.props(styles.fine, rise(250))}>
         <li>
-          <a href={DEPLOY} {...stylex.props(styles.fineLink)}>
-            Docker Compose or Railway
+          <a href={SOURCE} {...stylex.props(styles.fineLink)}>
+            Open source on GitHub
           </a>
         </li>
         <li aria-hidden {...stylex.props(styles.sep)}>
           ·
         </li>
-        <li>Your own Postgres</li>
+        <li>
+          <a href={DEPLOY} {...stylex.props(styles.fineLink)}>
+            Hosted or self-hosted
+          </a>
+        </li>
         <li aria-hidden {...stylex.props(styles.sep)}>
           ·
         </li>
@@ -93,8 +97,8 @@ export function Footer({ setupOpen }: { setupOpen: boolean }) {
             Worklog
           </a>
           <p {...stylex.props(styles.tagline)}>
-            A shared record of what your team and its agents did, and of what
-            needs whom.
+            The open-source logbook for teams of people and agents: what
+            everyone did, and what needs whom.
           </p>
         </div>
         <div {...stylex.props(styles.columns)}>
@@ -127,7 +131,7 @@ export function Footer({ setupOpen }: { setupOpen: boolean }) {
               Sign in
             </Link>
             <a href={DEPLOY} {...stylex.props(styles.link)}>
-              Host your own
+              Self-host
             </a>
           </nav>
         </div>

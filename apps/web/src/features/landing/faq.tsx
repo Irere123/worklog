@@ -11,22 +11,32 @@ import { page, reveal } from "./styles";
 
 const QUESTIONS: { ask: string; answer: ReactNode }[] = [
   {
-    ask: "Do we need an AI key?",
+    ask: "Is Worklog open source?",
     answer: (
       <>
-        No. Without one, briefs are written from templates and rules, and the
-        board, inbox and activity work the same. Add an OpenRouter key when you
-        want the assistant and written briefs.
+        Yes. The server, the worker and the web app are all on GitHub, and the
+        hosted Worklog runs the same code. Read it, file an issue, or send a
+        pull request.
       </>
     ),
   },
   {
-    ask: "Where does our data live?",
+    ask: "Can we host it ourselves?",
     answer: (
       <>
-        In your own Postgres. Worklog is a Bun server, a worker and a web app:
-        run them with Docker Compose on your machine, or deploy them to Railway.
-        Telemetry is off unless you give it a Tinybird token.
+        Yes. Run it on your own server with Docker Compose, or deploy it to
+        Railway, and your data stays in your own Postgres. Telemetry is off
+        unless you give it a Tinybird token.
+      </>
+    ),
+  },
+  {
+    ask: "Do we need AI?",
+    answer: (
+      <>
+        No. Without a model, briefs are written from templates and rules, and
+        the board, inbox and activity work the same. With one, the assistant
+        answers and briefs are written in sentences.
       </>
     ),
   },

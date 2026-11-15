@@ -9,7 +9,7 @@ import { Landing } from "#features/landing/landing";
 import newsreaderUrl from "@fontsource-variable/newsreader/opsz.css?url";
 
 const DESCRIPTION =
-  "Your team’s logbook. GitHub, Slack, Discord and your agents write it as they work; Worklog tells you what needs you and gives everyone an assistant that knows their work.";
+  "The open-source logbook for teams of people and agents. GitHub, Slack, Discord and your agents write it as they work; Worklog tells you what needs you and gives everyone an assistant that knows their work.";
 
 export const Route = createFileRoute("/")({
   head: () => ({

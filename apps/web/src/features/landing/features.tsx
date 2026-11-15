@@ -110,7 +110,7 @@ export function Features() {
           wide
           title="AI if you want it"
           badge="Opt-in"
-          copy="Worklog runs whole without a model. Add an OpenRouter key and the assistant answers, and briefs are written rather than filled in."
+          copy="Worklog runs whole without a model. With one, the assistant answers, and briefs are written rather than filled in."
           at={10}
         >
           {(on) => <ModelKey on={on} />}

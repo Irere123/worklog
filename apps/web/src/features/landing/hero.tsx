@@ -78,20 +78,20 @@ export function Hero({ setupOpen }: { setupOpen: boolean }) {
             {...stylex.props(cta.base, cta.primary, styles.action)}
           >
             <Logo size={16} tinted />
-            {setupOpen ? "Set up your workspace" : "Sign in to Worklog"}
+            Get started
           </Link>
           <a
-            href={DEPLOY}
+            href={SOURCE}
             {...stylex.props(cta.base, cta.secondary, styles.action)}
           >
             <GithubLogoIcon size={16} weight="fill" />
-            Host your own
+            Star on GitHub
           </a>
         </div>
         <ul {...stylex.props(styles.facts)}>
           <li>
-            <a href="#tour" {...stylex.props(styles.fact)}>
-              On the web and your phone
+            <a href={SOURCE} {...stylex.props(styles.fact)}>
+              Open source
             </a>
           </li>
           <li aria-hidden {...stylex.props(styles.sep)}>
@@ -99,7 +99,7 @@ export function Hero({ setupOpen }: { setupOpen: boolean }) {
           </li>
           <li>
             <a href={DEPLOY} {...stylex.props(styles.fact)}>
-              Your server, your Postgres
+              Hosted, or on your own server
             </a>
           </li>
           <li aria-hidden {...stylex.props(styles.sep)}>

@@ -56,15 +56,17 @@ export function Open() {
     <section id="open" {...stylex.props(page.wide, page.section)}>
       <div ref={panel} {...stylex.props(page.tile, styles.panel, rise(0))}>
         <div {...stylex.props(styles.words)}>
-          <h2 {...stylex.props(type.heading, rise(50))}>Open by design.</h2>
+          <h2 {...stylex.props(type.heading, rise(50))}>
+            Open source, open API.
+          </h2>
           <p {...stylex.props(type.lede, rise(100))}>
-            One OpenAPI contract and a resumable event stream serve the web app,
-            your scripts and your agents alike. Run it on your own server with
-            Docker, or deploy it to Railway.
+            Every line of Worklog is on GitHub. One OpenAPI contract and a
+            resumable event stream serve the web app, your scripts and your
+            agents alike.
           </p>
           <ul {...stylex.props(styles.chips, rise(180))}>
             <li {...stylex.props(styles.chip)}>OpenAPI 3.1</li>
-            <li {...stylex.props(styles.chip)}>Postgres and Bun</li>
+            <li {...stylex.props(styles.chip)}>Self-host with Docker</li>
           </ul>
         </div>
 
@@ -77,14 +79,6 @@ export function Open() {
               <span {...stylex.props(styles.termTitle)}>~/referrals</span>
             </div>
             <pre {...stylex.props(styles.code)}>
-              <span {...stylex.props(styles.prompt)}>$ </span>
-              docker compose up -d{"\n"}
-              <span {...stylex.props(styles.dim)}>
-                {
-                  " ✔ Container worklog-api-1  Started\n ✔ Container worklog-web-1  Started"
-                }
-              </span>
-              {"\n\n"}
               <span {...stylex.props(styles.prompt)}>$ </span>
               {COMMAND.slice(0, shown.typed)}
               {!shown.answered && <span {...stylex.props(styles.cursor)} />}
