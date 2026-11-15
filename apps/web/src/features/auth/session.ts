@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import type { Schemas } from "#api/client";
 import { auth } from "#api/client";
 import { q } from "#api/queries";
+import { rememberSignedIn } from "#lib/boot";
 
 export type Me = Schemas["Member"];
 
@@ -15,6 +16,7 @@ export function useMe() {
 
 export async function signOut(client: QueryClient) {
   auth.setKey(null);
+  rememberSignedIn(false);
   // Signing out locally must still work when the server can't be reached.
   await fetch("/api/auth/sign-out", {
     method: "POST",

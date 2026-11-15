@@ -68,6 +68,16 @@ export function webAppRoutes(dist: string) {
       }
       return send(c, asset);
     }
+    // A page the build prerendered (the front page) is its folder's index.html. Like the shell,
+    // it names this build's hashed assets, so it's never served from a cache.
+    const inside = wanted === root || wanted.startsWith(root + path.sep);
+    if (inside && c.req.path.endsWith("/")) {
+      const page = await load(path.join(wanted, "index.html"));
+      if (page) {
+        c.header("cache-control", "no-cache");
+        return send(c, page);
+      }
+    }
     // A tab on an older build asks for chunks this one doesn't have: a 404 lets it fail cleanly,
     // where the shell would arrive as a script and break with a MIME error.
     if (c.req.path.startsWith("/assets/")) {

@@ -75,7 +75,15 @@ export default defineConfig({
         rootDir: import.meta.dirname,
       },
     }),
-    tanstackStart({ spa: { enabled: true } }),
+    tanstackStart({
+      // The shell is rendered at a signed-in route, where only the root's head and scripts make it
+      // into the HTML. At "/" (the default) it would take the front page's place.
+      spa: { enabled: true, maskPath: "/home" },
+      // The front page is the one route a stranger opens first, so it ships as HTML that paints
+      // before the app's JavaScript arrives. Every other route is behind sign-in: the shell.
+      // Its links lead to the API or behind sign-in, so the crawl stops at the page itself.
+      pages: [{ path: "/", prerender: { enabled: true, crawlLinks: false } }],
+    }),
     react(),
   ],
 });

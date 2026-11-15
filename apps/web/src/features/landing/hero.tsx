@@ -192,11 +192,20 @@ const styles = stylex.create({
     maxWidth: 520,
     marginTop: space.x3,
   },
+  // On a phone the two buttons stack, full width: side by side they fit or wrap depending on
+  // which font has arrived, and the page would jump when Inter swaps in.
   actions: {
     display: "flex",
+    flexDirection: {
+      default: "row",
+      "@media (max-width: 520px)": "column",
+    },
     flexWrap: "wrap",
     justifyContent: "center",
-    gap: space.lg,
+    gap: {
+      default: space.lg,
+      "@media (max-width: 520px)": space.md,
+    },
     marginTop: space.x4,
     width: {
       default: "auto",

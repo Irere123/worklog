@@ -12,7 +12,6 @@ const DESCRIPTION =
   "Your team’s logbook. GitHub, Slack, Discord and your agents write it as they work; Worklog tells you what needs you and gives everyone an assistant that knows their work.";
 
 export const Route = createFileRoute("/")({
-  ssr: false,
   head: () => ({
     meta: [
       { title: "Worklog · Your team’s logbook" },
@@ -29,9 +28,13 @@ export const Route = createFileRoute("/")({
       { rel: "stylesheet", href: newsreaderUrl },
     ],
   }),
-  // Someone signed in came for the app, not the pitch. The boot script has already asked for the
-  // session, so this costs no extra round trip.
+  // Someone signed in came for the app, not the pitch. On a first load the prerendered page's
+  // head script sends them on (lib/boot.ts); this covers arriving here from inside the app.
   beforeLoad: async ({ context }) => {
+    // The build renders this page with no visitor at all.
+    if (import.meta.env.SSR) {
+      return;
+    }
     try {
       await context.queryClient.query({ ...q.session(), staleTime: "static" });
     } catch (error) {

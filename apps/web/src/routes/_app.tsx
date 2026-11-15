@@ -4,6 +4,7 @@ import { ApiError } from "#api/client";
 import { preloadShell } from "#api/preload";
 import { q } from "#api/queries";
 import { Shell } from "#features/shell/shell";
+import { rememberSignedIn } from "#lib/boot";
 
 export type AppSearch = { card?: number };
 
@@ -21,9 +22,11 @@ export const Route = createFileRoute("/_app")({
         context.queryClient.query({ ...q.me(), staleTime: "static" }),
       ]);
       preloadShell(context.queryClient);
+      rememberSignedIn(true);
       return { session };
     } catch (error) {
       if (error instanceof ApiError && error.status === 401) {
+        rememberSignedIn(false);
         redirect({
           to: "/login",
           search: { next: location.href },

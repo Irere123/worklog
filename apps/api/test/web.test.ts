@@ -23,6 +23,10 @@ beforeAll(async () => {
     path.join(dist, "_shell.html"),
     "<!doctype html><title>Worklog</title>"
   );
+  writeFileSync(
+    path.join(dist, "index.html"),
+    "<!doctype html><title>Worklog · Your team’s logbook</title>"
+  );
   writeFileSync(path.join(dist, "assets", "app-abc123.js"), script);
   writeFileSync(
     path.join(dist, "assets", "inter-abc123.woff2"),
@@ -107,6 +111,22 @@ describe("serving the web app", () => {
     });
     expect(missing.status).toBe(404);
     expect(missing.headers.get("content-type")).toContain("application/json");
+  });
+
+  test("the front page is served as the build prerendered it, never cached", async () => {
+    const app = webApp();
+    const front = await app.request("/");
+    expect(front.status).toBe(200);
+    expect(front.headers.get("cache-control")).toBe("no-cache");
+    expect(await front.text()).toContain("Your team’s logbook");
+
+    // Every other route is still the shell, which routes in the browser.
+    const home = await app.request("/home");
+    expect(await home.text()).toContain("<title>Worklog</title>");
+
+    // A folder outside the build is never looked in.
+    const escaped = await app.request("/..%2f..%2f/");
+    expect(await escaped.text()).toContain("<title>Worklog</title>");
   });
 
   test("a path that isn't a file isn't remembered, so asking for many can't fill memory", async () => {

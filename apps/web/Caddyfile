@@ -52,9 +52,10 @@
 			}
 		}
 
-		# Any other path that isn't a file is a route the app handles in the browser.
+		# A page the build prerendered (the front page) is its folder's index.html. Any other path
+		# that isn't a file is a route the app handles in the browser.
 		handle {
-			try_files {path} /_shell.html
+			try_files {path} {path}/index.html /_shell.html
 			file_server {
 				precompressed br gzip
 			}
