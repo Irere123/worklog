@@ -75,3 +75,7 @@ Telemetry is optional too. Set `TINYBIRD_TOKEN` to send traces, logs and errors 
 - [ ] Voice logs in the mobile app (the web app already dictates logs, comments and questions), generated TypeScript SDK
 
 Inspired by [Fizzy](https://fizzy.do), [OpenCode](https://github.com/anomalyco/opencode), [OpenClaw](https://github.com/openclaw/openclaw) and [Cursor](https://cursor.com).
+
+## License
+
+Worklog is free software under the [GNU Affero General Public License v3](LICENSE). Run it, change it and host it for others; if people use a changed version over a network, offer them its source.
