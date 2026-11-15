@@ -3,7 +3,6 @@ import * as stylex from "@stylexjs/stylex";
 import { useState } from "react";
 
 import { AppWindow } from "#features/landing/frame";
-import { Collapse, Roll } from "#features/landing/motion";
 import { useScript } from "#features/landing/script";
 import { Logo } from "#ui/logo";
 import { ProductMark } from "#ui/product-mark";
@@ -18,6 +17,40 @@ const FIGURES = [
   { label: "Closed", value: 6 },
   { label: "Drifting soon", value: 1 },
 ] as const;
+
+// The lines that need Ada, written into the brief one after another.
+const LINES = [
+  {
+    key: "atlas",
+    width: "88%",
+    text: (
+      <>
+        <strong>Atlas needs you:</strong> approve Saturday’s window for the
+        Postgres 18 upgrade
+      </>
+    ),
+  },
+  {
+    key: "jean",
+    width: "74%",
+    text: (
+      <>
+        Jean Miller assigned you <CardNumber>8</CardNumber> Track referral
+        turnaround per county
+      </>
+    ),
+  },
+  {
+    key: "drift",
+    width: "80%",
+    text: (
+      <>
+        <CardNumber>9</CardNumber> Let receiving clinicians reply drifts to Not
+        now on Thursday
+      </>
+    ),
+  },
+];
 
 type State = { figures: boolean; lines: number; sent: boolean };
 
@@ -111,7 +144,13 @@ export function BriefsScene({ play, paused, still }: SceneProps) {
                     "tone" in figure && styles.figureAccent
                   )}
                 >
-                  <Roll value={s.figures ? figure.value : 0} />
+                  {s.figures ? (
+                    figure.value
+                  ) : (
+                    <span
+                      {...stylex.props(styles.skeleton, styles.skeletonFigure)}
+                    />
+                  )}
                 </span>
               </span>
             ))}
@@ -119,30 +158,31 @@ export function BriefsScene({ play, paused, still }: SceneProps) {
 
           <span {...stylex.props(styles.heading)}>Needs your attention</span>
           <ul {...stylex.props(styles.list)}>
-            <Collapse open={s.lines >= 1}>
-              <li {...stylex.props(styles.item)}>
-                <strong>Atlas needs you:</strong> approve Saturday’s window for
-                the Postgres 18 upgrade
+            {LINES.map((line, at) => (
+              <li key={line.key} {...stylex.props(styles.item)}>
+                {s.lines > at ? (
+                  <span {...stylex.props(styles.written)}>{line.text}</span>
+                ) : (
+                  <span
+                    {...stylex.props(
+                      styles.skeleton,
+                      styles.skeletonLine(line.width)
+                    )}
+                  />
+                )}
               </li>
-            </Collapse>
-            <Collapse open={s.lines >= 2}>
-              <li {...stylex.props(styles.item)}>
-                Jean Miller assigned you{" "}
-                <CardNumber sx={styles.link}>8</CardNumber> Track referral
-                turnaround per county
-              </li>
-            </Collapse>
-            <Collapse open={s.lines >= 3}>
-              <li {...stylex.props(styles.item)}>
-                <CardNumber sx={styles.link}>9</CardNumber> Let receiving
-                clinicians reply drifts to Not now on Thursday
-              </li>
-            </Collapse>
+            ))}
           </ul>
           <span {...stylex.props(styles.heading)}>Shipped since Friday</span>
           <span {...stylex.props(styles.paragraph)}>
             Eric fixed <CardNumber sx={styles.link}>1</CardNumber> attachments
             on slow connections; Atlas finished the SMS fallback prototype.
+          </span>
+          <span {...stylex.props(styles.heading)}>Still stuck</span>
+          <span {...stylex.props(styles.paragraph)}>
+            The nightly sync on the Denver server,{" "}
+            <CardNumber sx={styles.link}>14</CardNumber>. Scout found the cause;
+            Eric is fixing it today.
           </span>
         </div>
       </div>
@@ -230,10 +270,33 @@ const styles = stylex.create({
     paddingLeft: 0,
   },
   item: {
-    paddingBlock: space.xxs,
-    // Inside, because each line clips while it opens and would cut an outside marker off.
-    listStylePosition: "inside",
+    display: "flex",
+    alignItems: "center",
+    minHeight: 24,
   },
+  written: {
+    animationName: stylex.keyframes({
+      from: { opacity: 0 },
+      to: { opacity: 1 },
+    }),
+    animationDuration: "300ms",
+  },
+  // Placeholders at the written content's own size, so nothing moves when the words replace them.
+  skeleton: {
+    display: "block",
+    height: 10,
+    borderRadius: radius.full,
+    backgroundColor: color.ui,
+  },
+  skeletonFigure: {
+    width: 28,
+    height: 22,
+    marginBlock: 4,
+    borderRadius: radius.sm,
+  },
+  skeletonLine: (width: string) => ({
+    width,
+  }),
   link: {
     color: color.accentFg,
     fontSize: text.label,

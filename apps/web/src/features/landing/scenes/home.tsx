@@ -111,6 +111,7 @@ export function HomeScene({ play, paused, still }: SceneProps) {
             <Row
               target="assigned"
               hover={s.hover}
+              pressed={s.pressed}
               who={<Avatar person={jean} size={24} />}
               title={
                 <>
@@ -163,6 +164,7 @@ function Row({
   urgent = false,
   fresh = false,
   hover = false,
+  pressed = false,
   target,
 }: {
   who: ReactNode;
@@ -172,12 +174,17 @@ function Row({
   urgent?: boolean;
   fresh?: boolean;
   hover?: boolean;
+  pressed?: boolean;
   target?: string;
 }) {
   return (
     <div
       data-target={target}
-      {...stylex.props(styles.row, hover && styles.rowHover)}
+      {...stylex.props(
+        styles.row,
+        hover && styles.rowHover,
+        pressed && styles.rowPressed
+      )}
     >
       {who}
       <span {...stylex.props(styles.rowText)}>
@@ -301,6 +308,10 @@ const styles = stylex.create({
   },
   rowHover: {
     backgroundColor: color.uiHover,
+  },
+  // The click lands on the row itself, not only on the pointer.
+  rowPressed: {
+    backgroundColor: color.uiActive,
   },
   title: {
     display: "-webkit-box",

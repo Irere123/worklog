@@ -133,6 +133,13 @@ export const parts = stylex.create({
     color: color.fg,
     fontWeight: 500,
     whiteSpace: "nowrap",
+    transitionProperty: "background-color, transform",
+    transitionDuration: "120ms",
+  },
+  // A control the pointer is pressing: it darkens and gives a little, as the app's buttons do.
+  controlPressed: {
+    backgroundColor: color.uiActive,
+    transform: "scale(0.96)",
   },
   faint: {
     color: color.fgFaint,

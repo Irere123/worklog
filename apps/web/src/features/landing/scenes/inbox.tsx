@@ -175,7 +175,7 @@ export function InboxScene({ play, paused, still }: SceneProps) {
 
           <div {...stylex.props(styles.detail)}>
             <div {...stylex.props(styles.page, s.done && styles.pageGone)}>
-              <Assignment />
+              <Assignment pressed={s.pressed} />
             </div>
             <div {...stylex.props(styles.page, !s.done && styles.pageWaiting)}>
               <Comment />
@@ -242,7 +242,7 @@ function Comment() {
   );
 }
 
-function Assignment() {
+function Assignment({ pressed }: { pressed: boolean }) {
   return (
     <>
       <span {...stylex.props(styles.badges)}>
@@ -261,7 +261,10 @@ function Assignment() {
         you own this?
       </span>
       <span {...stylex.props(styles.actions)}>
-        <span data-target="done" {...stylex.props(parts.control)}>
+        <span
+          data-target="done"
+          {...stylex.props(parts.control, pressed && parts.controlPressed)}
+        >
           <CheckIcon size={14} /> Done{" "}
           <kbd {...stylex.props(styles.key)}>E</kbd>
         </span>
@@ -454,11 +457,15 @@ const styles = stylex.create({
     transitionProperty: "opacity, transform",
     transitionDuration: "320ms",
     transitionTimingFunction: "cubic-bezier(0.25, 0.8, 0.25, 1)",
+    // The next item waits for the last to leave, so the two are never drawn over each other.
+    transitionDelay: "160ms",
   },
   pageGone: {
     opacity: 0,
     transform: "translateY(-8px)",
     pointerEvents: "none",
+    transitionDuration: "140ms",
+    transitionDelay: "0ms",
   },
   pageWaiting: {
     opacity: 0,

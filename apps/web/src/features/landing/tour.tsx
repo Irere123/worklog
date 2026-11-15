@@ -16,13 +16,16 @@ import clay from "./plates/clay.webp";
 import ink from "./plates/ink.webp";
 import sage from "./plates/sage.webp";
 import sky from "./plates/sky.webp";
+import stone from "./plates/stone.webp";
 import activityThumb from "./plates/thumbs/activity.webp";
+import assistantThumb from "./plates/thumbs/assistant.webp";
 import boardThumb from "./plates/thumbs/board.webp";
 import briefsThumb from "./plates/thumbs/briefs.webp";
 import homeThumb from "./plates/thumbs/home.webp";
 import inboxThumb from "./plates/thumbs/inbox.webp";
 import ticket from "./plates/ticket.webp";
 import { ActivityScene } from "./scenes/activity";
+import { AssistantScene } from "./scenes/assistant";
 import { BoardScene } from "./scenes/board";
 import { BriefsScene } from "./scenes/briefs";
 import { HomeScene } from "./scenes/home";
@@ -63,6 +66,16 @@ const CHAPTERS: Chapter[] = [
     Scene: InboxScene,
   },
   {
+    id: "assistant",
+    label: "Assistant",
+    caption:
+      "Ask about anyone’s work. It shows what it checked, and answers from the record.",
+    plate: stone,
+    thumb: assistantThumb,
+    duration: 9500,
+    Scene: AssistantScene,
+  },
+  {
     id: "board",
     label: "Board",
     caption:
@@ -94,7 +107,7 @@ const CHAPTERS: Chapter[] = [
   },
 ];
 
-const PLATES = [ink, ticket, sage, sky, clay];
+const PLATES = [ink, ticket, stone, sage, sky, clay];
 
 // The window is laid out at the app's own size and scaled to the wallpaper, as a screenshot would
 // be: the miniature keeps the app's proportions instead of reflowing into a cramped one.
