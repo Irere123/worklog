@@ -1,27 +1,22 @@
-import { DesktopIcon, MoonIcon, SunIcon } from "@phosphor-icons/react";
-import type { Icon } from "@phosphor-icons/react";
 import * as stylex from "@stylexjs/stylex";
-import { Link } from "@tanstack/react-router";
 
-import { setTheme, useTheme } from "#lib/theme";
-import type { Theme } from "#lib/theme";
 import { Logo } from "#ui/logo";
+import { ProductMark } from "#ui/product-mark";
 import { color, media, motion, radius, space } from "#ui/tokens.stylex";
 
+import { GitHubLink, StartLink } from "./actions";
 import { DEPLOY, SOURCE, doc } from "./links";
-import { useStart } from "./start";
-import { cta, page, type } from "./styles";
+import { page, type } from "./styles";
 
 /** The last ask, then the way around. */
 export function Closing() {
-  const start = useStart();
   return (
     <section {...stylex.props(page.wide, page.section, styles.closing)}>
       <h2 {...stylex.props(type.heading)}>Start your team’s logbook.</h2>
-      <Link to={start} {...stylex.props(cta.base, cta.primary, styles.action)}>
-        <Logo size={16} tinted />
-        Start free
-      </Link>
+      <div {...stylex.props(styles.actions)}>
+        <StartLink />
+        <GitHubLink />
+      </div>
       <ul {...stylex.props(styles.fine)}>
         <li>Free for up to 3 people</li>
         <li aria-hidden {...stylex.props(styles.sep)}>
@@ -50,13 +45,14 @@ const COLUMNS = [
       { label: "Pricing", href: "/pricing" },
       { label: "Changelog", href: "/changelog" },
       { label: "Self-hosting", href: DEPLOY },
+      { label: "Sign in", href: "/login" },
     ],
   },
   {
     title: "Learn",
     links: [
       { label: "FAQ", href: "/faq" },
-      { label: "API reference", href: "/docs" },
+      { label: "API docs", href: "/docs" },
       { label: "Connectors", href: doc("CONNECTORS") },
       { label: "Architecture", href: doc("ARCHITECTURE") },
     ],
@@ -64,7 +60,7 @@ const COLUMNS = [
   {
     title: "Project",
     links: [
-      { label: "Source on GitHub", href: SOURCE },
+      { label: "Source code", href: SOURCE },
       { label: "Roadmap", href: `${SOURCE}#roadmap` },
       { label: "Contributing", href: `${SOURCE}/blob/main/CONTRIBUTING.md` },
       { label: "License", href: `${SOURCE}/blob/main/LICENSE` },
@@ -72,8 +68,7 @@ const COLUMNS = [
   },
 ];
 
-export function Footer({ setupOpen }: { setupOpen: boolean }) {
-  const start = useStart();
+export function Footer() {
   return (
     <footer {...stylex.props(page.narrow, styles.footer)}>
       <div {...stylex.props(styles.top)}>
@@ -86,6 +81,10 @@ export function Footer({ setupOpen }: { setupOpen: boolean }) {
             The open-source team logbook. On Worklog Cloud, or on your own
             server.
           </p>
+          <a href={SOURCE} {...stylex.props(styles.star)}>
+            <ProductMark product="github" size={14} />
+            Star on GitHub
+          </a>
         </div>
         <div {...stylex.props(styles.columns)}>
           {COLUMNS.map((column) => (
@@ -106,52 +105,20 @@ export function Footer({ setupOpen }: { setupOpen: boolean }) {
               ))}
             </nav>
           ))}
-          <nav aria-label="Get started" {...stylex.props(styles.column)}>
-            <span {...stylex.props(styles.columnTitle)}>Get started</span>
-            <Link to={start} {...stylex.props(styles.link)}>
-              {setupOpen ? "Set up a workspace" : "Start free"}
-            </Link>
-            <Link to="/login" {...stylex.props(styles.link)}>
-              Sign in
-            </Link>
-            <Link to="/pricing" {...stylex.props(styles.link)}>
-              Compare plans
-            </Link>
-          </nav>
         </div>
       </div>
       <div {...stylex.props(styles.bottom)}>
-        <span>© 2026 Worklog</span>
-        <ThemeSwitch />
+        <span>© 2026 Worklog. Open source under the AGPL-3.0.</span>
+        <nav aria-label="Legal" {...stylex.props(styles.legal)}>
+          <a href="/terms" {...stylex.props(styles.fineFoot)}>
+            Terms of use
+          </a>
+          <a href="/privacy" {...stylex.props(styles.fineFoot)}>
+            Privacy policy
+          </a>
+        </nav>
       </div>
     </footer>
-  );
-}
-
-const THEMES: { theme: Theme; label: string; icon: Icon }[] = [
-  { theme: "system", label: "System", icon: DesktopIcon },
-  { theme: "light", label: "Light", icon: SunIcon },
-  { theme: "dark", label: "Dark", icon: MoonIcon },
-];
-
-function ThemeSwitch() {
-  const theme = useTheme();
-  return (
-    <fieldset aria-label="Theme" {...stylex.props(styles.themes)}>
-      {THEMES.map(({ theme: each, label, icon: Glyph }) => (
-        <button
-          key={each}
-          type="button"
-          aria-pressed={theme === each}
-          aria-label={label}
-          title={label}
-          onClick={() => setTheme(each)}
-          {...stylex.props(styles.theme, theme === each && styles.themeOn)}
-        >
-          <Glyph size={14} />
-        </button>
-      ))}
-    </fieldset>
   );
 }
 
@@ -162,9 +129,12 @@ const styles = stylex.create({
     alignItems: "center",
     textAlign: "center",
   },
-  action: {
+  actions: {
+    display: "flex",
+    flexWrap: "wrap",
+    justifyContent: "center",
+    gap: 10,
     marginTop: 40,
-    paddingLeft: 18,
   },
   // The hero's row of facts again: one line on a wide screen, a stack on a phone, so no dot is
   // ever left at a line's end.
@@ -268,14 +238,14 @@ const styles = stylex.create({
   },
   columns: {
     display: "grid",
-    gridTemplateColumns: {
-      default: "repeat(4, minmax(0, 1fr))",
-      "@media (max-width: 640px)": "repeat(2, minmax(0, 1fr))",
+    gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+    columnGap: {
+      default: space.x4,
+      "@media (max-width: 640px)": space.xl,
     },
-    columnGap: space.x4,
     rowGap: 40,
     flexGrow: 1,
-    maxWidth: 600,
+    maxWidth: 460,
   },
   column: {
     display: "flex",
@@ -313,10 +283,10 @@ const styles = stylex.create({
     display: "flex",
     flexWrap: "wrap",
     alignItems: "center",
-    justifyContent: "center",
+    justifyContent: "space-between",
     columnGap: space.xl,
     rowGap: space.xs,
-    paddingTop: space.x3,
+    paddingTop: space.xl,
     borderTopWidth: 1,
     borderTopStyle: "solid",
     borderTopColor:
@@ -325,42 +295,50 @@ const styles = stylex.create({
     lineHeight: "20px",
     color: color.fgMuted,
   },
-  themes: {
-    display: "flex",
-    minWidth: 0,
-    margin: 0,
-    borderWidth: 0,
-    borderStyle: "none",
-    gap: space.xxs,
-    padding: space.xxs,
-    borderRadius: radius.full,
-    backgroundColor: color.ui,
-  },
-  theme: {
-    display: "grid",
-    placeItems: "center",
-    width: 28,
+  star: {
+    display: "inline-flex",
+    alignItems: "center",
+    alignSelf: "flex-start",
+    gap: space.sm,
     height: 28,
-    borderWidth: 0,
-    borderStyle: "none",
-    borderRadius: radius.full,
-    backgroundColor: "transparent",
-    color: {
-      default: color.fgMuted,
-      ":hover": { default: null, [media.hover]: color.fg },
+    marginTop: space.xs,
+    paddingInline: 10,
+    borderRadius: radius.md,
+    backgroundColor: {
+      default: color.raised,
+      ":hover": { default: null, [media.hover]: color.surface },
     },
-    cursor: "pointer",
-    transitionProperty: "background-color, color",
+    boxShadow:
+      "0 0 0 1px light-dark(oklch(0.2 0.01 80 / 0.1), oklch(1 0 0 / 0.12))",
+    color: color.fg,
+    fontSize: 12,
+    fontWeight: 500,
+    textDecoration: "none",
+    transitionProperty: "background-color",
     transitionDuration: motion.fast,
     outline: {
       default: "none",
       ":focus-visible": `2px solid ${color.focus}`,
     },
-    outlineOffset: 1,
+    outlineOffset: 2,
   },
-  themeOn: {
-    backgroundColor: color.raised,
-    color: color.fg,
-    boxShadow: `0 0 0 1px ${color.line}`,
+  legal: {
+    display: "flex",
+    gap: space.xl,
+  },
+  fineFoot: {
+    color: {
+      default: "inherit",
+      ":hover": { default: null, [media.hover]: color.fg },
+    },
+    textDecoration: "none",
+    transitionProperty: "color",
+    transitionDuration: motion.fast,
+    borderRadius: radius.xs,
+    outline: {
+      default: "none",
+      ":focus-visible": `2px solid ${color.focus}`,
+    },
+    outlineOffset: 2,
   },
 });

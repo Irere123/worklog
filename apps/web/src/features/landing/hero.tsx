@@ -1,19 +1,14 @@
-import {
-  ArrowUpRightIcon,
-  GithubLogoIcon,
-  HardDrivesIcon,
-} from "@phosphor-icons/react";
+import { ArrowRightIcon } from "@phosphor-icons/react";
 import * as stylex from "@stylexjs/stylex";
 import { Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 
-import { Logo } from "#ui/logo";
 import { color, media, motion, space } from "#ui/tokens.stylex";
 
-import { DEPLOY, SOURCE } from "./links";
+import { GitHubLink, StartLink } from "./actions";
+import { DEPLOY } from "./links";
 import { useReducedMotion } from "./script";
-import { useStart } from "./start";
-import { cta, page, type } from "./styles";
+import { page, type } from "./styles";
 
 // Short enough to hold one line on a phone: the cell keeps the height of one line, never two.
 const ENDINGS = [
@@ -27,7 +22,6 @@ const TURN = 3200;
 
 /** The headline and the way in. */
 export function Hero() {
-  const start = useStart();
   const reduced = useReducedMotion();
   const [turn, setTurn] = useState(0);
 
@@ -43,11 +37,11 @@ export function Hero() {
   return (
     <header {...stylex.props(page.wide, styles.hero)}>
       <div {...stylex.props(styles.words)}>
-        <a href={SOURCE} {...stylex.props(styles.badge)}>
-          <GithubLogoIcon size={14} weight="fill" />
-          Now open source under the AGPL-3.0
-          <ArrowUpRightIcon size={12} {...stylex.props(styles.badgeArrow)} />
-        </a>
+        <Link to="/changelog" {...stylex.props(styles.badge)}>
+          <span {...stylex.props(styles.badgeNew)}>New</span>
+          Worklog is now open source
+          <ArrowRightIcon size={12} {...stylex.props(styles.badgeArrow)} />
+        </Link>
         <h1 {...stylex.props(type.display, styles.title)}>
           Your team’s logbook
           <span {...stylex.props(styles.endings)}>
@@ -76,20 +70,8 @@ export function Hero() {
       </div>
       <div {...stylex.props(styles.ways)}>
         <div {...stylex.props(styles.actions)}>
-          <Link
-            to={start}
-            {...stylex.props(cta.base, cta.primary, styles.action)}
-          >
-            <Logo size={16} tinted />
-            Start free
-          </Link>
-          <a
-            href={DEPLOY}
-            {...stylex.props(cta.base, cta.secondary, styles.action)}
-          >
-            <HardDrivesIcon size={16} weight="fill" />
-            Host it yourself
-          </a>
+          <StartLink sx={styles.action} />
+          <GitHubLink sx={styles.action} />
         </div>
         <ul {...stylex.props(styles.facts)}>
           <li>
@@ -101,8 +83,8 @@ export function Hero() {
             ·
           </li>
           <li>
-            <a href="#tour" {...stylex.props(styles.fact)}>
-              On the web and your phone
+            <a href={DEPLOY} {...stylex.props(styles.fact)}>
+              Self-host with Docker
             </a>
           </li>
           <li aria-hidden {...stylex.props(styles.sep)}>
@@ -152,7 +134,7 @@ const styles = stylex.create({
     gap: space.sm,
     height: 24,
     marginBottom: space.md,
-    paddingLeft: space.sm,
+    paddingLeft: space.xs,
     paddingRight: space.sm,
     borderRadius: 999,
     backgroundColor: color.raised,
@@ -255,8 +237,23 @@ const styles = stylex.create({
       "@media (max-width: 768px)": 384,
     },
   },
+  // Full width when the pair stacks on a phone.
   action: {
-    paddingLeft: 18,
+    width: {
+      default: "auto",
+      "@media (max-width: 768px)": "100%",
+    },
+  },
+  badgeNew: {
+    display: "inline-flex",
+    alignItems: "center",
+    height: 16,
+    paddingInline: space.sm,
+    borderRadius: 999,
+    backgroundColor: color.accentSubtle,
+    color: color.accentFg,
+    fontSize: 11,
+    fontWeight: 600,
   },
   facts: {
     display: "flex",

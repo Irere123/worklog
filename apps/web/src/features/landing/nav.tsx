@@ -1,9 +1,5 @@
 import {
-  BracketsCurlyIcon,
-  CloudIcon,
   GitPullRequestIcon,
-  GithubLogoIcon,
-  HardDrivesIcon,
   ListIcon,
   MapTrifoldIcon,
   PlugsIcon,
@@ -16,12 +12,14 @@ import { useEffect, useRef, useState } from "react";
 import type { MouseEvent } from "react";
 
 import { Logo } from "#ui/logo";
+import { ProductMark } from "#ui/product-mark";
 import { color, media, motion, radius, shadow, space } from "#ui/tokens.stylex";
 
-import { DEPLOY, SOURCE } from "./links";
+import { SOURCE } from "./links";
 import { NavMenu } from "./menus";
 import type { NavItem } from "./menus";
 import { cta } from "./styles";
+import { ThemeToggle } from "./theme-toggle";
 
 // Full paths, so the bar works the same from the pricing page as from the front page.
 const LINKS = [
@@ -56,29 +54,6 @@ const RESOURCES: NavItem[] = [
     icon: GitPullRequestIcon,
   },
 ];
-
-function waysIn(start: string): NavItem[] {
-  return [
-    {
-      title: "Worklog Cloud",
-      detail: "Start free in your browser",
-      href: start,
-      icon: CloudIcon,
-    },
-    {
-      title: "Self-host",
-      detail: "Docker Compose or Railway",
-      href: DEPLOY,
-      icon: HardDrivesIcon,
-    },
-    {
-      title: "API and agents",
-      detail: "One API for scripts and agents",
-      href: "/docs",
-      icon: BracketsCurlyIcon,
-    },
-  ];
-}
 
 // Past the hero's own buttons, the bar's button takes over as the way in, so it darkens to match.
 const PAST_HERO = 460;
@@ -125,7 +100,8 @@ export function Nav({ setupOpen }: { setupOpen: boolean }) {
     return () => window.removeEventListener("keydown", close);
   }, [open]);
 
-  // A fresh server starts with setting up its first workspace; any other starts at sign-in.
+  // Getting started is signing in: a new person names their workspace next. A fresh server
+  // starts by setting up its first workspace instead.
   const to = setupOpen ? "/setup" : "/login";
 
   return (
@@ -167,27 +143,25 @@ export function Nav({ setupOpen }: { setupOpen: boolean }) {
         </li>
       </ul>
       <div {...stylex.props(styles.end)}>
+        <ThemeToggle />
         <a
           href={SOURCE}
-          aria-label="Worklog on GitHub"
           {...stylex.props(styles.quietLink, styles.desktopOnly)}
         >
-          <GithubLogoIcon size={16} weight="fill" />
+          <ProductMark product="github" size={16} />
+          GitHub
         </a>
         <Link
-          to="/login"
-          {...stylex.props(styles.quietLink, styles.desktopOnly)}
+          to={to}
+          {...stylex.props(
+            cta.base,
+            cta.small,
+            past ? cta.primary : styles.quiet,
+            styles.desktopOnly
+          )}
         >
-          Sign in
+          Get started
         </Link>
-        <span {...stylex.props(styles.desktopOnly)}>
-          <NavMenu
-            label="Get started"
-            items={waysIn(to)}
-            align="end"
-            trigger={[cta.base, cta.small, past ? cta.primary : styles.quiet]}
-          />
-        </span>
         <button
           type="button"
           aria-label={open ? "Close menu" : "Open menu"}
@@ -225,9 +199,6 @@ export function Nav({ setupOpen }: { setupOpen: boolean }) {
           >
             GitHub
           </a>
-          <Link to="/login" {...stylex.props(styles.menuLink)}>
-            Sign in
-          </Link>
           <Link
             to={to}
             {...stylex.props(cta.base, cta.primary, styles.menuAction)}
@@ -372,6 +343,7 @@ const styles = stylex.create({
   },
   quietLink: {
     alignItems: "center",
+    gap: space.sm,
     height: 28,
     paddingInline: 10,
     borderRadius: radius.md,

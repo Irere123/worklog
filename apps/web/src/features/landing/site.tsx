@@ -17,7 +17,7 @@ export function Site({ children }: { children: ReactNode }) {
     <div id="top" {...stylex.props(styles.page)}>
       <Nav setupOpen={setupOpen} />
       <main>{children}</main>
-      <Footer setupOpen={setupOpen} />
+      <Footer />
     </div>
   );
 }

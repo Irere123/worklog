@@ -82,10 +82,12 @@ export default defineConfig({
       // The public pages are the ones a stranger opens first, so they ship as HTML that paints
       // before the app's JavaScript arrives. Every other route is behind sign-in: the shell.
       // Their links lead to each other, the API or behind sign-in, so nothing is crawled.
-      pages: ["/", "/pricing", "/faq", "/changelog"].map((path) => ({
-        path,
-        prerender: { enabled: true, crawlLinks: false },
-      })),
+      pages: ["/", "/pricing", "/faq", "/changelog", "/terms", "/privacy"].map(
+        (path) => ({
+          path,
+          prerender: { enabled: true, crawlLinks: false },
+        })
+      ),
     }),
     react(),
   ],

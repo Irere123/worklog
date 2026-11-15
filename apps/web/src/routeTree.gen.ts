@@ -15,7 +15,9 @@ import { Route as ChangelogRouteImport } from './routes/changelog'
 import { Route as FaqRouteImport } from './routes/faq'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as PricingRouteImport } from './routes/pricing'
+import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as SetupRouteImport } from './routes/setup'
+import { Route as TermsRouteImport } from './routes/terms'
 import { Route as AppActivityRouteImport } from './routes/_app/activity'
 import { Route as AppAssistantRouteImport } from './routes/_app/assistant'
 import { Route as AppBriefsRouteImport } from './routes/_app/briefs'
@@ -71,9 +73,19 @@ const PricingRoute = PricingRouteImport.update({
   path: '/pricing',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PrivacyRoute = PrivacyRouteImport.update({
+  id: '/privacy',
+  path: '/privacy',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SetupRoute = SetupRouteImport.update({
   id: '/setup',
   path: '/setup',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TermsRoute = TermsRouteImport.update({
+  id: '/terms',
+  path: '/terms',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AppActivityRoute = AppActivityRouteImport.update({
@@ -212,7 +224,9 @@ export interface FileRoutesByFullPath {
   '/faq': typeof FaqRoute
   '/login': typeof LoginRoute
   '/pricing': typeof PricingRoute
+  '/privacy': typeof PrivacyRoute
   '/setup': typeof SetupRoute
+  '/terms': typeof TermsRoute
   '/activity': typeof AppActivityRoute
   '/assistant': typeof AppAssistantRouteWithChildren
   '/briefs': typeof AppBriefsRoute
@@ -245,7 +259,9 @@ export interface FileRoutesByTo {
   '/faq': typeof FaqRoute
   '/login': typeof LoginRoute
   '/pricing': typeof PricingRoute
+  '/privacy': typeof PrivacyRoute
   '/setup': typeof SetupRoute
+  '/terms': typeof TermsRoute
   '/activity': typeof AppActivityRoute
   '/briefs': typeof AppBriefsRoute
   '/home': typeof AppHomeRoute
@@ -278,7 +294,9 @@ export interface FileRoutesById {
   '/faq': typeof FaqRoute
   '/login': typeof LoginRoute
   '/pricing': typeof PricingRoute
+  '/privacy': typeof PrivacyRoute
   '/setup': typeof SetupRoute
+  '/terms': typeof TermsRoute
   '/_app/activity': typeof AppActivityRoute
   '/_app/assistant': typeof AppAssistantRouteWithChildren
   '/_app/briefs': typeof AppBriefsRoute
@@ -313,7 +331,9 @@ export interface FileRouteTypes {
     | '/faq'
     | '/login'
     | '/pricing'
+    | '/privacy'
     | '/setup'
+    | '/terms'
     | '/activity'
     | '/assistant'
     | '/briefs'
@@ -346,7 +366,9 @@ export interface FileRouteTypes {
     | '/faq'
     | '/login'
     | '/pricing'
+    | '/privacy'
     | '/setup'
+    | '/terms'
     | '/activity'
     | '/briefs'
     | '/home'
@@ -378,7 +400,9 @@ export interface FileRouteTypes {
     | '/faq'
     | '/login'
     | '/pricing'
+    | '/privacy'
     | '/setup'
+    | '/terms'
     | '/_app/activity'
     | '/_app/assistant'
     | '/_app/briefs'
@@ -413,7 +437,9 @@ export interface RootRouteChildren {
   FaqRoute: typeof FaqRoute
   LoginRoute: typeof LoginRoute
   PricingRoute: typeof PricingRoute
+  PrivacyRoute: typeof PrivacyRoute
   SetupRoute: typeof SetupRoute
+  TermsRoute: typeof TermsRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -460,11 +486,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PricingRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/privacy': {
+      id: '/privacy'
+      path: '/privacy'
+      fullPath: '/privacy'
+      preLoaderRoute: typeof PrivacyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/setup': {
       id: '/setup'
       path: '/setup'
       fullPath: '/setup'
       preLoaderRoute: typeof SetupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/terms': {
+      id: '/terms'
+      path: '/terms'
+      fullPath: '/terms'
+      preLoaderRoute: typeof TermsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_app/activity': {
@@ -731,7 +771,9 @@ const rootRouteChildren: RootRouteChildren = {
   FaqRoute: FaqRoute,
   LoginRoute: LoginRoute,
   PricingRoute: PricingRoute,
+  PrivacyRoute: PrivacyRoute,
   SetupRoute: SetupRoute,
+  TermsRoute: TermsRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
