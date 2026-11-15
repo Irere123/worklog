@@ -96,11 +96,8 @@ const styles = stylex.create({
     },
     color: "oklch(0.22 0.01 80 / 0.3)",
   },
-  // Lit from above with a soft fall beneath, so the way in sits a step off the page.
   start: {
     paddingRight: 18,
-    boxShadow:
-      "inset 0 1px 0 oklch(1 0 0 / 0.14), 0 1px 2px oklch(0 0 0 / 0.18), 0 6px 16px -6px oklch(0 0 0 / 0.35)",
   },
   nudge: {
     transitionProperty: "transform",
