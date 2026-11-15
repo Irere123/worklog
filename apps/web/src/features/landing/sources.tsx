@@ -6,13 +6,15 @@ import {
   WebhooksLogoIcon,
 } from "@phosphor-icons/react";
 import * as stylex from "@stylexjs/stylex";
+import { useRef } from "react";
 import type { ReactNode } from "react";
 
 import { Ghost } from "#ui/ghost";
 import { ProductMark } from "#ui/product-mark";
 import { color, media, space, text } from "#ui/tokens.stylex";
 
-import { page, type } from "./styles";
+import { useReveal } from "./script";
+import { page, reveal, type } from "./styles";
 
 type Source = { name: string; brings: string; mark: ReactNode };
 
@@ -79,20 +81,35 @@ const PEOPLE: Source[] = [
 
 /** Where the record comes from, drifting past in two rows like a ticker. */
 export function Sources() {
+  const ref = useRef<HTMLElement>(null);
+  const on = useReveal(ref);
   return (
     <section
+      ref={ref}
       aria-labelledby="sources"
-      {...stylex.props(page.section, styles.section)}
+      {...stylex.props(page.wide, page.section)}
     >
-      <p id="sources" {...stylex.props(page.narrow, type.lede, styles.lede)}>
-        <span {...stylex.props(styles.line)}>
-          Code, chat, agents and a sentence from you.
-        </span>
-        <span {...stylex.props(styles.line)}>
-          Every source becomes one line, credited to whoever did it.
-        </span>
+      <p
+        id="sources"
+        {...stylex.props(
+          type.lede,
+          styles.lede,
+          reveal.line,
+          reveal.delay(50),
+          on && reveal.on
+        )}
+      >
+        Code, chat, agents and a sentence from you. Every source becomes one
+        line, credited to whoever did it.
       </p>
-      <div {...stylex.props(styles.rows)}>
+      <div
+        {...stylex.props(
+          styles.rows,
+          reveal.line,
+          reveal.delay(150),
+          on && reveal.on
+        )}
+      >
         <Row items={TOOLS} />
         <Row items={PEOPLE} reverse />
       </div>
@@ -129,32 +146,20 @@ function Row({
 
 const slide = stylex.keyframes({
   from: { transform: "translateX(0)" },
-  to: { transform: "translateX(-50%)" },
+  // Half the doubled list plus half a gap, so the seam lands exactly on the copy.
+  to: { transform: `translateX(calc(-50% - ${space.lg} / 2))` },
 });
 
 const styles = stylex.create({
   lede: {
+    marginInline: "auto",
+    marginBottom: space.x4,
     textAlign: "center",
-    marginBottom: space.x5,
-    color: color.fgMuted,
-  },
-  // A ticker between two full sections needs less air than a section of its own.
-  section: {
-    paddingTop: {
-      default: 112,
-      "@media (max-width: 640px)": 80,
-    },
-  },
-  line: {
-    display: "block",
-    textWrap: "balance",
   },
   rows: {
     display: "flex",
     flexDirection: "column",
-    gap: space.md,
-    maxWidth: 1056,
-    marginInline: "auto",
+    gap: space.lg,
   },
   viewport: {
     overflow: "hidden",
@@ -163,7 +168,7 @@ const styles = stylex.create({
   },
   track: {
     display: "flex",
-    gap: space.md,
+    gap: space.lg,
     width: "max-content",
     margin: 0,
     padding: 0,
@@ -185,22 +190,30 @@ const styles = stylex.create({
   item: {
     display: "flex",
     flexDirection: "column",
-    width: 188,
+    width: 176,
     height: 112,
-    padding: space.lg,
-    paddingTop: space.lg,
-    borderRadius: 16,
-    backgroundColor: "light-dark(oklch(0.958 0.004 80), oklch(0.215 0.005 80))",
-    // In the dark a surface a step up isn't edge enough; a hairline carries it, as in the app.
-    boxShadow: "inset 0 0 0 1px light-dark(transparent, oklch(1 0 0 / 0.06))",
+    padding: 14,
+    borderRadius: 12,
+    backgroundColor: {
+      default: "light-dark(oklch(0.2 0.01 80 / 0.035), oklch(1 0 0 / 0.04))",
+      ":hover": {
+        default: null,
+        [media.hover]:
+          "light-dark(oklch(0.2 0.01 80 / 0.06), oklch(1 0 0 / 0.07))",
+      },
+    },
+    boxShadow: "inset 0 0 0 1px light-dark(transparent, oklch(1 0 0 / 0.05))",
     color: color.fgMuted,
+    transitionProperty: "background-color",
+    transitionDuration: "200ms",
   },
+  // Every name sits the same step under its mark, however its line below wraps.
   mark: {
     display: "flex",
-    marginBottom: space.xxl,
+    marginBottom: 14,
   },
   name: {
-    fontSize: text.copy,
+    fontSize: 14,
     fontWeight: 500,
     color: color.fg,
   },

@@ -16,12 +16,19 @@ import type { Mood } from "#ui/ghost";
 import { color, font, radius, space, text } from "#ui/tokens.stylex";
 
 import { Cursor, Plate } from "./frame";
+import { Intro } from "./intro";
 import { Collapse, Roll } from "./motion";
 import ink from "./plates/ink.webp";
 import sage from "./plates/sage.webp";
-import { pointAt, useInView, useReducedMotion, useScript } from "./script";
+import {
+  pointAt,
+  useInView,
+  useReducedMotion,
+  useReveal,
+  useScript,
+} from "./script";
 import type { Point } from "./script";
-import { page, type } from "./styles";
+import { page, reveal, type } from "./styles";
 import { ada, atlas, grace, jean } from "./team";
 
 /**
@@ -29,17 +36,24 @@ import { ada, atlas, grace, jean } from "./team";
  * a card and asks before it changes what others will see.
  */
 export function Agents() {
+  const pair = useRef<HTMLDivElement>(null);
+  const on = useReveal(pair);
   return (
     <section id="agents" {...stylex.props(page.wide, page.section)}>
-      <div {...stylex.props(page.intro)}>
-        <h2 {...stylex.props(type.heading)}>Agents on the team.</h2>
-        <p {...stylex.props(type.lede, styles.lede)}>
-          Everyone gets an assistant that knows their work. Coding agents report
-          like teammates, and ask before they act.
-        </p>
-      </div>
-      <div {...stylex.props(styles.pair)}>
-        <figure {...stylex.props(styles.card)}>
+      <Intro
+        title="Agents on the team."
+        lede="Everyone gets an assistant that knows their work. Coding agents report like teammates, and ask before they act."
+      />
+      <div ref={pair} {...stylex.props(styles.pair)}>
+        <figure
+          {...stylex.props(
+            page.tile,
+            styles.card,
+            reveal.line,
+            reveal.delay(100),
+            on && reveal.on
+          )}
+        >
           <Plate src={ink} sx={styles.plate}>
             <div aria-hidden {...stylex.props(styles.picture)}>
               <Ask />
@@ -54,7 +68,15 @@ export function Agents() {
             </p>
           </figcaption>
         </figure>
-        <figure {...stylex.props(styles.card)}>
+        <figure
+          {...stylex.props(
+            page.tile,
+            styles.card,
+            reveal.line,
+            reveal.delay(150),
+            on && reveal.on
+          )}
+        >
           <Plate src={sage} sx={styles.plate}>
             <div aria-hidden {...stylex.props(styles.picture)}>
               <Approve />
@@ -351,6 +373,14 @@ function Approve() {
           </span>
           <span {...stylex.props(styles.when)}>Thu</span>
         </span>
+        <span {...stylex.props(styles.logLine)}>
+          <Avatar person={ada} size={16} />
+          <span>
+            <span {...stylex.props(styles.strong)}>{ada.name}</span> Assigned
+            the card to Atlas
+          </span>
+          <span {...stylex.props(styles.when)}>Wed</span>
+        </span>
       </div>
       <Cursor at={s.cursor} pressed={s.pressed} shown={s.shown && !reduced} />
     </div>
@@ -358,9 +388,6 @@ function Approve() {
 }
 
 const styles = stylex.create({
-  lede: {
-    maxWidth: 520,
-  },
   pair: {
     display: "grid",
     gridTemplateColumns: {
@@ -374,21 +401,20 @@ const styles = stylex.create({
     flexDirection: "column",
     margin: 0,
     overflow: "hidden",
-    borderRadius: 20,
-    backgroundColor: "light-dark(oklch(0.958 0.004 80), oklch(0.215 0.005 80))",
-    // In the dark a surface a step up isn't edge enough; a hairline carries it, as in the app.
-    boxShadow: "inset 0 0 0 1px light-dark(transparent, oklch(1 0 0 / 0.06))",
   },
   plate: {
-    // Sized to what the two windows hold once they've played, so neither ends on a blank third.
+    // Sized to what the two windows hold once they've played, so neither ends on a blank band.
     height: {
-      default: 340,
-      "@media (max-width: 640px)": 360,
+      default: 400,
+      "@media (max-width: 640px)": 380,
     },
     borderRadius: 0,
     display: "flex",
     justifyContent: "center",
-    paddingTop: 44,
+    paddingTop: {
+      default: 64,
+      "@media (max-width: 640px)": 40,
+    },
     paddingInline: {
       default: 40,
       "@media (max-width: 640px)": space.xl,
@@ -403,9 +429,7 @@ const styles = stylex.create({
     display: "flex",
     flexDirection: "column",
     gap: space.xs,
-    paddingTop: space.xxl,
-    paddingBottom: space.x3,
-    paddingInline: space.x3,
+    padding: space.xxl,
   },
   panel: {
     position: "relative",

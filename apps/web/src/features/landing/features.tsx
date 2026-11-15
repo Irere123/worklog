@@ -17,10 +17,11 @@ import { Avatar } from "#ui/avatar";
 import { Logo } from "#ui/logo";
 import { ProductMark } from "#ui/product-mark";
 import type { Product } from "#ui/product-mark";
-import { color, font, radius, space, text } from "#ui/tokens.stylex";
+import { color, font, radius, shadow, space, text } from "#ui/tokens.stylex";
 
+import { Intro } from "./intro";
 import { useInView, useReducedMotion } from "./script";
-import { page, type } from "./styles";
+import { page, reveal, type } from "./styles";
 import { eric } from "./team";
 
 /**
@@ -30,17 +31,16 @@ import { eric } from "./team";
 export function Features() {
   return (
     <section id="features" {...stylex.props(page.wide, page.section)}>
-      <div {...stylex.props(page.intro)}>
-        <h2 {...stylex.props(type.heading)}>
-          The tools write it.
-          <br />
-          Everyone can read it.
-        </h2>
-        <p {...stylex.props(type.lede, styles.lede)}>
-          Nobody reports status. Worklog keeps the record from the work itself,
-          filters it, credits it and shows each person what’s theirs.
-        </p>
-      </div>
+      <Intro
+        title={
+          <>
+            The tools write it.
+            <br />
+            Everyone can read it.
+          </>
+        }
+        lede="Nobody reports status. Worklog keeps the record from the work itself, filters it, credits it and shows each person what’s theirs."
+      />
       <div {...stylex.props(styles.grid)}>
         <Tile
           wide
@@ -150,14 +150,26 @@ function Tile({
     return () => clearTimeout(timer);
   }, [on, at]);
   return (
-    <article ref={ref} {...stylex.props(styles.tile, wide && styles.wide)}>
+    <article
+      ref={ref}
+      {...stylex.props(
+        page.tile,
+        styles.tile,
+        wide && styles.wide,
+        reveal.line,
+        reveal.delay(150 + (at % 3) * 50),
+        (on || reduced) && reveal.on
+      )}
+    >
       <div aria-hidden {...stylex.props(styles.art)}>
         {children(turn || reduced)}
       </div>
       <div {...stylex.props(styles.words)}>
         <h3 {...stylex.props(type.tileTitle, styles.title)}>
           {title}
-          {badge && <span {...stylex.props(styles.badge)}>{badge}</span>}
+          {badge && (
+            <span {...stylex.props(type.chip, styles.badge)}>{badge}</span>
+          )}
         </h3>
         <p {...stylex.props(type.tileCopy)}>{copy}</p>
       </div>
@@ -323,7 +335,11 @@ function Drift({ on, fluid = false }: { on: boolean; fluid?: boolean }) {
       )}
     >
       <span {...stylex.props(styles.cardTop)}>
-        <span {...stylex.props(styles.mono, styles.numberChip)}>#9</span>
+        <span
+          {...stylex.props(styles.mono, styles.numberChip, styles.numberFaded)}
+        >
+          #9
+        </span>
         <span {...stylex.props(styles.countdown)}>
           <HourglassMediumIcon size={12} weight="fill" /> 3 days
         </span>
@@ -484,9 +500,6 @@ function ModelKey({ on }: { on: boolean }) {
 const ARRIVE = "cubic-bezier(0.25, 0.8, 0.25, 1)";
 
 const styles = stylex.create({
-  lede: {
-    maxWidth: 540,
-  },
   grid: {
     display: "grid",
     gridTemplateColumns: {
@@ -500,10 +513,6 @@ const styles = stylex.create({
     display: "flex",
     flexDirection: "column",
     overflow: "hidden",
-    borderRadius: 18,
-    backgroundColor: "light-dark(oklch(0.958 0.004 80), oklch(0.215 0.005 80))",
-    // In the dark a surface a step up isn't edge enough; a hairline carries it, as in the app.
-    boxShadow: "inset 0 0 0 1px light-dark(transparent, oklch(1 0 0 / 0.06))",
   },
   wide: {
     gridColumn: {
@@ -569,7 +578,7 @@ const styles = stylex.create({
     padding: space.lg,
     borderRadius: radius.lg,
     backgroundColor: color.raised,
-    boxShadow: `0 0 0 1px ${color.line}`,
+    boxShadow: shadow.object,
     textAlign: "start",
     transitionProperty: "box-shadow, background-color",
     transitionDuration: "500ms",
@@ -619,12 +628,7 @@ const styles = stylex.create({
     display: "flex",
     flexDirection: "column",
     gap: space.xs,
-    paddingTop: space.xs,
-    paddingBottom: {
-      default: space.xxl,
-      "@media (max-width: 600px)": space.xl,
-    },
-    paddingInline: space.xxl,
+    padding: space.xl,
   },
   title: {
     display: "flex",
@@ -633,16 +637,6 @@ const styles = stylex.create({
   },
   badge: {
     marginLeft: "auto",
-    paddingInline: space.md,
-    height: 22,
-    display: "inline-flex",
-    alignItems: "center",
-    borderRadius: radius.full,
-    backgroundColor: "light-dark(oklch(0.912 0.005 80), oklch(0.28 0.005 80))",
-    color: color.fgMuted,
-    fontSize: text.meta,
-    fontWeight: 500,
-    letterSpacing: "normal",
   },
   row: {
     display: "flex",
@@ -659,7 +653,7 @@ const styles = stylex.create({
     height: 76,
     borderRadius: 14,
     backgroundColor: color.raised,
-    boxShadow: `0 0 0 1px ${color.line}, 0 1px 2px light-dark(oklch(0.2 0.01 80 / 0.06), oklch(0 0 0 / 0.3))`,
+    boxShadow: shadow.object,
   },
   appName: {
     fontSize: text.caption,
@@ -704,7 +698,7 @@ const styles = stylex.create({
     paddingInline: space.lg,
     borderRadius: radius.md,
     backgroundColor: color.raised,
-    boxShadow: `0 0 0 1px ${color.line}`,
+    boxShadow: shadow.object,
     fontSize: text.label,
     whiteSpace: "nowrap",
   },
@@ -758,7 +752,7 @@ const styles = stylex.create({
     paddingInline: space.md,
     borderRadius: radius.full,
     backgroundColor: color.raised,
-    boxShadow: `0 0 0 1px ${color.line}`,
+    boxShadow: shadow.object,
     fontSize: text.meta,
     fontWeight: 500,
   },
@@ -804,7 +798,7 @@ const styles = stylex.create({
     padding: space.lg,
     borderRadius: radius.md,
     backgroundColor: color.raised,
-    boxShadow: `0 0 0 1px ${color.line}, 0 4px 12px light-dark(oklch(0.2 0.01 80 / 0.06), oklch(0 0 0 / 0.3))`,
+    boxShadow: shadow.object,
     textAlign: "start",
     transitionProperty: "opacity, transform, box-shadow, background-color",
     transitionDuration: "900ms",
@@ -826,7 +820,7 @@ const styles = stylex.create({
   },
   // Faded enough to read as drifting, not so far that its words stop being legible.
   driftOn: {
-    opacity: 0.72,
+    opacity: 0.8,
     transform: "translateY(6px) scale(0.985)",
     transitionDuration: "2400ms",
     transitionDelay: "500ms",
@@ -846,6 +840,10 @@ const styles = stylex.create({
     fontSize: text.meta,
     color: color.fgMuted,
   },
+  // The card it sits on is already faded, so its number starts a step darker to stay legible.
+  numberFaded: {
+    color: color.fg,
+  },
   numberGolden: {
     color: color.goldFg,
   },
@@ -855,7 +853,7 @@ const styles = stylex.create({
     gap: space.xxs,
     fontSize: text.caption,
     fontWeight: 500,
-    color: color.fgMuted,
+    color: color.fg,
   },
   cardTitle: {
     fontSize: text.label,
@@ -910,7 +908,7 @@ const styles = stylex.create({
     padding: space.lg,
     borderRadius: radius.lg,
     backgroundColor: color.raised,
-    boxShadow: `0 0 0 1px ${color.line}`,
+    boxShadow: shadow.object,
   },
   budgetHead: {
     display: "flex",
@@ -1014,7 +1012,7 @@ const styles = stylex.create({
     height: 20,
     borderRadius: radius.xs,
     backgroundColor: color.raised,
-    boxShadow: `0 0 0 1px ${color.line}`,
+    boxShadow: shadow.object,
     fontFamily: font.mono,
     fontSize: text.caption,
     color: color.fgMuted,

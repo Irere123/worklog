@@ -127,6 +127,10 @@ export const radius = stylex.defineVars({
 });
 
 export const shadow = stylex.defineVars({
+  // A small white object resting on a landing page tile: a top highlight, a half-pixel edge and a
+  // soft fall, so it reads as lifted without a drawn border.
+  object:
+    "inset 0 1px 0 light-dark(oklch(1 0 0), oklch(1 0 0 / 0.06)), 0 0 0 0.5px light-dark(oklch(0 0 0 / 0.08), oklch(1 0 0 / 0.1)), 0 6px 18px -8px light-dark(oklch(0 0 0 / 0.14), oklch(0 0 0 / 0.6))",
   // Two layers plus a hairline: the hairline carries the edge in dark mode, where shadows vanish.
   // light-dark() takes colours only, so each layer picks its own; wrapped around a whole shadow
   // list it's invalid and the browser draws no shadow at all.

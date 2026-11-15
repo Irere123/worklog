@@ -17,9 +17,12 @@ import { color, motion } from "./tokens.stylex";
 export function Logo({
   size = 24,
   draw = false,
+  tinted = false,
 }: {
   size?: number;
   draw?: boolean;
+  /** Takes the colour of the text around it, for the mark inside a filled button. */
+  tinted?: boolean;
 }) {
   const mask = useId();
   const cuts = markCuts(size);
@@ -54,14 +57,17 @@ export function Logo({
         />
       </mask>
       <g mask={`url(#${mask})`} {...stylex.props(draw && styles.settle)}>
-        {size >= RIM_FROM && (
+        {size >= RIM_FROM && !tinted && (
           <path
             d={MARK_LOBES}
             transform="translate(-0.8 0.5)"
             {...stylex.props(styles.rim)}
           />
         )}
-        <path d={MARK_LOBES} {...stylex.props(styles.ink)} />
+        <path
+          d={MARK_LOBES}
+          {...stylex.props(styles.ink, tinted && styles.tinted)}
+        />
       </g>
     </svg>
   );
@@ -83,6 +89,7 @@ const write = stylex.keyframes({
 const styles = stylex.create({
   logo: { flexShrink: 0 },
   ink: { fill: color.brand },
+  tinted: { fill: "currentColor" },
   rim: { fill: color.brandRim },
   settle: {
     transformBox: "fill-box",

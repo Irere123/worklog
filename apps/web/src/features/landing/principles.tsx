@@ -1,11 +1,14 @@
 import * as stylex from "@stylexjs/stylex";
+import { useRef } from "react";
 import type { ReactNode } from "react";
 
 import { Avatar } from "#ui/avatar";
 import { Ghost } from "#ui/ghost";
-import { color, font, radius, space, text } from "#ui/tokens.stylex";
+import { color, font, radius, shadow, space, text } from "#ui/tokens.stylex";
 
-import { page, type } from "./styles";
+import { Intro } from "./intro";
+import { useReveal } from "./script";
+import { page, reveal, type } from "./styles";
 import { ada, atlas, eric, grace, jean, scout } from "./team";
 
 /**
@@ -13,12 +16,20 @@ import { ada, atlas, eric, grace, jean, scout } from "./team";
  * small piece of the product that keeps it.
  */
 export function Principles() {
+  const grid = useRef<HTMLDivElement>(null);
+  const on = useReveal(grid);
   return (
-    <section {...stylex.props(page.wide, page.section)}>
-      <div {...stylex.props(page.intro)}>
-        <h2 {...stylex.props(type.heading)}>Honest, calm and human.</h2>
-      </div>
-      <div {...stylex.props(styles.grid)}>
+    <section {...stylex.props(page.narrow, page.section)}>
+      <Intro title="Honest, calm and human." />
+      <div
+        ref={grid}
+        {...stylex.props(
+          styles.grid,
+          reveal.line,
+          reveal.delay(150),
+          on && reveal.on
+        )}
+      >
         <Principle
           name="Honest"
           words="Every line is something that happened, with a source and a time. An agent’s work says so, and names the person answerable for it."
@@ -30,7 +41,6 @@ export function Principles() {
             <span {...stylex.props(styles.ellipsis, styles.muted)}>
               opened <span {...stylex.props(styles.mono)}>#209</span>
             </span>
-            <span {...stylex.props(styles.when)}>Sat 7:30</span>
           </span>
         </Principle>
         <Principle
@@ -74,7 +84,7 @@ function Principle({
 }) {
   return (
     <article {...stylex.props(styles.card)}>
-      <h3 {...stylex.props(styles.name)}>{name}</h3>
+      <h3 {...stylex.props(type.tileTitle)}>{name}</h3>
       <p {...stylex.props(styles.words)}>{words}</p>
       <div aria-hidden {...stylex.props(styles.foot)}>
         {children}
@@ -96,27 +106,20 @@ const styles = stylex.create({
   card: {
     display: "flex",
     flexDirection: "column",
-    gap: space.md,
-    padding: space.x3,
-    borderRadius: 18,
-    backgroundColor: "light-dark(oklch(0.958 0.004 80), oklch(0.215 0.005 80))",
-    // In the dark a surface a step up isn't edge enough; a hairline carries it, as in the app.
-    boxShadow: "inset 0 0 0 1px light-dark(transparent, oklch(1 0 0 / 0.06))",
-  },
-  name: {
-    margin: 0,
-    fontFamily: font.display,
-    fontSize: 26,
-    lineHeight: "30px",
-    fontWeight: 500,
-    letterSpacing: "-0.015em",
+    gap: space.sm,
+    padding: space.xxl,
+    borderRadius: 16,
+    backgroundColor:
+      "light-dark(oklch(0.2 0.01 80 / 0.03), oklch(1 0 0 / 0.035))",
+    boxShadow: "inset 0 0 0 1px light-dark(transparent, oklch(1 0 0 / 0.05))",
   },
   words: {
     margin: 0,
     flexGrow: 1,
-    fontSize: 15,
-    lineHeight: "23px",
-    color: color.fgMuted,
+    fontSize: 14,
+    lineHeight: "22px",
+    fontWeight: 400,
+    color: "light-dark(oklch(0.22 0.01 80 / 0.8), oklch(0.94 0.004 80 / 0.8))",
     textWrap: "pretty",
   },
   foot: {
@@ -133,7 +136,7 @@ const styles = stylex.create({
     paddingInline: space.lg,
     borderRadius: radius.md,
     backgroundColor: color.raised,
-    boxShadow: `0 0 0 1px ${color.line}`,
+    boxShadow: shadow.object,
     whiteSpace: "nowrap",
   },
   strong: {
@@ -158,11 +161,6 @@ const styles = stylex.create({
     fontSize: text.meta,
     color: color.fgMuted,
   },
-  when: {
-    marginLeft: "auto",
-    color: color.fgMuted,
-    fontSize: text.meta,
-  },
   nav: {
     display: "flex",
     alignItems: "center",
@@ -172,7 +170,7 @@ const styles = stylex.create({
     paddingInline: space.lg,
     borderRadius: radius.md,
     backgroundColor: color.raised,
-    boxShadow: `0 0 0 1px ${color.line}`,
+    boxShadow: shadow.object,
     fontWeight: 500,
   },
   grow: {

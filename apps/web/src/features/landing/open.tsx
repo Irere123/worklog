@@ -5,8 +5,8 @@ import { useRef, useState } from "react";
 import { Avatar } from "#ui/avatar";
 import { color, font, radius, space, text } from "#ui/tokens.stylex";
 
-import { useInView, useReducedMotion, useScript } from "./script";
-import { page, type } from "./styles";
+import { useInView, useReducedMotion, useReveal, useScript } from "./script";
+import { page, reveal, type } from "./styles";
 import { ada } from "./team";
 
 // Broken at its own flags and fields, so a narrow terminal never has to split a word.
@@ -48,18 +48,21 @@ export function Open() {
     { running: inView && !reduced, paused: false }
   );
 
+  const panel = useRef<HTMLDivElement>(null);
+  const on = useReveal(panel);
+  const rise = (ms: number) => [reveal.line, reveal.delay(ms), on && reveal.on];
   const shown = reduced ? END : s;
   return (
     <section id="open" {...stylex.props(page.wide, page.section)}>
-      <div {...stylex.props(styles.panel)}>
+      <div ref={panel} {...stylex.props(page.tile, styles.panel, rise(0))}>
         <div {...stylex.props(styles.words)}>
-          <h2 {...stylex.props(type.heading)}>Open by design.</h2>
-          <p {...stylex.props(type.lede, styles.lede)}>
+          <h2 {...stylex.props(type.heading, rise(50))}>Open by design.</h2>
+          <p {...stylex.props(type.lede, rise(100))}>
             One OpenAPI contract and a resumable event stream serve the web app,
             your scripts and your agents alike. Run it on your own server with
             Docker, or deploy it to Railway.
           </p>
-          <ul {...stylex.props(styles.chips)}>
+          <ul {...stylex.props(styles.chips, rise(180))}>
             <li {...stylex.props(styles.chip)}>OpenAPI 3.1</li>
             <li {...stylex.props(styles.chip)}>Postgres and Bun</li>
           </ul>
@@ -134,39 +137,35 @@ const styles = stylex.create({
       default: space.x5,
       "@media (max-width: 640px)": space.xl,
     },
-    borderRadius: 24,
-    backgroundColor: "light-dark(oklch(0.958 0.004 80), oklch(0.215 0.005 80))",
-    // In the dark a surface a step up isn't edge enough; a hairline carries it, as in the app.
-    boxShadow: "inset 0 0 0 1px light-dark(transparent, oklch(1 0 0 / 0.06))",
   },
   words: {
     display: "flex",
     flexDirection: "column",
     alignItems: "center",
-    gap: space.xl,
+    gap: space.xxl,
     maxWidth: 560,
     textAlign: "center",
-  },
-  lede: {
-    fontSize: 17,
   },
   chips: {
     display: "flex",
     flexWrap: "wrap",
     justifyContent: "center",
-    gap: space.sm,
+    gap: space.md,
     margin: 0,
+    marginTop: space.xs,
     padding: 0,
     listStyle: "none",
   },
   chip: {
     display: "inline-flex",
     alignItems: "center",
-    height: 30,
+    height: 28,
     paddingInline: space.lg,
     borderRadius: radius.full,
-    backgroundColor: "light-dark(oklch(0.912 0.005 80), oklch(0.27 0.005 80))",
-    fontSize: text.label,
+    backgroundColor:
+      "light-dark(oklch(0.2 0.01 80 / 0.05), oklch(1 0 0 / 0.07))",
+    color: "light-dark(oklch(0.22 0.01 80 / 0.7), oklch(0.94 0.004 80 / 0.75))",
+    fontSize: 13,
     fontWeight: 500,
   },
   scene: {

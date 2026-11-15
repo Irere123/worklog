@@ -7,6 +7,8 @@ import {
 } from "react";
 import type { RefObject } from "react";
 
+import { useTheme } from "#lib/theme";
+
 /**
  * The landing page's demos are scripts: a list of beats that set state and wait. A script stops
  * where it is when someone presses Pause, and is dropped mid-beat when its demo unmounts, so
@@ -108,6 +110,15 @@ export function useInView<T extends Element>(
   return inView;
 }
 
+/**
+ * Whether a section's words should play their entrance: once it is a little way on screen, or at
+ * once with reduced motion, where an entrance held back would leave the words unseen.
+ */
+export function useReveal<T extends Element>(ref: RefObject<T | null>) {
+  const seen = useInView(ref, { margin: "0px 0px -8% 0px", once: true });
+  return useReducedMotion() || seen;
+}
+
 const REDUCED = "(prefers-reduced-motion: reduce)";
 
 export function useReducedMotion() {
@@ -120,6 +131,26 @@ export function useReducedMotion() {
     () => matchMedia(REDUCED).matches,
     () => false
   );
+}
+
+const DARK = "(prefers-color-scheme: dark)";
+
+/**
+ * Whether the page is showing dark, from the theme a visitor picked or, on "system", their
+ * device. For pictures, which can't follow a light-dark() colour on their own.
+ */
+export function useDark() {
+  const theme = useTheme();
+  const system = useSyncExternalStore(
+    (change) => {
+      const query = matchMedia(DARK);
+      query.addEventListener("change", change);
+      return () => query.removeEventListener("change", change);
+    },
+    () => matchMedia(DARK).matches,
+    () => false
+  );
+  return theme === "system" ? system : theme === "dark";
 }
 
 export type Point = { x: number; y: number };
@@ -141,8 +172,11 @@ export function pointAt(
   }
   const outer = root.getBoundingClientRect();
   const box = target.getBoundingClientRect();
+  // The desktop tour draws the window at its design size and scales it to fit; the cursor lives
+  // inside that scale, so a measured distance is turned back into the window's own pixels.
+  const scale = root.offsetWidth > 0 ? outer.width / root.offsetWidth : 1;
   return {
-    x: box.left - outer.left + box.width * fx,
-    y: box.top - outer.top + box.height * fy,
+    x: (box.left - outer.left + box.width * fx) / scale,
+    y: (box.top - outer.top + box.height * fy) / scale,
   };
 }

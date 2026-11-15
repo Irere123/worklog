@@ -1,10 +1,13 @@
 import { PlusIcon } from "@phosphor-icons/react";
 import * as stylex from "@stylexjs/stylex";
+import { useRef } from "react";
 import type { ReactNode } from "react";
 
 import { color, font, media, motion, radius, space } from "#ui/tokens.stylex";
 
-import { page, type } from "./styles";
+import { Intro } from "./intro";
+import { useReveal } from "./script";
+import { page, reveal } from "./styles";
 
 const QUESTIONS: { ask: string; answer: ReactNode }[] = [
   {
@@ -62,12 +65,20 @@ const QUESTIONS: { ask: string; answer: ReactNode }[] = [
 
 /** The questions a team asks before it sets anything up, answered in a line or two each. */
 export function Faq() {
+  const list = useRef<HTMLDivElement>(null);
+  const on = useReveal(list);
   return (
     <section {...stylex.props(page.narrow, page.section)}>
-      <div {...stylex.props(page.intro)}>
-        <h2 {...stylex.props(type.heading)}>Before you set it up.</h2>
-      </div>
-      <div {...stylex.props(styles.list)}>
+      <Intro title="Before you set it up." />
+      <div
+        ref={list}
+        {...stylex.props(
+          styles.list,
+          reveal.line,
+          reveal.delay(150),
+          on && reveal.on
+        )}
+      >
         {QUESTIONS.map((item) => (
           <details key={item.ask} {...stylex.props(styles.item)}>
             <summary {...stylex.props(styles.ask)}>
@@ -86,6 +97,8 @@ const styles = stylex.create({
   list: {
     display: "flex",
     flexDirection: "column",
+    maxWidth: 640,
+    marginInline: "auto",
     borderTopWidth: 1,
     borderTopStyle: "solid",
     borderTopColor: color.line,
@@ -100,9 +113,9 @@ const styles = stylex.create({
     alignItems: "center",
     justifyContent: "space-between",
     gap: space.xl,
-    paddingBlock: space.xxl,
+    paddingBlock: 18,
     fontFamily: font.sans,
-    fontSize: 17,
+    fontSize: 15,
     fontWeight: 500,
     listStyle: "none",
     cursor: "pointer",
@@ -138,9 +151,9 @@ const styles = stylex.create({
   answer: {
     margin: 0,
     paddingBottom: space.xxl,
-    maxWidth: 620,
-    fontSize: 15,
-    lineHeight: "24px",
+    maxWidth: 580,
+    fontSize: 14,
+    lineHeight: "22px",
     color: color.fgMuted,
     textWrap: "pretty",
   },

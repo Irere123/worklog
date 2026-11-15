@@ -2,31 +2,42 @@ import { DesktopIcon, MoonIcon, SunIcon } from "@phosphor-icons/react";
 import type { Icon } from "@phosphor-icons/react";
 import * as stylex from "@stylexjs/stylex";
 import { Link } from "@tanstack/react-router";
+import { useRef } from "react";
 
 import { setTheme, useTheme } from "#lib/theme";
 import type { Theme } from "#lib/theme";
 import { Logo } from "#ui/logo";
-import { color, media, motion, radius, space, text } from "#ui/tokens.stylex";
+import { color, media, motion, radius, space } from "#ui/tokens.stylex";
 
 import { DEPLOY, SOURCE } from "./hero";
-import { cta, page, type } from "./styles";
+import { useReveal } from "./script";
+import { cta, page, reveal, type } from "./styles";
 
 /** The last ask, then the way around. */
 export function Closing({ setupOpen }: { setupOpen: boolean }) {
+  const ref = useRef<HTMLElement>(null);
+  const on = useReveal(ref);
+  const rise = (ms: number) => [reveal.line, reveal.delay(ms), on && reveal.on];
   return (
-    <section {...stylex.props(page.narrow, page.section, styles.closing)}>
-      <h2 {...stylex.props(type.heading)}>Start your team’s logbook.</h2>
+    <section
+      ref={ref}
+      {...stylex.props(page.wide, page.section, styles.closing)}
+    >
+      <h2 {...stylex.props(type.heading, rise(50))}>
+        Start your team’s logbook.
+      </h2>
       <Link
         to={setupOpen ? "/setup" : "/login"}
-        {...stylex.props(cta.base, cta.primary, styles.action)}
+        {...stylex.props(cta.base, cta.primary, styles.action, rise(200))}
       >
+        <Logo size={16} tinted />
         {setupOpen ? "Set up your workspace" : "Sign in to Worklog"}
       </Link>
-      <p {...stylex.props(styles.fine)}>
-        Running your own?{" "}
+      <p {...stylex.props(styles.fine, rise(250))}>
         <a href={DEPLOY} {...stylex.props(styles.fineLink)}>
-          It takes a few minutes with Docker Compose.
-        </a>
+          Docker Compose or Railway
+        </a>{" "}
+        · Your own Postgres · AI optional
       </p>
     </section>
   );
@@ -57,53 +68,55 @@ const COLUMNS = [
 
 export function Footer({ setupOpen }: { setupOpen: boolean }) {
   return (
-    <footer {...stylex.props(page.wide, styles.footer)}>
+    <footer {...stylex.props(page.narrow, styles.footer)}>
       <div {...stylex.props(styles.top)}>
         <div {...stylex.props(styles.brand)}>
-          <span {...stylex.props(styles.wordmark)}>
-            <Logo size={22} />
+          <a href="#top" {...stylex.props(styles.wordmark)}>
+            <Logo size={18} />
             Worklog
-          </span>
+          </a>
           <p {...stylex.props(styles.tagline)}>
             A shared record of what your team and its agents did, and of what
             needs whom.
           </p>
         </div>
-        {COLUMNS.map((column) => (
-          <nav
-            key={column.title}
-            aria-label={column.title}
-            {...stylex.props(styles.column)}
-          >
-            <span {...stylex.props(styles.columnTitle)}>{column.title}</span>
-            {column.links.map((link) => (
-              <a
-                key={link.label}
-                href={link.href}
-                {...stylex.props(styles.link)}
-              >
-                {link.label}
-              </a>
-            ))}
-          </nav>
-        ))}
-        <nav aria-label="Get started" {...stylex.props(styles.column)}>
-          <span {...stylex.props(styles.columnTitle)}>Get started</span>
-          {setupOpen && (
-            <Link to="/setup" {...stylex.props(styles.link)}>
-              Set up a workspace
+        <div {...stylex.props(styles.columns)}>
+          {COLUMNS.map((column) => (
+            <nav
+              key={column.title}
+              aria-label={column.title}
+              {...stylex.props(styles.column)}
+            >
+              <span {...stylex.props(styles.columnTitle)}>{column.title}</span>
+              {column.links.map((link) => (
+                <a
+                  key={link.label}
+                  href={link.href}
+                  {...stylex.props(styles.link)}
+                >
+                  {link.label}
+                </a>
+              ))}
+            </nav>
+          ))}
+          <nav aria-label="Get started" {...stylex.props(styles.column)}>
+            <span {...stylex.props(styles.columnTitle)}>Get started</span>
+            {setupOpen && (
+              <Link to="/setup" {...stylex.props(styles.link)}>
+                Set up a workspace
+              </Link>
+            )}
+            <Link to="/login" {...stylex.props(styles.link)}>
+              Sign in
             </Link>
-          )}
-          <Link to="/login" {...stylex.props(styles.link)}>
-            Sign in
-          </Link>
-          <a href={DEPLOY} {...stylex.props(styles.link)}>
-            Host your own
-          </a>
-          <a href="/docs" {...stylex.props(styles.link)}>
-            API reference
-          </a>
-        </nav>
+            <a href={DEPLOY} {...stylex.props(styles.link)}>
+              Host your own
+            </a>
+            <a href="/docs" {...stylex.props(styles.link)}>
+              API reference
+            </a>
+          </nav>
+        </div>
       </div>
       <div {...stylex.props(styles.bottom)}>
         <span>© 2026 Worklog</span>
@@ -145,26 +158,29 @@ const styles = stylex.create({
     display: "flex",
     flexDirection: "column",
     alignItems: "center",
-    gap: space.x4,
     textAlign: "center",
   },
   action: {
-    minWidth: 220,
+    marginTop: 40,
+    paddingLeft: 18,
   },
   fine: {
     margin: 0,
-    marginTop: {
-      default: `calc(${space.lg} * -1)`,
-    },
-    fontSize: text.label,
+    marginTop: space.xxl,
+    fontSize: 13,
     color: color.fgMuted,
     textWrap: "balance",
   },
   fineLink: {
-    color: color.fg,
+    color: {
+      default: color.fgMuted,
+      ":hover": { default: null, [media.hover]: color.fg },
+    },
     textDecorationLine: "underline",
     textDecorationColor: color.lineStrong,
     textUnderlineOffset: 3,
+    transitionProperty: "color",
+    transitionDuration: motion.fast,
     outline: {
       default: "none",
       ":focus-visible": `2px solid ${color.focus}`,
@@ -172,56 +188,91 @@ const styles = stylex.create({
     outlineOffset: 2,
   },
   footer: {
-    marginTop: 140,
+    display: "flex",
+    flexDirection: "column",
+    paddingTop: 128,
+    paddingBottom: space.x4,
   },
   top: {
-    display: "grid",
-    gridTemplateColumns: {
-      default: "2fr 1fr 1fr 1fr",
-      "@media (max-width: 760px)": "1fr 1fr",
+    display: "flex",
+    flexDirection: {
+      default: "row",
+      "@media (max-width: 1023px)": "column",
     },
-    gap: space.x4,
-    paddingTop: space.x5,
+    justifyContent: "space-between",
+    gap: {
+      default: 64,
+      "@media (max-width: 1023px)": 48,
+    },
+    paddingTop: 40,
+    paddingBottom: 48,
     borderTopWidth: 1,
     borderTopStyle: "solid",
-    borderTopColor: color.line,
+    borderTopColor:
+      "light-dark(oklch(0.2 0.01 80 / 0.07), oklch(1 0 0 / 0.08))",
   },
   brand: {
     display: "flex",
     flexDirection: "column",
     gap: space.lg,
-    gridColumn: {
-      default: "auto",
-      "@media (max-width: 760px)": "1 / -1",
+    flexShrink: 0,
+    width: {
+      default: 220,
+      "@media (max-width: 1023px)": "auto",
     },
   },
   wordmark: {
     display: "inline-flex",
     alignItems: "center",
-    gap: space.md,
-    fontSize: 16,
+    alignSelf: "flex-start",
+    gap: space.sm,
+    color: color.fg,
+    fontSize: 14,
     fontWeight: 600,
+    textDecoration: "none",
+    borderRadius: radius.xs,
+    outline: {
+      default: "none",
+      ":focus-visible": `2px solid ${color.focus}`,
+    },
+    outlineOffset: 3,
   },
   tagline: {
     margin: 0,
-    maxWidth: 260,
-    fontSize: text.copy,
-    lineHeight: "21px",
+    maxWidth: 220,
+    fontSize: 13,
+    lineHeight: "20px",
     color: color.fgMuted,
+  },
+  columns: {
+    display: "grid",
+    gridTemplateColumns: {
+      default: "repeat(3, minmax(0, 1fr))",
+      "@media (max-width: 640px)": "repeat(2, minmax(0, 1fr))",
+    },
+    columnGap: space.x4,
+    rowGap: 40,
+    flexGrow: 1,
+    maxWidth: 480,
   },
   column: {
     display: "flex",
     flexDirection: "column",
     alignItems: "flex-start",
-    gap: space.md,
+    minWidth: 0,
   },
   columnTitle: {
-    marginBottom: space.xs,
-    fontSize: text.copy,
-    fontWeight: 600,
+    paddingBottom: space.md,
+    fontSize: 13,
+    lineHeight: "20px",
+    fontWeight: 500,
+    color: color.fg,
   },
   link: {
-    fontSize: text.copy,
+    display: "block",
+    paddingBlock: space.xs,
+    fontSize: 13,
+    lineHeight: "20px",
     color: {
       default: color.fgMuted,
       ":hover": { default: null, [media.hover]: color.fg },
@@ -238,14 +289,18 @@ const styles = stylex.create({
   },
   bottom: {
     display: "flex",
+    flexWrap: "wrap",
     alignItems: "center",
-    justifyContent: "space-between",
-    marginTop: space.x5,
-    paddingBlock: space.x3,
+    justifyContent: "center",
+    columnGap: space.xl,
+    rowGap: space.xs,
+    paddingTop: space.x3,
     borderTopWidth: 1,
     borderTopStyle: "solid",
-    borderTopColor: color.line,
-    fontSize: text.label,
+    borderTopColor:
+      "light-dark(oklch(0.2 0.01 80 / 0.07), oklch(1 0 0 / 0.08))",
+    fontSize: 12,
+    lineHeight: "20px",
     color: color.fgMuted,
   },
   themes: {

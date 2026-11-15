@@ -1,59 +1,61 @@
 import * as stylex from "@stylexjs/stylex";
 
-import {
-  color,
-  font,
-  media,
-  motion,
-  radius,
-  space,
-  text,
-} from "#ui/tokens.stylex";
+import { color, font, media, motion, space } from "#ui/tokens.stylex";
 
-// The landing page's type and buttons. The app inside the demos keeps the app's own sizes; these
-// are the page around them, set larger, as print sets a headline over its body.
+// The landing page's measure and type. The app inside the demos keeps the app's own sizes; the
+// page around them is quieter: a light serif over small, grey sans, and a 960px column.
+
+const PHONE = "@media (max-width: 640px)";
 
 export const page = stylex.create({
   wide: {
     width: "100%",
-    maxWidth: 1104,
+    maxWidth: 1024,
     marginInline: "auto",
     paddingInline: {
-      default: space.x3,
-      "@media (max-width: 640px)": space.xl,
+      default: space.x4,
+      [PHONE]: space.x3,
     },
   },
   narrow: {
     width: "100%",
-    maxWidth: 760,
+    maxWidth: 896,
     marginInline: "auto",
     paddingInline: {
-      default: space.x3,
-      "@media (max-width: 640px)": space.xl,
+      default: space.x4,
+      [PHONE]: space.x3,
     },
   },
   section: {
     paddingTop: {
-      default: 160,
-      "@media (max-width: 640px)": 104,
+      default: 128,
+      [PHONE]: 96,
     },
     // A nav link lands with the heading a comfortable step under the sticky bar, not a whole
     // section's padding below it.
     scrollMarginTop: {
-      default: -80,
-      "@media (max-width: 640px)": -40,
+      default: -64,
+      [PHONE]: -40,
     },
   },
   intro: {
     display: "flex",
     flexDirection: "column",
     alignItems: "center",
-    gap: space.xl,
+    gap: space.xxl,
     marginBottom: {
-      default: 56,
-      "@media (max-width: 640px)": 40,
+      default: 48,
+      [PHONE]: 40,
     },
     textAlign: "center",
+  },
+  // The page's surfaces: a quiet fill a step off the page, no edge in the light, a hairline in
+  // the dark where a fill alone doesn't separate.
+  tile: {
+    borderRadius: 16,
+    backgroundColor:
+      "light-dark(oklch(0.2 0.01 80 / 0.04), oklch(1 0 0 / 0.04))",
+    boxShadow: "inset 0 0 0 1px light-dark(transparent, oklch(1 0 0 / 0.05))",
   },
 });
 
@@ -61,46 +63,78 @@ export const type = stylex.create({
   display: {
     margin: 0,
     fontFamily: font.display,
-    fontSize: "clamp(40px, 6.4vw, 66px)",
-    lineHeight: 1.02,
-    fontWeight: 500,
-    letterSpacing: "-0.028em",
-    fontOpticalSizing: "auto",
+    fontSize: {
+      default: 45,
+      "@media (max-width: 768px)": 40,
+      [PHONE]: 36,
+    },
+    lineHeight: {
+      default: "52px",
+      "@media (max-width: 768px)": "46px",
+      [PHONE]: "41px",
+    },
+    // Newsreader's display cut is all hairline at this weight; its text cut, set large, has the
+    // even, sturdy stroke of a book face, which is the voice the page wants.
+    // design-allow: the serif headlines sit between Newsreader's light and regular
+    fontWeight: 360,
+    fontOpticalSizing: "none",
+    fontVariationSettings: "'opsz' 18",
+    letterSpacing: "-0.035em",
     textWrap: "balance",
   },
   heading: {
     margin: 0,
+    maxWidth: 640,
     fontFamily: font.display,
-    fontSize: "clamp(34px, 5vw, 48px)",
-    lineHeight: 1.06,
-    fontWeight: 500,
-    letterSpacing: "-0.022em",
+    fontSize: {
+      default: 40,
+      "@media (max-width: 768px)": 36,
+      [PHONE]: 32,
+    },
+    lineHeight: 1.1,
+    // design-allow: the serif headlines sit between Newsreader's light and regular
+    fontWeight: 360,
+    fontOpticalSizing: "none",
+    fontVariationSettings: "'opsz' 18",
+    letterSpacing: "-0.025em",
     textWrap: "balance",
   },
   lede: {
     margin: 0,
-    fontSize: {
-      default: 18,
-      "@media (max-width: 640px)": 17,
-    },
-    lineHeight: 1.55,
+    maxWidth: 520,
+    fontSize: 16,
+    lineHeight: "24px",
     color: color.fgMuted,
-    textWrap: "pretty",
+    textWrap: "balance",
   },
   tileTitle: {
     margin: 0,
-    fontSize: 17,
+    fontSize: 16,
     lineHeight: "24px",
     fontWeight: 500,
-    letterSpacing: "-0.01em",
+    letterSpacing: "-0.025em",
     color: color.fg,
   },
   tileCopy: {
     margin: 0,
-    fontSize: text.copy,
+    fontSize: 13,
     lineHeight: "21px",
     color: color.fgMuted,
     textWrap: "pretty",
+  },
+  chip: {
+    display: "inline-flex",
+    alignItems: "center",
+    height: 20,
+    paddingInline: space.md,
+    borderRadius: 999,
+    backgroundColor:
+      "light-dark(oklch(0.2 0.01 80 / 0.08), oklch(1 0 0 / 0.1))",
+    color: color.fg,
+    fontSize: 12,
+    fontWeight: 500,
+    letterSpacing: "normal",
+    whiteSpace: "nowrap",
   },
 });
 
@@ -109,17 +143,17 @@ export const cta = stylex.create({
     display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
-    gap: space.md,
-    height: 44,
+    gap: space.sm,
+    height: 40,
     paddingInline: space.xxl,
-    borderRadius: radius.lg,
-    fontSize: 15,
+    borderRadius: 8,
+    fontSize: 14,
     fontWeight: 500,
     textDecoration: "none",
     whiteSpace: "nowrap",
     cursor: "pointer",
-    transitionProperty: "background-color, transform",
-    transitionDuration: motion.fast,
+    transitionProperty: "background-color, color, transform",
+    transitionDuration: "200ms",
     transitionTimingFunction: motion.out,
     transform: { default: null, ":active": "scale(0.97)" },
     outline: {
@@ -140,15 +174,52 @@ export const cta = stylex.create({
   },
   secondary: {
     backgroundColor: {
-      default: color.ui,
-      ":hover": { default: null, [media.hover]: color.uiActive },
+      default: "light-dark(oklch(0.2 0.01 80 / 0.05), oklch(1 0 0 / 0.07))",
+      ":hover": {
+        default: null,
+        [media.hover]:
+          "light-dark(oklch(0.2 0.01 80 / 0.1), oklch(1 0 0 / 0.12))",
+      },
     },
     color: color.fg,
   },
   small: {
-    height: 32,
-    paddingInline: space.lg,
-    borderRadius: radius.md,
-    fontSize: text.label,
+    height: 28,
+    gap: space.xs,
+    paddingInline: 10,
+    fontSize: 12,
   },
+});
+
+/**
+ * A section's words arrive as resurf's do: each line sharpens out of a blur as it rises into
+ * place, a beat after the one above. `on` starts the play; until then the lines wait, unseen.
+ */
+const rise = stylex.keyframes({
+  from: {
+    opacity: 0,
+    filter: "blur(10px)",
+    transform: "translateY(10px)",
+  },
+  to: {
+    opacity: 1,
+    filter: "none",
+    transform: "none",
+  },
+});
+
+export const reveal = stylex.create({
+  line: {
+    animationName: rise,
+    animationDuration: "600ms",
+    animationTimingFunction: "ease-out",
+    animationFillMode: "both",
+    animationPlayState: "paused",
+  },
+  on: {
+    animationPlayState: "running",
+  },
+  delay: (ms: number) => ({
+    animationDelay: `${ms}ms`,
+  }),
 });
