@@ -1,17 +1,19 @@
-import { ArrowUpRightIcon, GithubLogoIcon } from "@phosphor-icons/react";
+import {
+  ArrowUpRightIcon,
+  GithubLogoIcon,
+  HardDrivesIcon,
+} from "@phosphor-icons/react";
 import * as stylex from "@stylexjs/stylex";
 import { Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 
-import { Ghost } from "#ui/ghost";
 import { Logo } from "#ui/logo";
 import { color, media, motion, space } from "#ui/tokens.stylex";
 
+import { DEPLOY, SOURCE } from "./links";
 import { useReducedMotion } from "./script";
+import { useStart } from "./start";
 import { cta, page, type } from "./styles";
-
-export const SOURCE = "https://github.com/Irere123/worklog";
-export const DEPLOY = `${SOURCE}/blob/main/docs/DEPLOY.md`;
 
 // Short enough to hold one line on a phone: the cell keeps the height of one line, never two.
 const ENDINGS = [
@@ -24,7 +26,8 @@ const ENDINGS = [
 const TURN = 3200;
 
 /** The headline and the way in. */
-export function Hero({ setupOpen }: { setupOpen: boolean }) {
+export function Hero() {
+  const start = useStart();
   const reduced = useReducedMotion();
   const [turn, setTurn] = useState(0);
 
@@ -40,9 +43,9 @@ export function Hero({ setupOpen }: { setupOpen: boolean }) {
   return (
     <header {...stylex.props(page.wide, styles.hero)}>
       <div {...stylex.props(styles.words)}>
-        <a href="#agents" {...stylex.props(styles.badge)}>
-          <Ghost size={16} still />
-          The assistant now shows its work
+        <a href={SOURCE} {...stylex.props(styles.badge)}>
+          <GithubLogoIcon size={14} weight="fill" />
+          Now open source under the AGPL-3.0
           <ArrowUpRightIcon size={12} {...stylex.props(styles.badgeArrow)} />
         </a>
         <h1 {...stylex.props(type.display, styles.title)}>
@@ -74,32 +77,32 @@ export function Hero({ setupOpen }: { setupOpen: boolean }) {
       <div {...stylex.props(styles.ways)}>
         <div {...stylex.props(styles.actions)}>
           <Link
-            to={setupOpen ? "/setup" : "/login"}
+            to={start}
             {...stylex.props(cta.base, cta.primary, styles.action)}
           >
             <Logo size={16} tinted />
-            Get started
+            Start free
           </Link>
           <a
-            href={SOURCE}
+            href={DEPLOY}
             {...stylex.props(cta.base, cta.secondary, styles.action)}
           >
-            <GithubLogoIcon size={16} weight="fill" />
-            Star on GitHub
+            <HardDrivesIcon size={16} weight="fill" />
+            Host it yourself
           </a>
         </div>
         <ul {...stylex.props(styles.facts)}>
           <li>
-            <a href={SOURCE} {...stylex.props(styles.fact)}>
-              Open source
-            </a>
+            <Link to="/pricing" {...stylex.props(styles.fact)}>
+              Free for up to 3 people
+            </Link>
           </li>
           <li aria-hidden {...stylex.props(styles.sep)}>
             ·
           </li>
           <li>
-            <a href={DEPLOY} {...stylex.props(styles.fact)}>
-              Hosted, or on your own server
+            <a href="#tour" {...stylex.props(styles.fact)}>
+              On the web and your phone
             </a>
           </li>
           <li aria-hidden {...stylex.props(styles.sep)}>
@@ -107,7 +110,7 @@ export function Hero({ setupOpen }: { setupOpen: boolean }) {
           </li>
           <li>
             <a href="#open" {...stylex.props(styles.fact)}>
-              An API for agents
+              API and agents
             </a>
           </li>
         </ul>

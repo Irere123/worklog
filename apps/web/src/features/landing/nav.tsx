@@ -1,20 +1,84 @@
-import { GithubLogoIcon, ListIcon, XIcon } from "@phosphor-icons/react";
+import {
+  BracketsCurlyIcon,
+  CloudIcon,
+  GitPullRequestIcon,
+  GithubLogoIcon,
+  HardDrivesIcon,
+  ListIcon,
+  MapTrifoldIcon,
+  PlugsIcon,
+  QuestionIcon,
+  XIcon,
+} from "@phosphor-icons/react";
 import * as stylex from "@stylexjs/stylex";
 import { Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
+import type { MouseEvent } from "react";
 
 import { Logo } from "#ui/logo";
 import { color, media, motion, radius, shadow, space } from "#ui/tokens.stylex";
 
-import { SOURCE } from "./hero";
+import { DEPLOY, SOURCE } from "./links";
+import { NavMenu } from "./menus";
+import type { NavItem } from "./menus";
 import { cta } from "./styles";
 
+// Full paths, so the bar works the same from the pricing page as from the front page.
 const LINKS = [
-  { href: "#tour", label: "Tour" },
-  { href: "#features", label: "Features" },
-  { href: "#agents", label: "Agents" },
-  { href: "#open", label: "Developers" },
+  { href: "/#features", label: "Features" },
+  { href: "/pricing", label: "Pricing" },
+  { href: "/changelog", label: "Changelog" },
 ];
+
+const RESOURCES: NavItem[] = [
+  {
+    title: "FAQ",
+    detail: "Plain answers before you start",
+    href: "/faq",
+    icon: QuestionIcon,
+  },
+  {
+    title: "Connectors",
+    detail: "Every tool Worklog reads, and how",
+    href: `${SOURCE}/blob/main/docs/CONNECTORS.md`,
+    icon: PlugsIcon,
+  },
+  {
+    title: "Roadmap",
+    detail: "What we’re building next",
+    href: `${SOURCE}#roadmap`,
+    icon: MapTrifoldIcon,
+  },
+  {
+    title: "Contributing",
+    detail: "Set up the code and send a change",
+    href: `${SOURCE}/blob/main/CONTRIBUTING.md`,
+    icon: GitPullRequestIcon,
+  },
+];
+
+function waysIn(start: string): NavItem[] {
+  return [
+    {
+      title: "Worklog Cloud",
+      detail: "Start free in your browser",
+      href: start,
+      icon: CloudIcon,
+    },
+    {
+      title: "Self-host",
+      detail: "Docker Compose or Railway",
+      href: DEPLOY,
+      icon: HardDrivesIcon,
+    },
+    {
+      title: "API and agents",
+      detail: "One API for scripts and agents",
+      href: "/docs",
+      icon: BracketsCurlyIcon,
+    },
+  ];
+}
 
 // Past the hero's own buttons, the bar's button takes over as the way in, so it darkens to match.
 const PAST_HERO = 460;
@@ -33,9 +97,10 @@ export function Nav({ setupOpen }: { setupOpen: boolean }) {
   // Leaving one link for the next clears and then sets the highlight; the clear waits a tick so
   // the move between neighbours slides instead of fading out and back in.
   const clear = useRef<ReturnType<typeof setTimeout>>(undefined);
-  function point(left: number, width: number) {
+  function point(event: MouseEvent<HTMLElement>) {
     clearTimeout(clear.current);
-    setHover({ left, width });
+    const target = event.currentTarget;
+    setHover({ left: target.offsetLeft, width: target.offsetWidth });
   }
   function leave() {
     clear.current = setTimeout(() => setHover(null), 40);
@@ -83,12 +148,7 @@ export function Nav({ setupOpen }: { setupOpen: boolean }) {
           <li key={link.href}>
             <a
               href={link.href}
-              onMouseEnter={(event) =>
-                point(
-                  event.currentTarget.offsetLeft,
-                  event.currentTarget.offsetWidth
-                )
-              }
+              onMouseEnter={point}
               onMouseLeave={leave}
               {...stylex.props(styles.link)}
             >
@@ -96,6 +156,15 @@ export function Nav({ setupOpen }: { setupOpen: boolean }) {
             </a>
           </li>
         ))}
+        <li>
+          <NavMenu
+            label="Resources"
+            items={RESOURCES}
+            trigger={styles.link}
+            onPoint={point}
+            onLeave={leave}
+          />
+        </li>
       </ul>
       <div {...stylex.props(styles.end)}>
         <a
@@ -111,17 +180,14 @@ export function Nav({ setupOpen }: { setupOpen: boolean }) {
         >
           Sign in
         </Link>
-        <Link
-          to={to}
-          {...stylex.props(
-            cta.base,
-            cta.small,
-            past ? cta.primary : styles.quiet,
-            styles.desktopOnly
-          )}
-        >
-          Get started
-        </Link>
+        <span {...stylex.props(styles.desktopOnly)}>
+          <NavMenu
+            label="Get started"
+            items={waysIn(to)}
+            align="end"
+            trigger={[cta.base, cta.small, past ? cta.primary : styles.quiet]}
+          />
+        </span>
         <button
           type="button"
           aria-label={open ? "Close menu" : "Open menu"}
@@ -145,6 +211,13 @@ export function Nav({ setupOpen }: { setupOpen: boolean }) {
               {link.label}
             </a>
           ))}
+          <a
+            href="/faq"
+            onClick={() => setOpen(false)}
+            {...stylex.props(styles.menuLink)}
+          >
+            FAQ
+          </a>
           <a
             href={SOURCE}
             onClick={() => setOpen(false)}
@@ -273,6 +346,8 @@ const styles = stylex.create({
     height: 28,
     paddingInline: space.lg,
     borderRadius: radius.full,
+    // A menu's trigger is a button, which brings a grey fill of its own.
+    backgroundColor: "transparent",
     color: {
       default:
         "light-dark(oklch(0.22 0.01 80 / 0.7), oklch(0.94 0.004 80 / 0.7))",

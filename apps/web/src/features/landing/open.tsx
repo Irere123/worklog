@@ -66,7 +66,7 @@ export function Open() {
           </p>
           <ul {...stylex.props(styles.chips, rise(180))}>
             <li {...stylex.props(styles.chip)}>OpenAPI 3.1</li>
-            <li {...stylex.props(styles.chip)}>Self-host with Docker</li>
+            <li {...stylex.props(styles.chip)}>Resumable event stream</li>
           </ul>
         </div>
 

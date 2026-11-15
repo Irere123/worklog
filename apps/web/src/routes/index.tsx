@@ -1,12 +1,9 @@
-import newsreaderLatinUrl from "@fontsource-variable/newsreader/files/newsreader-latin-opsz-normal.woff2?url";
-import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, redirect } from "@tanstack/react-router";
 
 import { ApiError } from "#api/client";
 import { q } from "#api/queries";
+import { DISPLAY_FONT } from "#features/landing/head";
 import { Landing } from "#features/landing/landing";
-
-import newsreaderUrl from "@fontsource-variable/newsreader/opsz.css?url";
 
 const DESCRIPTION =
   "The open-source logbook for teams of people and agents. GitHub, Slack, Discord and your agents write it as they work; Worklog tells you what needs you and gives everyone an assistant that knows their work.";
@@ -17,16 +14,7 @@ export const Route = createFileRoute("/")({
       { title: "Worklog · Your team’s logbook" },
       { name: "description", content: DESCRIPTION },
     ],
-    links: [
-      {
-        rel: "preload",
-        href: newsreaderLatinUrl,
-        as: "font",
-        type: "font/woff2",
-        crossOrigin: "anonymous" as const,
-      },
-      { rel: "stylesheet", href: newsreaderUrl },
-    ],
+    links: DISPLAY_FONT,
   }),
   // Someone signed in came for the app, not the pitch. On a first load the prerendered page's
   // head script sends them on (lib/boot.ts); this covers arriving here from inside the app.
@@ -45,10 +33,5 @@ export const Route = createFileRoute("/")({
     }
     redirect({ to: "/home", throw: true });
   },
-  component: Front,
+  component: Landing,
 });
-
-function Front() {
-  const config = useQuery(q.authConfig());
-  return <Landing setupOpen={config.data?.setupOpen === true} />;
-}

@@ -79,10 +79,13 @@ export default defineConfig({
       // The shell is rendered at a signed-in route, where only the root's head and scripts make it
       // into the HTML. At "/" (the default) it would take the front page's place.
       spa: { enabled: true, maskPath: "/home" },
-      // The front page is the one route a stranger opens first, so it ships as HTML that paints
+      // The public pages are the ones a stranger opens first, so they ship as HTML that paints
       // before the app's JavaScript arrives. Every other route is behind sign-in: the shell.
-      // Its links lead to the API or behind sign-in, so the crawl stops at the page itself.
-      pages: [{ path: "/", prerender: { enabled: true, crawlLinks: false } }],
+      // Their links lead to each other, the API or behind sign-in, so nothing is crawled.
+      pages: ["/", "/pricing", "/faq", "/changelog"].map((path) => ({
+        path,
+        prerender: { enabled: true, crawlLinks: false },
+      })),
     }),
     react(),
   ],

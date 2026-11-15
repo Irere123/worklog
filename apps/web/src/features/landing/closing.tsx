@@ -9,12 +9,14 @@ import type { Theme } from "#lib/theme";
 import { Logo } from "#ui/logo";
 import { color, media, motion, radius, space } from "#ui/tokens.stylex";
 
-import { DEPLOY, SOURCE } from "./hero";
+import { DEPLOY, SOURCE, doc } from "./links";
 import { useReveal } from "./script";
+import { useStart } from "./start";
 import { cta, page, reveal, type } from "./styles";
 
 /** The last ask, then the way around. */
-export function Closing({ setupOpen }: { setupOpen: boolean }) {
+export function Closing() {
+  const start = useStart();
   const ref = useRef<HTMLElement>(null);
   const on = useReveal(ref);
   const rise = (ms: number) => [reveal.line, reveal.delay(ms), on && reveal.on];
@@ -27,54 +29,49 @@ export function Closing({ setupOpen }: { setupOpen: boolean }) {
         Start your team’s logbook.
       </h2>
       <Link
-        to={setupOpen ? "/setup" : "/login"}
+        to={start}
         {...stylex.props(cta.base, cta.primary, styles.action, rise(200))}
       >
         <Logo size={16} tinted />
-        Get started
+        Start free
       </Link>
       <ul {...stylex.props(styles.fine, rise(250))}>
-        <li>
-          <a href={SOURCE} {...stylex.props(styles.fineLink)}>
-            Open source on GitHub
-          </a>
+        <li>Free for up to 3 people</li>
+        <li aria-hidden {...stylex.props(styles.sep)}>
+          ·
         </li>
+        <li>No card to start</li>
         <li aria-hidden {...stylex.props(styles.sep)}>
           ·
         </li>
         <li>
           <a href={DEPLOY} {...stylex.props(styles.fineLink)}>
-            Hosted or self-hosted
+            Or host it yourself, free
           </a>
         </li>
-        <li aria-hidden {...stylex.props(styles.sep)}>
-          ·
-        </li>
-        <li>AI optional</li>
       </ul>
     </section>
   );
 }
 
+// Full paths, so the footer works the same from every public page.
 const COLUMNS = [
   {
     title: "Product",
     links: [
-      { label: "Tour", href: "#tour" },
-      { label: "Features", href: "#features" },
-      { label: "Agents", href: "#agents" },
-      { label: "Open by design", href: "#open" },
+      { label: "Features", href: "/#features" },
+      { label: "Pricing", href: "/pricing" },
+      { label: "Changelog", href: "/changelog" },
+      { label: "Self-hosting", href: DEPLOY },
     ],
   },
   {
-    title: "Developers",
+    title: "Learn",
     links: [
-      { label: "Connectors", href: `${SOURCE}/blob/main/docs/CONNECTORS.md` },
-      {
-        label: "Architecture",
-        href: `${SOURCE}/blob/main/docs/ARCHITECTURE.md`,
-      },
+      { label: "FAQ", href: "/faq" },
       { label: "API reference", href: "/docs" },
+      { label: "Connectors", href: doc("CONNECTORS") },
+      { label: "Architecture", href: doc("ARCHITECTURE") },
     ],
   },
   {
@@ -83,22 +80,24 @@ const COLUMNS = [
       { label: "Source on GitHub", href: SOURCE },
       { label: "Roadmap", href: `${SOURCE}#roadmap` },
       { label: "Contributing", href: `${SOURCE}/blob/main/CONTRIBUTING.md` },
+      { label: "License", href: `${SOURCE}/blob/main/LICENSE` },
     ],
   },
 ];
 
 export function Footer({ setupOpen }: { setupOpen: boolean }) {
+  const start = useStart();
   return (
     <footer {...stylex.props(page.narrow, styles.footer)}>
       <div {...stylex.props(styles.top)}>
         <div {...stylex.props(styles.brand)}>
-          <a href="#top" {...stylex.props(styles.wordmark)}>
+          <a href="/" {...stylex.props(styles.wordmark)}>
             <Logo size={18} />
             Worklog
           </a>
           <p {...stylex.props(styles.tagline)}>
-            The open-source logbook for teams of people and agents: what
-            everyone did, and what needs whom.
+            The open-source team logbook. On Worklog Cloud, or on your own
+            server.
           </p>
         </div>
         <div {...stylex.props(styles.columns)}>
@@ -122,17 +121,15 @@ export function Footer({ setupOpen }: { setupOpen: boolean }) {
           ))}
           <nav aria-label="Get started" {...stylex.props(styles.column)}>
             <span {...stylex.props(styles.columnTitle)}>Get started</span>
-            {setupOpen && (
-              <Link to="/setup" {...stylex.props(styles.link)}>
-                Set up a workspace
-              </Link>
-            )}
+            <Link to={start} {...stylex.props(styles.link)}>
+              {setupOpen ? "Set up a workspace" : "Start free"}
+            </Link>
             <Link to="/login" {...stylex.props(styles.link)}>
               Sign in
             </Link>
-            <a href={DEPLOY} {...stylex.props(styles.link)}>
-              Self-host
-            </a>
+            <Link to="/pricing" {...stylex.props(styles.link)}>
+              Compare plans
+            </Link>
           </nav>
         </div>
       </div>
