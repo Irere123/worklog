@@ -1,5 +1,6 @@
 import { CheckCircleIcon } from "@phosphor-icons/react";
 import * as stylex from "@stylexjs/stylex";
+import type { StyleXStyles } from "@stylexjs/stylex";
 import { Link } from "@tanstack/react-router";
 
 import { color, media, shadow, space } from "#ui/tokens.stylex";
@@ -96,7 +97,7 @@ export function Pricing() {
       <div {...stylex.props(page.wide, styles.plans)}>
         <PlanCard plan={FREE} to={start} />
         <PlanCard plan={TEAM} to={start} />
-        <PlanCard plan={SELF} href={DEPLOY} />
+        <PlanCard plan={SELF} href={DEPLOY} sx={styles.lastPlan} />
       </div>
       <Facts
         sx={styles.fine}
@@ -134,10 +135,12 @@ function PlanCard({
   plan,
   to,
   href,
+  sx,
 }: {
   plan: Plan;
   to?: string;
   href?: string;
+  sx?: StyleXStyles;
 }) {
   const button = stylex.props(
     cta.base,
@@ -145,7 +148,7 @@ function PlanCard({
     styles.action
   );
   return (
-    <article {...stylex.props(styles.plan, plan.lead && styles.lead)}>
+    <article {...stylex.props(styles.plan, plan.lead && styles.lead, sx)}>
       <h2 {...stylex.props(styles.name)}>{plan.name}</h2>
       <p {...stylex.props(styles.price)}>
         <span {...stylex.props(styles.amount)}>{plan.price}</span>
@@ -177,15 +180,26 @@ function PlanCard({
   );
 }
 
+const TABLET = "@media (max-width: 900px)";
+
 const styles = stylex.create({
   plans: {
     display: "grid",
     gridTemplateColumns: {
       default: "repeat(3, minmax(0, 1fr))",
-      "@media (max-width: 900px)": "1fr",
+      [TABLET]: "repeat(2, minmax(0, 1fr))",
+      "@media (max-width: 640px)": "1fr",
     },
     gap: space.md,
     alignItems: "stretch",
+  },
+  // A tablet fits the two Cloud plans side by side; self-hosting takes the row under them.
+  lastPlan: {
+    gridColumn: {
+      default: "auto",
+      [TABLET]: "1 / -1",
+      "@media (max-width: 640px)": "auto",
+    },
   },
   plan: {
     display: "flex",

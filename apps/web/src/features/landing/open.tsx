@@ -169,12 +169,17 @@ const styles = stylex.create({
     paddingTop: space.xl,
     // Room under the reply for the line it writes, which lands over this empty foot.
     paddingBottom: 128,
-    paddingInline: space.xxl,
+    paddingInline: {
+      default: space.xxl,
+      "@media (max-width: 640px)": space.lg,
+    },
     overflowX: "hidden",
     fontFamily: font.mono,
+    // The longest line is 36 characters; scaled with the screen, it still fits whole at 320px
+    // instead of leaving its trailing backslash on a line of its own.
     fontSize: {
       default: 13,
-      "@media (max-width: 640px)": 10,
+      "@media (max-width: 640px)": "clamp(9px, 2.9vw, 10px)",
     },
     lineHeight: 1.7,
     whiteSpace: "pre-wrap",

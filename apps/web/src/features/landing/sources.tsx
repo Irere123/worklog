@@ -111,7 +111,7 @@ function Row({
           <li
             key={`${item.name}-${at < items.length ? "a" : "b"}`}
             aria-hidden={at >= items.length}
-            {...stylex.props(styles.item)}
+            {...stylex.props(styles.item, at >= items.length && styles.copy)}
           >
             <span {...stylex.props(styles.mark)}>{item.mark}</span>
             <span {...stylex.props(styles.name)}>{item.name}</span>
@@ -129,6 +129,8 @@ const slide = stylex.keyframes({
   to: { transform: `translateX(calc(-50% - ${space.lg} / 2))` },
 });
 
+const STILL = "@media (prefers-reduced-motion: reduce)";
+
 const styles = stylex.create({
   lede: {
     marginInline: "auto",
@@ -140,10 +142,23 @@ const styles = stylex.create({
     flexDirection: "column",
     gap: space.lg,
   },
+  // Held still, the ticker would hide most of its tiles past the edge, so the row scrolls by hand
+  // instead: one copy of the list, no fade, swipeable on a phone.
   viewport: {
-    overflow: "hidden",
-    maskImage:
-      "linear-gradient(to right, transparent, black 12%, black 88%, transparent)",
+    overflowX: {
+      default: "hidden",
+      [STILL]: "auto",
+    },
+    maskImage: {
+      default:
+        "linear-gradient(to right, transparent, black 12%, black 88%, transparent)",
+      [STILL]: "none",
+    },
+    scrollbarWidth: "thin",
+    scrollSnapType: {
+      default: null,
+      [STILL]: "x proximity",
+    },
   },
   track: {
     display: "flex",
@@ -152,14 +167,17 @@ const styles = stylex.create({
     margin: 0,
     padding: 0,
     listStyle: "none",
-    animationName: slide,
+    // Paused rather than removed, the reversed row would hold its end frame, half a list along.
+    animationName: {
+      default: slide,
+      [STILL]: "none",
+    },
     animationDuration: "48s",
     animationTimingFunction: "linear",
     animationIterationCount: "infinite",
     animationPlayState: {
       default: "running",
       ":hover": { default: null, [media.hover]: "paused" },
-      "@media (prefers-reduced-motion: reduce)": "paused",
     },
   },
   reverse: {
@@ -168,6 +186,8 @@ const styles = stylex.create({
   },
   item: {
     display: "flex",
+    flexShrink: 0,
+    scrollSnapAlign: "start",
     flexDirection: "column",
     width: 176,
     height: 112,
@@ -183,6 +203,12 @@ const styles = stylex.create({
     color: color.fgMuted,
     transitionProperty: "background-color",
     transitionDuration: "200ms",
+  },
+  copy: {
+    display: {
+      default: "flex",
+      [STILL]: "none",
+    },
   },
   // Every name sits the same step under its mark, however its line below wraps. The box is a
   // fixed 24px, so a mark drawn larger to match its neighbours' weight doesn't push its name down.

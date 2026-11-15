@@ -616,10 +616,13 @@ const styles = stylex.create({
     backgroundColor: color.amberSubtle,
     boxShadow: `inset 0 0 0 1px oklch(0.85 0.08 75)`,
   },
+  // The state can't wrap mid-roll, so on a narrow phone the whole state drops to its own line.
   runHead: {
     display: "flex",
+    flexWrap: "wrap",
     alignItems: "center",
-    gap: space.sm,
+    columnGap: space.sm,
+    rowGap: space.xxs,
     color: color.fgMuted,
   },
   strong: {

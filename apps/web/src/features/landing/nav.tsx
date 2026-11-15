@@ -256,6 +256,10 @@ const styles = stylex.create({
     alignItems: "center",
     gap: space.md,
     justifySelf: "start",
+    // A 22px mark is too small to tap; the padding gives it a 40px target and the margin takes the
+    // padding back, so the mark stays where it was.
+    padding: 9,
+    margin: -9,
     color: color.fg,
     fontSize: 15,
     fontWeight: 600,
