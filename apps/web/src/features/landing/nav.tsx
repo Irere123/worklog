@@ -1,4 +1,6 @@
 import {
+  BookOpenIcon,
+  BracketsCurlyIcon,
   GitPullRequestIcon,
   ListIcon,
   MapTrifoldIcon,
@@ -15,7 +17,7 @@ import { Logo } from "#ui/logo";
 import { ProductMark } from "#ui/product-mark";
 import { color, media, motion, radius, shadow, space } from "#ui/tokens.stylex";
 
-import { SOURCE } from "./links";
+import { DEPLOY, doc, SOURCE } from "./links";
 import { NavMenu } from "./menus";
 import type { NavItem } from "./menus";
 import { cta, focus } from "./styles";
@@ -27,30 +29,44 @@ const LINKS = [
   { href: "/changelog", label: "Changelog" },
 ];
 
+// Each tile's glyph in a colour of its own, as resurf's are: on the dark panel they're how the eye
+// tells six tiles apart before reading them.
 const RESOURCES: NavItem[] = [
   {
+    title: "Self-hosting",
+    href: DEPLOY,
+    icon: BookOpenIcon,
+    tint: "oklch(0.74 0.17 55)",
+  },
+  {
     title: "FAQ",
-    detail: "Plain answers before you start",
     href: "/faq",
     icon: QuestionIcon,
+    tint: "oklch(0.72 0.15 235)",
+  },
+  {
+    title: "API docs",
+    href: "/docs",
+    icon: BracketsCurlyIcon,
+    tint: "oklch(0.72 0.14 295)",
   },
   {
     title: "Connectors",
-    detail: "Every tool Worklog reads, and how",
-    href: `${SOURCE}/blob/main/docs/CONNECTORS.md`,
+    href: doc("CONNECTORS"),
     icon: PlugsIcon,
+    tint: "oklch(0.72 0.17 350)",
   },
   {
     title: "Roadmap",
-    detail: "What we’re building next",
     href: `${SOURCE}#roadmap`,
     icon: MapTrifoldIcon,
+    tint: "oklch(0.82 0.16 85)",
   },
   {
     title: "Contributing",
-    detail: "Set up the code and send a change",
     href: `${SOURCE}/blob/main/CONTRIBUTING.md`,
     icon: GitPullRequestIcon,
+    tint: "oklch(0.76 0.14 175)",
   },
 ];
 
@@ -71,13 +87,24 @@ export function Nav({ setupOpen }: { setupOpen: boolean }) {
   // Leaving one link for the next clears and then sets the highlight; the clear waits a tick so
   // the move between neighbours slides instead of fading out and back in.
   const clear = useRef<ReturnType<typeof setTimeout>>(undefined);
+  // An open menu keeps the highlight on its trigger, as the pressed state of the button.
+  const held = useRef(false);
   function point(event: MouseEvent<HTMLElement>) {
     clearTimeout(clear.current);
     const target = event.currentTarget;
     setHover({ left: target.offsetLeft, width: target.offsetWidth });
   }
   function leave() {
+    if (held.current) {
+      return;
+    }
     clear.current = setTimeout(() => setHover(null), 40);
+  }
+  function hold(menuOpen: boolean) {
+    held.current = menuOpen;
+    if (!menuOpen) {
+      leave();
+    }
   }
 
   useEffect(() => {
@@ -138,6 +165,7 @@ export function Nav({ setupOpen }: { setupOpen: boolean }) {
             trigger={[focus.ring, styles.link]}
             onPoint={point}
             onLeave={leave}
+            onOpenChange={hold}
           />
         </li>
       </ul>

@@ -9,14 +9,14 @@ import { space } from "#ui/tokens.stylex";
 
 export type NavItem = {
   title: string;
-  detail: string;
   href: string;
   icon: Icon;
+  tint: string;
 };
 
 /**
- * A menu of places in the nav, as resurf's "Get Resurf" is: a dark panel of rows, each a title
- * and the line that says what's there. It opens on hover for a pointer and on a press for
+ * A menu of places in the nav, as resurf's Resources is: a dark panel of tiles, three to a row,
+ * each a coloured glyph over its name. It opens on hover for a pointer and on a press for
  * everyone else, and moves by arrow keys.
  */
 export function NavMenu({
@@ -26,6 +26,7 @@ export function NavMenu({
   trigger,
   onPoint,
   onLeave,
+  onOpenChange,
 }: {
   label: ReactNode;
   items: NavItem[];
@@ -33,9 +34,10 @@ export function NavMenu({
   trigger: StyleXStyles;
   onPoint?: (event: MouseEvent<HTMLElement>) => void;
   onLeave?: () => void;
+  onOpenChange?: (open: boolean) => void;
 }) {
   return (
-    <Menu.Root modal={false}>
+    <Menu.Root modal={false} onOpenChange={onOpenChange}>
       <Menu.Trigger
         openOnHover
         delay={80}
@@ -59,7 +61,7 @@ export function NavMenu({
           {...stylex.props(styles.positioner)}
         >
           <Menu.Popup {...stylex.props(styles.popup)}>
-            {items.map(({ title, detail, href, icon: Glyph }) => (
+            {items.map(({ title, href, icon: Glyph, tint }) => (
               <Menu.LinkItem
                 key={title}
                 href={href}
@@ -67,11 +69,12 @@ export function NavMenu({
                 closeOnClick
                 {...stylex.props(styles.item)}
               >
-                <Glyph size={18} {...stylex.props(styles.icon)} />
-                <span {...stylex.props(styles.words)}>
-                  <span {...stylex.props(styles.title)}>{title}</span>
-                  <span {...stylex.props(styles.detail)}>{detail}</span>
-                </span>
+                <Glyph
+                  size={22}
+                  weight="fill"
+                  {...stylex.props(styles.icon(tint))}
+                />
+                <span {...stylex.props(styles.title)}>{title}</span>
               </Menu.LinkItem>
             ))}
           </Menu.Popup>
@@ -107,11 +110,13 @@ const styles = stylex.create({
   },
   popup: {
     display: "grid",
+    gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
     gap: 1,
-    width: 272,
+    width: 600,
+    maxWidth: "calc(100vw - 32px)",
     overflow: "hidden",
     borderRadius: 16,
-    // Seen through the 1px gaps between rows, it rules them apart without a border on each.
+    // Seen through the 1px gaps between tiles, it rules them apart without a border on each.
     backgroundColor: "oklch(0.33 0.004 80)",
     boxShadow:
       "0 0 0 1px oklch(1 0 0 / 0.1), 0 1px 2px oklch(0 0 0 / 0.05), 0 4px 8px -2px oklch(0 0 0 / 0.05), 0 12px 24px -4px oklch(0 0 0 / 0.06), 0 24px 48px -8px oklch(0 0 0 / 0.07)",
@@ -131,10 +136,10 @@ const styles = stylex.create({
   },
   item: {
     display: "flex",
-    alignItems: "flex-start",
-    gap: space.lg,
-    paddingBlock: space.lg,
-    paddingInline: space.xl,
+    flexDirection: "column",
+    justifyContent: "space-between",
+    minHeight: 104,
+    padding: space.xl,
     backgroundColor: {
       default: PANEL,
       ":is([data-highlighted])": ROW_HOVER,
@@ -146,27 +151,13 @@ const styles = stylex.create({
     transitionProperty: "background-color",
     transitionDuration: "120ms",
   },
-  icon: {
-    flexShrink: 0,
-    marginTop: 1,
-    color: "oklch(1 0 0 / 0.85)",
-  },
-  words: {
-    display: "flex",
-    flexDirection: "column",
-    minWidth: 0,
-  },
+  icon: (tint: string) => ({
+    color: tint,
+  }),
   title: {
-    fontSize: 14,
+    fontSize: 15,
     lineHeight: "20px",
     fontWeight: 500,
-  },
-  detail: {
-    fontSize: 12,
-    lineHeight: "17px",
-    color: {
-      default: "oklch(1 0 0 / 0.55)",
-      ":is([data-highlighted] *)": "oklch(1 0 0 / 0.7)",
-    },
+    letterSpacing: "-0.005em",
   },
 });
