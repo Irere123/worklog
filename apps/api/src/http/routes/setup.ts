@@ -76,6 +76,7 @@ export const authConfigRoutes = router().openapi(
         socialProviders: enabledSocialProviders(ctx.config),
         authBasePath: "/api/auth",
         setupOpen: (await countWorkspaces(ctx.db)) === 0,
+        signupOpen: ctx.config.SIGNUP === "open",
       },
       200
     );
@@ -141,6 +142,8 @@ export const sessionRoutes = router()
       operationId: "workspace.create",
       tags: ["Setup"],
       summary: "Create a workspace (signed-in people); you become its owner",
+      description:
+        "Open to anyone signed in unless the server sets `SIGNUP=closed`; then only the first workspace can be created this way, and everyone else joins by invite.",
       request: body(CreateWorkspaceRequest),
       responses: {
         201: json(WorkspaceCreatedResponse, "Created"),
@@ -153,6 +156,14 @@ export const sessionRoutes = router()
       if (!user) {
         throw forbidden(
           "Workspaces are created by signed-in people, not API keys"
+        );
+      }
+      if (
+        ctx.config.SIGNUP === "closed" &&
+        (await countWorkspaces(ctx.db)) > 0
+      ) {
+        throw forbidden(
+          "This server is invite-only: ask a workspace owner to add you"
         );
       }
       const { workspace, member } = await people.createWorkspaceForUser(

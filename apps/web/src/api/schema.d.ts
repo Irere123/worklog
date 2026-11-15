@@ -73,7 +73,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Create a workspace (signed-in people); you become its owner */
+        /**
+         * Create a workspace (signed-in people); you become its owner
+         * @description Open to anyone signed in unless the server sets `SIGNUP=closed`; then only the first workspace can be created this way, and everyone else joins by invite.
+         */
         post: operations["workspace.create"];
         delete?: never;
         options?: never;
@@ -2573,6 +2576,8 @@ export interface operations {
                         authBasePath: string;
                         /** @description No workspace exists yet, so `POST /v1/setup` is open */
                         setupOpen: boolean;
+                        /** @description Anyone who signs in may start a workspace with `POST /v1/workspaces`; otherwise people join by invite */
+                        signupOpen: boolean;
                     };
                 };
             };

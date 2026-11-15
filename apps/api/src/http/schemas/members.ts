@@ -214,6 +214,10 @@ export const AuthConfigResponse = z.object({
   setupOpen: z.boolean().openapi({
     description: "No workspace exists yet, so `POST /v1/setup` is open",
   }),
+  signupOpen: z.boolean().openapi({
+    description:
+      "Anyone who signs in may start a workspace with `POST /v1/workspaces`; otherwise people join by invite",
+  }),
 });
 
 const Membership = z.object({ workspace: Workspace, member: MemberResponse });

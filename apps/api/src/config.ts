@@ -34,6 +34,9 @@ const Env = z.object({
     ),
   // Allows POST /v1/setup after the first workspace exists (multi-workspace hosting).
   SETUP_SECRET: z.string().optional(),
+  // Who may start a workspace once one exists: anyone who signs in (open, as a hosted Worklog
+  // needs) or nobody, so people join only by invite (closed, for a team's own server).
+  SIGNUP: z.enum(["open", "closed"]).default("open"),
 
   // Required in production: openssl rand -hex 32
   AUTH_SECRET: z.string().min(32).optional(),

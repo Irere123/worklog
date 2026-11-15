@@ -46,7 +46,26 @@ describe("signing in", () => {
       socialProviders: [],
       authBasePath: "/api/auth",
       setupOpen: false,
+      signupOpen: true,
     });
+  });
+
+  test("a server with signup closed lets people join only by invite", async () => {
+    await env.workspace();
+    env.ctx.config.SIGNUP = "closed";
+    try {
+      const config = await env.call("GET", "/v1/auth/config");
+      expect(config.body.signupOpen).toBe(false);
+      const token = await signIn("stranger@example.com");
+      const created = await env.call("POST", "/v1/workspaces", {
+        token,
+        body: { name: "Not here" },
+      });
+      expect(created.status).toBe(403);
+      expect(created.body.error.message).toContain("invite-only");
+    } finally {
+      env.ctx.config.SIGNUP = "open";
+    }
   });
 
   test("a new person signs in with an email link, creates a workspace, and is its owner", async () => {

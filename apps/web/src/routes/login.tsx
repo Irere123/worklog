@@ -182,7 +182,11 @@ function Login() {
       >
         <Field
           label="Email"
-          hint="Invited? Use the address your invite went to."
+          hint={
+            config.data?.signupOpen === false
+              ? "Invited? Use the address your invite went to."
+              : "New here? You’ll name your team’s workspace next. Invited? Use the address your invite went to."
+          }
         >
           {(id) => (
             <Input

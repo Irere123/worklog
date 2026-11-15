@@ -34,6 +34,8 @@ function Setup() {
   const session = useQuery({ ...q.session(), retry: false });
   const config = useQuery(q.authConfig());
   const signedIn = Boolean(session.data?.user);
+  // A hosted Worklog lets anyone start a workspace; a team's own server may be invite-only.
+  const signupOpen = config.data?.signupOpen !== false;
   const inWorkspace = (session.data?.memberships.length ?? 0) > 0;
   const [token, setToken] = useState<string | null>(null);
   const [error, setError] = useState<unknown>(null);
@@ -71,7 +73,7 @@ function Setup() {
         setToken(result.token.token);
       } catch (error_) {
         setError(
-          error_ instanceof ApiError && error_.status === 403
+          error_ instanceof ApiError && error_.status === 403 && !signedIn
             ? new Error(
                 "This server already has a workspace. Sign in, or ask its owner to invite you."
               )
@@ -118,11 +120,11 @@ function Setup() {
     return <Navigate to="/home" />;
   }
   // Ask before the form: filling it in only to hear "setup is closed" wastes the visit.
-  if (!signedIn && config.data?.setupOpen === false) {
+  if (!signedIn && config.data?.setupOpen === false && signupOpen) {
     return (
       <AuthFrame
-        title="This server is already set up"
-        subtitle="Sign in to join your team’s workspace. If you don’t have an account yet, ask its owner to invite you."
+        title="Start with your email"
+        subtitle="Sign in with a link we email you. Then you’ll name your team’s workspace, and you’ll be its owner."
       >
         <Button
           variant="primary"
@@ -130,12 +132,34 @@ function Setup() {
             void navigate({ to: "/login" });
           }}
         >
-          Go to sign in
+          Continue with email
         </Button>
       </AuthFrame>
     );
   }
-
+  if (config.data?.setupOpen === false && !signupOpen) {
+    return (
+      <AuthFrame
+        title="This server is invite-only"
+        subtitle={
+          signedIn
+            ? "You’re signed in but don’t belong to a workspace yet. Ask a workspace owner to add you with this email."
+            : "Sign in to join your team’s workspace. If you don’t have an account yet, ask its owner to invite you."
+        }
+      >
+        {!signedIn && (
+          <Button
+            variant="primary"
+            onClick={() => {
+              void navigate({ to: "/login" });
+            }}
+          >
+            Go to sign in
+          </Button>
+        )}
+      </AuthFrame>
+    );
+  }
   return (
     <AuthFrame
       title={signedIn ? "Create a workspace" : "Set up Worklog"}

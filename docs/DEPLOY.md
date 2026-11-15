@@ -51,7 +51,7 @@ Worklog runs as three processes and a database. Each process has its own image, 
 4. **Apply:** `railway config plan` shows what will be created; `railway config apply` creates it. The services build and deploy.
 5. **Give `web` a domain:** its Settings → Networking → Generate Domain, or add your custom domain there and point its DNS as shown. If `PUBLIC_URL` was waiting on it, set it now and redeploy `api` and `worker`. Leave `api` and `worker` without a public domain: they're reached over the private network.
 6. **Turn on backups:** the Postgres service's Backups tab, with a daily schedule.
-7. **Check it:** open the domain, create the first workspace, and look at `api`'s deploy logs for "Worklog API started".
+7. **Check it:** open the domain, create the first workspace, and look at `api`'s deploy logs for "Worklog API started". For a server only your team uses, set `SIGNUP=closed` on `api`, so strangers who sign in can't start workspaces of their own.
 
 ### From then on
 
