@@ -183,7 +183,8 @@ const styles = stylex.create({
     marginBottom: -24,
     overflow: "hidden",
     borderRadius: `${radius.lg} ${radius.lg} 0 0`,
-    backgroundColor: "oklch(0.2 0.006 80)",
+    // A step above the dark page's panel, or the two would read as one surface.
+    backgroundColor: "light-dark(oklch(0.2 0.006 80), oklch(0.24 0.006 80))",
     boxShadow:
       "0 0 0 1px light-dark(oklch(0 0 0 / 0.2), oklch(1 0 0 / 0.12)), 0 24px 48px light-dark(oklch(0.2 0.02 60 / 0.22), oklch(0 0 0 / 0.5))",
     color: "oklch(0.9 0.004 80)",

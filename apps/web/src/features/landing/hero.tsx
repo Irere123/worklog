@@ -41,9 +41,7 @@ export function Hero({ setupOpen }: { setupOpen: boolean }) {
     <header {...stylex.props(page.wide, styles.hero)}>
       <div {...stylex.props(styles.words)}>
         <a href="#agents" {...stylex.props(styles.badge)}>
-          <span {...stylex.props(styles.badgeMark)}>
-            <Ghost size={12} still />
-          </span>
+          <Ghost size={16} still />
           The assistant now shows its work
           <ArrowUpRightIcon size={12} {...stylex.props(styles.badgeArrow)} />
         </a>
@@ -151,7 +149,7 @@ const styles = stylex.create({
     gap: space.sm,
     height: 24,
     marginBottom: space.md,
-    paddingLeft: space.xs,
+    paddingLeft: space.sm,
     paddingRight: space.sm,
     borderRadius: 999,
     backgroundColor: color.raised,
@@ -172,15 +170,6 @@ const styles = stylex.create({
       ":focus-visible": `2px solid ${color.focus}`,
     },
     outlineOffset: 3,
-  },
-  badgeMark: {
-    display: "grid",
-    placeItems: "center",
-    width: 16,
-    height: 16,
-    borderRadius: 999,
-    backgroundColor: color.fg,
-    color: color.bg,
   },
   badgeArrow: {
     color: color.fgFaint,

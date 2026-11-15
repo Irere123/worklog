@@ -22,32 +22,32 @@ const TOOLS: Source[] = [
   {
     name: "GitHub",
     brings: "Pull requests, reviews, issues",
-    mark: <ProductMark product="github" size={22} />,
+    mark: <ProductMark product="github" size={20} />,
   },
   {
     name: "GitLab",
     brings: "Merge requests and pipelines",
-    mark: <ProductMark product="gitlab" size={22} />,
+    mark: <ProductMark product="gitlab" size={20} />,
   },
   {
     name: "Gitea",
     brings: "Your self-hosted repos",
-    mark: <ProductMark product="gitea" size={22} />,
+    mark: <ProductMark product="gitea" size={24} />,
   },
   {
     name: "Slack",
     brings: "The threads that decide things",
-    mark: <ProductMark product="slack" size={22} />,
+    mark: <ProductMark product="slack" size={20} />,
   },
   {
     name: "Discord",
     brings: "Channels and threads",
-    mark: <ProductMark product="discord" size={22} />,
+    mark: <ProductMark product="discord" size={20} />,
   },
   {
     name: "Webhooks",
     brings: "Any tool, mapped by rules",
-    mark: <WebhooksLogoIcon size={22} />,
+    mark: <WebhooksLogoIcon size={20} />,
   },
 ];
 
@@ -55,27 +55,27 @@ const PEOPLE: Source[] = [
   {
     name: "Agents",
     brings: "Progress, runs and questions",
-    mark: <Ghost size={22} still />,
+    mark: <Ghost size={20} still />,
   },
   {
     name: "Logs",
     brings: "A sentence about what happened",
-    mark: <NotePencilIcon size={22} />,
+    mark: <NotePencilIcon size={20} />,
   },
   {
     name: "Voice",
     brings: "Dictated on the phone or laptop",
-    mark: <MicrophoneIcon size={22} />,
+    mark: <MicrophoneIcon size={20} />,
   },
   {
     name: "REST API",
     brings: "One OpenAPI contract",
-    mark: <BracketsCurlyIcon size={22} />,
+    mark: <BracketsCurlyIcon size={20} />,
   },
   {
     name: "Event stream",
     brings: "Resumable, for any client",
-    mark: <BroadcastIcon size={22} />,
+    mark: <BroadcastIcon size={20} />,
   },
 ];
 
@@ -207,10 +207,13 @@ const styles = stylex.create({
     transitionProperty: "background-color",
     transitionDuration: "200ms",
   },
-  // Every name sits the same step under its mark, however its line below wraps.
+  // Every name sits the same step under its mark, however its line below wraps. The box is a
+  // fixed 24px, so a mark drawn larger to match its neighbours' weight doesn't push its name down.
   mark: {
     display: "flex",
-    marginBottom: 14,
+    alignItems: "center",
+    height: 24,
+    marginBottom: 12,
   },
   name: {
     fontSize: 14,

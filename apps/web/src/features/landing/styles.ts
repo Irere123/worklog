@@ -63,14 +63,16 @@ export const type = stylex.create({
   display: {
     margin: 0,
     fontFamily: font.display,
+    // A step above resurf's 45px: Newsreader's x-height is smaller than Signifier's, so the same
+    // size reads small beside it.
     fontSize: {
-      default: 45,
-      "@media (max-width: 768px)": 40,
+      default: 48,
+      "@media (max-width: 768px)": 42,
       [PHONE]: 36,
     },
     lineHeight: {
-      default: "52px",
-      "@media (max-width: 768px)": "46px",
+      default: "54px",
+      "@media (max-width: 768px)": "48px",
       [PHONE]: "41px",
     },
     // Newsreader's display cut is all hairline at this weight; its text cut, set large, has the
@@ -87,9 +89,9 @@ export const type = stylex.create({
     maxWidth: 640,
     fontFamily: font.display,
     fontSize: {
-      default: 40,
-      "@media (max-width: 768px)": 36,
-      [PHONE]: 32,
+      default: 42,
+      "@media (max-width: 768px)": 38,
+      [PHONE]: 34,
     },
     lineHeight: 1.1,
     // design-allow: the serif headlines sit between Newsreader's light and regular

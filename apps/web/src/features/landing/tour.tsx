@@ -104,6 +104,8 @@ const PLATES = [ink, ticket, sage, sky, clay];
 // The window is laid out at the app's own size and scaled to the wallpaper, as a screenshot would
 // be: the miniature keeps the app's proportions instead of reflowing into a cramped one.
 const DESIGN_WIDTH = 1000;
+// A tablet's window lays out narrower instead of shrinking further, so its words stay readable.
+const NARROWEST = 860;
 // What a 1440px screen shows, so the first paint is already the right size.
 const FIRST_SCALE = 0.806;
 // The slide lasts as long as resurf's: long enough to read as one window leaving for the next.
@@ -137,7 +139,10 @@ export function Tour() {
     const observer = new ResizeObserver(([entry]) => {
       const width = entry?.contentRect.width ?? 0;
       if (width > 0) {
-        setScale(width / DESIGN_WIDTH);
+        setScale(
+          width /
+            Math.max(NARROWEST, Math.min(DESIGN_WIDTH, width / FIRST_SCALE))
+        );
       }
     });
     if (element) {
@@ -392,9 +397,14 @@ const styles = stylex.create({
       [PHONE]: `calc(100% - 2 * ${space.xl})`,
     },
     // A phone's window runs off the wallpaper's foot instead: whole, it would be too small to read.
+    // It fades out just above the edge, so no line of the app is sliced through.
     height: {
       default: "84%",
       [PHONE]: 520,
+    },
+    maskImage: {
+      default: "none",
+      [PHONE]: "linear-gradient(to bottom, #000 392px, transparent 448px)",
     },
   },
   slide: {
@@ -421,7 +431,7 @@ const styles = stylex.create({
   design: {
     display: "grid",
     width: {
-      default: DESIGN_WIDTH,
+      default: "calc(100% / var(--tour-scale))",
       [PHONE]: "100%",
     },
     height: {
@@ -457,7 +467,8 @@ const styles = stylex.create({
       [PHONE]: 32,
     },
     padding: 0,
-    border: "none",
+    borderWidth: 0,
+    borderStyle: "none",
     borderRadius: 999,
     backgroundColor: {
       default: "light-dark(oklch(1 0 0 / 0.9), oklch(0.25 0.005 80 / 0.9))",
@@ -515,7 +526,8 @@ const styles = stylex.create({
       default: space.xxl,
       [PHONE]: space.lg,
     },
-    border: "none",
+    borderWidth: 0,
+    borderStyle: "none",
     borderRadius: 999,
     backgroundColor: {
       default: "oklch(1 0 0 / 0.9)",
@@ -537,10 +549,11 @@ const styles = stylex.create({
     },
     outlineOffset: 2,
   },
+  // Inside the window's corner, as a player's control sits on its video, not astride the frame.
   pauseOnPlate: {
     position: "absolute",
-    right: space.xl,
-    bottom: space.xl,
+    right: `calc(8% + ${space.xl})`,
+    bottom: `calc(6.28% + ${space.xl})`,
     zIndex: 2,
     display: {
       default: "inline-flex",
@@ -607,7 +620,7 @@ const styles = stylex.create({
       "@media (max-width: 1023px)": space.xl,
       [PHONE]: space.lg,
     },
-    marginTop: space.md,
+    marginTop: space.xxl,
     marginInline: {
       default: 0,
       [PHONE]: `calc(-1 * ${space.x3})`,
@@ -632,7 +645,8 @@ const styles = stylex.create({
     },
     aspectRatio: "16 / 10",
     padding: 0,
-    border: "none",
+    borderWidth: 0,
+    borderStyle: "none",
     borderRadius: 6,
     backgroundColor: color.ui,
     boxShadow: {

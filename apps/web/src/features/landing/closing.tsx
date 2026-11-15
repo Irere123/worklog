@@ -33,12 +33,21 @@ export function Closing({ setupOpen }: { setupOpen: boolean }) {
         <Logo size={16} tinted />
         {setupOpen ? "Set up your workspace" : "Sign in to Worklog"}
       </Link>
-      <p {...stylex.props(styles.fine, rise(250))}>
-        <a href={DEPLOY} {...stylex.props(styles.fineLink)}>
-          Docker Compose or Railway
-        </a>{" "}
-        · Your own Postgres · AI optional
-      </p>
+      <ul {...stylex.props(styles.fine, rise(250))}>
+        <li>
+          <a href={DEPLOY} {...stylex.props(styles.fineLink)}>
+            Docker Compose or Railway
+          </a>
+        </li>
+        <li aria-hidden {...stylex.props(styles.sep)}>
+          ·
+        </li>
+        <li>Your own Postgres</li>
+        <li aria-hidden {...stylex.props(styles.sep)}>
+          ·
+        </li>
+        <li>AI optional</li>
+      </ul>
     </section>
   );
 }
@@ -61,7 +70,15 @@ const COLUMNS = [
         label: "Architecture",
         href: `${SOURCE}/blob/main/docs/ARCHITECTURE.md`,
       },
+      { label: "API reference", href: "/docs" },
+    ],
+  },
+  {
+    title: "Project",
+    links: [
       { label: "Source on GitHub", href: SOURCE },
+      { label: "Roadmap", href: `${SOURCE}#roadmap` },
+      { label: "Contributing", href: `${SOURCE}/blob/main/CONTRIBUTING.md` },
     ],
   },
 ];
@@ -112,9 +129,6 @@ export function Footer({ setupOpen }: { setupOpen: boolean }) {
             <a href={DEPLOY} {...stylex.props(styles.link)}>
               Host your own
             </a>
-            <a href="/docs" {...stylex.props(styles.link)}>
-              API reference
-            </a>
           </nav>
         </div>
       </div>
@@ -146,7 +160,7 @@ function ThemeSwitch() {
           onClick={() => setTheme(each)}
           {...stylex.props(styles.theme, theme === each && styles.themeOn)}
         >
-          <Glyph size={14} weight={theme === each ? "fill" : "regular"} />
+          <Glyph size={14} />
         </button>
       ))}
     </fieldset>
@@ -164,21 +178,41 @@ const styles = stylex.create({
     marginTop: 40,
     paddingLeft: 18,
   },
+  // The hero's row of facts again: one line on a wide screen, a stack on a phone, so no dot is
+  // ever left at a line's end.
   fine: {
+    display: "flex",
+    flexDirection: {
+      default: "row",
+      "@media (max-width: 640px)": "column",
+    },
+    alignItems: "center",
+    gap: {
+      default: space.md,
+      "@media (max-width: 640px)": space.sm,
+    },
     margin: 0,
     marginTop: space.xxl,
+    padding: 0,
+    listStyle: "none",
     fontSize: 13,
+    lineHeight: "20px",
     color: color.fgMuted,
-    textWrap: "balance",
+  },
+  sep: {
+    display: {
+      default: "list-item",
+      "@media (max-width: 640px)": "none",
+    },
+    color: "light-dark(oklch(0.22 0.01 80 / 0.3), oklch(0.94 0.004 80 / 0.3))",
   },
   fineLink: {
     color: {
       default: color.fgMuted,
       ":hover": { default: null, [media.hover]: color.fg },
     },
-    textDecorationLine: "underline",
-    textDecorationColor: color.lineStrong,
-    textUnderlineOffset: 3,
+    textDecoration: "none",
+    borderRadius: radius.xs,
     transitionProperty: "color",
     transitionDuration: motion.fast,
     outline: {
@@ -247,13 +281,13 @@ const styles = stylex.create({
   columns: {
     display: "grid",
     gridTemplateColumns: {
-      default: "repeat(3, minmax(0, 1fr))",
+      default: "repeat(4, minmax(0, 1fr))",
       "@media (max-width: 640px)": "repeat(2, minmax(0, 1fr))",
     },
     columnGap: space.x4,
     rowGap: 40,
     flexGrow: 1,
-    maxWidth: 480,
+    maxWidth: 600,
   },
   column: {
     display: "flex",
@@ -307,7 +341,8 @@ const styles = stylex.create({
     display: "flex",
     minWidth: 0,
     margin: 0,
-    border: "none",
+    borderWidth: 0,
+    borderStyle: "none",
     gap: space.xxs,
     padding: space.xxs,
     borderRadius: radius.full,
@@ -318,7 +353,8 @@ const styles = stylex.create({
     placeItems: "center",
     width: 28,
     height: 28,
-    border: "none",
+    borderWidth: 0,
+    borderStyle: "none",
     borderRadius: radius.full,
     backgroundColor: "transparent",
     color: {

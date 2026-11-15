@@ -567,7 +567,7 @@ const styles = stylex.create({
       default: "1fr 1fr",
       "@media (max-width: 600px)": "1fr",
     },
-    gap: space.md,
+    gap: space.lg,
     width: "100%",
     maxWidth: 560,
   },
@@ -859,14 +859,27 @@ const styles = stylex.create({
     fontSize: text.label,
     lineHeight: "19px",
     fontWeight: 500,
+    textWrap: "balance",
   },
+  // A phone's card is too narrow to share its title's line with the stamp, so the stamp moves up
+  // beside the card's number and the title gets the whole width.
   stamped: {
-    paddingRight: 64,
+    paddingRight: {
+      default: 64,
+      "@media (max-width: 600px)": 0,
+    },
   },
   stamp: {
     position: "absolute",
     right: 12,
-    bottom: 10,
+    top: {
+      default: "auto",
+      "@media (max-width: 600px)": 8,
+    },
+    bottom: {
+      default: 10,
+      "@media (max-width: 600px)": "auto",
+    },
     display: "flex",
     flexDirection: "column",
     alignItems: "center",
@@ -895,7 +908,12 @@ const styles = stylex.create({
     textTransform: "uppercase",
     letterSpacing: "0.06em",
   },
+  // Up beside the number on a phone, the stamp keeps to one line: the date would reach the title.
   stampDate: {
+    display: {
+      default: "inline",
+      "@media (max-width: 600px)": "none",
+    },
     fontSize: 10,
     fontWeight: 500,
   },
@@ -1092,7 +1110,7 @@ const styles = stylex.create({
   tab: {
     display: "flex",
     alignItems: "center",
-    gap: space.md,
+    gap: 10,
     height: 38,
     paddingInline: space.lg,
     borderRadius: radius.md,
@@ -1116,12 +1134,12 @@ const styles = stylex.create({
   },
   faviconCount: {
     position: "absolute",
-    top: -5,
-    right: -7,
+    top: -4,
+    right: -5,
     display: "grid",
     placeItems: "center",
-    minWidth: 14,
-    height: 14,
+    minWidth: 12,
+    height: 12,
     borderRadius: radius.full,
     backgroundColor: color.red,
     color: color.fgOnSolid,

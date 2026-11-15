@@ -292,8 +292,13 @@ function Approve() {
   return (
     <div ref={ref} {...stylex.props(styles.panel, styles.cardPanel)}>
       <div {...stylex.props(styles.cardHead)}>
-        <KanbanIcon size={14} {...stylex.props(styles.faint)} />
-        <span {...stylex.props(styles.mono, styles.faint)}>#16</span>
+        <KanbanIcon
+          size={14}
+          {...stylex.props(styles.faint, styles.wideOnly)}
+        />
+        <span {...stylex.props(styles.mono, styles.faint, styles.wideOnly)}>
+          #16
+        </span>
         <span {...stylex.props(styles.panelTitle)}>Upgrade Postgres to 18</span>
         <span
           {...stylex.props(
@@ -460,14 +465,18 @@ const styles = stylex.create({
     borderBottomColor: color.line,
   },
   panelTitle: {
+    minWidth: 0,
     fontWeight: 600,
-    // A phone wraps a card's title rather than cutting the number that matters.
-    whiteSpace: {
-      default: "nowrap",
-      "@media (max-width: 640px)": "normal",
-    },
+    whiteSpace: "nowrap",
     overflow: "hidden",
     textOverflow: "ellipsis",
+  },
+  // A phone's header keeps the title and its status whole and drops the card's icon and number.
+  wideOnly: {
+    display: {
+      default: "inline",
+      "@media (max-width: 640px)": "none",
+    },
   },
   away: {
     marginLeft: "auto",
@@ -576,6 +585,7 @@ const styles = stylex.create({
     display: "inline-flex",
     alignItems: "center",
     gap: space.xs,
+    flexShrink: 0,
     marginLeft: "auto",
     height: 22,
     paddingInline: space.md,

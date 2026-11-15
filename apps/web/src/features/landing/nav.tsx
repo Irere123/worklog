@@ -298,7 +298,8 @@ const styles = stylex.create({
     width: 32,
     height: 32,
     padding: 0,
-    border: "none",
+    borderWidth: 0,
+    borderStyle: "none",
     borderRadius: radius.md,
     backgroundColor: {
       default: "transparent",
