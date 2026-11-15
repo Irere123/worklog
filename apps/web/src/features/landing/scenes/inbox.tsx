@@ -555,7 +555,7 @@ const styles = stylex.create({
     borderRadius: radius.lg,
     backgroundColor: color.raised,
     boxShadow:
-      "0 0 0 1px light-dark(oklch(0.2 0.01 80 / 0.08), oklch(1 0 0 / 0.1)), 0 8px 24px light-dark(oklch(0.2 0.01 80 / 0.14), oklch(0 0 0 / 0.45))",
+      "0 0 0 1px oklch(0.2 0.01 80 / 0.08), 0 8px 24px oklch(0.2 0.01 80 / 0.14)",
     opacity: 0,
     transform: "translateY(8px) scale(0.98)",
     transitionProperty: "opacity, transform",

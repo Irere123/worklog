@@ -81,7 +81,7 @@ export function NavMenu({
   );
 }
 
-// The panel is dark in either theme, as resurf's is: it reads as something laid over the page.
+// The panel is dark on the light page, as resurf's is: it reads as something laid over it.
 const PANEL = "oklch(0.25 0.004 80)";
 const ROW_HOVER = "oklch(0.3 0.004 80)";
 

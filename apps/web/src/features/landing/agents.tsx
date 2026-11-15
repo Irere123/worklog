@@ -423,7 +423,7 @@ const styles = stylex.create({
     borderRadius: radius.lg,
     backgroundColor: color.bg,
     boxShadow:
-      "0 0 0 1px light-dark(oklch(0.2 0.01 80 / 0.1), oklch(1 0 0 / 0.1)), 0 12px 32px light-dark(oklch(0.2 0.02 60 / 0.16), oklch(0 0 0 / 0.5))",
+      "0 0 0 1px oklch(0.2 0.01 80 / 0.1), 0 12px 32px oklch(0.2 0.02 60 / 0.16)",
     fontSize: text.label,
     lineHeight: "20px",
     color: color.fg,
@@ -593,7 +593,7 @@ const styles = stylex.create({
   },
   runAsking: {
     backgroundColor: color.amberSubtle,
-    boxShadow: `inset 0 0 0 1px light-dark(oklch(0.85 0.08 75), oklch(0.4 0.07 70))`,
+    boxShadow: `inset 0 0 0 1px oklch(0.85 0.08 75)`,
   },
   runHead: {
     display: "flex",

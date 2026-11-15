@@ -49,13 +49,10 @@ export const page = stylex.create({
     },
     textAlign: "center",
   },
-  // The page's surfaces: a quiet fill a step off the page, no edge in the light, a hairline in
-  // the dark where a fill alone doesn't separate.
+  // The page's surfaces: a quiet fill a step off the page, with no edge drawn.
   tile: {
     borderRadius: 16,
-    backgroundColor:
-      "light-dark(oklch(0.2 0.01 80 / 0.04), oklch(1 0 0 / 0.04))",
-    boxShadow: "inset 0 0 0 1px light-dark(transparent, oklch(1 0 0 / 0.05))",
+    backgroundColor: "oklch(0.2 0.01 80 / 0.04)",
   },
 });
 
@@ -130,13 +127,54 @@ export const type = stylex.create({
     height: 20,
     paddingInline: space.md,
     borderRadius: 999,
-    backgroundColor:
-      "light-dark(oklch(0.2 0.01 80 / 0.08), oklch(1 0 0 / 0.1))",
+    backgroundColor: "oklch(0.2 0.01 80 / 0.08)",
     color: color.fg,
     fontSize: 12,
     fontWeight: 500,
     letterSpacing: "normal",
     whiteSpace: "nowrap",
+  },
+});
+
+// The ring a keyboard focus draws, shared by every control on the public pages.
+const RING = {
+  outline: {
+    default: "none",
+    ":focus-visible": `2px solid ${color.focus}`,
+  },
+  outlineOffset: 2,
+} as const;
+
+export const focus = stylex.create({
+  ring: RING,
+});
+
+// The two kinds of link the pages use: a quiet grey one that darkens on hover (facts, footers),
+// and an underlined one inside a sentence.
+export const links = stylex.create({
+  quiet: {
+    color: {
+      default: color.fgMuted,
+      ":hover": { default: null, [media.hover]: color.fg },
+    },
+    textDecoration: "none",
+    transitionProperty: "color",
+    transitionDuration: motion.fast,
+    borderRadius: 4,
+    ...RING,
+  },
+  inline: {
+    color: {
+      default: color.fg,
+      ":hover": { default: null, [media.hover]: color.accentFg },
+    },
+    textDecorationLine: "underline",
+    textDecorationColor: color.lineStrong,
+    textUnderlineOffset: 3,
+    transitionProperty: "color",
+    transitionDuration: motion.fast,
+    borderRadius: 4,
+    ...RING,
   },
 });
 
@@ -169,18 +207,17 @@ export const cta = stylex.create({
       default: color.fg,
       ":hover": {
         default: null,
-        [media.hover]: "light-dark(oklch(0.32 0.01 80), oklch(0.86 0.004 80))",
+        [media.hover]: "oklch(0.32 0.01 80)",
       },
     },
     color: color.bg,
   },
   secondary: {
     backgroundColor: {
-      default: "light-dark(oklch(0.2 0.01 80 / 0.05), oklch(1 0 0 / 0.07))",
+      default: "oklch(0.2 0.01 80 / 0.05)",
       ":hover": {
         default: null,
-        [media.hover]:
-          "light-dark(oklch(0.2 0.01 80 / 0.1), oklch(1 0 0 / 0.12))",
+        [media.hover]: "oklch(0.2 0.01 80 / 0.1)",
       },
     },
     color: color.fg,

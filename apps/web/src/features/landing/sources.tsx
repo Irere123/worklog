@@ -174,14 +174,12 @@ const styles = stylex.create({
     padding: 14,
     borderRadius: 12,
     backgroundColor: {
-      default: "light-dark(oklch(0.2 0.01 80 / 0.035), oklch(1 0 0 / 0.04))",
+      default: "oklch(0.2 0.01 80 / 0.035)",
       ":hover": {
         default: null,
-        [media.hover]:
-          "light-dark(oklch(0.2 0.01 80 / 0.06), oklch(1 0 0 / 0.07))",
+        [media.hover]: "oklch(0.2 0.01 80 / 0.06)",
       },
     },
-    boxShadow: "inset 0 0 0 1px light-dark(transparent, oklch(1 0 0 / 0.05))",
     color: color.fgMuted,
     transitionProperty: "background-color",
     transitionDuration: "200ms",

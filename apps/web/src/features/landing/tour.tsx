@@ -29,7 +29,7 @@ import { HomeScene } from "./scenes/home";
 import { InboxScene } from "./scenes/inbox";
 import type { SceneProps } from "./scenes/parts";
 import { useInView, useReducedMotion } from "./script";
-import { page } from "./styles";
+import { focus, page } from "./styles";
 
 type Chapter = {
   id: string;
@@ -206,7 +206,7 @@ export function Tour() {
           type="button"
           aria-label="Previous chapter"
           onClick={() => go(shown.index - 1, -1)}
-          {...stylex.props(styles.arrow, styles.arrowLeft)}
+          {...stylex.props(focus.ring, styles.arrow, styles.arrowLeft)}
         >
           <CaretLeftIcon size={16} weight="bold" />
         </button>
@@ -214,7 +214,7 @@ export function Tour() {
           type="button"
           aria-label="Next chapter"
           onClick={() => go(shown.index + 1)}
-          {...stylex.props(styles.arrow, styles.arrowRight)}
+          {...stylex.props(focus.ring, styles.arrow, styles.arrowRight)}
         >
           <CaretRightIcon size={16} weight="bold" />
         </button>
@@ -314,7 +314,7 @@ function Pause({
       type="button"
       aria-label={paused ? "Play the tour" : "Pause the tour"}
       onClick={onToggle}
-      {...stylex.props(styles.pause, sx)}
+      {...stylex.props(focus.ring, styles.pause, sx)}
     >
       {paused ? (
         <PlayIcon size={14} weight="fill" />
@@ -372,7 +372,7 @@ const styles = stylex.create({
       [PHONE]: 480,
     },
     boxShadow:
-      "inset 0 0 0 1px light-dark(oklch(0.2 0.01 80 / 0.1), oklch(1 0 0 / 0.08)), 0 2px 6px oklch(0 0 0 / 0.03), 0 16px 40px oklch(0 0 0 / 0.05), 0 40px 100px oklch(0 0 0 / 0.07)",
+      "inset 0 0 0 1px oklch(0.2 0.01 80 / 0.1), 0 2px 6px oklch(0 0 0 / 0.03), 0 16px 40px oklch(0 0 0 / 0.05), 0 40px 100px oklch(0 0 0 / 0.07)",
   },
   // Where the window stands on the wallpaper: resurf's proportions, an even margin either side and
   // a little more air above than below, like a window on a desktop.
@@ -465,22 +465,21 @@ const styles = stylex.create({
     borderStyle: "none",
     borderRadius: 999,
     backgroundColor: {
-      default: "light-dark(oklch(1 0 0 / 0.9), oklch(0.25 0.005 80 / 0.9))",
+      default: "oklch(1 0 0 / 0.9)",
       ":hover": { default: null, [media.hover]: color.raised },
     },
     backdropFilter: "blur(12px)",
     boxShadow: {
       default:
-        "0 0 0 0.5px light-dark(oklch(0 0 0 / 0.1), oklch(1 0 0 / 0.12)), 0 1px 2px oklch(0 0 0 / 0.08), 0 4px 12px -2px oklch(0 0 0 / 0.16)",
+        "0 0 0 0.5px oklch(0 0 0 / 0.1), 0 1px 2px oklch(0 0 0 / 0.08), 0 4px 12px -2px oklch(0 0 0 / 0.16)",
       ":hover": {
         default: null,
         [media.hover]:
-          "0 0 0 0.5px light-dark(oklch(0 0 0 / 0.1), oklch(1 0 0 / 0.12)), 0 1px 2px oklch(0 0 0 / 0.08), 0 8px 20px -4px oklch(0 0 0 / 0.22)",
+          "0 0 0 0.5px oklch(0 0 0 / 0.1), 0 1px 2px oklch(0 0 0 / 0.08), 0 8px 20px -4px oklch(0 0 0 / 0.22)",
       },
     },
     color: {
-      default:
-        "light-dark(oklch(0.22 0.01 80 / 0.7), oklch(0.94 0.004 80 / 0.8))",
+      default: "oklch(0.22 0.01 80 / 0.7)",
       ":hover": { default: null, [media.hover]: color.fg },
     },
     cursor: "pointer",
@@ -491,11 +490,6 @@ const styles = stylex.create({
     transitionProperty: "color, background-color, box-shadow, transform",
     transitionDuration: "200ms",
     transitionTimingFunction: "ease-out",
-    outline: {
-      default: "none",
-      ":focus-visible": `2px solid ${color.focus}`,
-    },
-    outlineOffset: 2,
   },
   arrowLeft: {
     left: {
@@ -537,11 +531,6 @@ const styles = stylex.create({
     transitionProperty: "background-color, transform",
     transitionDuration: "200ms",
     transform: { default: null, ":active": "scale(0.96)" },
-    outline: {
-      default: "none",
-      ":focus-visible": `2px solid ${color.focus}`,
-    },
-    outlineOffset: 2,
   },
   // Inside the window's corner, as a player's control sits on its video, not astride the frame.
   pauseOnPlate: {
@@ -677,8 +666,7 @@ const styles = stylex.create({
       position: "absolute",
       inset: 0,
       borderRadius: "inherit",
-      boxShadow:
-        "inset 0 0 0 1px light-dark(oklch(0.2 0.01 80 / 0.1), oklch(1 0 0 / 0.1))",
+      boxShadow: "inset 0 0 0 1px oklch(0.2 0.01 80 / 0.1)",
       pointerEvents: "none",
     },
   },

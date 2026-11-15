@@ -249,7 +249,7 @@ const styles = stylex.create({
     paddingInline: space.lg,
     borderRadius: radius.lg,
     backgroundColor: color.raised,
-    boxShadow: `0 0 0 1px ${color.line}, 0 1px 2px light-dark(oklch(0.2 0.01 80 / 0.05), oklch(0 0 0 / 0.3))`,
+    boxShadow: `0 0 0 1px ${color.line}, 0 1px 2px oklch(0.2 0.01 80 / 0.05)`,
   },
   composerFoot: {
     display: "flex",

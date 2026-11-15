@@ -55,13 +55,14 @@ export function Open() {
         <div {...stylex.props(styles.words)}>
           <h2 {...stylex.props(type.heading)}>Open source, open API.</h2>
           <p {...stylex.props(type.lede)}>
-            Every line of Worklog is on GitHub. One OpenAPI contract and a
-            resumable event stream serve the web app, your scripts and your
-            agents alike.
+            Every line of Worklog is on GitHub. Use Worklog Cloud, or run the
+            same code on your own server. One OpenAPI contract serves the web
+            app, your scripts and your agents.
           </p>
           <ul {...stylex.props(styles.chips)}>
+            <li {...stylex.props(styles.chip)}>AGPL-3.0</li>
             <li {...stylex.props(styles.chip)}>OpenAPI 3.1</li>
-            <li {...stylex.props(styles.chip)}>Resumable event stream</li>
+            <li {...stylex.props(styles.chip)}>Docker Compose or Railway</li>
           </ul>
         </div>
 
@@ -151,9 +152,8 @@ const styles = stylex.create({
     height: 28,
     paddingInline: space.lg,
     borderRadius: radius.full,
-    backgroundColor:
-      "light-dark(oklch(0.2 0.01 80 / 0.05), oklch(1 0 0 / 0.07))",
-    color: "light-dark(oklch(0.22 0.01 80 / 0.7), oklch(0.94 0.004 80 / 0.75))",
+    backgroundColor: "oklch(0.2 0.01 80 / 0.05)",
+    color: "oklch(0.22 0.01 80 / 0.7)",
     fontSize: 13,
     fontWeight: 500,
   },
@@ -167,15 +167,14 @@ const styles = stylex.create({
       "@media (max-width: 640px)": 0,
     },
   },
-  // Always dark, as a terminal is, in either theme; it runs off the panel's foot.
+  // Dark, as a terminal is; it runs off the panel's foot.
   terminal: {
     marginBottom: -24,
     overflow: "hidden",
     borderRadius: `${radius.lg} ${radius.lg} 0 0`,
-    // A step above the dark page's panel, or the two would read as one surface.
-    backgroundColor: "light-dark(oklch(0.2 0.006 80), oklch(0.24 0.006 80))",
+    backgroundColor: "oklch(0.2 0.006 80)",
     boxShadow:
-      "0 0 0 1px light-dark(oklch(0 0 0 / 0.2), oklch(1 0 0 / 0.12)), 0 24px 48px light-dark(oklch(0.2 0.02 60 / 0.22), oklch(0 0 0 / 0.5))",
+      "0 0 0 1px oklch(0 0 0 / 0.2), 0 24px 48px oklch(0.2 0.02 60 / 0.22)",
     color: "oklch(0.9 0.004 80)",
   },
   termBar: {
@@ -268,7 +267,7 @@ const styles = stylex.create({
     borderRadius: radius.lg,
     backgroundColor: color.raised,
     boxShadow:
-      "0 0 0 1px light-dark(oklch(0.2 0.01 80 / 0.08), oklch(1 0 0 / 0.1)), 0 16px 40px light-dark(oklch(0.2 0.02 60 / 0.2), oklch(0 0 0 / 0.55))",
+      "0 0 0 1px oklch(0.2 0.01 80 / 0.08), 0 16px 40px oklch(0.2 0.02 60 / 0.2)",
     color: color.fg,
     fontSize: text.label,
     lineHeight: "20px",

@@ -1,11 +1,11 @@
 import * as stylex from "@stylexjs/stylex";
 import type { ReactNode } from "react";
 
-import { color, media, motion, radius, space } from "#ui/tokens.stylex";
+import { color, space } from "#ui/tokens.stylex";
 
 import { SOURCE } from "./links";
 import { Site } from "./site";
-import { page, type } from "./styles";
+import { links, page, type } from "./styles";
 
 export const CONTACT = "privacy@worklog.app";
 const UPDATED = "15 November 2026";
@@ -46,7 +46,7 @@ function Legal({
 
 function Mail() {
   return (
-    <a href={`mailto:${CONTACT}`} {...stylex.props(styles.link)}>
+    <a href={`mailto:${CONTACT}`} {...stylex.props(links.inline)}>
       {CONTACT}
     </a>
   );
@@ -209,7 +209,7 @@ function terms(): Section[] {
           Worklog’s code is open source under the{" "}
           <a
             href={`${SOURCE}/blob/main/LICENSE`}
-            {...stylex.props(styles.link)}
+            {...stylex.props(links.inline)}
           >
             GNU Affero General Public License v3
           </a>
@@ -415,22 +415,5 @@ const styles = stylex.create({
   },
   point: {
     paddingLeft: space.xs,
-  },
-  link: {
-    color: {
-      default: color.fg,
-      ":hover": { default: null, [media.hover]: color.accentFg },
-    },
-    textDecorationLine: "underline",
-    textDecorationColor: color.lineStrong,
-    textUnderlineOffset: 3,
-    transitionProperty: "color",
-    transitionDuration: motion.fast,
-    borderRadius: radius.xs,
-    outline: {
-      default: "none",
-      ":focus-visible": `2px solid ${color.focus}`,
-    },
-    outlineOffset: 2,
   },
 });

@@ -36,7 +36,7 @@ export type Nav =
 
 /**
  * Worklog's own window in miniature: the real sidebar, in the real order, beside a page. Drawn
- * from the app's tokens, so it follows the visitor's light or dark theme like the app does.
+ * from the app's tokens, so it looks as the app does.
  */
 export function AppWindow({
   nav,
@@ -262,7 +262,7 @@ const styles = stylex.create({
     backgroundColor: color.sidebar,
     borderRadius: radius.lg,
     boxShadow:
-      "0 0 0 1px light-dark(oklch(0.2 0.01 80 / 0.12), oklch(1 0 0 / 0.1)), 0 12px 32px light-dark(oklch(0.2 0.02 60 / 0.18), oklch(0 0 0 / 0.5)), 0 40px 80px light-dark(oklch(0.2 0.02 60 / 0.16), oklch(0 0 0 / 0.45))",
+      "0 0 0 1px oklch(0.2 0.01 80 / 0.12), 0 12px 32px oklch(0.2 0.02 60 / 0.18), 0 40px 80px oklch(0.2 0.02 60 / 0.16)",
     fontFamily: font.sans,
     fontSize: text.label,
     lineHeight: "20px",
@@ -495,16 +495,6 @@ const styles = stylex.create({
     isolation: "isolate",
     borderRadius: 20,
     backgroundColor: color.ui,
-    // The wallpaper is a light picture; in the dark it steps down so the window stays the light.
-    // A light-dark() veil follows the app's own theme switch, where a media query wouldn't.
-    "::after": {
-      content: '""',
-      position: "absolute",
-      inset: 0,
-      zIndex: -1,
-      backgroundColor: "light-dark(transparent, oklch(0.12 0.01 80 / 0.38))",
-      pointerEvents: "none",
-    },
   },
   plateImage: {
     position: "absolute",

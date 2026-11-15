@@ -449,7 +449,7 @@ const styles = stylex.create({
     borderRadius: radius.full,
     backgroundColor: color.green,
     color: color.fgOnSolid,
-    boxShadow: `0 0 0 2px light-dark(oklch(0.958 0.004 80), oklch(0.215 0.005 80))`,
+    boxShadow: `0 0 0 2px oklch(0.958 0.004 80)`,
     opacity: 0,
     transform: "scale(0.4)",
     transitionProperty: "opacity, transform",
@@ -483,8 +483,8 @@ const styles = stylex.create({
     transform: "rotate(-2deg)",
   },
   goldenOn: {
-    backgroundColor: "light-dark(oklch(0.95 0.08 88), oklch(0.4 0.085 84))",
-    boxShadow: `0 0 0 1px ${color.gold}, 0 8px 20px light-dark(oklch(0.78 0.15 82 / 0.35), oklch(0 0 0 / 0.35))`,
+    backgroundColor: "oklch(0.95 0.08 88)",
+    boxShadow: `0 0 0 1px ${color.gold}, 0 8px 20px oklch(0.78 0.15 82 / 0.35)`,
     transform: "rotate(-2deg) translateY(-3px)",
   },
   ticket: {
@@ -511,7 +511,7 @@ const styles = stylex.create({
     height: 20,
     paddingInline: space.sm,
     borderRadius: radius.xs,
-    backgroundColor: "light-dark(oklch(0 0 0 / 0.05), oklch(1 0 0 / 0.08))",
+    backgroundColor: "oklch(0 0 0 / 0.05)",
     fontSize: text.meta,
     color: color.fgMuted,
   },
@@ -717,7 +717,7 @@ const styles = stylex.create({
     width: 220,
     padding: 3,
     borderRadius: radius.full,
-    backgroundColor: "light-dark(oklch(0.912 0.005 80), oklch(0.27 0.005 80))",
+    backgroundColor: "oklch(0.912 0.005 80)",
   },
   thumb: {
     position: "absolute",
@@ -727,8 +727,7 @@ const styles = stylex.create({
     width: "calc(50% - 3px)",
     borderRadius: radius.full,
     backgroundColor: color.raised,
-    boxShadow:
-      "0 1px 3px light-dark(oklch(0.2 0.01 80 / 0.12), oklch(0 0 0 / 0.4))",
+    boxShadow: "0 1px 3px oklch(0.2 0.01 80 / 0.12)",
     transitionProperty: "transform",
     transitionDuration: "520ms",
     transitionDelay: "600ms",

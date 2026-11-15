@@ -3,12 +3,12 @@ import * as stylex from "@stylexjs/stylex";
 import { Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 
-import { color, media, motion, space } from "#ui/tokens.stylex";
+import { color, media, space } from "#ui/tokens.stylex";
 
-import { GitHubLink, StartLink } from "./actions";
+import { Facts, GitHubLink, StartLink } from "./actions";
 import { DEPLOY } from "./links";
 import { useReducedMotion } from "./script";
-import { page, type } from "./styles";
+import { focus, page, type } from "./styles";
 
 // Short enough to hold one line on a phone: the cell keeps the height of one line, never two.
 const ENDINGS = [
@@ -37,7 +37,7 @@ export function Hero() {
   return (
     <header {...stylex.props(page.wide, styles.hero)}>
       <div {...stylex.props(styles.words)}>
-        <Link to="/changelog" {...stylex.props(styles.badge)}>
+        <Link to="/changelog" {...stylex.props(focus.ring, styles.badge)}>
           <span {...stylex.props(styles.badgeNew)}>New</span>
           Worklog is now open source
           <ArrowRightIcon size={12} {...stylex.props(styles.badgeArrow)} />
@@ -73,29 +73,13 @@ export function Hero() {
           <StartLink sx={styles.action} />
           <GitHubLink sx={styles.action} />
         </div>
-        <ul {...stylex.props(styles.facts)}>
-          <li>
-            <Link to="/pricing" {...stylex.props(styles.fact)}>
-              Free for up to 3 people
-            </Link>
-          </li>
-          <li aria-hidden {...stylex.props(styles.sep)}>
-            ·
-          </li>
-          <li>
-            <a href={DEPLOY} {...stylex.props(styles.fact)}>
-              Self-host with Docker
-            </a>
-          </li>
-          <li aria-hidden {...stylex.props(styles.sep)}>
-            ·
-          </li>
-          <li>
-            <a href="#open" {...stylex.props(styles.fact)}>
-              API and agents
-            </a>
-          </li>
-        </ul>
+        <Facts
+          items={[
+            { label: "Free for up to 3 people", to: "/pricing" },
+            { label: "Self-host with Docker", href: DEPLOY },
+            { label: "API and agents", href: "#open" },
+          ]}
+        />
       </div>
     </header>
   );
@@ -139,7 +123,7 @@ const styles = stylex.create({
     borderRadius: 999,
     backgroundColor: color.raised,
     boxShadow:
-      "0 0 0 1px light-dark(oklch(0 0 0 / 0.06), oklch(1 0 0 / 0.12)), inset 0 0.85px 0.5px light-dark(oklch(1 0 0), oklch(1 0 0 / 0.05)), 0 1px 2px light-dark(oklch(0 0 0 / 0.09), oklch(0 0 0 / 0.4))",
+      "0 0 0 1px oklch(0 0 0 / 0.06), inset 0 0.85px 0.5px oklch(1 0 0), 0 1px 2px oklch(0 0 0 / 0.09)",
     color: color.fg,
     fontSize: 12,
     fontWeight: 500,
@@ -150,11 +134,6 @@ const styles = stylex.create({
     },
     transitionProperty: "opacity",
     transitionDuration: "200ms",
-    outline: {
-      default: "none",
-      ":focus-visible": `2px solid ${color.focus}`,
-    },
-    outlineOffset: 3,
   },
   badgeArrow: {
     color: color.fgFaint,
@@ -169,7 +148,7 @@ const styles = stylex.create({
     display: "grid",
     width: "100%",
     // As grey as large type can go and still read: 3:1 against the page.
-    color: "light-dark(oklch(0.22 0.01 80 / 0.52), oklch(0.94 0.004 80 / 0.5))",
+    color: "oklch(0.22 0.01 80 / 0.52)",
     whiteSpace: "nowrap",
   },
   ending: {
@@ -254,45 +233,5 @@ const styles = stylex.create({
     color: color.accentFg,
     fontSize: 11,
     fontWeight: 600,
-  },
-  facts: {
-    display: "flex",
-    flexDirection: {
-      default: "row",
-      [PHONE]: "column",
-    },
-    alignItems: "center",
-    gap: {
-      default: space.lg,
-      [PHONE]: space.sm,
-    },
-    margin: 0,
-    padding: 0,
-    listStyle: "none",
-    fontSize: 13,
-    lineHeight: "20px",
-    color: color.fgMuted,
-  },
-  fact: {
-    color: {
-      default: color.fgMuted,
-      ":hover": { default: null, [media.hover]: color.fg },
-    },
-    textDecoration: "none",
-    transitionProperty: "color",
-    transitionDuration: motion.base,
-    borderRadius: 4,
-    outline: {
-      default: "none",
-      ":focus-visible": `2px solid ${color.focus}`,
-    },
-    outlineOffset: 2,
-  },
-  sep: {
-    display: {
-      default: "list-item",
-      [PHONE]: "none",
-    },
-    color: "light-dark(oklch(0.22 0.01 80 / 0.3), oklch(0.94 0.004 80 / 0.3))",
   },
 });

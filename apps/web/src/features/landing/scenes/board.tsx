@@ -424,12 +424,12 @@ const styles = stylex.create({
     padding: space.lg,
     borderRadius: radius.md,
     backgroundColor: color.raised,
-    boxShadow: `0 0 0 1px ${color.line}, 0 1px 2px light-dark(oklch(0.2 0.01 80 / 0.05), oklch(0 0 0 / 0.3))`,
+    boxShadow: `0 0 0 1px ${color.line}, 0 1px 2px oklch(0.2 0.01 80 / 0.05)`,
   },
   golden: {
     backgroundImage:
-      "linear-gradient(160deg, light-dark(oklch(0.97 0.06 92), oklch(0.4 0.085 86)), light-dark(oklch(0.93 0.09 85), oklch(0.34 0.075 80)))",
-    boxShadow: `0 0 0 1px ${color.gold}, 0 2px 8px light-dark(oklch(0.78 0.15 82 / 0.3), oklch(0 0 0 / 0.3))`,
+      "linear-gradient(160deg, oklch(0.97 0.06 92), oklch(0.93 0.09 85))",
+    boxShadow: `0 0 0 1px ${color.gold}, 0 2px 8px oklch(0.78 0.15 82 / 0.3)`,
   },
   drifting: {
     opacity: 0.72,
@@ -448,7 +448,7 @@ const styles = stylex.create({
     backgroundColor: color.ui,
   },
   numberGolden: {
-    backgroundColor: "light-dark(oklch(1 0 0 / 0.6), oklch(0 0 0 / 0.2))",
+    backgroundColor: "oklch(1 0 0 / 0.6)",
   },
   ticket: {
     color: color.goldFg,
@@ -495,8 +495,7 @@ const styles = stylex.create({
   }),
   // Held, it lifts, tilts a little with the hand and casts a deeper shadow; it settles flat on drop.
   flyerHeld: {
-    filter:
-      "drop-shadow(0 12px 18px light-dark(oklch(0.2 0.02 60 / 0.18), oklch(0 0 0 / 0.5)))",
+    filter: "drop-shadow(0 12px 18px oklch(0.2 0.02 60 / 0.18))",
     rotate: "2deg",
     scale: "1.03",
   },

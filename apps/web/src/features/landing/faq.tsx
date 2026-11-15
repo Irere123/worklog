@@ -4,12 +4,12 @@ import * as stylex from "@stylexjs/stylex";
 import { color, font, media, motion, radius, space } from "#ui/tokens.stylex";
 
 import { Intro } from "./intro";
-import { AI, OPEN, PRIVACY } from "./questions";
+import { AI, OPEN, PRIVACY, START } from "./questions";
 import type { Question } from "./questions";
-import { page } from "./styles";
+import { focus, links, page } from "./styles";
 
 // The five a team asks first; the rest wait on the FAQ page.
-const FIRST: Question[] = [OPEN[0], OPEN[1], AI[0], AI[2], PRIVACY[0]].filter(
+const FIRST: Question[] = [START[1], OPEN[1], AI[0], AI[2], PRIVACY[0]].filter(
   (each) => each !== undefined
 );
 
@@ -20,7 +20,7 @@ export function Faq() {
       <Intro title="Before you start." />
       <div {...stylex.props(styles.column)}>
         <Questions items={FIRST} />
-        <a href="/faq" {...stylex.props(styles.more)}>
+        <a href="/faq" {...stylex.props(links.quiet, styles.more)}>
           More questions, answered
         </a>
       </div>
@@ -34,7 +34,7 @@ export function Questions({ items }: { items: Question[] }) {
     <div {...stylex.props(styles.list)}>
       {items.map((item) => (
         <details key={item.ask} {...stylex.props(styles.item)}>
-          <summary {...stylex.props(styles.ask)}>
+          <summary {...stylex.props(focus.ring, styles.ask)}>
             <span>{item.ask}</span>
             <PlusIcon size={16} {...stylex.props(styles.icon)} />
           </summary>
@@ -56,19 +56,6 @@ const styles = stylex.create({
   },
   more: {
     fontSize: 13,
-    color: {
-      default: color.fgMuted,
-      ":hover": { default: null, [media.hover]: color.fg },
-    },
-    textDecoration: "none",
-    transitionProperty: "color",
-    transitionDuration: motion.fast,
-    borderRadius: radius.xs,
-    outline: {
-      default: "none",
-      ":focus-visible": `2px solid ${color.focus}`,
-    },
-    outlineOffset: 2,
   },
   list: {
     display: "flex",
@@ -100,11 +87,6 @@ const styles = stylex.create({
     },
     transitionProperty: "color",
     transitionDuration: motion.fast,
-    outline: {
-      default: "none",
-      ":focus-visible": `2px solid ${color.focus}`,
-    },
-    outlineOffset: 4,
     borderRadius: radius.xs,
     // Safari draws its own disclosure triangle unless the marker is hidden this way.
     "::-webkit-details-marker": {

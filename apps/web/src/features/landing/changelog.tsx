@@ -2,9 +2,10 @@ import * as stylex from "@stylexjs/stylex";
 
 import { color, space } from "#ui/tokens.stylex";
 
+import { PageHead } from "./intro";
 import { SOURCE } from "./links";
 import { Site } from "./site";
-import { page, type } from "./styles";
+import { links, page, type } from "./styles";
 
 type Entry = { date: string; title: string; body: string; tags: string[] };
 
@@ -83,16 +84,18 @@ const DAY = new Intl.DateTimeFormat("en", {
 export function Changelog() {
   return (
     <Site>
-      <header {...stylex.props(page.narrow, styles.head)}>
-        <h1 {...stylex.props(type.display)}>What’s new</h1>
-        <p {...stylex.props(type.lede)}>
-          What shipped, and why it matters. Every change is also on{" "}
-          <a href={`${SOURCE}/commits/main`} {...stylex.props(styles.link)}>
-            GitHub
-          </a>
-          .
-        </p>
-      </header>
+      <PageHead
+        title="What’s new"
+        lede={
+          <>
+            What shipped, and why it matters. Every change is also on{" "}
+            <a href={`${SOURCE}/commits/main`} {...stylex.props(links.inline)}>
+              GitHub
+            </a>
+            .
+          </>
+        }
+      />
       <ol {...stylex.props(page.narrow, styles.entries)}>
         {ENTRIES.map((entry) => (
           <li key={entry.date} {...stylex.props(styles.entry)}>
@@ -120,24 +123,6 @@ export function Changelog() {
 }
 
 const styles = stylex.create({
-  head: {
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    gap: space.xxl,
-    paddingTop: {
-      default: 96,
-      "@media (max-width: 640px)": 64,
-    },
-    paddingBottom: 56,
-    textAlign: "center",
-  },
-  link: {
-    color: "inherit",
-    textDecorationLine: "underline",
-    textDecorationColor: color.lineStrong,
-    textUnderlineOffset: 3,
-  },
   entries: {
     display: "flex",
     flexDirection: "column",

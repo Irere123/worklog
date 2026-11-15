@@ -2,15 +2,17 @@ import { CheckCircleIcon } from "@phosphor-icons/react";
 import * as stylex from "@stylexjs/stylex";
 import { Link } from "@tanstack/react-router";
 
-import { color, media, motion, radius, shadow, space } from "#ui/tokens.stylex";
+import { color, media, shadow, space } from "#ui/tokens.stylex";
 
+import { Facts } from "./actions";
 import { Questions } from "./faq";
+import { PageHead } from "./intro";
 import { DEPLOY, SOURCE } from "./links";
 import { AI, OPEN, PRICING } from "./questions";
 import type { Question } from "./questions";
 import { Site } from "./site";
 import { useStart } from "./start";
-import { cta, page, type } from "./styles";
+import { cta, links, page, type } from "./styles";
 
 type Plan = {
   name: string;
@@ -81,30 +83,29 @@ export function Pricing() {
   const start = useStart();
   return (
     <Site>
-      <header {...stylex.props(page.wide, styles.head)}>
-        <h1 {...stylex.props(type.display)}>Free to start. Yours to run.</h1>
-        <p {...stylex.props(type.lede)}>
-          Worklog Cloud is free for a team of three. The same open-source code
-          runs on your own server, free, with every feature.
-        </p>
-      </header>
+      <PageHead
+        title="Free to start. Yours to run."
+        lede={
+          <>
+            Worklog Cloud is free for a team of three. The same open-source code
+            runs on your own server, free, with every feature.
+          </>
+        }
+      />
 
       <div {...stylex.props(page.wide, styles.plans)}>
         <PlanCard plan={FREE} to={start} />
         <PlanCard plan={TEAM} to={start} />
         <PlanCard plan={SELF} href={DEPLOY} />
       </div>
-      <ul {...stylex.props(page.wide, styles.fine)}>
-        <li>Prices in USD</li>
-        <li aria-hidden {...stylex.props(styles.sep)}>
-          ·
-        </li>
-        <li>No card to start</li>
-        <li aria-hidden {...stylex.props(styles.sep)}>
-          ·
-        </li>
-        <li>Self-hosting has every feature</li>
-      </ul>
+      <Facts
+        sx={styles.fine}
+        items={[
+          { label: "Prices in USD" },
+          { label: "No card to start" },
+          { label: "Self-hosting has every feature" },
+        ]}
+      />
 
       <section {...stylex.props(page.narrow, page.section, styles.before)}>
         <h2 {...stylex.props(type.heading, styles.beforeTitle)}>
@@ -114,11 +115,11 @@ export function Pricing() {
           <Questions items={BEFORE} />
           <p {...stylex.props(styles.help)}>
             Something else? Read the{" "}
-            <Link to="/faq" {...stylex.props(styles.helpLink)}>
+            <Link to="/faq" {...stylex.props(links.inline)}>
               FAQ
             </Link>
             , or{" "}
-            <a href={`${SOURCE}/issues`} {...stylex.props(styles.helpLink)}>
+            <a href={`${SOURCE}/issues`} {...stylex.props(links.inline)}>
               ask on GitHub
             </a>
             .
@@ -176,21 +177,7 @@ function PlanCard({
   );
 }
 
-const PHONE = "@media (max-width: 640px)";
-
 const styles = stylex.create({
-  head: {
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    gap: space.xxl,
-    paddingTop: {
-      default: 96,
-      [PHONE]: 64,
-    },
-    paddingBottom: 48,
-    textAlign: "center",
-  },
   plans: {
     display: "grid",
     gridTemplateColumns: {
@@ -205,9 +192,7 @@ const styles = stylex.create({
     flexDirection: "column",
     padding: space.x3,
     borderRadius: 16,
-    backgroundColor:
-      "light-dark(oklch(0.2 0.01 80 / 0.04), oklch(1 0 0 / 0.04))",
-    boxShadow: "inset 0 0 0 1px light-dark(transparent, oklch(1 0 0 / 0.05))",
+    backgroundColor: "oklch(0.2 0.01 80 / 0.04)",
   },
   // The plan most teams grow into stands a step forward, as resurf's paid card does.
   lead: {
@@ -289,29 +274,7 @@ const styles = stylex.create({
     color: color.accent,
   },
   fine: {
-    display: "flex",
-    flexDirection: {
-      default: "row",
-      [PHONE]: "column",
-    },
-    justifyContent: "center",
-    alignItems: "center",
-    gap: {
-      default: space.md,
-      [PHONE]: space.xs,
-    },
     marginTop: space.x3,
-    marginBottom: 0,
-    listStyle: "none",
-    fontSize: 13,
-    color: color.fgMuted,
-  },
-  sep: {
-    display: {
-      default: "list-item",
-      [PHONE]: "none",
-    },
-    color: "light-dark(oklch(0.22 0.01 80 / 0.3), oklch(0.94 0.004 80 / 0.3))",
   },
   before: {
     display: "grid",
@@ -334,19 +297,5 @@ const styles = stylex.create({
     margin: 0,
     fontSize: 13,
     color: color.fgMuted,
-  },
-  helpLink: {
-    color: color.fg,
-    textDecorationLine: "underline",
-    textDecorationColor: color.lineStrong,
-    textUnderlineOffset: 3,
-    transitionProperty: "text-decoration-color",
-    transitionDuration: motion.fast,
-    borderRadius: radius.xs,
-    outline: {
-      default: "none",
-      ":focus-visible": `2px solid ${color.focus}`,
-    },
-    outlineOffset: 2,
   },
 });

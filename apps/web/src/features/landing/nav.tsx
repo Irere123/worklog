@@ -18,7 +18,7 @@ import { color, media, motion, radius, shadow, space } from "#ui/tokens.stylex";
 import { SOURCE } from "./links";
 import { NavMenu } from "./menus";
 import type { NavItem } from "./menus";
-import { cta } from "./styles";
+import { cta, focus } from "./styles";
 
 // Full paths, so the bar works the same from the pricing page as from the front page.
 const LINKS = [
@@ -107,7 +107,7 @@ export function Nav({ setupOpen }: { setupOpen: boolean }) {
     <nav aria-label="Worklog" {...stylex.props(styles.bar)}>
       <div aria-hidden {...stylex.props(styles.blur)} />
       <div aria-hidden {...stylex.props(styles.fade)} />
-      <a href="#top" {...stylex.props(styles.brand)}>
+      <a href="/" {...stylex.props(focus.ring, styles.brand)}>
         <Logo size={22} />
       </a>
       <ul {...stylex.props(styles.links)}>
@@ -125,7 +125,7 @@ export function Nav({ setupOpen }: { setupOpen: boolean }) {
               href={link.href}
               onMouseEnter={point}
               onMouseLeave={leave}
-              {...stylex.props(styles.link)}
+              {...stylex.props(focus.ring, styles.link)}
             >
               {link.label}
             </a>
@@ -135,7 +135,7 @@ export function Nav({ setupOpen }: { setupOpen: boolean }) {
           <NavMenu
             label="Resources"
             items={RESOURCES}
-            trigger={styles.link}
+            trigger={[focus.ring, styles.link]}
             onPoint={point}
             onLeave={leave}
           />
@@ -144,7 +144,7 @@ export function Nav({ setupOpen }: { setupOpen: boolean }) {
       <div {...stylex.props(styles.end)}>
         <a
           href={SOURCE}
-          {...stylex.props(styles.quietLink, styles.desktopOnly)}
+          {...stylex.props(focus.ring, styles.quietLink, styles.desktopOnly)}
         >
           <ProductMark product="github" size={16} />
           GitHub
@@ -166,7 +166,7 @@ export function Nav({ setupOpen }: { setupOpen: boolean }) {
           aria-expanded={open}
           aria-controls="landing-menu"
           onClick={() => setOpen((now) => !now)}
-          {...stylex.props(styles.menuButton)}
+          {...stylex.props(focus.ring, styles.menuButton)}
         >
           {open ? <XIcon size={18} /> : <ListIcon size={18} />}
         </button>
@@ -178,7 +178,7 @@ export function Nav({ setupOpen }: { setupOpen: boolean }) {
               key={link.href}
               href={link.href}
               onClick={() => setOpen(false)}
-              {...stylex.props(styles.menuLink)}
+              {...stylex.props(focus.ring, styles.menuLink)}
             >
               {link.label}
             </a>
@@ -186,14 +186,14 @@ export function Nav({ setupOpen }: { setupOpen: boolean }) {
           <a
             href="/faq"
             onClick={() => setOpen(false)}
-            {...stylex.props(styles.menuLink)}
+            {...stylex.props(focus.ring, styles.menuLink)}
           >
             FAQ
           </a>
           <a
             href={SOURCE}
             onClick={() => setOpen(false)}
-            {...stylex.props(styles.menuLink)}
+            {...stylex.props(focus.ring, styles.menuLink)}
           >
             GitHub
           </a>
@@ -249,7 +249,7 @@ const styles = stylex.create({
     height: 112,
     pointerEvents: "none",
     backgroundImage:
-      "linear-gradient(to bottom, light-dark(oklch(0.982 0.003 80 / 0.85), oklch(0.19 0.004 80 / 0.85)), light-dark(oklch(0.982 0.003 80 / 0.45), oklch(0.19 0.004 80 / 0.45)), transparent)",
+      "linear-gradient(to bottom, oklch(0.982 0.003 80 / 0.85), oklch(0.982 0.003 80 / 0.45), transparent)",
   },
   brand: {
     display: "inline-flex",
@@ -262,11 +262,6 @@ const styles = stylex.create({
     letterSpacing: "-0.01em",
     textDecoration: "none",
     borderRadius: radius.sm,
-    outline: {
-      default: "none",
-      ":focus-visible": `2px solid ${color.focus}`,
-    },
-    outlineOffset: 3,
   },
   links: {
     position: "relative",
@@ -288,8 +283,7 @@ const styles = stylex.create({
     left: 0,
     height: 28,
     borderRadius: radius.md,
-    backgroundColor:
-      "light-dark(oklch(0.2 0.01 80 / 0.07), oklch(1 0 0 / 0.08))",
+    backgroundColor: "oklch(0.2 0.01 80 / 0.07)",
     opacity: 0,
     transform: "scale(1.3)",
     filter: "blur(2px)",
@@ -318,8 +312,7 @@ const styles = stylex.create({
     // A menu's trigger is a button, which brings a grey fill of its own.
     backgroundColor: "transparent",
     color: {
-      default:
-        "light-dark(oklch(0.22 0.01 80 / 0.7), oklch(0.94 0.004 80 / 0.7))",
+      default: "oklch(0.22 0.01 80 / 0.7)",
       ":hover": { default: null, [media.hover]: color.fg },
     },
     fontSize: 13,
@@ -327,11 +320,6 @@ const styles = stylex.create({
     textDecoration: "none",
     transitionProperty: "color",
     transitionDuration: "200ms",
-    outline: {
-      default: "none",
-      ":focus-visible": `2px solid ${color.focus}`,
-    },
-    outlineOffset: 1,
   },
   end: {
     display: "flex",
@@ -346,8 +334,7 @@ const styles = stylex.create({
     paddingInline: 10,
     borderRadius: radius.md,
     color: {
-      default:
-        "light-dark(oklch(0.22 0.01 80 / 0.7), oklch(0.94 0.004 80 / 0.7))",
+      default: "oklch(0.22 0.01 80 / 0.7)",
       ":hover": { default: null, [media.hover]: color.fg },
     },
     fontSize: 13,
@@ -355,19 +342,13 @@ const styles = stylex.create({
     textDecoration: "none",
     transitionProperty: "color",
     transitionDuration: "200ms",
-    outline: {
-      default: "none",
-      ":focus-visible": `2px solid ${color.focus}`,
-    },
-    outlineOffset: 1,
   },
   quiet: {
     backgroundColor: {
-      default: "light-dark(oklch(0.2 0.01 80 / 0.08), oklch(1 0 0 / 0.1))",
+      default: "oklch(0.2 0.01 80 / 0.08)",
       ":hover": {
         default: null,
-        [media.hover]:
-          "light-dark(oklch(0.2 0.01 80 / 0.13), oklch(1 0 0 / 0.15))",
+        [media.hover]: "oklch(0.2 0.01 80 / 0.13)",
       },
     },
     color: color.fg,
@@ -392,14 +373,10 @@ const styles = stylex.create({
     borderRadius: radius.md,
     backgroundColor: {
       default: "transparent",
-      ":active": "light-dark(oklch(0.2 0.01 80 / 0.06), oklch(1 0 0 / 0.08))",
+      ":active": "oklch(0.2 0.01 80 / 0.06)",
     },
     color: color.fgMuted,
     cursor: "pointer",
-    outline: {
-      default: "none",
-      ":focus-visible": `2px solid ${color.focus}`,
-    },
   },
   menu: {
     position: "absolute",
@@ -428,10 +405,6 @@ const styles = stylex.create({
     backgroundColor: {
       default: "transparent",
       ":active": color.ui,
-    },
-    outline: {
-      default: "none",
-      ":focus-visible": `2px solid ${color.focus}`,
     },
   },
   menuAction: {
