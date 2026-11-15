@@ -114,9 +114,9 @@ export function HomeScene({ play, paused, still }: SceneProps) {
               who={<Avatar person={jean} size={24} />}
               title={
                 <>
-                  Jean Habimana assigned you{" "}
+                  Jean Miller assigned you{" "}
                   <CardNumber sx={styles.inline}>8</CardNumber> Track referral
-                  turnaround per district
+                  turnaround per county
                 </>
               }
               why="Assigned to you"

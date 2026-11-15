@@ -142,7 +142,7 @@ function Ask() {
         <Collapse open={shown.asked}>
           <div {...stylex.props(styles.question)}>
             <Avatar person={grace} size={20} />
-            <span>Is the SMS fallback ready for Kibagabaga to test?</span>
+            <span>Is the SMS fallback ready for Riverside to test?</span>
           </div>
         </Collapse>
         <Collapse open={shown.steps > 0 && !shown.folded}>
@@ -349,8 +349,8 @@ function Approve() {
         <span {...stylex.props(styles.logLine)}>
           <Avatar person={jean} size={16} />
           <span>
-            <span {...stylex.props(styles.strong)}>Jean Habimana</span> Blocked
-            on Ada · production DB credentials need rotating first
+            <span {...stylex.props(styles.strong)}>Jean Miller</span> Blocked on
+            Ada · production DB credentials need rotating first
           </span>
           <span {...stylex.props(styles.when)}>Thu</span>
         </span>

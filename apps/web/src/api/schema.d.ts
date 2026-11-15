@@ -2506,7 +2506,7 @@ export interface operations {
                     /** Format: email */
                     email?: string;
                     handle?: string;
-                    /** @example Africa/Kigali */
+                    /** @example America/New_York */
                     timezone?: string;
                 };
             };
@@ -2654,7 +2654,7 @@ export interface operations {
             content: {
                 "application/json": {
                     name: string;
-                    /** @example Africa/Kigali */
+                    /** @example America/New_York */
                     timezone?: string;
                     handle?: string;
                 };

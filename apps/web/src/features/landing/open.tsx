@@ -97,7 +97,7 @@ export function Open() {
             <span {...stylex.props(styles.lineText)}>
               <span {...stylex.props(styles.lineHead)}>
                 <Avatar person={ada} size={16} />
-                <span {...stylex.props(styles.strong)}>Ada Mukamana</span>
+                <span {...stylex.props(styles.strong)}>Ada Chen</span>
                 <span>Agreed on FHIR R4 for referrals</span>
               </span>
               <span {...stylex.props(styles.lineMeta)}>

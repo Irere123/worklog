@@ -45,7 +45,7 @@ Or create a workspace and log some work from the shell:
 
 ```bash
 curl -X POST localhost:4000/v1/setup -H 'content-type: application/json' \
-  -d '{"workspaceName":"My team","name":"Ada","email":"ada@example.com","timezone":"Africa/Kigali"}'
+  -d '{"workspaceName":"My team","name":"Ada","email":"ada@example.com","timezone":"America/New_York"}'
 # → returns an API key: export WL="authorization: Bearer wl_…"
 
 curl -X POST localhost:4000/v1/logs -H "$WL" -H 'content-type: application/json' \

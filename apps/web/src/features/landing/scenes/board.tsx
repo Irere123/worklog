@@ -118,7 +118,7 @@ export function BoardScene({ play, paused, still }: SceneProps) {
           <Column name="Maybe?" hue="violet" count={2} narrowHidden>
             <Tile
               number={8}
-              title="Track referral turnaround per district"
+              title="Track referral turnaround per county"
               tags={["reporting"]}
               who={ada}
               owner={ada}
@@ -135,7 +135,7 @@ export function BoardScene({ play, paused, still }: SceneProps) {
           <Column name="Investigating" hue="violet" count={moved ? 1 : 2}>
             <Tile
               number={5}
-              title="Duplicate patients after district merge"
+              title="Duplicate patients after county merge"
               tags={["data"]}
               who={eric}
             />

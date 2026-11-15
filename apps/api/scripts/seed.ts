@@ -37,11 +37,11 @@ const setup = await call<{
   token: { token: string };
   member: { id: string };
 }>(null, "POST", "/v1/setup", {
-  workspaceName: "Umuganda Health",
-  name: "Ada Mukamana",
+  workspaceName: "Larkspur Health",
+  name: "Ada Chen",
   email: "ada@example.com",
   handle: "ada",
-  timezone: "Africa/Kigali",
+  timezone: "America/New_York",
 });
 const ada = setup.token.token;
 const adaId = setup.member.id;
@@ -57,24 +57,24 @@ async function person(body: Json) {
 
 const jean = await person({
   kind: "human",
-  name: "Jean Habimana",
+  name: "Jean Miller",
   handle: "jean",
   title: "Backend engineer",
-  timezone: "Africa/Kigali",
+  timezone: "America/New_York",
 });
 const grace = await person({
   kind: "human",
-  name: "Grace Uwase",
+  name: "Grace Kim",
   handle: "grace",
   title: "Product designer",
-  timezone: "Europe/Berlin",
+  timezone: "America/Los_Angeles",
 });
 const eric = await person({
   kind: "human",
-  name: "Eric Nkurunziza",
+  name: "Eric Brooks",
   handle: "eric",
   title: "Clinical lead",
-  timezone: "Africa/Kigali",
+  timezone: "America/New_York",
 });
 const codex = await person({
   kind: "agent",
@@ -178,7 +178,7 @@ const plans: Plan[] = [
     comments: [
       [
         eric.token,
-        "Ministry prefers the IPS-aligned profile. Draft is in the shared folder.",
+        "The state prefers the IPS-aligned profile. Draft is in the shared folder.",
       ],
     ],
   },
@@ -201,14 +201,14 @@ const plans: Plan[] = [
   },
   {
     board: referrals,
-    title: "Duplicate patients after district merge",
+    title: "Duplicate patients after county merge",
     by: eric.token,
     column: "Investigating",
     tags: ["data"],
   },
   {
     board: referrals,
-    title: "Kinyarwanda copy review for the referral flow",
+    title: "Spanish copy review for the referral flow",
     by: grace.token,
     column: "On hold",
     assign: [grace.id],
@@ -222,7 +222,7 @@ const plans: Plan[] = [
   },
   {
     board: referrals,
-    title: "Track referral turnaround per district",
+    title: "Track referral turnaround per county",
     by: ada,
     tags: ["reporting"],
   },
@@ -245,7 +245,7 @@ const plans: Plan[] = [
   },
   {
     board: referrals,
-    title: "Search referrals by national ID",
+    title: "Search referrals by patient ID",
     by: jean.token,
     column: "In progress",
     assign: [jean.id],
@@ -253,13 +253,13 @@ const plans: Plan[] = [
   },
   {
     board: referrals,
-    title: "Sign-in with health worker registry",
+    title: "Sign-in with hospital SSO",
     by: ada,
     done: true,
   },
   {
     board: platform,
-    title: "Nightly sync stalls on the Huye server",
+    title: "Nightly sync stalls on the Denver server",
     body: "The job holds a lock for 40 minutes after a network blip. Needs a timeout and a resume point.",
     by: jean.token,
     column: "Doing",
@@ -365,7 +365,7 @@ const logs: [string, Json][] = [
   [
     ada,
     {
-      text: "Met the Ministry team: they want turnaround reporting by district before the January review",
+      text: "Met the state health team: they want turnaround reporting by county before the January review",
       kind: "entry",
       occurredAt: ago(26),
     },
@@ -438,7 +438,7 @@ const agentWork: [string, Json][] = [
       thread: "sync",
       onBehalfOf: "jean",
       state: "finished",
-      cardNumber: n("Nightly sync stalls on the Huye server"),
+      cardNumber: n("Nightly sync stalls on the Denver server"),
       occurredAt: ago(4),
     },
   ],
@@ -450,7 +450,7 @@ const agentWork: [string, Json][] = [
       thread: "dupes",
       onBehalfOf: "jean",
       state: "failed",
-      cardNumber: n("Duplicate patients after district merge"),
+      cardNumber: n("Duplicate patients after county merge"),
       occurredAt: ago(9),
     },
   ],
@@ -462,7 +462,7 @@ for (const [token, body] of agentWork) {
 await call(
   jean.token,
   "POST",
-  `/v1/cards/${n("Track referral turnaround per district")}/assignments`,
+  `/v1/cards/${n("Track referral turnaround per county")}/assignments`,
   { memberId: adaId }
 );
 
@@ -474,7 +474,7 @@ for (const memory of [
   },
   {
     content:
-      "The Ministry review is in mid-January; turnaround reporting by district is the headline ask.",
+      "The state review is in mid-January; turnaround reporting by county is the headline ask.",
     kind: "fact",
   },
   {
@@ -487,10 +487,10 @@ for (const memory of [
 }
 await call(ada, "PUT", "/v1/voice", {
   content:
-    "Be brief. Lead with what changed and what needs me. Use Kigali time.",
+    "Be brief. Lead with what changed and what needs me. Use New York time.",
 });
 await call(ada, "POST", "/v1/briefs", { period: "daily" });
 
-console.log(`Seeded "Umuganda Health" on ${BASE}.
+console.log(`Seeded "Larkspur Health" on ${BASE}.
 Owner API key (Ada): ${ada}
 Paste it into the web app's sign-in screen, or: export WL="authorization: Bearer ${ada}"`);

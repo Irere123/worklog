@@ -126,7 +126,7 @@ export type Point = { x: number; y: number };
 
 /**
  * Where the cursor should land on `[data-target=name]` inside `root`, as fractions of its box.
- * Aimed off the label's centre, so the pointer never covers the words it clicks.
+ * Aimed off the label's center, so the pointer never covers the words it clicks.
  */
 export function pointAt(
   root: HTMLElement | null,

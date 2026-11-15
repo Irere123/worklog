@@ -244,7 +244,7 @@ function Stamp({ on, fluid = false }: { on: boolean; fluid?: boolean }) {
         <span {...stylex.props(styles.mono, styles.numberChip)}>#12</span>
       </span>
       <span {...stylex.props(styles.cardTitle, styles.stamped)}>
-        Search by national ID
+        Search by patient ID
       </span>
       <span {...stylex.props(styles.stamp, on && styles.stampOn)}>
         <span {...stylex.props(styles.stampWord)}>Done</span>

@@ -6,7 +6,7 @@ type Member = Schemas["Member"];
 
 export type Clock = {
   time: string;
-  /** The city of their time zone: "Kigali" for Africa/Kigali. */
+  /** The city of their time zone: "New York" for America/New_York. */
   place: string;
   zone: string;
   /** Null when they haven't said when they work. */

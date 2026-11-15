@@ -312,7 +312,12 @@ function terms(): Section[] {
     },
     {
       title: "Governing law",
-      body: <p>These terms are governed by the laws of Rwanda.</p>,
+      body: (
+        <p>
+          These terms are governed by the laws of the State of Delaware, United
+          States.
+        </p>
+      ),
     },
     {
       title: "Changes and contact",

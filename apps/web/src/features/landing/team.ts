@@ -4,25 +4,25 @@
 
 export const ada = {
   id: "ada",
-  name: "Ada Mukamana",
+  name: "Ada Chen",
   avatarUrl: "/avatars/ada.svg",
 };
 
 export const jean = {
   id: "jean",
-  name: "Jean Habimana",
+  name: "Jean Miller",
   avatarUrl: "/avatars/jean.svg",
 };
 
 export const grace = {
   id: "grace",
-  name: "Grace Uwase",
+  name: "Grace Kim",
   avatarUrl: "/avatars/grace.svg",
 };
 
 export const eric = {
   id: "eric",
-  name: "Eric Nkurunziza",
+  name: "Eric Brooks",
   avatarUrl: "/avatars/eric.svg",
 };
 
@@ -38,4 +38,4 @@ export const scout = {
   kind: "agent",
 };
 
-export const WORKSPACE = "Umuganda Health";
+export const WORKSPACE = "Larkspur Health";

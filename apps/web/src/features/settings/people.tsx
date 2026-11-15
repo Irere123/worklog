@@ -571,7 +571,7 @@ function AddMember({
                 <Input
                   id={id}
                   autoFocus
-                  placeholder={kind === "agent" ? "Atlas" : "Grace Uwase"}
+                  placeholder={kind === "agent" ? "Atlas" : "Grace Kim"}
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                 />

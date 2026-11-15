@@ -102,7 +102,7 @@ export function ActivityScene({ play, paused, still }: SceneProps) {
               who={atlas.name}
               card={16}
               title="Upgrade Postgres to 18"
-              detail="Drafted the rollback plan · Asked Ada Mukamana for a decision"
+              detail="Drafted the rollback plan · Asked Ada Chen for a decision"
               when="Now"
               agent
             />
@@ -113,7 +113,7 @@ export function ActivityScene({ play, paused, still }: SceneProps) {
               who={grace.name}
               person={grace}
               title="in #referrals"
-              detail="“Kibagabaga says the SMS fallback held through Friday’s outage.”"
+              detail="“Riverside says the SMS fallback held through Friday’s outage.”"
               when="9:58"
             />
           </Collapse>
@@ -150,8 +150,8 @@ export function ActivityScene({ play, paused, still }: SceneProps) {
             who={jean.name}
             person={jean}
             card={8}
-            title="Track referral turnaround per district"
-            detail="Added this card · Moved to Maybe? · Assigned to Ada Mukamana"
+            title="Track referral turnaround per county"
+            detail="Added this card · Moved to Maybe? · Assigned to Ada Chen"
             when="9:40"
           />
           <Line
@@ -159,7 +159,7 @@ export function ActivityScene({ play, paused, still }: SceneProps) {
             who={eric.name}
             person={eric}
             title="in #platform-ops"
-            detail="“Huye server is back after the power cut; sync caught up.”"
+            detail="“Denver server is back after the power outage; sync caught up.”"
             when="8:15"
           />
           <Line
@@ -184,7 +184,7 @@ export function ActivityScene({ play, paused, still }: SceneProps) {
             source={<Avatar person={scout} size={22} />}
             who={scout.name}
             card={14}
-            title="Nightly sync stalls on the Huye server"
+            title="Nightly sync stalls on the Denver server"
             detail="Found the stall: a lock held past midnight · Asked Eric to look"
             when="6:40"
             agent
@@ -194,7 +194,7 @@ export function ActivityScene({ play, paused, still }: SceneProps) {
             who={jean.name}
             person={jean}
             title="in #referrals"
-            detail="“Kicking off the district turnaround numbers this week.”"
+            detail="“Kicking off the county turnaround numbers this week.”"
             when="6:05"
           />
         </div>

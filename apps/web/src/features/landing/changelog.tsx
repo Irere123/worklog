@@ -26,7 +26,7 @@ const ENTRIES: Entry[] = [
   {
     date: "2026-11-13",
     title: "Real logos for connected tools",
-    body: "GitHub, Slack, GitLab and the rest appear in their own colours wherever they’re named, and status badges carry a filled glyph of their own shape.",
+    body: "GitHub, Slack, GitLab and the rest appear in their own colors wherever they’re named, and status badges carry a filled glyph of their own shape.",
     tags: ["Design"],
   },
   {

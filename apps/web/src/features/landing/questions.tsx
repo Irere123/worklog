@@ -109,7 +109,7 @@ export const AI: Question[] = [
       <>
         Each agent gets its own API key, scoped to read, write or ingest. It
         owns cards, reports progress, and asks its person when a change needs a
-        decision. Everything it does is labelled as the agent’s.
+        decision. Everything it does is labeled as the agent’s.
       </>
     ),
   },

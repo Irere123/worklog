@@ -89,7 +89,7 @@ export function BriefsScene({ play, paused, still }: SceneProps) {
         <div {...stylex.props(styles.doc)}>
           <Pill tone="blue">Daily brief</Pill>
           <span {...stylex.props(styles.title)}>
-            Morning brief for Ada Mukamana
+            Morning brief for Ada Chen
           </span>
           <span {...stylex.props(parts.muted)}>
             Monday, 9 November · 8:00
@@ -127,9 +127,9 @@ export function BriefsScene({ play, paused, still }: SceneProps) {
             </Collapse>
             <Collapse open={s.lines >= 2}>
               <li {...stylex.props(styles.item)}>
-                Jean Habimana assigned you{" "}
+                Jean Miller assigned you{" "}
                 <CardNumber sx={styles.link}>8</CardNumber> Track referral
-                turnaround per district
+                turnaround per county
               </li>
             </Collapse>
             <Collapse open={s.lines >= 3}>

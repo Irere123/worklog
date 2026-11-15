@@ -469,7 +469,7 @@ async function namedTeammate(ctx: AppContext, owner: Member, question: string) {
   return (
     everyone
       .filter((m) => m.id !== owner.id)
-      // People before agents: "Jean" means Jean, not "Jean Habimana's assistant".
+      // People before agents: "Jean" means Jean, not "Jean Miller's assistant".
       .toSorted(
         (a, b) => Number(a.kind === "agent") - Number(b.kind === "agent")
       )

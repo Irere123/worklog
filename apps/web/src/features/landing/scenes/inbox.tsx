@@ -110,8 +110,8 @@ export function InboxScene({ play, paused, still }: SceneProps) {
                 who={<Avatar person={jean} size={26} />}
                 title={
                   <>
-                    Jean Habimana assigned you <CardNumber>8</CardNumber> Track
-                    referral turnaround per district
+                    Jean Miller assigned you <CardNumber>8</CardNumber> Track
+                    referral turnaround per county
                   </>
                 }
                 why="Assigned to you"
@@ -150,8 +150,8 @@ export function InboxScene({ play, paused, still }: SceneProps) {
               who={<Avatar person={eric} size={26} />}
               title={
                 <>
-                  Eric Nkurunziza closed <CardNumber>1</CardNumber> Referral
-                  form loses attachments
+                  Eric Brooks closed <CardNumber>1</CardNumber> Referral form
+                  loses attachments
                 </>
               }
               why="Card you follow"
@@ -163,7 +163,7 @@ export function InboxScene({ play, paused, still }: SceneProps) {
               title={
                 <>
                   Scout found why <CardNumber>14</CardNumber> Nightly sync
-                  stalls on the Huye server
+                  stalls on the Denver server
                 </>
               }
               why="Agent finished"
@@ -212,12 +212,12 @@ function Comment() {
       </span>
       <span {...stylex.props(styles.byline)}>
         <Avatar person={grace} size={18} />
-        <span {...stylex.props(parts.strong)}>Grace Uwase</span>
+        <span {...stylex.props(parts.strong)}>Grace Kim</span>
         <span {...stylex.props(parts.muted)}>· 2 comments</span>
       </span>
       <span {...stylex.props(styles.quote)}>
-        I kept the profile to the five fields the district hospitals already
-        send. Ready for your review.
+        I kept the profile to the five fields the county hospitals already send.
+        Ready for your review.
       </span>
       <span {...stylex.props(styles.actions)}>
         <span {...stylex.props(parts.control)}>
@@ -249,16 +249,16 @@ function Assignment() {
         <Pill tone="blue">Assigned to you</Pill>
       </span>
       <span {...stylex.props(styles.title)}>
-        Jean Habimana assigned you #8 Track referral turnaround per district
+        Jean Miller assigned you #8 Track referral turnaround per county
       </span>
       <span {...stylex.props(styles.byline)}>
         <Avatar person={jean} size={18} />
-        <span {...stylex.props(parts.strong)}>Jean Habimana</span>
+        <span {...stylex.props(parts.strong)}>Jean Miller</span>
         <span {...stylex.props(parts.muted)}>· Referrals lead</span>
       </span>
       <span {...stylex.props(styles.quote)}>
-        The district leads want weekly numbers before the review on the 20th.
-        Can you own this?
+        The county leads want weekly numbers before the review on the 20th. Can
+        you own this?
       </span>
       <span {...stylex.props(styles.actions)}>
         <span data-target="done" {...stylex.props(parts.control)}>
@@ -278,7 +278,7 @@ function Assignment() {
         <KanbanIcon size={14} {...stylex.props(parts.faint)} />
         <CardNumber>8</CardNumber>
         <span {...stylex.props(styles.grow)}>
-          Track referral turnaround per district
+          Track referral turnaround per county
         </span>
         <Pill tone="neutral">Maybe?</Pill>
       </span>

@@ -214,7 +214,7 @@ export function Cursor({
   );
 }
 
-/** A wallpaper for a product shot to sit on: grain and colour, like a desktop behind a window. */
+/** A wallpaper for a product shot to sit on: grain and color, like a desktop behind a window. */
 export function Plate({
   src,
   choices,

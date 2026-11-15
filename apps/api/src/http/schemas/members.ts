@@ -137,7 +137,7 @@ export const Workspace = z
 
 export const CreateWorkspaceRequest = z.object({
   name: z.string().min(1),
-  timezone: z.string().optional().openapi({ example: "Africa/Kigali" }),
+  timezone: z.string().optional().openapi({ example: "America/New_York" }),
   handle: z.string().optional(),
 });
 
@@ -197,7 +197,7 @@ export const SetupRequest = z.object({
   name: z.string().min(1),
   email: z.email().optional(),
   handle: z.string().optional(),
-  timezone: z.string().optional().openapi({ example: "Africa/Kigali" }),
+  timezone: z.string().optional().openapi({ example: "America/New_York" }),
 });
 
 export const SetupResponse = z.object({
