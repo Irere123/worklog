@@ -143,7 +143,8 @@ const WAITING: {
   },
 ];
 
-function NeedsYou() {
+/** What needs you, and the budget that keeps it short: the promise the sign-in page shows too. */
+export function NeedsYou() {
   return (
     <div {...stylex.props(styles.needs)}>
       <div {...stylex.props(styles.list)}>

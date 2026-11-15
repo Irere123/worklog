@@ -9,6 +9,7 @@ import { ApiError, auth } from "#api/client";
 import { q } from "#api/queries";
 import { AuthFrame, authStyles } from "#features/auth/frame";
 import { requestMagicLink, socialSignIn } from "#features/auth/session";
+import { DISPLAY_FONT } from "#features/landing/head";
 import { Button } from "#ui/button";
 import { Badge } from "#ui/chip";
 import { ErrorNote } from "#ui/feedback";
@@ -19,7 +20,10 @@ import { color, space, text } from "#ui/tokens.stylex";
 type Search = { next?: string };
 
 export const Route = createFileRoute("/login")({
-  head: () => ({ meta: [{ title: "Sign in · Worklog" }] }),
+  head: () => ({
+    meta: [{ title: "Sign in · Worklog" }],
+    links: DISPLAY_FONT,
+  }),
   ssr: false,
   validateSearch: (search: Record<string, unknown>): Search => ({
     next: typeof search.next === "string" ? search.next : undefined,
@@ -149,6 +153,7 @@ function Login() {
     <AuthFrame
       title="Sign in to Worklog"
       subtitle="Your team’s logbook: what shipped, what’s stuck, and what needs you."
+      legal
       footer={
         setupOpen || import.meta.env.DEV ? (
           <>
@@ -346,7 +351,6 @@ const styles = stylex.create({
   },
   footerAction: {
     display: "block",
-    marginInline: "auto",
     marginBlockStart: space.sm,
   },
 });

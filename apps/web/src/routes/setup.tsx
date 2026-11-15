@@ -14,12 +14,16 @@ import { toast } from "sonner";
 import { ApiError, api, auth, unwrap } from "#api/client";
 import { q } from "#api/queries";
 import { AuthFrame, authStyles } from "#features/auth/frame";
+import { DISPLAY_FONT } from "#features/landing/head";
 import { Button } from "#ui/button";
 import { ErrorNote } from "#ui/feedback";
 import { Field, Input } from "#ui/field";
 
 export const Route = createFileRoute("/setup")({
-  head: () => ({ meta: [{ title: "Set up · Worklog" }] }),
+  head: () => ({
+    meta: [{ title: "Set up · Worklog" }],
+    links: DISPLAY_FONT,
+  }),
   ssr: false,
   component: Setup,
 });
@@ -163,6 +167,7 @@ function Setup() {
   return (
     <AuthFrame
       title={signedIn ? "Create a workspace" : "Set up Worklog"}
+      legal
       subtitle={
         signedIn
           ? "You’re signed in but don’t belong to a workspace yet. Start one, or ask a teammate to invite you."
