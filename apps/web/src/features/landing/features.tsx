@@ -1,5 +1,4 @@
 import {
-  CheckIcon,
   HourglassMediumIcon,
   LightbulbIcon,
   LockSimpleIcon,
@@ -11,6 +10,8 @@ import * as stylex from "@stylexjs/stylex";
 import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 
+import { Avatar } from "#ui/avatar";
+import { Logo } from "#ui/logo";
 import { ProductMark } from "#ui/product-mark";
 import type { Product } from "#ui/product-mark";
 import { color, font, radius, shadow, space, text } from "#ui/tokens.stylex";
@@ -18,10 +19,14 @@ import { color, font, radius, shadow, space, text } from "#ui/tokens.stylex";
 import { Intro } from "./intro";
 import { useInView, useReducedMotion } from "./script";
 import { page, type } from "./styles";
+import { atlas, grace, jean } from "./team";
+
+type Person = typeof jean | typeof atlas;
 
 /**
- * The small things that make Worklog itself, one tile each. Every tile holds one object from the
- * product at its real size, and does one small thing as the grid scrolls in.
+ * What Worklog does, one tile each: what needs you, the stream, the brief and the board lead,
+ * then two smaller promises. Every tile holds an object from the product at its real size, and
+ * shows its point in its first frame; motion only adds to it.
  */
 export function Features() {
   return (
@@ -38,38 +43,48 @@ export function Features() {
       />
       <div {...stylex.props(styles.grid)}>
         <Tile
-          wide
+          size="wide"
+          title="Only what needs you"
+          copy="Worklog pings you when something is blocked on you, and says why, within a daily budget you set. Everything else waits for your brief."
+          at={0}
+        >
+          {() => <NeedsYou />}
+        </Tile>
+        <Tile
+          title="Every tool, one stream"
+          copy="GitHub, Slack, Discord and your agents in one feed, credited to the right person. Bot noise never reaches it."
+          at={2}
+        >
+          {(on) => <Stream on={on} />}
+        </Tile>
+        <Tile
+          title="A brief, not a feed"
+          copy="Each morning: what moved, what’s stuck and what needs you, by email, Slack, Discord or webhook."
+          at={3}
+        >
+          {() => <Brief />}
+        </Tile>
+        <Tile
+          size="wide"
           title="A board that stays honest"
           copy="A golden ticket marks the one card that matters, instead of ranking them all. Cards nobody touches drift to Not now, and finished ones are stamped."
-          at={0}
+          at={4}
         >
           {(on) => <Board on={on} />}
         </Tile>
         <Tile
-          title="A budget for pings"
-          copy="Only what’s blocked on you interrupts, up to a limit you set. The rest waits for your brief."
-          at={2}
-        >
-          {(on) => <Budget on={on} />}
-        </Tile>
-        <Tile
-          title="Connect in a click"
-          copy="GitHub and Slack install in one step and bring their recent history. Bot noise never reaches the stream."
-          at={3}
-        >
-          {(on) => <Marks on={on} />}
-        </Tile>
-        <Tile
+          size="half"
           title="Log it in a sentence"
           copy="A call, a decision, a fix off the radar. Type it or say it: dictation knows your team’s names."
-          at={4}
+          at={6}
         >
           {(on) => <QuickLog on={on} />}
         </Tile>
         <Tile
+          size="half"
           title="Private stays private"
           copy="Teammates, and their assistants, only ever see what you shared with the team."
-          at={5}
+          at={7}
         >
           {(on) => <Privacy on={on} />}
         </Tile>
@@ -82,15 +97,15 @@ function Tile({
   title,
   copy,
   badge,
-  wide = false,
+  size = "third",
   at,
   children,
 }: {
   title: string;
   copy: string;
   badge?: string;
-  /** Two columns: the grid's lead tile, and the one that answers it at the foot. */
-  wide?: boolean;
+  /** A third of the row, two thirds for a lead, or half for a closing pair. */
+  size?: "third" | "wide" | "half";
   at: number;
   children: (on: boolean) => ReactNode;
 }) {
@@ -108,10 +123,7 @@ function Tile({
     return () => clearTimeout(timer);
   }, [on, at]);
   return (
-    <article
-      ref={ref}
-      {...stylex.props(page.tile, styles.tile, wide && styles.wide)}
-    >
+    <article ref={ref} {...stylex.props(page.tile, styles.tile, styles[size])}>
       <div aria-hidden {...stylex.props(styles.art)}>
         {children(turn || reduced)}
       </div>
@@ -128,29 +140,114 @@ function Tile({
   );
 }
 
-const PRODUCTS: { product: Product; name: string; connected: boolean }[] = [
-  { product: "github", name: "GitHub", connected: true },
-  { product: "slack", name: "Slack", connected: true },
+const WAITING: {
+  who: Person;
+  title: string;
+  why: string;
+  tone: "amber" | "blue" | "violet";
+}[] = [
+  {
+    who: atlas,
+    title: "Postgres 18 upgrade plan",
+    why: "Needs a decision",
+    tone: "amber",
+  },
+  {
+    who: jean,
+    title: "Track referral turnaround",
+    why: "Assigned to you",
+    tone: "blue",
+  },
+  {
+    who: grace,
+    title: "FHIR R4 profile for referrals",
+    why: "Waiting on your review",
+    tone: "violet",
+  },
 ];
 
-function Marks({ on }: { on: boolean }) {
+function NeedsYou() {
   return (
-    <div {...stylex.props(styles.row)}>
-      {PRODUCTS.map((each, at) => (
-        <span key={each.product} {...stylex.props(styles.app)}>
-          <ProductMark product={each.product} size={24} />
-          <span {...stylex.props(styles.appName)}>{each.name}</span>
-          {each.connected && (
-            <span
-              {...stylex.props(
-                styles.check,
-                on && styles.checkOn,
-                styles.delay(500 + at * 220)
-              )}
-            >
-              <CheckIcon size={10} weight="bold" />
+    <div {...stylex.props(styles.needs)}>
+      <div {...stylex.props(styles.list)}>
+        <span {...stylex.props(styles.listHead)}>
+          Needs you <span {...stylex.props(styles.listCount)}>3</span>
+        </span>
+        {WAITING.map((item) => (
+          <span key={item.title} {...stylex.props(styles.waiting)}>
+            <Avatar person={item.who} size={20} />
+            <span {...stylex.props(styles.waitingText)}>
+              <span {...stylex.props(styles.waitingTitle)}>{item.title}</span>
+              <span {...stylex.props(styles.why, styles[item.tone])}>
+                {item.why}
+              </span>
             </span>
+          </span>
+        ))}
+      </div>
+      <Budget />
+    </div>
+  );
+}
+
+const EVENTS: { product: Product | "agent"; text: string; noise: boolean }[] = [
+  { product: "github", text: "Eric merged #212", noise: false },
+  { product: "github", text: "dependabot bumped axios", noise: true },
+  { product: "slack", text: "Grace: ship it Friday", noise: false },
+  { product: "github", text: "CI passed on main", noise: true },
+  { product: "agent", text: "Atlas opened #209", noise: false },
+];
+
+function Stream({ on }: { on: boolean }) {
+  return (
+    <div {...stylex.props(styles.stream)}>
+      {EVENTS.map((event, at) => (
+        <span
+          key={event.text}
+          {...stylex.props(styles.event, styles.delay(500 + at * 120))}
+        >
+          {event.product === "agent" ? (
+            <Avatar person={atlas} size={14} />
+          ) : (
+            <ProductMark product={event.product} size={14} />
           )}
+          <span
+            {...stylex.props(
+              styles.eventText,
+              event.noise && on && styles.struck,
+              styles.delay(500 + at * 120)
+            )}
+          >
+            {event.text}
+          </span>
+        </span>
+      ))}
+    </div>
+  );
+}
+
+const BRIEF = [
+  { mark: "1", text: "needs you: approve Atlas’s plan", lead: true },
+  { mark: "✓", text: "Shipped: SMS fallback (#4)", lead: false },
+  { mark: "!", text: "Stuck: sync on the Denver server", lead: false },
+];
+
+function Brief() {
+  return (
+    <div {...stylex.props(styles.brief)}>
+      <span {...stylex.props(styles.briefHead)}>
+        <Logo size={16} />
+        <span {...stylex.props(styles.briefTitle)}>Morning brief</span>
+        <span {...stylex.props(styles.briefTime)}>8:00</span>
+      </span>
+      {BRIEF.map((line) => (
+        <span key={line.text} {...stylex.props(styles.briefLine)}>
+          <span
+            {...stylex.props(styles.briefMark, line.lead && styles.briefLead)}
+          >
+            {line.mark}
+          </span>
+          {line.text}
         </span>
       ))}
     </div>
@@ -254,7 +351,7 @@ function Stamp({ on, fluid = false }: { on: boolean; fluid?: boolean }) {
   );
 }
 
-function Budget({ on }: { on: boolean }) {
+function Budget() {
   return (
     <div {...stylex.props(styles.budget)}>
       <span {...stylex.props(styles.budgetHead)}>
@@ -265,11 +362,7 @@ function Budget({ on }: { on: boolean }) {
         {[0, 1, 2, 3].map((at) => (
           <span
             key={at}
-            {...stylex.props(
-              styles.segment,
-              at < 2 && on && styles.segmentOn,
-              styles.delay(400 + at * 200)
-            )}
+            {...stylex.props(styles.segment, at < 2 && styles.segmentOn)}
           />
         ))}
       </span>
@@ -319,12 +412,13 @@ function Privacy({ on }: { on: boolean }) {
 const ARRIVE = "cubic-bezier(0.25, 0.8, 0.25, 1)";
 
 const styles = stylex.create({
+  // Six columns, so a row is a third and two thirds, or two halves.
   grid: {
     display: "grid",
     gridTemplateColumns: {
-      default: "repeat(3, 1fr)",
-      "@media (max-width: 960px)": "repeat(2, 1fr)",
-      "@media (max-width: 600px)": "1fr",
+      default: "repeat(6, minmax(0, 1fr))",
+      "@media (max-width: 960px)": "repeat(2, minmax(0, 1fr))",
+      "@media (max-width: 600px)": "minmax(0, 1fr)",
     },
     gap: space.md,
   },
@@ -333,10 +427,23 @@ const styles = stylex.create({
     flexDirection: "column",
     overflow: "hidden",
   },
-  wide: {
+  third: {
     gridColumn: {
       default: "span 2",
-      "@media (max-width: 600px)": "auto",
+      "@media (max-width: 960px)": "span 1",
+    },
+  },
+  wide: {
+    gridColumn: {
+      default: "span 4",
+      "@media (max-width: 960px)": "span 2",
+      "@media (max-width: 600px)": "span 1",
+    },
+  },
+  half: {
+    gridColumn: {
+      default: "span 3",
+      "@media (max-width: 960px)": "span 1",
     },
   },
   board: {
@@ -752,5 +859,166 @@ const styles = stylex.create({
   },
   optionOn: {
     color: color.fg,
+  },
+  needs: {
+    display: "flex",
+    flexDirection: {
+      default: "row",
+      "@media (max-width: 600px)": "column",
+    },
+    alignItems: "center",
+    justifyContent: "center",
+    gap: space.lg,
+    width: "100%",
+  },
+  list: {
+    display: "flex",
+    flexDirection: "column",
+    gap: space.md,
+    width: "100%",
+    maxWidth: 280,
+    padding: space.lg,
+    borderRadius: radius.lg,
+    backgroundColor: color.raised,
+    boxShadow: shadow.object,
+    textAlign: "start",
+  },
+  listHead: {
+    display: "flex",
+    alignItems: "center",
+    gap: space.sm,
+    fontSize: text.meta,
+    fontWeight: 600,
+  },
+  listCount: {
+    display: "grid",
+    placeItems: "center",
+    minWidth: 18,
+    height: 18,
+    paddingInline: space.xs,
+    borderRadius: radius.full,
+    backgroundColor: color.accent,
+    color: color.fgOnSolid,
+    fontSize: text.caption,
+  },
+  waiting: {
+    display: "flex",
+    alignItems: "flex-start",
+    gap: space.md,
+  },
+  waitingText: {
+    display: "flex",
+    flexDirection: "column",
+    minWidth: 0,
+  },
+  waitingTitle: {
+    overflow: "hidden",
+    fontSize: text.label,
+    lineHeight: "17px",
+    fontWeight: 500,
+    whiteSpace: "nowrap",
+    textOverflow: "ellipsis",
+  },
+  why: {
+    fontSize: text.caption,
+    lineHeight: "15px",
+    fontWeight: 500,
+  },
+  amber: { color: color.amberFg },
+  blue: { color: color.blueFg },
+  violet: { color: color.violetFg },
+  stream: {
+    display: "flex",
+    flexDirection: "column",
+    width: "100%",
+    maxWidth: 240,
+    paddingBlock: space.xs,
+    paddingInline: space.lg,
+    borderRadius: radius.lg,
+    backgroundColor: color.raised,
+    boxShadow: shadow.object,
+    textAlign: "start",
+  },
+  event: {
+    display: "flex",
+    alignItems: "center",
+    gap: space.md,
+    height: 30,
+    borderTopWidth: {
+      default: 1,
+      ":first-child": 0,
+    },
+    borderTopStyle: "solid",
+    borderTopColor: color.line,
+    fontSize: text.meta,
+  },
+
+  eventText: {
+    overflow: "hidden",
+    whiteSpace: "nowrap",
+    textOverflow: "ellipsis",
+    textDecorationLine: "none",
+    textDecorationColor: color.fgMuted,
+    transitionProperty: "color",
+    transitionDuration: "600ms",
+  },
+  // Noise is struck out, not hidden: the point is seeing it left out. Grey, not faded, so it
+  // stays legible.
+  struck: {
+    color: color.fgMuted,
+    textDecorationLine: "line-through",
+  },
+  brief: {
+    display: "flex",
+    flexDirection: "column",
+    gap: space.md,
+    width: "100%",
+    maxWidth: 250,
+    padding: space.lg,
+    borderRadius: radius.lg,
+    backgroundColor: color.raised,
+    boxShadow: shadow.object,
+    textAlign: "start",
+  },
+  briefHead: {
+    display: "flex",
+    alignItems: "center",
+    gap: space.sm,
+    paddingBottom: space.sm,
+    borderBottomWidth: 1,
+    borderBottomStyle: "solid",
+    borderBottomColor: color.line,
+  },
+  briefTitle: {
+    flexGrow: 1,
+    fontSize: text.meta,
+    fontWeight: 600,
+  },
+  briefTime: {
+    fontSize: text.caption,
+    color: color.fgMuted,
+  },
+  briefLine: {
+    display: "flex",
+    alignItems: "center",
+    gap: space.md,
+    fontSize: text.meta,
+    lineHeight: "16px",
+  },
+  briefMark: {
+    display: "grid",
+    placeItems: "center",
+    flexShrink: 0,
+    width: 16,
+    height: 16,
+    borderRadius: radius.full,
+    backgroundColor: color.ui,
+    color: color.fgMuted,
+    fontSize: 10,
+    fontWeight: 600,
+  },
+  briefLead: {
+    backgroundColor: color.accent,
+    color: color.fgOnSolid,
   },
 });
