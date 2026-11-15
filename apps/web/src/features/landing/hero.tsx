@@ -15,7 +15,6 @@ const ENDINGS = [
   "that writes itself.",
   "for people and agents.",
   "with no status meetings.",
-  "that knows who’s waiting.",
 ];
 
 const TURN = 3200;
@@ -138,11 +137,24 @@ const styles = stylex.create({
   badgeArrow: {
     color: color.fgFaint,
   },
+  // The front page's headline stands a size above the other pages' titles.
   title: {
     display: "flex",
     flexDirection: "column",
     alignItems: "center",
-    maxWidth: 640,
+    maxWidth: 720,
+    // A phone scales the line with the screen, so the longest ending, which can't wrap, still fits
+    // a 360px screen.
+    fontSize: {
+      default: 54,
+      "@media (max-width: 768px)": 46,
+      [PHONE]: "clamp(30px, 9.4vw, 38px)",
+    },
+    lineHeight: {
+      default: "60px",
+      "@media (max-width: 768px)": "52px",
+      [PHONE]: 1.13,
+    },
   },
   endings: {
     display: "grid",
