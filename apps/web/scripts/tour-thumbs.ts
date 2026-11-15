@@ -6,7 +6,7 @@ import { chromium } from "playwright";
 
 const url = process.argv[2] ?? "http://localhost:3000/";
 const out = new URL("../src/features/landing/plates/thumbs/", import.meta.url);
-const CHAPTERS = ["Home", "Inbox", "Assistant", "Board", "Activity", "Briefs"];
+const CHAPTERS = ["Home", "Inbox", "Board", "Activity", "Briefs"];
 const WIDTH = 320;
 const HEIGHT = 200;
 

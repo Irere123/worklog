@@ -76,12 +76,14 @@ export function Agents() {
 const ANSWER =
   "Yes. Atlas finished the prototype on Saturday and opened a pull request for review. Jean approved queueing messages until the clinic is back; testing waits on Eric’s review of #4.";
 
+const WORDS = ANSWER.split(" ");
+
 type AskState = {
   asked: boolean;
   mood: Mood;
   steps: number;
   folded: boolean;
-  typed: number;
+  words: number;
 };
 
 // The question is asked and the lookup under way: the first frame is already a working assistant.
@@ -90,7 +92,7 @@ const ASK_START: AskState = {
   mood: "thinking",
   steps: 1,
   folded: false,
-  typed: 0,
+  words: 0,
 };
 
 const ASK_END: AskState = {
@@ -98,7 +100,7 @@ const ASK_END: AskState = {
   mood: "done",
   steps: 2,
   folded: true,
-  typed: ANSWER.length,
+  words: WORDS.length,
 };
 
 function Ask() {
@@ -115,12 +117,10 @@ function Ask() {
       await a.wait(900);
       set({ folded: true, mood: "writing" });
       await a.wait(300);
-      // Streams in word by word, the way the assistant really answers.
-      const words = ANSWER.split(" ");
-      let typed = 0;
-      for (const word of words) {
-        typed += word.length + 1;
-        set({ typed: Math.min(typed, ANSWER.length) });
+      // Streams in word by word, the way the assistant really answers. Every word is laid out
+      // from the start and shown in turn, so the answer grows in place instead of reflowing.
+      for (let words = 1; words <= WORDS.length; words += 1) {
+        set({ words });
         // oxlint-disable-next-line no-await-in-loop -- one word after another
         await a.wait(55);
       }
@@ -130,7 +130,6 @@ function Ask() {
   );
 
   const shown = reduced ? ASK_END : s;
-  const answer = ANSWER.slice(0, shown.typed);
   return (
     <div ref={ref} {...stylex.props(styles.panel)}>
       <div {...stylex.props(styles.panelHead)}>
@@ -171,17 +170,32 @@ function Ask() {
             Checked 2 things · 3s
           </span>
         </Collapse>
-        <Collapse open={shown.typed > 0}>
+        <Collapse open={shown.words > 0}>
           <p {...stylex.props(styles.answer)}>
-            {answer.split("#4").map((part, at, all) => (
-              // oxlint-disable-next-line react/no-array-index-key -- the parts never reorder
-              <span key={at}>
-                {part}
-                {at < all.length - 1 && (
-                  <span {...stylex.props(styles.ref)}>#4</span>
-                )}
-              </span>
-            ))}
+            {WORDS.map((word, at) => {
+              const { card, rest } =
+                /^(?<card>#\d+)(?<rest>.*)$/u.exec(word)?.groups ?? {};
+              return (
+                // oxlint-disable-next-line react/no-array-index-key -- the words never reorder
+                <span key={at}>
+                  <span
+                    {...stylex.props(
+                      styles.word,
+                      at < shown.words && styles.wordShown
+                    )}
+                  >
+                    {card === undefined ? (
+                      word
+                    ) : (
+                      <>
+                        <span {...stylex.props(styles.ref)}>{card}</span>
+                        {rest}
+                      </>
+                    )}
+                  </span>{" "}
+                </span>
+              );
+            })}
           </p>
         </Collapse>
         <Collapse open={shown.mood === "done"}>
@@ -255,10 +269,9 @@ function Approve() {
       }
       await a.wait(100);
       set({ phase: "allowed" });
-      await a.wait(900);
-      if (allow) {
-        set({ cursor: { x: allow.x + 30, y: allow.y + 90 } });
-      }
+      // Its job done, the pointer fades where it is rather than coming to rest on the record.
+      await a.wait(700);
+      set({ shown: false });
     },
     { running: inView && !reduced, paused: false }
   );
@@ -528,6 +541,14 @@ const styles = stylex.create({
     whiteSpace: "nowrap",
     overflow: "hidden",
     textOverflow: "ellipsis",
+  },
+  word: {
+    opacity: 0,
+    transitionProperty: "opacity",
+    transitionDuration: "160ms",
+  },
+  wordShown: {
+    opacity: 1,
   },
   ref: {
     paddingInline: 3,
