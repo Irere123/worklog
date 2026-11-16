@@ -56,6 +56,7 @@ const SOURCES: Record<string, string> = {
   worklog: "Worklog",
   webhook: "Webhook",
   api: "API",
+  mcp: "MCP",
 };
 
 /** The tool's own mark, or a generic one for webhooks and code that pushes events itself. */
@@ -77,7 +78,7 @@ export function sourceLabel(source: string) {
   return SOURCES[source] ?? source;
 }
 
-const IN_APP = new Set(["worklog", "api"]);
+const IN_APP = new Set(["worklog", "api", "mcp"]);
 
 /** The tool's own mark beside its name. Worklog's own sources and unknown ones are words alone: a mark only helps where it is recognised. */
 export function SourceName({

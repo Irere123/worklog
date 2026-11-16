@@ -20,11 +20,12 @@ import { Avatar } from "#ui/avatar";
 import { Button } from "#ui/button";
 import { Badge } from "#ui/chip";
 import { EmptyState, Skeleton } from "#ui/feedback";
-import { Checkbox, Field, Input, Select } from "#ui/field";
+import { Checkbox, Field, Input, Segmented, Select } from "#ui/field";
 import { Ghost } from "#ui/ghost";
 import { Dialog, Tooltip } from "#ui/overlay";
 import { color, radius, space, text } from "#ui/tokens.stylex";
 
+import { ConnectAgentSteps } from "./connect-agent";
 import { Card, SettingsPage, settingsStyles } from "./frame";
 
 type Scope = "read" | "write" | "ingest";
@@ -336,23 +337,26 @@ export function Members() {
   const me = useMe();
   const [adding, setAdding] = useState<"human" | "agent" | null>(null);
   const [keyFor, setKeyFor] = useState<string | null>(null);
+  const { data: connections } = useQuery(q.agentConnections());
   const humans = list.filter((m) => m.kind === "human");
   const agents = list.filter((m) => m.kind === "agent");
   const admin = me?.member.role === "owner" || me?.member.role === "admin";
+  const connected = new Map((connections ?? []).map((c) => [c.agent.id, c]));
   return (
     <SettingsPage
       title="Members and agents"
       description="Everyone whose work shows up in Worklog. Agents act for a person, who stays accountable for them."
       actions={
-        admin && (
-          <>
-            <Button
-              size="sm"
-              icon={<Ghost size={14} still tinted />}
-              onClick={() => setAdding("agent")}
-            >
-              Add agent
-            </Button>
+        <>
+          {/* Anyone can connect their own coding tool: it works for them, and they approve it. */}
+          <Button
+            size="sm"
+            icon={<Ghost size={14} still tinted />}
+            onClick={() => setAdding("agent")}
+          >
+            Add agent
+          </Button>
+          {admin && (
             <Button
               size="sm"
               variant="primary"
@@ -361,8 +365,8 @@ export function Members() {
             >
               Invite
             </Button>
-          </>
-        )
+          )}
+        </>
       }
     >
       <Card title={`People · ${humans.length}`}>
@@ -370,18 +374,19 @@ export function Members() {
       </Card>
       <Card
         title={`Agents · ${agents.length}`}
-        description="Each agent logs in with its own key and reports work on behalf of its person."
+        description="Coding tools connect themselves and report for the person who approved them; scripts and bots use a key."
       >
         <MemberRows
           members={agents}
+          connected={connected}
           onKey={(m) =>
-            admin || m.ownerId === me?.member.id
+            !connected.has(m.id) && (admin || m.ownerId === me?.member.id)
               ? () => setKeyFor(m.handle)
               : undefined
           }
         />
       </Card>
-      <AddMember kind={adding} onClose={() => setAdding(null)} />
+      <AddMember kind={adding} admin={admin} onClose={() => setAdding(null)} />
       <NewKey
         open={keyFor !== null}
         handle={keyFor ?? ""}
@@ -393,51 +398,127 @@ export function Members() {
 
 function MemberRows({
   members,
+  connected,
   onKey,
 }: {
   members: Schemas["Member"][];
+  /** Agents that connected themselves over MCP, by agent id. */
+  connected?: Map<string, Schemas["AgentConnection"]>;
   /** For agents the viewer may issue keys to: opens the new-key dialog for that agent. */
   onKey?: (member: Schemas["Member"]) => (() => void) | undefined;
 }) {
-  const { byId } = useMembers();
-  const me = useMe();
   return (
     <ul {...stylex.props(settingsStyles.list)}>
-      {members.map((m) => {
-        const owner = m.ownerId ? byId.get(m.ownerId) : undefined;
-        const self = m.id === me?.member.id;
-        // "Ada’s assistant" already says whom it works for.
-        const namedForOwner =
-          owner !== undefined && m.name.startsWith(owner.name);
-        return (
-          <li key={m.id} {...stylex.props(settingsStyles.listRow)}>
-            <Avatar person={m} size={28} />
-            <div {...stylex.props(settingsStyles.main)}>
-              <p {...stylex.props(settingsStyles.strong)}>{m.name}</p>
-              <p {...stylex.props(settingsStyles.sub)}>
-                @{m.handle}
-                {m.title ? ` · ${m.title}` : ""}
-                {owner && !namedForOwner ? ` · works for ${owner.name}` : ""}
-                {m.agentProvider ? ` · ${providerName(m.agentProvider)}` : ""}
-              </p>
-            </div>
-            {self && <Badge>You</Badge>}
-            {/* Someone using Worklog through an API key has no account but is plainly here. */}
-            {m.kind === "human" && !m.signedUp && !self && (
-              <Badge tone="amber" status="waiting">
-                Invited
-              </Badge>
-            )}
-            {m.role !== "member" && (
-              <Badge tone="accent">
-                {m.role === "owner" ? "Owner" : "Admin"}
-              </Badge>
-            )}
-            <KeyButton open={onKey?.(m)} name={m.name} />
-          </li>
-        );
-      })}
+      {members.map((m) => (
+        <MemberRow
+          key={m.id}
+          member={m}
+          link={connected?.get(m.id)}
+          openKey={onKey?.(m)}
+        />
+      ))}
     </ul>
+  );
+}
+
+function MemberRow({
+  member: m,
+  link,
+  openKey,
+}: {
+  member: Schemas["Member"];
+  link: Schemas["AgentConnection"] | undefined;
+  openKey: (() => void) | undefined;
+}) {
+  const { byId } = useMembers();
+  const me = useMe();
+  const admin = me?.member.role === "owner" || me?.member.role === "admin";
+  const owner = m.ownerId ? byId.get(m.ownerId) : undefined;
+  const self = m.id === me?.member.id;
+  return (
+    <li {...stylex.props(settingsStyles.listRow)}>
+      <Avatar person={m} size={28} />
+      <div {...stylex.props(settingsStyles.main)}>
+        <p {...stylex.props(settingsStyles.strong)}>{m.name}</p>
+        <p {...stylex.props(settingsStyles.sub)}>{aboutMember(m, owner)}</p>
+        {link && <ConnectionLine connection={link} />}
+      </div>
+      {self && <Badge>You</Badge>}
+      {/* Someone using Worklog through an API key has no account but is plainly here. */}
+      {m.kind === "human" && !m.signedUp && !self && (
+        <Badge tone="amber" status="waiting">
+          Invited
+        </Badge>
+      )}
+      {m.role !== "member" && (
+        <Badge tone="accent">{m.role === "owner" ? "Owner" : "Admin"}</Badge>
+      )}
+      <KeyButton open={openKey} name={m.name} />
+      {link && (admin || m.ownerId === me?.member.id) && (
+        <DisconnectButton agent={m} />
+      )}
+    </li>
+  );
+}
+
+function aboutMember(
+  m: Schemas["Member"],
+  owner: Schemas["Member"] | undefined
+) {
+  // "Ada’s assistant" already says whom it works for.
+  const namedForOwner = owner !== undefined && m.name.startsWith(owner.name);
+  return [
+    `@${m.handle}`,
+    m.title,
+    owner && !namedForOwner ? `works for ${owner.name}` : null,
+    m.agentProvider ? providerName(m.agentProvider) : null,
+  ]
+    .filter((part) => part !== null && part !== "")
+    .join(" · ");
+}
+
+function ConnectionLine({
+  connection,
+}: {
+  connection: Schemas["AgentConnection"];
+}) {
+  const used = connection.lastUsedAt ?? connection.createdAt;
+  return (
+    <p {...stylex.props(settingsStyles.sub)}>
+      {connection.verifiedHost
+        ? `Connected over MCP, verified by ${connection.verifiedHost}`
+        : "Connected over MCP"}
+      {` · last active ${ago(used)}`}
+    </p>
+  );
+}
+
+function DisconnectButton({ agent }: { agent: Schemas["Member"] }) {
+  const client = useQueryClient();
+  const disconnect = useMutation({
+    mutationFn: async () =>
+      await unwrap(
+        api.POST("/v1/members/{ref}/disconnect", {
+          params: { path: { ref: agent.id } },
+        })
+      ),
+    onSuccess: () => {
+      void client.invalidateQueries({ queryKey: ["members"] });
+      toast.success(
+        `${agent.name} is disconnected. Connecting it again asks for approval.`
+      );
+    },
+    onError: (error) => toast.error(error.message),
+  });
+  return (
+    <Button
+      size="sm"
+      variant="ghost"
+      busy={disconnect.isPending}
+      onClick={() => disconnect.mutate()}
+    >
+      Disconnect
+    </Button>
   );
 }
 
@@ -469,20 +550,34 @@ const ADD_COPY = {
   },
 };
 
+const KEY_COPY = {
+  title: "Give this key to your agent",
+  description:
+    "It won’t be shown again. The agent sends it as a Bearer token to log work and report progress.",
+};
+
+type AgentPath = "tool" | "key";
+
 function AddMember({
   kind,
+  admin,
   onClose,
 }: {
   kind: "human" | "agent" | null;
+  /** Only admins add members by hand; anyone connects their own coding tool. */
+  admin: boolean;
   onClose: () => void;
 }) {
   const me = useMe();
+  const [path, setPath] = useState<AgentPath>("tool");
+  const connecting = kind === "agent" && (path === "tool" || !admin);
   const [name, setName] = useState("");
   const [handle, setHandle] = useState("");
   const [email, setEmail] = useState("");
   const [title, setTitle] = useState("");
   const [provider, setProvider] = useState("");
   const [token, setToken] = useState<string | null>(null);
+  const copy = token === null ? ADD_COPY[kind ?? "human"] : KEY_COPY;
   const client = useQueryClient();
   const add = useMutation({
     mutationFn: async () =>
@@ -521,6 +616,7 @@ function AddMember({
     setTitle("");
     setProvider("");
     setToken(null);
+    setPath("tool");
     onClose();
   };
   return (
@@ -531,16 +627,10 @@ function AddMember({
           close();
         }
       }}
-      title={
-        token ? "Give this key to your agent" : ADD_COPY[kind ?? "human"].title
-      }
-      description={
-        token
-          ? "It won’t be shown again. The agent sends it as a Bearer token to log work and report progress."
-          : ADD_COPY[kind ?? "human"].description
-      }
+      title={copy.title}
+      description={copy.description}
       footer={
-        token ? (
+        token || connecting ? (
           <Button variant="primary" onClick={close}>
             Done
           </Button>
@@ -562,9 +652,20 @@ function AddMember({
       }
     >
       <div {...stylex.props(styles.body)}>
-        {token ? (
-          <SecretField value={token} />
-        ) : (
+        {kind === "agent" && admin && !token && (
+          <Segmented<AgentPath>
+            label="How the agent connects"
+            value={path}
+            onChange={setPath}
+            options={[
+              { value: "tool", label: "Coding tool" },
+              { value: "key", label: "Script or bot" },
+            ]}
+          />
+        )}
+        {token !== null && <SecretField value={token} />}
+        {token === null && connecting && <ConnectAgentSteps />}
+        {token === null && !connecting && (
           <>
             <Field label="Name">
               {(id) => (

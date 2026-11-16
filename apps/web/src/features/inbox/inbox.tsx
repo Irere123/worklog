@@ -58,6 +58,7 @@ import {
   text,
 } from "#ui/tokens.stylex";
 
+import { AgentAnswer } from "./answer";
 import { agentFace, kindOf } from "./kinds";
 
 type Item = Schemas["AttentionListItem"];
@@ -612,6 +613,8 @@ function Detail({
           </div>
         </div>
       )}
+
+      <AgentAnswer item={item} from={from} state={state} onSent={onDone} />
 
       <div {...stylex.props(styles.links)}>
         {item.url && (

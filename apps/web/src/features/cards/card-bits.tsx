@@ -76,10 +76,13 @@ export function roleOf(member: Schemas["Member"]) {
 const PROVIDERS: Record<string, string> = {
   worklog: "Worklog",
   "claude-code": "Claude Code",
+  claude: "Claude",
   cursor: "Cursor",
   codex: "Codex",
   devin: "Devin",
   copilot: "GitHub Copilot",
+  windsurf: "Windsurf",
+  gemini: "Gemini",
 };
 
 /** Where an agent runs, as people write it: "Claude Code", not "claude-code". */

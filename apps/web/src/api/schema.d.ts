@@ -677,6 +677,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/attention/{id}/answer": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Answer your coding agent's question in words
+         * @description Only for an agent's `agent.needs_you` item. The answer is private to you and the agent, which reads it with its `check_in` tool; answering marks the item done.
+         */
+        post: operations["attention.answer"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/attention/metrics": {
         parameters: {
             query?: never;
@@ -994,6 +1014,66 @@ export interface paths {
         get: operations["voice.history"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/agent-approval": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * What a coding agent asking to connect is, and where it could work
+         * @description For the approval page an MCP client's sign-in lands on. It reads the browser's session and ignores any API key: an approval is a person's own decision, and the token goes to whoever that session belongs to. Without a session it answers 401.
+         */
+        get: operations["agentApproval.get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/agent-connections": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Coding agents that connected themselves over MCP
+         * @description Yours, or everyone's for admins: which tool each is, whether its domain vouches for it, and when it last called.
+         */
+        get: operations["agentConnection.list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/members/{ref}/disconnect": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Disconnect a coding agent that connected itself
+         * @description Revokes every approval it holds and takes it off the team; its history stays. Connecting it again asks its person to approve it again. Its person or an admin can do this.
+         */
+        post: operations["member.disconnect"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2152,6 +2232,69 @@ export interface components {
              */
             savedAt: string | null;
         };
+        AgentApproval: {
+            /** @description The email of the person approving, whose session the token will be issued to */
+            signedInAs: string;
+            client: {
+                id: string;
+                name: string;
+                uri: string | null;
+                /** @description The domain that publishes this app's metadata, which vouches for its name; null when the app registered itself and its name is only a claim */
+                verifiedHost: string | null;
+                /**
+                 * @description The `agentProvider` its agent will have, e.g. claude-code, cursor, copilot
+                 * @example claude-code
+                 */
+                provider: string;
+            };
+            workspaces: {
+                id: string;
+                name: string;
+                /** @description The agent this app already is there, if it connected before */
+                agent: {
+                    id: string;
+                    /** @enum {string} */
+                    kind: "human" | "agent";
+                    /** @enum {string} */
+                    role: "owner" | "admin" | "member";
+                    name: string;
+                    handle: string;
+                    email: string | null;
+                    title: string | null;
+                    timezone: string | null;
+                    avatarUrl: string | null;
+                    /** @description For agents: the human they work for */
+                    ownerId: string | null;
+                    /** @description "worklog" for personal assistants; e.g. "claude-code" for external agents */
+                    agentProvider: string | null;
+                    /** @description For humans: whether a signed-in account is attached (false = invited, not yet joined) */
+                    signedUp: boolean;
+                    settings: components["schemas"]["MemberSettings"];
+                    /**
+                     * Format: date-time
+                     * @example 2026-10-26T08:30:00.000Z
+                     */
+                    createdAt: string;
+                } | null;
+            }[];
+        };
+        AgentConnection: {
+            id: string;
+            agent: components["schemas"]["Member"];
+            ownerId: string;
+            clientName: string | null;
+            verifiedHost: string | null;
+            /**
+             * Format: date-time
+             * @example 2026-10-26T08:30:00.000Z
+             */
+            lastUsedAt: string | null;
+            /**
+             * Format: date-time
+             * @example 2026-10-26T08:30:00.000Z
+             */
+            createdAt: string;
+        };
         Transcript: {
             /** @description What was said, with the workspace's own names spelled right. Empty when nothing was. */
             text: string;
@@ -2579,6 +2722,11 @@ export interface operations {
                         setupOpen: boolean;
                         /** @description Anyone who signs in may start a workspace with `POST /v1/workspaces`; otherwise people join by invite */
                         signupOpen: boolean;
+                        /**
+                         * @description Where coding agents connect over MCP; they sign in through Worklog on their own. Null when the server isn't on HTTPS
+                         * @example https://worklog.example.com/mcp
+                         */
+                        mcpUrl: string | null;
                     };
                 };
             };
@@ -5340,6 +5488,65 @@ export interface operations {
             };
         };
     };
+    "attention.answer": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /**
+                     * @description Markdown, for the agent to read the next time it checks in
+                     * @example 30 days: the security review wants short-lived tokens.
+                     */
+                    body: string;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttentionItem"];
+                };
+            };
+            /** @description Invalid request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid credentials */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     "attention.metrics": {
         parameters: {
             query?: {
@@ -6457,6 +6664,153 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Voice"][];
+                };
+            };
+            /** @description Invalid request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid credentials */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    "agentApproval.get": {
+        parameters: {
+            query: {
+                /** @description The `client_id` from the approval page's query */
+                clientId: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentApproval"];
+                };
+            };
+            /** @description Invalid request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid credentials */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    "agentConnection.list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentConnection"][];
+                };
+            };
+            /** @description Invalid request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid credentials */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    "member.disconnect": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Member id, handle, or "me" */
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Ok"];
                 };
             };
             /** @description Invalid request */

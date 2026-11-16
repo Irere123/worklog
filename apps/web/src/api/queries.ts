@@ -52,6 +52,12 @@ export const q = {
       queryFn: async () => await unwrap(api.GET("/v1/members")),
       staleTime: 60_000,
     }),
+  agentConnections: () =>
+    queryOptions({
+      queryKey: ["members", "connections"],
+      queryFn: async () => await unwrap(api.GET("/v1/agent-connections")),
+      staleTime: 60_000,
+    }),
   member: (ref: string) =>
     queryOptions({
       queryKey: ["members", ref],

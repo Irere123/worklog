@@ -24,6 +24,8 @@ import { Route as AppBriefsRouteImport } from './routes/_app/briefs'
 import { Route as AppHomeRouteImport } from './routes/_app/home'
 import { Route as AppInboxRouteImport } from './routes/_app/inbox'
 import { Route as AppSettingsRouteImport } from './routes/_app/settings'
+import { Route as ConnectIndexRouteImport } from './routes/connect.index'
+import { Route as ConnectSignInRouteImport } from './routes/connect.sign-in'
 import { Route as AppAssistantIndexRouteImport } from './routes/_app/assistant.index'
 import { Route as AppAssistantConversationIdRouteImport } from './routes/_app/assistant.$conversationId'
 import { Route as AppBoardsIndexRouteImport } from './routes/_app/boards.index'
@@ -117,6 +119,16 @@ const AppSettingsRoute = AppSettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
   getParentRoute: () => AppRoute,
+} as any)
+const ConnectIndexRoute = ConnectIndexRouteImport.update({
+  id: '/connect/',
+  path: '/connect/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ConnectSignInRoute = ConnectSignInRouteImport.update({
+  id: '/connect/sign-in',
+  path: '/connect/sign-in',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const AppAssistantIndexRoute = AppAssistantIndexRouteImport.update({
   id: '/',
@@ -233,6 +245,8 @@ export interface FileRoutesByFullPath {
   '/home': typeof AppHomeRoute
   '/inbox': typeof AppInboxRoute
   '/settings': typeof AppSettingsRouteWithChildren
+  '/connect/sign-in': typeof ConnectSignInRoute
+  '/connect/': typeof ConnectIndexRoute
   '/assistant/$conversationId': typeof AppAssistantConversationIdRoute
   '/boards/$boardId': typeof AppBoardsBoardIdRoute
   '/boards/new': typeof AppBoardsNewRoute
@@ -266,6 +280,8 @@ export interface FileRoutesByTo {
   '/briefs': typeof AppBriefsRoute
   '/home': typeof AppHomeRoute
   '/inbox': typeof AppInboxRoute
+  '/connect/sign-in': typeof ConnectSignInRoute
+  '/connect': typeof ConnectIndexRoute
   '/assistant/$conversationId': typeof AppAssistantConversationIdRoute
   '/boards/$boardId': typeof AppBoardsBoardIdRoute
   '/boards/new': typeof AppBoardsNewRoute
@@ -303,6 +319,8 @@ export interface FileRoutesById {
   '/_app/home': typeof AppHomeRoute
   '/_app/inbox': typeof AppInboxRoute
   '/_app/settings': typeof AppSettingsRouteWithChildren
+  '/connect/sign-in': typeof ConnectSignInRoute
+  '/connect/': typeof ConnectIndexRoute
   '/_app/assistant/$conversationId': typeof AppAssistantConversationIdRoute
   '/_app/boards/$boardId': typeof AppBoardsBoardIdRoute
   '/_app/boards/new': typeof AppBoardsNewRoute
@@ -340,6 +358,8 @@ export interface FileRouteTypes {
     | '/home'
     | '/inbox'
     | '/settings'
+    | '/connect/sign-in'
+    | '/connect/'
     | '/assistant/$conversationId'
     | '/boards/$boardId'
     | '/boards/new'
@@ -373,6 +393,8 @@ export interface FileRouteTypes {
     | '/briefs'
     | '/home'
     | '/inbox'
+    | '/connect/sign-in'
+    | '/connect'
     | '/assistant/$conversationId'
     | '/boards/$boardId'
     | '/boards/new'
@@ -409,6 +431,8 @@ export interface FileRouteTypes {
     | '/_app/home'
     | '/_app/inbox'
     | '/_app/settings'
+    | '/connect/sign-in'
+    | '/connect/'
     | '/_app/assistant/$conversationId'
     | '/_app/boards/$boardId'
     | '/_app/boards/new'
@@ -440,6 +464,8 @@ export interface RootRouteChildren {
   PrivacyRoute: typeof PrivacyRoute
   SetupRoute: typeof SetupRoute
   TermsRoute: typeof TermsRoute
+  ConnectSignInRoute: typeof ConnectSignInRoute
+  ConnectIndexRoute: typeof ConnectIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -548,6 +574,20 @@ declare module '@tanstack/react-router' {
       fullPath: '/settings'
       preLoaderRoute: typeof AppSettingsRouteImport
       parentRoute: typeof AppRoute
+    }
+    '/connect/': {
+      id: '/connect/'
+      path: '/connect'
+      fullPath: '/connect/'
+      preLoaderRoute: typeof ConnectIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/connect/sign-in': {
+      id: '/connect/sign-in'
+      path: '/connect/sign-in'
+      fullPath: '/connect/sign-in'
+      preLoaderRoute: typeof ConnectSignInRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/_app/assistant/': {
       id: '/_app/assistant/'
@@ -774,6 +814,8 @@ const rootRouteChildren: RootRouteChildren = {
   PrivacyRoute: PrivacyRoute,
   SetupRoute: SetupRoute,
   TermsRoute: TermsRoute,
+  ConnectSignInRoute: ConnectSignInRoute,
+  ConnectIndexRoute: ConnectIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

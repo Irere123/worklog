@@ -44,6 +44,7 @@ const GROUPS: { title: string; keys: [string, string][] }[] = [
       ["⇧ X", "Dismiss, and fewer like it"],
       ["Y", "Allow (approvals)"],
       ["N", "Deny (approvals)"],
+      ["R", "Answer an agent's question"],
       ["Z", "Undo"],
     ],
   },
