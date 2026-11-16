@@ -5,7 +5,7 @@ import type { Tone } from "#ui/chip";
 import { Ghost } from "#ui/ghost";
 import type { Mood } from "#ui/ghost";
 
-export type Run = NonNullable<Schemas["TeamNow"][number]["agent"]>;
+export type Run = Schemas["AgentRun"];
 
 const RUN: Record<
   Run["state"],

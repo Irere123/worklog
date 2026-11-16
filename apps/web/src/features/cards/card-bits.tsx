@@ -178,27 +178,33 @@ export function CardTile({
 /**
  * An agent at work on a card says so on the card, as a person at the desk would. Only runs that
  * are moving or waiting on someone show: a finished run is in the history, and a stalled one is
- * on People.
+ * on People. One agent can be on several cards at once (a session per task), and a card shows
+ * whichever is on it, one waiting on someone first.
  */
 export function CardRun({ number, full }: { number: number; full?: boolean }) {
   const { data: on } = useQuery({
     ...q.teamNow(3),
     select: (rows) =>
-      rows.find(
-        (row) =>
-          row.agent?.cardNumber === number &&
-          (row.agent.state === "needs_you" ||
-            (row.agent.state === "working" && !isStale(row.agent)))
-      ),
+      rows
+        .flatMap((row) =>
+          row.runs
+            .filter((run) => run.cardNumber === number && !isStale(run))
+            .map((run) => ({ memberId: row.memberId, run }))
+        )
+        .toSorted(
+          (a, b) =>
+            Number(b.run.state === "needs_you") -
+            Number(a.run.state === "needs_you")
+        )[0],
   });
   const { byId } = useMembers();
   const me = useMe();
   const agent = on ? byId.get(on.memberId) : undefined;
-  if (!on?.agent || !agent) {
+  if (!on || !agent) {
     return null;
   }
   const owner = agent.ownerId ? byId.get(agent.ownerId) : undefined;
-  const waiting = on.agent.state === "needs_you";
+  const waiting = on.run.state === "needs_you";
   const who = ownerWord(owner, me?.member.id) ?? "a person";
   return (
     <p {...stylex.props(styles.run, full === true && styles.runFull)}>
@@ -213,7 +219,7 @@ export function CardRun({ number, full }: { number: number; full?: boolean }) {
         ) : (
           <span {...stylex.props(styles.runWorking)}>is on it:</span>
         )}{" "}
-        {on.agent.title}
+        {on.run.title}
       </span>
     </p>
   );

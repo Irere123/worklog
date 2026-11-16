@@ -3,6 +3,7 @@ import {
   countActivitiesByActorHour,
   listActivities,
   listAgentStates,
+  listRunsInPlay,
   listLatestByActor,
 } from "#db/queries/activities";
 import { listCurrentCards } from "#db/queries/cards";
@@ -115,6 +116,10 @@ export async function teamNow(
     workspaceId: asker.workspaceId,
     since: new Date(ctx.now().getTime() - days * DAY_MS),
   });
+  const inPlay = await listRunsInPlay(ctx.db, {
+    workspaceId: asker.workspaceId,
+    since: new Date(ctx.now().getTime() - days * DAY_MS),
+  });
   const rhythms = await rhythmsOf(ctx, {
     workspaceId: asker.workspaceId,
     privateFor: [asker.id],
@@ -128,7 +133,11 @@ export async function teamNow(
   return [...ids].map((memberId) => {
     const card = current.find((c) => c.memberId === memberId);
     const last = latest.find((l) => l.actorId === memberId);
-    const run = agents.find((a) => a.actorId === memberId);
+    const latestRun = agents.find((a) => a.actorId === memberId);
+    const runs = inPlay
+      .filter((r) => r.actorId === memberId)
+      .flatMap(asRun)
+      .toSorted(waitingFirst);
     return {
       memberId,
       current: card
@@ -147,18 +156,48 @@ export async function teamNow(
             title: last.title,
           }
         : null,
-      agent: run?.state
-        ? {
-            state: run.state,
-            title: run.title,
-            at: run.at.toISOString(),
-            cardNumber: run.cardNumber,
-          }
-        : null,
+      // Waiting on someone is the news, whatever else the agent did since.
+      agent:
+        runs.find((r) => r.state === "needs_you") ??
+        (latestRun ? (asRun(latestRun)[0] ?? null) : null),
+      runs,
       lastActiveAt: last?.at.toISOString() ?? null,
       rhythm: rhythms.get(memberId) ?? emptyRhythm(RHYTHM_DAYS),
     };
   });
+}
+
+type RunRow = Awaited<ReturnType<typeof listRunsInPlay>>[number];
+
+// A question its person has settled no longer holds the agent up: it's back at work until its next
+// update says otherwise.
+function asRun(row: RunRow) {
+  if (row.state === null) {
+    return [];
+  }
+  const answered =
+    row.state === "needs_you" &&
+    row.asked !== null &&
+    row.asked !== "open" &&
+    row.asked !== "snoozed";
+  return [
+    {
+      state: answered ? ("working" as const) : row.state,
+      title: row.title,
+      at: row.at.toISOString(),
+      cardNumber: row.cardNumber,
+    },
+  ];
+}
+
+function waitingFirst(
+  a: { state: string; at: string },
+  b: { state: string; at: string }
+) {
+  return (
+    Number(b.state === "needs_you") - Number(a.state === "needs_you") ||
+    b.at.localeCompare(a.at)
+  );
 }
 
 /**

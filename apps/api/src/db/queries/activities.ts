@@ -17,7 +17,7 @@ import {
 import type { SQL } from "drizzle-orm";
 
 import type { DbOrTx } from "#db";
-import { activities, cards, inboundEvents } from "#db/schema";
+import { activities, attentionItems, cards, inboundEvents } from "#db/schema";
 import { returned } from "#lib/assert";
 
 export type ActivityRow = typeof activities.$inferSelect;
@@ -366,8 +366,40 @@ export async function countActivitiesByActorHour(
     .groupBy(activities.actorId, hour);
 }
 
+// A run is one thread of an agent's work; an update with no thread is a run of its own, as its
+// question is filed under its id.
+const runThread = sql<string>`coalesce(${activities.threadKey}, ${activities.id})`;
+
+function runColumns() {
+  return {
+    actorId: activities.actorId,
+    state: activities.agentState,
+    title: activities.title,
+    at: activities.occurredAt,
+    cardNumber: cards.number,
+    // The inbox item its question raised: once its person has settled it, the agent is no longer
+    // waiting, even before it says so.
+    asked: attentionItems.state,
+  };
+}
+
+function runsSince(params: { workspaceId: string; since: Date }) {
+  return and(
+    eq(activities.workspaceId, params.workspaceId),
+    eq(activities.visibility, "team"),
+    isNotNull(activities.actorId),
+    isNotNull(activities.agentState),
+    gte(activities.occurredAt, params.since)
+  );
+}
+
+const questionOfRun = and(
+  eq(attentionItems.memberId, activities.onBehalfOfId),
+  eq(attentionItems.dedupeKey, sql`'agent:' || ${runThread}`)
+);
+
 /**
- * Where each agent's run stands: the latest of its updates that carry a state (working, needs
+ * Where each agent's work stands: the latest of its updates that carry a state (working, needs
  * you, finished, failed) since `since`. Agent updates are team-visible work.
  */
 export async function listAgentStates(
@@ -375,25 +407,35 @@ export async function listAgentStates(
   params: { workspaceId: string; since: Date }
 ) {
   return await db
-    .selectDistinctOn([activities.actorId], {
-      actorId: activities.actorId,
-      state: activities.agentState,
-      title: activities.title,
-      at: activities.occurredAt,
-      cardNumber: cards.number,
-    })
+    .selectDistinctOn([activities.actorId], runColumns())
     .from(activities)
     .leftJoin(cards, eq(cards.id, activities.cardId))
-    .where(
-      and(
-        eq(activities.workspaceId, params.workspaceId),
-        eq(activities.visibility, "team"),
-        isNotNull(activities.actorId),
-        isNotNull(activities.agentState),
-        gte(activities.occurredAt, params.since)
-      )
-    )
+    .leftJoin(attentionItems, questionOfRun)
+    .where(runsSince(params))
     .orderBy(activities.actorId, desc(activities.occurredAt));
+}
+
+/**
+ * Every run still in play since `since`, per agent and thread: one whose latest update says it's
+ * working or waiting on someone. An agent works several tasks at once (one per session or laptop),
+ * and each shows on its own card.
+ */
+export async function listRunsInPlay(
+  db: DbOrTx,
+  params: { workspaceId: string; since: Date }
+) {
+  const latest = db
+    .selectDistinctOn([activities.actorId, runThread], runColumns())
+    .from(activities)
+    .leftJoin(cards, eq(cards.id, activities.cardId))
+    .leftJoin(attentionItems, questionOfRun)
+    .where(runsSince(params))
+    .orderBy(activities.actorId, runThread, desc(activities.occurredAt))
+    .as("latest");
+  return await db
+    .select()
+    .from(latest)
+    .where(inArray(latest.state, ["working", "needs_you"]));
 }
 
 export async function deleteOwnActivity(

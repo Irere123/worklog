@@ -42,6 +42,17 @@ export const Snapshot = z
   })
   .openapi("WorkSnapshot");
 
+const AgentRun = z
+  .object({
+    state: z.enum(["working", "needs_you", "finished", "failed"]),
+    title: z.string(),
+    at: IsoTimestamp,
+    cardNumber: z.number().int().nullable().openapi({
+      description: "The card the run is on, if it named one",
+    }),
+  })
+  .openapi("AgentRun");
+
 export const TeamNow = z
   .array(
     z.object({
@@ -67,20 +78,14 @@ export const TeamNow = z
         })
         .nullable()
         .openapi({ description: "The latest thing they did in the window" }),
-      agent: z
-        .object({
-          state: z.enum(["working", "needs_you", "finished", "failed"]),
-          title: z.string(),
-          at: IsoTimestamp,
-          cardNumber: z.number().int().nullable().openapi({
-            description: "The card the run is on, if it named one",
-          }),
-        })
-        .nullable()
-        .openapi({
-          description:
-            "For an agent: where its latest run stands, from the last update that said",
-        }),
+      agent: z.union([AgentRun, z.null()]).openapi({
+        description:
+          "For an agent: the run waiting on someone if any, else where its latest update left it",
+      }),
+      runs: z.array(AgentRun).openapi({
+        description:
+          "For an agent: every run still working or waiting on someone, one per thread, waiting first",
+      }),
       lastActiveAt: IsoTimestamp.nullable(),
       rhythm: z.array(z.number().int()).openapi({
         description:

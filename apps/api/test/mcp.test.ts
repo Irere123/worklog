@@ -504,6 +504,69 @@ describe("coding agents over MCP", () => {
     expect(item).toMatchObject({ kind: "agent.finished", cardNumber: 1 });
   });
 
+  test("an agent on two cards at once shows on both, and is back at work once answered", async () => {
+    const ws = await env.workspace("Nyanza", {
+      name: "Ivy Kamanzi",
+      email: "ivy@nyanza.test",
+    });
+    const tokens = await approve(
+      await signIn("ivy@nyanza.test"),
+      await register("Claude Code")
+    );
+    await rpc(tokens.access_token, "initialize", initialize);
+    const board = await env.call("POST", "/v1/boards", {
+      token: ws.token,
+      body: { name: "Product" },
+    });
+    for (const title of ["Export invoices", "Rotate keys"]) {
+      await env.call("POST", "/v1/cards", {
+        token: ws.token,
+        body: { boardId: board.body.id, title },
+      });
+    }
+    const report = async (args: Record<string, unknown>) =>
+      (await call(tokens.access_token, "report_progress", args)).value
+        .thread as string;
+    // Two sessions of one tool are one agent.
+    const exporting = await report({
+      state: "working",
+      title: "Exporting",
+      card: 1,
+    });
+    await report({ state: "needs_you", title: "Rotate now?", card: 2 });
+    const runs = async () => {
+      const rows = (await env.call("GET", "/v1/now", { token: ws.token }))
+        .body as any[];
+      const agent = rows.find((r) => r.runs.length > 0);
+      return {
+        headline: [agent.agent.state, agent.agent.cardNumber],
+        cards: (agent.runs as any[]).map((r) => [r.state, r.cardNumber]),
+      };
+    };
+    expect(await runs()).toEqual({
+      headline: ["needs_you", 2],
+      cards: [
+        ["needs_you", 2],
+        ["working", 1],
+      ],
+    });
+
+    const [question] = (
+      await env.call("GET", "/v1/attention", { token: ws.token })
+    ).body as any[];
+    await env.call("POST", `/v1/attention/${question.id}/answer`, {
+      token: ws.token,
+      body: { body: "Yes, tonight." },
+    });
+    expect((await runs()).cards).toEqual([
+      ["working", 2],
+      ["working", 1],
+    ]);
+
+    await report({ state: "finished", title: "Exported", thread: exporting });
+    expect((await runs()).cards).toEqual([["working", 2]]);
+  });
+
   test("a looping agent runs out of writes before it floods the feed", async () => {
     await env.workspace("Huye", { name: "Uwa", email: "uwa@huye.test" });
     const tokens = await approve(

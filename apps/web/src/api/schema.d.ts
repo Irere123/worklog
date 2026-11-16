@@ -1850,19 +1850,10 @@ export interface components {
                 source: string;
                 title: string;
             } | null;
-            /** @description For an agent: where its latest run stands, from the last update that said */
-            agent: {
-                /** @enum {string} */
-                state: "working" | "needs_you" | "finished" | "failed";
-                title: string;
-                /**
-                 * Format: date-time
-                 * @example 2026-10-26T08:30:00.000Z
-                 */
-                at: string;
-                /** @description The card the run is on, if it named one */
-                cardNumber: number | null;
-            } | null;
+            /** @description For an agent: the run waiting on someone if any, else where its latest update left it */
+            agent: components["schemas"]["AgentRun"] | null;
+            /** @description For an agent: every run still working or waiting on someone, one per thread, waiting first */
+            runs: components["schemas"]["AgentRun"][];
             /**
              * Format: date-time
              * @example 2026-10-26T08:30:00.000Z
@@ -1871,6 +1862,18 @@ export interface components {
             /** @description Activities per day over the last 14 days of the member's own calendar, oldest first and today last */
             rhythm: number[];
         }[];
+        AgentRun: {
+            /** @enum {string} */
+            state: "working" | "needs_you" | "finished" | "failed";
+            title: string;
+            /**
+             * Format: date-time
+             * @example 2026-10-26T08:30:00.000Z
+             */
+            at: string;
+            /** @description The card the run is on, if it named one */
+            cardNumber: number | null;
+        };
         WorkSnapshot: {
             person: {
                 id: string;
