@@ -15,7 +15,8 @@ import type { SentNews } from "#api/live";
 import { CardPreviews } from "#features/cards/card-preview";
 import { kindOf } from "#features/inbox/kinds";
 import { showDesktopAlert } from "#lib/desktop-alerts";
-import { color } from "#ui/tokens.stylex";
+import { setSidebarFolded, useNarrow, useSidebarFolded } from "#lib/sidebar";
+import { color, motion } from "#ui/tokens.stylex";
 
 import { MobileBar } from "./mobile-bar";
 import { Sidebar } from "./sidebar";
@@ -118,6 +119,17 @@ export function Shell() {
     () => router.subscribe("onBeforeNavigate", () => setDrawer(false)),
     [router]
   );
+  const narrow = useNarrow();
+  const folded = useSidebarFolded();
+  const rail = folded && !narrow;
+  // On a phone the same button puts the drawer away; there's no rail to fold to.
+  const toggleSidebar = () => {
+    if (narrow) {
+      setDrawer(false);
+    } else {
+      setSidebarFolded(!folded);
+    }
+  };
   const card = useSearch({ from: "/_app", select: (s) => s.card });
   useEffect(() => {
     const warm = () => {
@@ -140,6 +152,9 @@ export function Shell() {
   });
   useHotkey("Shift+?", open("shortcuts"), {
     meta: { name: "Keyboard shortcuts", group: "General" },
+  });
+  useHotkey("Mod+\\", toggleSidebar, {
+    meta: { name: "Fold the sidebar", group: "General" },
   });
   useHotkey("L", open("log"), { meta: { name: "Log work", group: "Create" } });
   useHotkey("C", open("card"), { meta: { name: "New card", group: "Create" } });
@@ -182,13 +197,15 @@ export function Shell() {
   });
 
   return (
-    <div {...stylex.props(styles.shell)}>
+    <div {...stylex.props(styles.shell, rail && styles.shellRail)}>
       <a href="#main" {...stylex.props(styles.skip)}>
         Skip to content
       </a>
       <Sidebar
         live={live}
         drawer={drawer}
+        rail={rail}
+        onToggle={toggleSidebar}
         onOpen={(d) => {
           setDrawer(false);
           show(d);
@@ -242,9 +259,22 @@ const styles = stylex.create({
       default: "232px minmax(0, 1fr)",
       "@media (max-width: 860px)": "minmax(0, 1fr)",
     },
+    // The column itself moves, so the page beside it follows on the same curve.
+    transitionProperty: "grid-template-columns",
+    transitionDuration: {
+      default: motion.slow,
+      "@media (prefers-reduced-motion: reduce)": "0s",
+    },
+    transitionTimingFunction: motion.out,
     height: "100dvh",
     overflow: "hidden",
     backgroundColor: color.sidebar,
+  },
+  shellRail: {
+    gridTemplateColumns: {
+      default: "56px minmax(0, 1fr)",
+      "@media (max-width: 860px)": "minmax(0, 1fr)",
+    },
   },
   skip: {
     position: "fixed",

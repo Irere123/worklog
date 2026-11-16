@@ -11,10 +11,12 @@ import {
   NewspaperIcon,
   NotePencilIcon,
   PlusIcon,
+  SidebarSimpleIcon,
   FootprintsIcon,
   SignOutIcon,
   SunIcon,
   TrayIcon,
+  UserCircleIcon,
   UsersIcon,
 } from "@phosphor-icons/react";
 import type { Icon } from "@phosphor-icons/react";
@@ -24,13 +26,14 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import type { LinkProps } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 
+import type { Schemas } from "#api/client";
 import type { LiveStatus } from "#api/live";
 import { q } from "#api/queries";
 import { AssistantFace, usePresence } from "#features/assistant/presence";
 import { signOut } from "#features/auth/session";
 import { useTabBadge } from "#lib/tab-badge";
 import { setTheme, useTheme } from "#lib/theme";
-import { Avatar } from "#ui/avatar";
+import { Avatar, hueOf } from "#ui/avatar";
 import { Count, Dot, Kbd } from "#ui/chip";
 import { Logo } from "#ui/logo";
 import { Menu, MenuItem, MenuLabel, MenuSeparator, Tooltip } from "#ui/overlay";
@@ -48,6 +51,8 @@ import {
 import { PinStack } from "./pin-stack";
 import type { ShellDialog } from "./shell";
 
+type Member = Schemas["Member"];
+
 // A working connection says nothing: the page updating is the signal. Only a broken one shows,
 // because then the page goes stale without looking any different.
 const BROKEN: Record<
@@ -58,15 +63,25 @@ const BROKEN: Record<
   offline: { tone: "neutral", label: "Offline: refresh to reconnect" },
 };
 
+const graphemes = new Intl.Segmenter(undefined, { granularity: "grapheme" });
+
+// The tooltip's spelling of Mod+\, which the shell binds.
+const FOLD_KEY = "⌘ \\";
+
 export function Sidebar({
   live,
   onOpen,
+  onToggle,
   drawer,
+  rail,
 }: {
   live: LiveStatus;
   onOpen: (dialog: ShellDialog) => void;
+  onToggle: () => void;
   /** On narrow screens the sidebar slides over the page; this says whether it's out. */
   drawer: boolean;
+  /** Folded to icons, each named by its tooltip. */
+  rail: boolean;
 }) {
   const me = useQuery(q.me());
   const attention = useQuery(q.attention("open"));
@@ -80,21 +95,202 @@ export function Sidebar({
       aria-label="Main"
       {...stylex.props(styles.sidebar, drawer && styles.drawerOpen)}
     >
-      <WorkspaceMenu
+      <SidebarHead
         name={me.data?.workspace.name ?? "Worklog"}
-        onOpen={onOpen}
+        drawer={drawer}
+        rail={rail}
+        onToggle={onToggle}
       />
 
-      <div {...stylex.props(styles.actions)}>
-        <button
-          type="button"
-          onClick={() => onOpen("palette")}
-          {...stylex.props(styles.search)}
+      <SidebarActions rail={rail} onOpen={onOpen} />
+
+      {/* Yours first, where counts wait on you; then the team's; then the boards. */}
+      <div {...stylex.props(styles.group)}>
+        <NavItem to="/home" icon={HouseIcon} rail={rail}>
+          Home
+        </NavItem>
+        <NavItem
+          to="/inbox"
+          icon={TrayIcon}
+          rail={rail}
+          trailing={open > 0 ? <Count tone="accent">{open}</Count> : null}
         >
-          <MagnifyingGlassIcon size={14} />
+          Inbox
+        </NavItem>
+        <AssistantItem rail={rail} />
+      </div>
+
+      <div {...stylex.props(styles.group)}>
+        <div {...stylex.props(styles.groupHead)}>
+          <span {...stylex.props(styles.label, rail && styles.labelOut)}>
+            Team
+          </span>
+          <span
+            aria-hidden
+            {...stylex.props(styles.rule, rail && styles.ruleIn)}
+          />
+        </div>
+        <NavItem to="/activity" icon={FootprintsIcon} rail={rail}>
+          Activity
+        </NavItem>
+        <NavItem to="/briefs" icon={NewspaperIcon} rail={rail}>
+          Briefs
+        </NavItem>
+        <NavItem to="/people" icon={UsersIcon} rail={rail}>
+          People
+        </NavItem>
+      </div>
+
+      <div {...stylex.props(styles.group)}>
+        <div {...stylex.props(styles.groupHead)}>
+          <span {...stylex.props(styles.label, rail && styles.labelOut)}>
+            Boards
+          </span>
+          <span
+            aria-hidden
+            {...stylex.props(styles.rule, rail && styles.ruleIn)}
+          />
+          {/* Folded, there's no room beside the heading; the palette still makes cards and boards. */}
+          {!rail && (
+            <Menu
+              align="end"
+              trigger={
+                <button
+                  type="button"
+                  aria-label="Add a card or board"
+                  {...stylex.props(styles.groupAction)}
+                >
+                  <PlusIcon size={14} />
+                </button>
+              }
+            >
+              <MenuItem
+                icon={<KanbanIcon size={14} />}
+                shortcut="C"
+                onClick={() => onOpen("card")}
+              >
+                New card
+              </MenuItem>
+              <MenuItem
+                icon={<PlusIcon size={14} />}
+                onClick={() => {
+                  void navigate({ to: "/boards/new" });
+                }}
+              >
+                New board
+              </MenuItem>
+            </Menu>
+          )}
+        </div>
+        {boards.data
+          ?.filter((b) => !b.archived)
+          .map((board) => (
+            <NavItem
+              key={board.id}
+              to="/boards/$boardId"
+              params={{ boardId: board.id }}
+              mark={<BoardMark id={board.id} name={board.name} />}
+              rail={rail}
+            >
+              {board.name}
+            </NavItem>
+          ))}
+      </div>
+
+      <div {...stylex.props(styles.spacer)} />
+      {/* Its fanned-out list needs the sidebar's width; P still reaches the cards from the page. */}
+      {!rail && <PinStack />}
+
+      <SidebarFooter
+        live={live}
+        rail={rail}
+        onOpen={onOpen}
+        onToggle={onToggle}
+      />
+    </nav>
+  );
+}
+
+/**
+ * The workspace's name and logo, and the button that folds the sidebar to a rail. Folded, only the
+ * logo stays up here; the way back sits by your face at the foot, always in sight.
+ */
+function SidebarHead({
+  name,
+  drawer,
+  rail,
+  onToggle,
+}: {
+  name: string;
+  drawer: boolean;
+  rail: boolean;
+  onToggle: () => void;
+}) {
+  const toggleLabel = drawer ? "Close menu" : "Collapse sidebar";
+  return (
+    <div {...stylex.props(styles.head)}>
+      <Tooltip label={name} side="right" disabled={!rail}>
+        <Link
+          to="/home"
+          aria-label={rail ? name : undefined}
+          {...stylex.props(styles.workspace, rail && styles.workspaceRail)}
+        >
+          <span {...stylex.props(styles.mark)}>
+            <Logo size={22} />
+          </span>
+          {!rail && <span {...stylex.props(styles.workspaceName)}>{name}</span>}
+        </Link>
+      </Tooltip>
+      {!rail && (
+        <Tooltip label={toggleLabel} shortcut={FOLD_KEY} side="bottom">
+          <button
+            type="button"
+            aria-label={toggleLabel}
+            onClick={onToggle}
+            {...stylex.props(styles.footerAction)}
+          >
+            {/* The same icon as the rail's expand button, its panel shaded while the sidebar is out. */}
+            <SidebarSimpleIcon size={16} weight="duotone" />
+          </button>
+        </Tooltip>
+      )}
+    </div>
+  );
+}
+
+/** Search, and logging work; folded, only search stays, since the palette can log work too. */
+function SidebarActions({
+  rail,
+  onOpen,
+}: {
+  rail: boolean;
+  onOpen: (dialog: ShellDialog) => void;
+}) {
+  const search = (
+    <button
+      type="button"
+      aria-label={rail ? "Search" : undefined}
+      onClick={() => onOpen("palette")}
+      {...stylex.props(styles.search, rail && styles.searchRail)}
+    >
+      <MagnifyingGlassIcon
+        size={14}
+        {...stylex.props(styles.noShrink, styles.grows, rail && styles.grown)}
+      />
+      {!rail && (
+        <>
           <span {...stylex.props(styles.grow)}>Search…</span>
           <Kbd>⌘ K</Kbd>
-        </button>
+        </>
+      )}
+    </button>
+  );
+  return (
+    <div {...stylex.props(styles.actions)}>
+      <Tooltip label="Search" shortcut="⌘ K" side="right" disabled={!rail}>
+        {search}
+      </Tooltip>
+      {!rail && (
         <Tooltip label="Log work" shortcut="L" side="right">
           <button
             type="button"
@@ -105,99 +301,43 @@ export function Sidebar({
             <NotePencilIcon size={15} />
           </button>
         </Tooltip>
-      </div>
+      )}
+    </div>
+  );
+}
 
-      {/* Yours first, where counts wait on you; then the team's; then the boards. */}
-      <div {...stylex.props(styles.group)}>
-        <NavItem to="/home" icon={HouseIcon}>
-          Home
-        </NavItem>
-        <NavItem
-          to="/inbox"
-          icon={TrayIcon}
-          trailing={open > 0 ? <Count tone="accent">{open}</Count> : null}
-        >
-          Inbox
-        </NavItem>
-        <AssistantItem />
-      </div>
-
-      <div {...stylex.props(styles.group)}>
-        <div {...stylex.props(styles.groupHead)}>
-          <span>Team</span>
-        </div>
-        <NavItem to="/activity" icon={FootprintsIcon}>
-          Activity
-        </NavItem>
-        <NavItem to="/briefs" icon={NewspaperIcon}>
-          Briefs
-        </NavItem>
-        <NavItem to="/people" icon={UsersIcon}>
-          People
-        </NavItem>
-      </div>
-
-      <div {...stylex.props(styles.group)}>
-        <div {...stylex.props(styles.groupHead)}>
-          <span>Boards</span>
-          <Menu
-            align="end"
-            trigger={
-              <button
-                type="button"
-                aria-label="Add a card or board"
-                {...stylex.props(styles.groupAction)}
-              >
-                <PlusIcon size={14} />
-              </button>
-            }
+function SidebarFooter({
+  live,
+  rail,
+  onOpen,
+  onToggle,
+}: {
+  live: LiveStatus;
+  rail: boolean;
+  onOpen: (dialog: ShellDialog) => void;
+  onToggle: () => void;
+}) {
+  const me = useQuery(q.me());
+  return (
+    <div {...stylex.props(styles.footer, rail && styles.footerRail)}>
+      {me.data && (
+        <ProfileMenu member={me.data.member} rail={rail} onOpen={onOpen} />
+      )}
+      {/* Stacked above your face: folded, the way back is never hidden or a guess. */}
+      {rail && (
+        <Tooltip label="Expand sidebar" shortcut={FOLD_KEY} side="right">
+          <button
+            type="button"
+            aria-label="Expand sidebar"
+            onClick={onToggle}
+            {...stylex.props(styles.footerAction, styles.railTarget)}
           >
-            <MenuItem
-              icon={<KanbanIcon size={14} />}
-              shortcut="C"
-              onClick={() => onOpen("card")}
-            >
-              New card
-            </MenuItem>
-            <MenuItem
-              icon={<PlusIcon size={14} />}
-              onClick={() => {
-                void navigate({ to: "/boards/new" });
-              }}
-            >
-              New board
-            </MenuItem>
-          </Menu>
-        </div>
-        {boards.data
-          ?.filter((b) => !b.archived)
-          .map((board) => (
-            <NavItem
-              key={board.id}
-              to="/boards/$boardId"
-              params={{ boardId: board.id }}
-              icon={KanbanIcon}
-              nested
-            >
-              {board.name}
-            </NavItem>
-          ))}
-      </div>
-
-      <div {...stylex.props(styles.spacer)} />
-      <PinStack />
-
-      <div {...stylex.props(styles.footer)}>
-        {me.data && (
-          <Link
-            to="/people/$handle"
-            params={{ handle: me.data.member.handle }}
-            {...stylex.props(styles.me)}
-          >
-            <Avatar person={me.data.member} size={22} />
-            <span {...stylex.props(styles.meName)}>{me.data.member.name}</span>
-          </Link>
-        )}
+            <SidebarSimpleIcon size={18} />
+          </button>
+        </Tooltip>
+      )}
+      {/* Folded, Settings moves into your menu rather than stacking a second button. */}
+      {!rail && (
         <Tooltip label="Settings" side="top">
           <Link
             to="/settings"
@@ -209,18 +349,18 @@ export function Sidebar({
             )}
           </Link>
         </Tooltip>
-        {live !== "live" && (
-          <Tooltip label={BROKEN[live].label} side="top">
-            <output
-              {...stylex.props(styles.live)}
-              aria-label={BROKEN[live].label}
-            >
-              <Dot tone={BROKEN[live].tone} pulse={live === "connecting"} />
-            </output>
-          </Tooltip>
-        )}
-      </div>
-    </nav>
+      )}
+      {live !== "live" && (
+        <Tooltip label={BROKEN[live].label} side={rail ? "right" : "top"}>
+          <output
+            {...stylex.props(styles.live)}
+            aria-label={BROKEN[live].label}
+          >
+            <Dot tone={BROKEN[live].tone} pulse={live === "connecting"} />
+          </output>
+        </Tooltip>
+      )}
+    </div>
   );
 }
 
@@ -229,7 +369,7 @@ export function Sidebar({
  * resting on it says in words. A count is what waits for your OK; a dot, an answer you haven't
  * read.
  */
-function AssistantItem() {
+function AssistantItem({ rail }: { rail: boolean }) {
   const { agent, presence, mood, glance } = usePresence();
   const line = glance?.line;
   const waiting = presence?.waiting ?? 0;
@@ -244,66 +384,108 @@ function AssistantItem() {
     <Tooltip label={line ?? "Your assistant"} side="right">
       <Link
         to="/assistant"
+        aria-label={rail ? "Assistant" : undefined}
         aria-description={line ?? undefined}
-        {...stylex.props(styles.item)}
+        {...stylex.props(styles.item, rail && styles.itemRail)}
       >
-        <span {...stylex.props(styles.itemIcon)}>
+        <span {...stylex.props(styles.itemIcon, rail && styles.grown)}>
           {agent ? (
             <AssistantFace mood={mood} size={16} />
           ) : (
             <ChatsCircleIcon size={16} />
           )}
         </span>
-        <span {...stylex.props(styles.itemLabel)}>Assistant</span>
-        {trailing}
+        <span {...stylex.props(styles.itemLabel, rail && styles.labelOut)}>
+          Assistant
+        </span>
+        {trailing !== null && (
+          <span {...stylex.props(rail && styles.badge)}>{trailing}</span>
+        )}
       </Link>
     </Tooltip>
   );
 }
 
+/**
+ * A row is the same element folded or open: its icon eases to the rail's centre line and grows,
+ * and its label fades as the sidebar narrows over it, so the fold reads as one motion, not a swap.
+ */
 function NavItem({
   icon,
+  mark,
   children,
   trailing,
-  nested = false,
+  rail,
   ...link
 }: LinkProps & {
-  icon: Icon;
-  children: ReactNode;
+  children: string;
   trailing?: ReactNode;
-  /** A child of its section, like each board: a quieter icon, so the section's items lead. */
-  nested?: boolean;
-}) {
+  rail: boolean;
+} & ({ icon: Icon; mark?: never } | { icon?: never; mark: ReactNode })) {
   const Glyph = icon;
-  return (
-    <Link {...link} {...stylex.props(styles.item)}>
+  // Always inside its tooltip, so folding never remounts the row and its label can fade.
+  const row = (
+    <Link
+      {...link}
+      aria-label={rail ? children : undefined}
+      {...stylex.props(styles.item, rail && styles.itemRail)}
+    >
       {({ isActive }) => (
         <>
           {/* Filled where you are, like a tab bar: the place reads from the icon as well as the row. */}
-          <span
-            {...stylex.props(
-              styles.itemIcon,
-              nested && !isActive && styles.nestedIcon
+          <span {...stylex.props(styles.itemIcon, rail && styles.grown)}>
+            {Glyph ? (
+              <Glyph size={16} weight={isActive ? "fill" : "regular"} />
+            ) : (
+              mark
             )}
-          >
-            <Glyph
-              size={nested ? 14 : 16}
-              weight={isActive ? "fill" : "regular"}
-            />
           </span>
-          <span {...stylex.props(styles.itemLabel)}>{children}</span>
-          {trailing}
+          <span {...stylex.props(styles.itemLabel, rail && styles.labelOut)}>
+            {children}
+          </span>
+          {trailing !== undefined && trailing !== null && (
+            <span {...stylex.props(rail && styles.badge)}>{trailing}</span>
+          )}
         </>
       )}
     </Link>
   );
+  return (
+    <Tooltip label={children} side="right" disabled={!rail}>
+      {row}
+    </Tooltip>
+  );
 }
 
-function WorkspaceMenu({
-  name,
+/**
+ * A board's initial on its own tint, the way a person gets an avatar: folded to a rail, identical
+ * glyphs would leave every board looking the same.
+ */
+function BoardMark({ id, name }: { id: string; name: string }) {
+  return (
+    <span aria-hidden {...stylex.props(styles.board, styles.tint(hueOf(id)))}>
+      {firstGrapheme(name)}
+    </span>
+  );
+}
+
+// A board named with an emoji shows the whole emoji, not half of one.
+function firstGrapheme(name: string) {
+  const [first] = graphemes.segment(name.trim());
+  return first?.segment.toUpperCase() ?? "?";
+}
+
+/**
+ * You, at the foot of the sidebar: your profile, and the settings that are yours rather than the
+ * team's, such as the theme and signing out.
+ */
+function ProfileMenu({
+  member,
+  rail,
   onOpen,
 }: {
-  name: string;
+  member: Member;
+  rail: boolean;
   onOpen: (dialog: ShellDialog) => void;
 }) {
   const theme = useTheme();
@@ -312,14 +494,48 @@ function WorkspaceMenu({
   return (
     <Menu
       width={240}
+      side={rail ? "right" : "top"}
+      align={rail ? "end" : "start"}
       trigger={
-        <button type="button" {...stylex.props(styles.workspace)}>
-          <Logo size={22} />
-          <span {...stylex.props(styles.workspaceName)}>{name}</span>
-          <CaretUpDownIcon size={14} {...stylex.props(styles.faint)} />
+        <button
+          type="button"
+          aria-label={rail ? member.name : undefined}
+          {...stylex.props(styles.me, rail && styles.meRail)}
+        >
+          <span {...stylex.props(styles.grows, rail && styles.grown)}>
+            <Avatar person={member} size={22} />
+          </span>
+          {!rail && (
+            <>
+              <span {...stylex.props(styles.meName)}>{member.name}</span>
+              <CaretUpDownIcon size={14} {...stylex.props(styles.faint)} />
+            </>
+          )}
         </button>
       }
     >
+      <MenuItem
+        icon={<UserCircleIcon size={14} />}
+        onClick={() => {
+          void navigate({
+            to: "/people/$handle",
+            params: { handle: member.handle },
+          });
+        }}
+      >
+        Your profile
+      </MenuItem>
+      {rail && (
+        <MenuItem
+          icon={<GearIcon size={14} />}
+          onClick={() => {
+            void navigate({ to: "/settings" });
+          }}
+        >
+          Settings
+        </MenuItem>
+      )}
+      <MenuSeparator />
       <MenuLabel>Theme</MenuLabel>
       <MenuItem
         icon={<MonitorIcon size={14} />}
@@ -373,6 +589,12 @@ function WorkspaceMenu({
   );
 }
 
+// Folded, every control is the same 40 by 36 target on one centre line, and its icon grows by an
+// eighth; padding, height and scale ease on the column's own curve, so the fold is one motion.
+const RAIL_TARGET = { width: 40, height: 36 };
+const GROW = "scale(1.125)";
+const REDUCED = "@media (prefers-reduced-motion: reduce)";
+
 const styles = stylex.create({
   sidebar: {
     display: "flex",
@@ -381,6 +603,7 @@ const styles = stylex.create({
     minHeight: 0,
     paddingBlock: space.md,
     paddingInline: space.md,
+    overflowX: "hidden",
     overflowY: "auto",
     color: color.fgMuted,
     backgroundColor: color.sidebar,
@@ -394,25 +617,41 @@ const styles = stylex.create({
       "@media (max-width: 860px)": "translateX(-105%)",
     },
     transitionProperty: "transform",
-    transitionDuration: motion.slow,
+    transitionDuration: { default: motion.slow, [REDUCED]: "0s" },
     transitionTimingFunction: motion.out,
   },
   drawerOpen: {
     transform: { default: null, "@media (max-width: 860px)": "translateX(0)" },
   },
+  head: { display: "flex", alignItems: "center", gap: space.xs },
   workspace: {
     display: "flex",
     alignItems: "center",
     gap: space.md,
-    width: "100%",
+    flexGrow: 1,
+    minWidth: 0,
     height: 36,
     paddingInline: space.sm,
     borderRadius: radius.sm,
+    color: color.fgMuted,
     backgroundColor: {
       default: "transparent",
       ":hover": { default: null, [media.hover]: color.uiHover },
     },
     outline: { default: "none", ":focus-visible": `2px solid ${color.focus}` },
+    outlineOffset: -2,
+  },
+  workspaceRail: {
+    flexGrow: 0,
+    ...RAIL_TARGET,
+    paddingInline: 9,
+  },
+  mark: {
+    display: "grid",
+    placeItems: "center",
+    flexShrink: 0,
+    width: 22,
+    height: 22,
   },
   workspaceName: {
     flexGrow: 1,
@@ -430,6 +669,7 @@ const styles = stylex.create({
     alignItems: "center",
     gap: space.md,
     flexGrow: 1,
+    minWidth: 0,
     height: { default: 30, [media.touch]: 40 },
     paddingInline: space.md,
     borderRadius: radius.sm,
@@ -442,6 +682,9 @@ const styles = stylex.create({
     boxShadow: `0 0 0 1px ${color.line}`,
     outline: { default: "none", ":focus-visible": `2px solid ${color.focus}` },
   },
+  // Square, so the folded field reads as a button; its padding is unchanged, so the icon doesn't move.
+  searchRail: { flexGrow: 0, ...RAIL_TARGET, paddingInline: 13 },
+  noShrink: { flexShrink: 0 },
   square: {
     display: "grid",
     placeItems: "center",
@@ -460,9 +703,17 @@ const styles = stylex.create({
     boxShadow: `0 0 0 1px ${color.line}`,
     outline: { default: "none", ":focus-visible": `2px solid ${color.focus}` },
   },
-  grow: { flexGrow: 1, textAlign: "left" },
+  grow: {
+    flexGrow: 1,
+    textAlign: "left",
+    overflow: "hidden",
+    whiteSpace: "nowrap",
+  },
   group: { display: "flex", flexDirection: "column", gap: 1 },
+  // Kept at full height when folded: the empty line still parts the sections, and nothing below
+  // it moves when the sidebar opens.
   groupHead: {
+    position: "relative",
     display: "flex",
     alignItems: "center",
     justifyContent: "space-between",
@@ -487,7 +738,33 @@ const styles = stylex.create({
       ":hover": { default: null, [media.hover]: color.uiHover },
     },
   },
+  // Opening, words wait a beat for room to appear; folding, they go at once, before they're cut.
+  label: {
+    whiteSpace: "nowrap",
+    transitionProperty: "opacity",
+    transitionDuration: motion.base,
+    transitionDelay: { default: "80ms", [REDUCED]: "0s" },
+    transitionTimingFunction: motion.out,
+  },
+  labelOut: {
+    opacity: 0,
+    transitionDuration: motion.fast,
+    transitionDelay: "0s",
+  },
+  rule: {
+    position: "absolute",
+    top: "50%",
+    left: 12,
+    width: 16,
+    height: 1,
+    backgroundColor: color.line,
+    opacity: 0,
+    transitionProperty: "opacity",
+    transitionDuration: motion.base,
+  },
+  ruleIn: { opacity: 1 },
   item: {
+    position: "relative",
     display: "flex",
     alignItems: "center",
     gap: space.md,
@@ -508,23 +785,66 @@ const styles = stylex.create({
       ":hover": { default: null, [media.hover]: color.uiHover },
       ":is([data-status=active])": color.uiActive,
     },
-    transitionProperty: "background-color, color",
-    transitionDuration: motion.fast,
+    transitionProperty: "background-color, color, height, padding",
+    transitionDuration: { default: motion.slow, [REDUCED]: "0s" },
+    transitionTimingFunction: motion.out,
     outline: { default: "none", ":focus-visible": `2px solid ${color.focus}` },
     outlineOffset: -2,
+  },
+  itemRail: { height: 36, paddingInline: 12 },
+  grows: {
+    display: "grid",
+    placeItems: "center",
+    transitionProperty: "transform",
+    transitionDuration: { default: motion.slow, [REDUCED]: "0s" },
+    transitionTimingFunction: motion.out,
+  },
+  grown: { transform: GROW },
+  railTarget: { ...RAIL_TARGET },
+  // Folded, a count rides on its icon's top corner instead of trailing a label.
+  badge: {
+    position: "absolute",
+    top: 1,
+    left: 22,
+    transform: "scale(0.82)",
+    transformOrigin: "left top",
+    pointerEvents: "none",
   },
   itemIcon: {
     display: "grid",
     placeItems: "center",
+    flexShrink: 0,
     width: 16,
     opacity: 0.9,
+    transitionProperty: "transform",
+    transitionDuration: { default: motion.slow, [REDUCED]: "0s" },
+    transitionTimingFunction: motion.out,
   },
-  nestedIcon: { color: color.fgFaint },
+  board: {
+    display: "grid",
+    placeItems: "center",
+    width: 16,
+    height: 16,
+    borderRadius: 4,
+    fontSize: 10,
+    fontWeight: 600,
+    lineHeight: 1,
+  },
+  // The avatar's tint, so a board's colour comes from the same family as a person's.
+  tint: (hue: number) => ({
+    color: `light-dark(oklch(0.38 0.09 ${hue}), oklch(0.9 0.06 ${hue}))`,
+    backgroundColor: `light-dark(oklch(0.9 0.05 ${hue}), oklch(0.36 0.07 ${hue}))`,
+  }),
   itemLabel: {
     flexGrow: 1,
+    minWidth: 0,
     overflow: "hidden",
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
+    transitionProperty: "opacity",
+    transitionDuration: motion.base,
+    transitionDelay: { default: "80ms", [REDUCED]: "0s" },
+    transitionTimingFunction: motion.out,
   },
   spacer: { flexGrow: 1 },
   footer: {
@@ -536,6 +856,8 @@ const styles = stylex.create({
     borderTopStyle: "solid",
     borderTopColor: color.line,
   },
+  // Your face stays on the bottom line, the way back just above it, then any connection warning.
+  footerRail: { flexDirection: "column-reverse", alignItems: "center" },
   me: {
     display: "flex",
     alignItems: "center",
@@ -551,8 +873,13 @@ const styles = stylex.create({
       default: "transparent",
       ":hover": { default: null, [media.hover]: color.uiHover },
     },
+    outline: { default: "none", ":focus-visible": `2px solid ${color.focus}` },
+    outlineOffset: -2,
   },
+  meRail: { flexGrow: 0, ...RAIL_TARGET, paddingInline: 9 },
   meName: {
+    flexGrow: 1,
+    textAlign: "left",
     overflow: "hidden",
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",

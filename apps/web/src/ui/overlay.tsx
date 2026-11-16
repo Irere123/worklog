@@ -32,15 +32,18 @@ export function Tooltip({
   label,
   shortcut,
   side = "bottom",
+  disabled = false,
   children,
 }: {
   label: ReactNode;
   shortcut?: string;
   side?: "top" | "bottom" | "left" | "right";
+  /** Off without unmounting, so a trigger that only sometimes needs a tooltip keeps its state. */
+  disabled?: boolean;
   children: ReactElement;
 }) {
   return (
-    <BaseTooltip.Root>
+    <BaseTooltip.Root disabled={disabled}>
       <BaseTooltip.Trigger render={children} />
       <BaseTooltip.Portal>
         <BaseTooltip.Positioner
