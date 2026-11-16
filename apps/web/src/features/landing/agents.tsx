@@ -308,7 +308,7 @@ function Approve() {
         {...stylex.props(styles.run, phase === "asking" && styles.runAsking)}
       >
         <span {...stylex.props(styles.runHead)}>
-          <Avatar person={atlas} size={20} />
+          <Avatar person={atlas} size={20} mood={mood} live />
           <span {...stylex.props(styles.strong)}>Atlas</span>
           <Ghost mood={mood} size={16} tinted />
           <span {...stylex.props(styles.runState)}>

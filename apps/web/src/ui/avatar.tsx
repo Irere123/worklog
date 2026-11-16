@@ -1,8 +1,11 @@
 import * as stylex from "@stylexjs/stylex";
 import { useState } from "react";
 
+import { PromptMark, toolOf } from "./agent-mark";
 import { VisuallyHidden } from "./feedback";
 import { Ghost } from "./ghost";
+import type { Mood } from "./ghost";
+import { ProductMark } from "./product-mark";
 import { color, font } from "./tokens.stylex";
 
 type Person = {
@@ -29,19 +32,27 @@ export function initials(name: string) {
 }
 
 /**
- * People are circles and agents are rounded squares with a face of their own, so a glance at any
- * list tells who is human: agents never pass as people, even with a picture. Your own assistant
- * wears the ghost it has everywhere else.
+ * People are circles and agents are rounded squares, so a glance at any list tells who is human:
+ * agents never pass as people, even with a picture. Your own assistant wears the ghost it has
+ * everywhere else; a coding agent wears its tool's mark as published, so you see what it runs on.
+ * Our own drawings (the ghost, the prompt) hold still unless `live`: only a run still in play
+ * moves, so finished work stays quiet.
  */
 export function Avatar({
   person,
   size = 20,
   ring = false,
   labelled = false,
+  mood,
+  live = false,
 }: {
   person: Person | null | undefined;
   size?: number;
   ring?: boolean;
+  /** How an agent is doing, shown on its face; ignored for people. */
+  mood?: Mood;
+  /** Lets an agent's face move: for a run still in play, or the agent's own page. */
+  live?: boolean;
   /**
    * Speak the name to screen readers. Off by default: almost everywhere the name is printed
    * beside the avatar, and hearing it twice is noise.
@@ -61,6 +72,9 @@ export function Avatar({
   const agent = person.kind === "agent";
   const picture =
     person.avatarUrl && person.avatarUrl !== broken ? person.avatarUrl : null;
+  // A tool's mark brings its own colours, which a tinted ground would clash with.
+  const neutral =
+    picture !== null || (agent && toolOf(person.agentProvider) !== undefined);
   return (
     <span
       title={person.name}
@@ -68,7 +82,7 @@ export function Avatar({
       {...stylex.props(
         styles.base,
         styles.size(size),
-        picture ? styles.photoGround : styles.tint(hueOf(person.id)),
+        neutral ? styles.neutralGround : styles.tint(hueOf(person.id)),
         agent ? styles.agent : styles.human,
         ring && styles.ring
       )}
@@ -85,10 +99,11 @@ export function Avatar({
       ) : (
         <Mark
           agent={agent}
-          assistant={person.agentProvider === "worklog"}
+          provider={person.agentProvider}
           name={person.name}
           size={size}
-          seed={person.id}
+          mood={mood}
+          live={live}
         />
       )}
       {labelled && (
@@ -127,84 +142,33 @@ export function AvatarStack({
 
 function Mark({
   agent,
-  assistant,
+  provider,
   name,
   size,
-  seed,
+  mood,
+  live,
 }: {
   agent: boolean;
-  assistant: boolean;
+  provider: string | null | undefined;
   name: string;
   size: number;
-  seed: string;
+  mood: Mood | undefined;
+  live: boolean;
 }) {
-  if (assistant) {
-    return <Ghost size={Math.round(size * 0.78)} still tinted />;
+  if (!agent) {
+    return <span aria-hidden>{initials(name)}</span>;
   }
-  return agent ? (
-    <AgentFace seed={seed} size={Math.round(size * 0.86)} />
-  ) : (
-    <span aria-hidden>{initials(name)}</span>
-  );
-}
-
-// Six agents in one list all wearing the same robot icon read as one thing; a face drawn from
-// the agent's id keeps each one recognisable at 16px, the way a person's picture does.
-const EYES = [
-  <g key="dots">
-    <circle cx="8.3" cy="10.8" r="2.3" />
-    <circle cx="15.7" cy="10.8" r="2.3" />
-  </g>,
-  <g key="pills">
-    <rect x="6.8" y="7.6" width="3.2" height="6.4" rx="1.6" />
-    <rect x="14" y="7.6" width="3.2" height="6.4" rx="1.6" />
-  </g>,
-  <rect key="visor" x="5" y="8.6" width="14" height="4.6" rx="2.3" />,
-  <g key="happy" fill="none" stroke="currentColor" strokeWidth="2.2">
-    <path d="M5.9 11.8q2.4-3.2 4.8 0" />
-    <path d="M13.3 11.8q2.4-3.2 4.8 0" />
-  </g>,
-  <g key="wink">
-    <circle cx="8.3" cy="10.8" r="2.3" />
-    <path
-      d="M13.4 10.8h4.6"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2.2"
-    />
-  </g>,
-  <g key="square">
-    <rect x="6.2" y="8.6" width="4.4" height="4.4" rx="1" />
-    <rect x="13.4" y="8.6" width="4.4" height="4.4" rx="1" />
-  </g>,
-];
-const MOUTHS = [
-  <path key="line" d="M9.2 17h5.6" />,
-  <path key="smile" d="M8.6 16q3.4 3 6.8 0" />,
-  <circle key="o" cx="12" cy="17" r="1.6" />,
-  <rect key="teeth" x="8.6" y="15.6" width="6.8" height="3" rx="1" />,
-];
-
-function AgentFace({ seed, size }: { seed: string; size: number }) {
-  // A second hash, so the face doesn't follow the tint: two green agents still differ.
-  let hash = 7;
-  for (const char of seed) {
-    hash = (hash * 131 + (char.codePointAt(0) ?? 0)) % 9973;
+  if (provider === "worklog") {
+    return (
+      <Ghost mood={mood} size={Math.round(size * 0.78)} still={!live} tinted />
+    );
+  }
+  const tool = toolOf(provider);
+  if (tool !== undefined) {
+    return <ProductMark product={tool} size={Math.round(size * 0.72)} />;
   }
   return (
-    <svg
-      aria-hidden
-      viewBox="0 0 24 24"
-      width={size}
-      height={size}
-      fill="currentColor"
-      strokeLinecap="round"
-    >
-      {EYES[hash % EYES.length]}
-      <g fill="none" stroke="currentColor" strokeWidth="2.2">
-        {MOUTHS[Math.floor(hash / EYES.length) % MOUTHS.length]}
-      </g>
-    </svg>
+    <PromptMark size={Math.round(size * 0.66)} mood={mood} still={!live} />
   );
 }
 
@@ -237,8 +201,9 @@ const styles = stylex.create({
     outline: `1px solid ${color.line}`,
     outlineOffset: -1,
   },
-  // While a picture loads, a neutral ground rather than a colored disc that flashes away.
-  photoGround: { backgroundColor: color.ui },
+  // While a picture loads, a neutral ground rather than a colored disc that flashes away; a
+  // tool's mark sits on it too, in its own colours.
+  neutralGround: { backgroundColor: color.ui },
   human: { borderRadius: "50%" },
   agent: { borderRadius: "28%" },
   empty: {

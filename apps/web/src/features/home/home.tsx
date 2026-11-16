@@ -10,7 +10,7 @@ import { Composer } from "#features/assistant/composer";
 import { useMe } from "#features/auth/session";
 import { stageLabel, useMembers } from "#features/cards/card-bits";
 import { kindOf } from "#features/inbox/kinds";
-import { AgentRun, ownerWord } from "#features/people/agent-run";
+import { AgentRun, ownerWord, runFace } from "#features/people/agent-run";
 import { ago, greeting, startOfYesterday } from "#lib/time";
 import { Avatar } from "#ui/avatar";
 import { Badge, Dot } from "#ui/chip";
@@ -398,7 +398,7 @@ function TeamNow({ selfId }: { selfId: string }) {
                 params={{ handle: agent.handle }}
                 {...stylex.props(styles.row)}
               >
-                <Avatar person={agent} size={24} />
+                <Avatar person={agent} size={24} {...runFace(run)} />
                 <div {...stylex.props(layout.grow)}>
                   <p {...stylex.props(styles.title)}>{agent.name}</p>
                   <p {...stylex.props(styles.meta)}>

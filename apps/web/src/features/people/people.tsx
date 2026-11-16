@@ -33,7 +33,7 @@ import {
   text,
 } from "#ui/tokens.stylex";
 
-import { AgentRun, isStale, ownerWord } from "./agent-run";
+import { AgentRun, isStale, ownerWord, runFace } from "./agent-run";
 import { clockOf, DAY_NAMES, useMinute } from "./presence";
 import type { Clock } from "./presence";
 import { RhythmCalendar, RhythmStrip } from "./rhythm";
@@ -172,7 +172,11 @@ function PersonRow({
         {...stylex.props(styles.grid, styles.row, nested && styles.rowNested)}
       >
         <div {...stylex.props(styles.who, nested && styles.whoNested)}>
-          <Avatar person={m} size={nested ? 24 : 32} />
+          <Avatar
+            person={m}
+            size={nested ? 24 : 32}
+            {...runFace(snap?.agent)}
+          />
           <div {...stylex.props(layout.grow)}>
             <Link
               to="/people/$handle"
@@ -476,7 +480,8 @@ function Profile({
   return (
     <>
       <div {...stylex.props(styles.identity)}>
-        <Avatar person={m} size={72} />
+        {/* Its own page is the one place an agent's face moves with nothing under way. */}
+        <Avatar person={m} size={72} mood={runFace(row?.agent).mood} live />
         <p {...stylex.props(styles.handle)}>
           @{m.handle} · {roleOf(m)}
         </p>

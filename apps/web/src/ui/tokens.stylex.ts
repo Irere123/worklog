@@ -75,6 +75,10 @@ export const product = stylex.defineVars({
   slackGreen: "#2eb67d",
   slackYellow: "#ecb22e",
   discord: "#5865f2",
+  claude: "#d97757",
+  // Both ship as black marks; on a dark page they turn to near-white, as GitHub's does.
+  cursor: "light-dark(#141414, #f0f0f0)",
+  copilot: "light-dark(#1f2328, #f0f6fc)",
 });
 
 export const font = stylex.defineVars({

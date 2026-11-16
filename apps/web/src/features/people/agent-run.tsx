@@ -32,6 +32,11 @@ export function runMood(state: string | null | undefined): Mood {
   return MOODS[state ?? ""] ?? "idle";
 }
 
+/** A run that's working or waiting on someone; a finished or failed one is history. */
+export function inPlay(state: string | null | undefined) {
+  return state === "working" || state === "needs_you";
+}
+
 /**
  * Where an agent's run stands as a ghost inside a coloured badge. Only runs still in play move:
  * a finished or failed one is history, and a dozen ghosts bobbing down a list is noise.
@@ -45,7 +50,7 @@ export function RunBadge({
   tone: Tone;
   children: string;
 }) {
-  const live = state === "working" || state === "needs_you";
+  const live = inPlay(state);
   return (
     <Badge
       tone={tone}
@@ -54,6 +59,20 @@ export function RunBadge({
       {children}
     </Badge>
   );
+}
+
+/**
+ * How an agent's face looks for its run, and whether it moves. A run that went quiet is shown as
+ * idle and still, the same as the line that says it has stalled.
+ */
+export function runFace(run: Run | null | undefined): {
+  mood: Mood;
+  live: boolean;
+} {
+  if (!run || isStale(run)) {
+    return { mood: "idle", live: false };
+  }
+  return { mood: runMood(run.state), live: inPlay(run.state) };
 }
 
 // An agent that says it's working but hasn't said anything for this long has probably stalled.

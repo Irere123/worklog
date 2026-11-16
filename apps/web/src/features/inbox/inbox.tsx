@@ -58,7 +58,7 @@ import {
   text,
 } from "#ui/tokens.stylex";
 
-import { kindOf } from "./kinds";
+import { agentFace, kindOf } from "./kinds";
 
 type Item = Schemas["AttentionListItem"];
 
@@ -460,7 +460,7 @@ function Row({
       >
         <span {...stylex.props(styles.rowAvatar)}>
           {from ? (
-            <Avatar person={from} size={28} />
+            <Avatar person={from} size={28} {...agentFace(item)} />
           ) : (
             <span {...stylex.props(styles.systemIcon)}>{kind.icon}</span>
           )}
@@ -575,7 +575,7 @@ function Detail({
           params={{ handle: from.handle }}
           {...stylex.props(styles.from)}
         >
-          <Avatar person={from} size={20} />
+          <Avatar person={from} size={20} {...agentFace(item)} />
           <span>{from.name}</span>
           {from.title && (
             <span {...stylex.props(layout.faint)}>· {from.title}</span>
