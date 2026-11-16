@@ -1,5 +1,4 @@
 import * as stylex from "@stylexjs/stylex";
-import { useState } from "react";
 import type { ComponentProps } from "react";
 
 import { VisuallyHidden } from "#ui/feedback";
@@ -64,13 +63,12 @@ export function RhythmStrip({
 }
 
 /**
- * A quarter as a calendar: a column per week, a row per weekday, a square per day, darker the more
- * that happened. Days they don't work are hollow when empty, so a quiet weekend reads as one.
+ * A quarter as a calendar: a column per week, a row per weekday, a square per day carrying its
+ * count, darker the more that happened. Days they don't work are hollow when empty, so a quiet
+ * weekend reads as one.
  */
 export function RhythmCalendar({ counts, today, workdays, name }: Props) {
-  const [picked, setPicked] = useState<number | null>(null);
   const days = daysOf(counts, today);
-  const pickedDay = days.find((d) => d.at.getTime() === picked);
   const weeks = weeksOf(days);
   const scale = Math.max(1, ...counts);
   const summary = summarize(
@@ -80,19 +78,8 @@ export function RhythmCalendar({ counts, today, workdays, name }: Props) {
   );
   return (
     <figure {...stylex.props(styles.figure)}>
-      {/* Touch has no hover, so a tap names the day in the caption, where the tooltip can't reach.
-          The calendar is hidden from assistive tech; the caption's summary speaks for it. */}
-      <div
-        aria-hidden
-        onClick={(event) => {
-          const at =
-            event.target instanceof HTMLElement
-              ? Number(event.target.dataset.at ?? Number.NaN)
-              : Number.NaN;
-          setPicked(Number.isNaN(at) || at === picked ? null : at);
-        }}
-        {...stylex.props(styles.calendar)}
-      >
+      {/* The counts are on the squares, so the summary is only for assistive tech. */}
+      <div aria-hidden {...stylex.props(styles.calendar)}>
         <div {...stylex.props(styles.column)}>
           <span {...stylex.props(styles.month)} />
           {WEEKDAY_LABELS.map((label) => (
@@ -112,8 +99,6 @@ export function RhythmCalendar({ counts, today, workdays, name }: Props) {
                     scale={scale}
                     off={!workdays.includes(d.weekday)}
                     large
-                    picked={d.at.getTime() === picked}
-                    data-at={d.at.getTime()}
                   />
                 </Tooltip>
               ) : (
@@ -127,13 +112,17 @@ export function RhythmCalendar({ counts, today, workdays, name }: Props) {
         ))}
       </div>
       <figcaption {...stylex.props(styles.caption)}>
-        <span>{pickedDay ? dayLabel(pickedDay) : summary}</span>
+        <VisuallyHidden>{summary}</VisuallyHidden>
         <span aria-hidden {...stylex.props(styles.legend)}>
           Less
           {LEVELS.map((level) => (
             <span
               key={level}
-              {...stylex.props(styles.square, styles.squareLg, levels[level])}
+              {...stylex.props(
+                styles.square,
+                styles.legendSquare,
+                levels[level]
+              )}
             />
           ))}
           More
@@ -162,14 +151,12 @@ function Square({
   scale,
   off,
   large = false,
-  picked = false,
   ...rest
 }: {
   day: Day;
   scale: number;
   off: boolean;
   large?: boolean;
-  picked?: boolean;
 } & Omit<ComponentProps<"span">, "className" | "style">) {
   const level = levelOf(day.count, scale);
   return (
@@ -180,10 +167,17 @@ function Square({
         large && styles.squareLg,
         levels[LEVELS[level] ?? "l0"],
         level === 0 && off && styles.off,
-        picked && styles.picked
+        large && level >= 3 && styles.countOnSolid
       )}
-    />
+    >
+      {large && day.count > 0 && countLabel(day.count)}
+    </span>
   );
+}
+
+// Three digits don't fit a square.
+function countLabel(count: number) {
+  return count > 99 ? "99+" : count;
 }
 
 // Square roots keep one busy day from washing every other day out to the palest green.
@@ -273,26 +267,40 @@ const styles = stylex.create({
     height: 8,
     borderRadius: 2,
   },
-  squareLg: { width: 12, height: 12, borderRadius: 3 },
+  squareLg: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    width: 14,
+    height: 14,
+    borderRadius: 3,
+    fontSize: 8,
+    fontWeight: 500,
+    fontVariantNumeric: "tabular-nums",
+    letterSpacing: "-0.04em",
+    lineHeight: 1,
+    color: color.fg,
+  },
+  countOnSolid: { color: color.fgOnGreen },
+  legendSquare: { width: 12, height: 12, borderRadius: 3 },
   off: {
     backgroundColor: "transparent",
     boxShadow: `inset 0 0 0 1px ${color.line}`,
   },
-  picked: { outline: `2px solid ${color.focus}`, outlineOffset: 1 },
-  blank: { display: "block", width: 12, height: 12 },
+  blank: { display: "block", width: 14, height: 14 },
   figure: { display: "flex", flexDirection: "column", gap: space.md },
-  calendar: { display: "flex", gap: 3 },
-  column: { display: "flex", flexDirection: "column", gap: 3 },
+  calendar: { display: "flex", gap: 2 },
+  column: { display: "flex", flexDirection: "column", gap: 2 },
   weekday: {
-    height: 12,
+    height: 14,
     paddingRight: space.xxs,
     fontSize: 9,
-    lineHeight: "12px",
+    lineHeight: "14px",
     color: color.fgFaint,
   },
   month: {
     height: 12,
-    width: 12,
+    width: 14,
     overflow: "visible",
     whiteSpace: "nowrap",
     fontSize: 9,

@@ -34,7 +34,7 @@ import {
 } from "#ui/tokens.stylex";
 
 import { AgentRun, isStale, ownerWord, runFace } from "./agent-run";
-import { clockOf, DAY_NAMES, useMinute } from "./presence";
+import { clockOf, useMinute } from "./presence";
 import type { Clock } from "./presence";
 import { RhythmCalendar, RhythmStrip } from "./rhythm";
 import { AgentSessions, sessionsOf } from "./sessions";
@@ -490,8 +490,7 @@ function Profile({
       {clock && (
         <p {...stylex.props(styles.sentence)}>
           <span {...stylex.props(styles.time)}>{clock.time}</span> in{" "}
-          {clock.place}.{" "}
-          <HoursSentence clock={clock} who={self ? "you" : first} />
+          {clock.place}
         </p>
       )}
 
@@ -623,40 +622,6 @@ function WorksFor({ member: m }: { member: Member }) {
       )}
     </Fact>
   );
-}
-
-function HoursSentence({ clock, who }: { clock: Clock; who: string }) {
-  if (!clock.hours || clock.inHours === null) {
-    return null;
-  }
-  const span = `${clock.hours.start}–${clock.hours.end}, ${daysPhrase(clock.workdays)}`;
-  const theirs = who === "you" ? "your" : `${who}’s`;
-  if (clock.inHours) {
-    return (
-      <>
-        Within {theirs} hours{" "}
-        <span {...stylex.props(styles.nowrap)}>({span}).</span>
-      </>
-    );
-  }
-  const subject = who === "you" ? "You’re" : `${who} is`;
-  return (
-    <>
-      {subject} off{clock.back ? ` until ${clock.back}` : ""}{" "}
-      <span {...stylex.props(styles.nowrap)}>({span}).</span>
-    </>
-  );
-}
-
-function daysPhrase(days: number[]) {
-  const set = [...new Set(days)].toSorted((a, b) => a - b);
-  if (set.length === 7) {
-    return "every day";
-  }
-  if (set.join(",") === "1,2,3,4,5") {
-    return "Mon–Fri";
-  }
-  return set.map((d) => DAY_NAMES[d]).join(", ");
 }
 
 function Fact({ label, children }: { label: string; children: ReactNode }) {
@@ -950,7 +915,6 @@ const styles = stylex.create({
     color: color.fgMuted,
     textWrap: "pretty",
   },
-  nowrap: { whiteSpace: "nowrap" },
   fact: { display: "flex", flexDirection: "column", gap: space.sm },
   factLabel: { fontSize: text.caption, fontWeight: 500, color: color.fgFaint },
   agentList: { display: "flex", flexDirection: "column" },
