@@ -159,7 +159,7 @@ describe("automations", () => {
     expect(mail.text).toContain("Call with finance about budget");
     expect(mail.html).toContain("Call with finance about budget");
     expect(mail.headers?.["List-Unsubscribe"]).toBe(
-      "<http://worklog.test/settings/automations>"
+      "<https://worklog.test/settings/automations>"
     );
     expect((env.ctx.fetch as any).calls.at(-1).url).toBe(
       "https://ntfy.test/emma"

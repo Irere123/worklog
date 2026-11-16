@@ -11,7 +11,7 @@ import {
   SetupResponse,
   WorkspaceCreatedResponse,
 } from "#http/schemas/members";
-import { enabledSocialProviders } from "#lib/auth";
+import { enabledSocialProviders, mcpAvailable, mcpResource } from "#lib/auth";
 import { safeEqual } from "#lib/crypto";
 import { forbidden } from "#lib/errors";
 import * as people from "#work/members";
@@ -77,6 +77,7 @@ export const authConfigRoutes = router().openapi(
         authBasePath: "/api/auth",
         setupOpen: (await countWorkspaces(ctx.db)) === 0,
         signupOpen: ctx.config.SIGNUP === "open",
+        mcpUrl: mcpAvailable(ctx.config) ? mcpResource(ctx.config) : null,
       },
       200
     );

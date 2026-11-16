@@ -5,6 +5,7 @@ import { getAttentionById } from "#db/queries/attention";
 import { body, errors, Id, json, respond, router } from "#http/router";
 import {
   ActionParams,
+  AnswerRequest,
   Attention,
   AttentionListItem,
   AttentionMetrics,
@@ -14,6 +15,7 @@ import {
   MetricsQuery,
   UpdateAttentionRequest,
 } from "#http/schemas/attention";
+import { answerAgent } from "#work/agents";
 import {
   attentionMetrics,
   giveFeedback,
@@ -110,6 +112,31 @@ export const attentionRoutes = router()
         200
       );
     }
+  )
+  .openapi(
+    createRoute({
+      method: "post",
+      path: "/v1/attention/{id}/answer",
+      operationId: "attention.answer",
+      tags: ["Attention"],
+      summary: "Answer your coding agent's question in words",
+      description:
+        "Only for an agent's `agent.needs_you` item. The answer is private to you and the agent, which reads it with its `check_in` tool; answering marks the item done.",
+      request: { params: Id, ...body(AnswerRequest) },
+      responses: { 200: json(Attention), ...errors },
+    }),
+    async (c) =>
+      respond(
+        c,
+        Attention,
+        await answerAgent(
+          c.get("ctx"),
+          c.get("member"),
+          c.req.valid("param").id,
+          c.req.valid("json").body
+        ),
+        200
+      )
   )
   .openapi(
     createRoute({

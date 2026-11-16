@@ -325,7 +325,7 @@ describe("GitLab with a token", () => {
     expect(created[0].token).toBe("glpat-bot");
     const hook = created[0].body;
     expect(hook).toMatchObject({
-      url: `http://worklog.test/hooks/${conn.id}`,
+      url: `https://worklog.test/hooks/${conn.id}`,
       merge_requests_events: true,
       note_events: true,
       confidential_issues_events: false,
@@ -348,7 +348,7 @@ describe("GitLab with a token", () => {
     existing = [
       {
         id: 5,
-        url: `http://worklog.test/hooks/${conn.id}`,
+        url: `https://worklog.test/hooks/${conn.id}`,
         alert_status: "disabled",
       },
     ];

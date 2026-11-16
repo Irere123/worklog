@@ -326,7 +326,7 @@ describe("Gitea and Forgejo backfill", () => {
       type: "gitea",
       active: true,
       config: {
-        url: `http://worklog.test/hooks/${conn.id}`,
+        url: `https://worklog.test/hooks/${conn.id}`,
         content_type: "json",
       },
     });
@@ -361,7 +361,7 @@ describe("Gitea and Forgejo backfill", () => {
       {
         id: 7,
         active: false,
-        config: { url: `http://worklog.test/hooks/${conn.id}` },
+        config: { url: `https://worklog.test/hooks/${conn.id}` },
       },
     ];
     await env.call("PATCH", `/v1/connections/${conn.id}`, {

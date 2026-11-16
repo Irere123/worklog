@@ -22,12 +22,16 @@
     "test": "bun test --timeout 60000"
   },
   "dependencies": {
+    "@better-auth/cimd": "1.7.25",
+    "@better-auth/mcp": "1.7.25",
+    "@better-auth/oauth-provider": "1.7.25",
     "@hono/zod-openapi": "^1.6.3",
+    "@modelcontextprotocol/server": "2.4.0",
     "@openrouter/ai-sdk-provider": "^3.1.0",
     "@react-email/render": "2.3.1",
     "@scalar/hono-api-reference": "^0.12.14",
     "ai": "^7.0.153",
-    "better-auth": "1.7.13",
+    "better-auth": "1.7.25",
     "drizzle-orm": "^0.45.4",
     "graphile-worker": "^0.18.0",
     "hono": "^4.13.14",
@@ -46,7 +50,7 @@
     "@types/pg": "^8.23.1",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
-    "auth": "1.7.13",
+    "auth": "1.7.25",
     "drizzle-kit": "^0.31.11",
     "typescript": "5"
   }

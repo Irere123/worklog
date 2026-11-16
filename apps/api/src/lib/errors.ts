@@ -22,6 +22,8 @@ export const conflict = (message: string) =>
   new ApiError(409, "conflict", message);
 export const tooLarge = (message: string) =>
   new ApiError(413, "too_large", message);
+export const tooMany = (message: string) =>
+  new ApiError(429, "rate_limited", message);
 /** A provider the request depends on failed; trying again may work. */
 export const upstreamFailed = (message: string) =>
   new ApiError(502, "upstream_failed", message);

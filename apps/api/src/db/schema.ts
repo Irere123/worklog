@@ -146,6 +146,39 @@ export const apiTokens = pgTable("api_tokens", {
   revokedAt: ts("revoked_at"),
 });
 
+/**
+ * A coding agent that connected itself over MCP: one per person, workspace and OAuth client, so
+ * Claude Code approved by two people is two agents, each working for its own person. The agent
+ * member is created on the client's first call; deactivating it is how a connection ends.
+ */
+export const agentConnections = pgTable(
+  "agent_connections",
+  {
+    id: text("id").primaryKey(),
+    workspaceId: text("workspace_id")
+      .notNull()
+      .references(() => workspaces.id),
+    agentId: text("agent_id")
+      .notNull()
+      .references(() => members.id),
+    ownerId: text("owner_id")
+      .notNull()
+      .references(() => members.id),
+    /** A metadata-document URL, whose domain vouches for the client, or a self-registered id. */
+    clientId: text("client_id").notNull(),
+    lastUsedAt: ts("last_used_at"),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    uniqueIndex("agent_connections_client_uq").on(
+      t.workspaceId,
+      t.ownerId,
+      t.clientId
+    ),
+    index("agent_connections_agent_idx").on(t.agentId),
+  ]
+);
+
 /** Open-ended: the connector registry decides which ids exist. */
 export type Provider = string;
 

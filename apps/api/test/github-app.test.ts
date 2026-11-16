@@ -450,7 +450,7 @@ describe("GitHub App", () => {
     expect(after).toMatchObject({ lastRejection: "bad signature" });
     expect(after.rejections).toBeGreaterThan(0);
     expect(app.webhookUrls).toEqual({
-      webhook: "http://worklog.test/hooks/apps/github",
+      webhook: "https://worklog.test/hooks/apps/github",
     });
   });
 
@@ -644,7 +644,7 @@ describe("GitHub App", () => {
     expect(html).toContain(
       'action="https://github.com/settings/apps/new?state='
     );
-    expect(html).toContain("http://worklog.test/hooks/apps/github");
+    expect(html).toContain("https://worklog.test/hooks/apps/github");
     const state = new URL(link.body.url).searchParams.get("state") ?? "";
     env.ctx.fetch = routedFetch([
       [

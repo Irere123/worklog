@@ -28,12 +28,17 @@ function requiredScope(method: string, path: string): ApiScope {
   return "write";
 }
 
+// The OAuth server that issues an agent's token sees only the browser's session cookie, so
+// approving one reads as that same person even when the web app also holds an API key.
+const SESSION_ONLY = new Set(["GET /v1/agent-approval"]);
+
 async function identify(
   ctx: AppContext,
-  c: Context<Env>
+  c: Context<Env>,
+  route: string
 ): Promise<Response | { member: Member | null; user: SignedInUser | null }> {
   const key = apiKeyOf(c);
-  if (key) {
+  if (key && !SESSION_ONLY.has(route)) {
     const found = await authenticate(ctx, key);
     if (!found) {
       return deny(c, 401, "unauthorized", "Invalid or expired API key");
@@ -53,7 +58,9 @@ async function identify(
     return { member: found.member, user: null };
   }
 
-  const session = await ctx.auth.api.getSession({ headers: c.req.raw.headers });
+  const session = await ctx.auth.api.getSession({
+    headers: key ? withoutKey(c.req.raw.headers) : c.req.raw.headers,
+  });
   if (!session) {
     return deny(c, 401, "unauthorized", "Sign in, or send an API key");
   }
@@ -72,6 +79,13 @@ async function identify(
   return { member: chosen?.member ?? null, user };
 }
 
+// Better Auth reads any bearer token as a session, which would hide the cookie behind the key.
+function withoutKey(headers: Headers) {
+  const rest = new Headers(headers);
+  rest.delete("authorization");
+  return rest;
+}
+
 function apiKeyOf(c: Context<Env>): string | undefined {
   const header = c.req.header("authorization");
   const bearer =
@@ -88,7 +102,11 @@ function apiKeyOf(c: Context<Env>): string | undefined {
   return undefined;
 }
 
-const IDENTITY_ONLY = new Set(["GET /v1/session", "POST /v1/workspaces"]);
+const IDENTITY_ONLY = new Set([
+  "GET /v1/session",
+  "POST /v1/workspaces",
+  "GET /v1/agent-approval",
+]);
 const PUBLIC = new Set(["POST /v1/setup", "GET /v1/auth/config"]);
 
 export function authMiddleware(ctx: AppContext) {
@@ -110,7 +128,7 @@ async function admit(
   if (PUBLIC.has(route)) {
     return null;
   }
-  const who = await identify(ctx, c);
+  const who = await identify(ctx, c, route);
   if (who instanceof Response) {
     return who;
   }

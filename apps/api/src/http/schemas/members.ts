@@ -218,6 +218,11 @@ export const AuthConfigResponse = z.object({
     description:
       "Anyone who signs in may start a workspace with `POST /v1/workspaces`; otherwise people join by invite",
   }),
+  mcpUrl: z.string().nullable().openapi({
+    description:
+      "Where coding agents connect over MCP; they sign in through Worklog on their own. Null when the server isn't on HTTPS",
+    example: "https://worklog.example.com/mcp",
+  }),
 });
 
 const Membership = z.object({ workspace: Workspace, member: MemberResponse });

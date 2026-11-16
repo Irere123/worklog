@@ -37,7 +37,7 @@ async function signIn(email: string) {
     method: "POST",
     headers: {
       "content-type": "application/json",
-      origin: "http://worklog.test",
+      origin: "https://worklog.test",
     },
     body: JSON.stringify({ email, callbackURL: "/" }),
   });
@@ -60,6 +60,7 @@ describe("signing in", () => {
       authBasePath: "/api/auth",
       setupOpen: false,
       signupOpen: true,
+      mcpUrl: "https://worklog.test/mcp",
     });
   });
 

@@ -125,6 +125,31 @@ export async function countHighPriorityFrom(
   return row?.n ?? 0;
 }
 
+/** One sender's items of a kind that a person hasn't settled, snoozed ones included. */
+export async function listUnsettledFrom(
+  db: DbOrTx,
+  params: {
+    memberId: string;
+    fromId: string;
+    kind: string;
+    exceptDedupeKey: string;
+  }
+) {
+  return await db
+    .select({ dedupeKey: attentionItems.dedupeKey })
+    .from(attentionItems)
+    .where(
+      and(
+        eq(attentionItems.memberId, params.memberId),
+        eq(attentionItems.fromId, params.fromId),
+        eq(attentionItems.kind, params.kind),
+        ne(attentionItems.dedupeKey, params.exceptDedupeKey),
+        inArray(attentionItems.state, ["open", "snoozed"])
+      )
+    )
+    .orderBy(attentionItems.createdAt);
+}
+
 export async function countOpenAttention(
   db: DbOrTx,
   params: { memberId: string; kind: string; now: Date }
@@ -372,6 +397,22 @@ export async function listPushedAttention(
         gte(attentionItems.pushedAt, params.since)
       )
     );
+}
+
+export async function findAttentionByDedupeKey(
+  db: DbOrTx,
+  params: { memberId: string; dedupeKey: string }
+) {
+  const [row] = await db
+    .select()
+    .from(attentionItems)
+    .where(
+      and(
+        eq(attentionItems.memberId, params.memberId),
+        eq(attentionItems.dedupeKey, params.dedupeKey)
+      )
+    );
+  return row;
 }
 
 // Without `memberId`, closes the open item for everyone who has it.

@@ -18,6 +18,7 @@ import { createMailer } from "./lib/mailer";
 import type { Mailer } from "./lib/mailer";
 import { tracedFetch } from "./telemetry/instrument";
 import { startTelemetry } from "./telemetry/start";
+import { agentWorkspace } from "./work/agents";
 import { claimMemberships } from "./work/members";
 
 export type AppContext = {
@@ -74,6 +75,8 @@ export async function createContext(
           await claimMemberships(ctx, user);
         }
       },
+      agentWorkspace: async (userId, picked) =>
+        await agentWorkspace(ctx, userId, picked),
     }),
     bus: new EventBus(db),
     tally,

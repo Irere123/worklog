@@ -141,7 +141,7 @@ async function openTestContext() {
         new URL(TEST_DATABASE_URL).pathname.slice(1)
       ),
       SETUP_SECRET: "test-secret",
-      PUBLIC_URL: "http://worklog.test",
+      PUBLIC_URL: "https://worklog.test",
     }),
     { models: null, mailer: new ConsoleMailer() }
   );

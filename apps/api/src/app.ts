@@ -9,10 +9,12 @@ import type { AppContext } from "./context";
 import { authMiddleware } from "./http/auth";
 import { healthReport } from "./http/health";
 import { hookRoutes } from "./http/hooks";
+import { mcpRoutes } from "./http/mcp";
 import { oauthRoutes } from "./http/oauth";
 import { router } from "./http/router";
 import { activityRoutes } from "./http/routes/activity";
 import { agentRoutes } from "./http/routes/agent";
+import { agentConnectionRoutes } from "./http/routes/agents";
 import { appRoutes } from "./http/routes/apps";
 import { attentionRoutes } from "./http/routes/attention";
 import { automationRoutes } from "./http/routes/automations";
@@ -93,11 +95,14 @@ export function createApp(ctx: AppContext) {
         "content-type",
         "x-worklog-workspace",
         "last-event-id",
+        "mcp-protocol-version",
+        "mcp-session-id",
       ],
       exposeHeaders: [
         "set-auth-token",
         "x-worklog-conversation",
         "x-worklog-trace",
+        "www-authenticate",
       ],
     })
   );
@@ -145,6 +150,7 @@ export function createApp(ctx: AppContext) {
     .route("/", attentionRoutes)
     .route("/", briefRoutes)
     .route("/", agentRoutes)
+    .route("/", agentConnectionRoutes)
     .route("/", transcriptionRoutes)
     .route("/", memoryRoutes)
     .route("/", deliveryRoutes)
@@ -153,7 +159,8 @@ export function createApp(ctx: AppContext) {
     .route("/", appRoutes)
     .route("/", eventRoutes)
     .route("/", hookRoutes())
-    .route("/", oauthRoutes());
+    .route("/", oauthRoutes())
+    .route("/", mcpRoutes(ctx));
 
   app.openAPIRegistry.registerComponent("securitySchemes", "bearerAuth", {
     type: "http",

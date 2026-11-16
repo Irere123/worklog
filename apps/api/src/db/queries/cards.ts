@@ -215,12 +215,32 @@ export async function listCardRelations(
   };
 }
 
-export async function listComments(db: DbOrTx, params: { cardId: string }) {
-  return await db
+/**
+ * A card's discussion, oldest first. `since` keeps what was said from then on; `latest` keeps only
+ * the newest that many, for a reader that can't take a long thread whole.
+ */
+export async function listComments(
+  db: DbOrTx,
+  params: { cardId: string; since?: Date; latest?: number }
+) {
+  const where = and(
+    eq(comments.cardId, params.cardId),
+    params.since ? gte(comments.createdAt, params.since) : undefined
+  );
+  if (params.latest === undefined) {
+    return await db
+      .select()
+      .from(comments)
+      .where(where)
+      .orderBy(asc(comments.createdAt));
+  }
+  const rows = await db
     .select()
     .from(comments)
-    .where(eq(comments.cardId, params.cardId))
-    .orderBy(asc(comments.createdAt));
+    .where(where)
+    .orderBy(desc(comments.createdAt))
+    .limit(params.latest);
+  return rows.toReversed();
 }
 
 export async function insertComment(db: DbOrTx, row: CommentRow) {

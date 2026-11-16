@@ -14,6 +14,7 @@ import {
   listOpenAttention,
   listPushedAttention,
   listTeamVisibleAttentionIds,
+  listUnsettledFrom,
   setAttentionDigested,
   updateAttentionById,
   upsertAttention,
@@ -92,6 +93,11 @@ export async function scheduleFollowUp(
 
 /** How many high-priority items one sender may raise for one person per day; the rest become normal. */
 const SENDER_HIGH_QUOTA = { human: 2, agent: 1 } as const;
+export const AGENT_QUESTION = "agent.needs_you";
+// A coding agent's question to its own person blocks the work they gave it, so it stays urgent
+// however many it asked today; what bounds a looping agent is how many it has waiting at once.
+// The person's push budget still decides when they hear.
+export const AGENT_QUESTIONS_WAITING = 3;
 /** An urgent item pulls that person's attention check forward to now + this, merging bursts. */
 const URGENT_DEBOUNCE_MS = 3 * 60_000;
 
@@ -166,6 +172,15 @@ async function applySenderQuota(
     return input.priority;
   }
   const sender = await findMemberById(ctx.db, { id: input.fromId });
+  if (input.kind === AGENT_QUESTION && sender?.ownerId === input.memberId) {
+    const waiting = await listUnsettledFrom(ctx.db, {
+      memberId: input.memberId,
+      fromId: input.fromId,
+      kind: AGENT_QUESTION,
+      exceptDedupeKey: input.dedupeKey,
+    });
+    return waiting.length >= AGENT_QUESTIONS_WAITING ? "normal" : "high";
+  }
   const quota = SENDER_HIGH_QUOTA[sender?.kind ?? "human"];
   const sent = await countHighPriorityFrom(ctx.db, {
     memberId: input.memberId,

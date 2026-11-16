@@ -1,14 +1,11 @@
 import { createRoute, z } from "@hono/zod-openapi";
 
-import type { AppContext } from "#context";
 import {
   countActivitiesByKind,
   deleteOwnActivity,
   listActivities,
 } from "#db/queries/activities";
-import type { ActivityRow } from "#db/queries/activities";
 import { getCardByNumber } from "#db/queries/cards";
-import type { Member } from "#db/queries/members";
 import { body, errors, Id, json, Ok, respond, router } from "#http/router";
 import {
   Activity,
@@ -17,10 +14,9 @@ import {
   CreateActivityRequest,
   ListActivitiesQuery,
 } from "#http/schemas/activity";
-import { applyAgentState } from "#ingest/effects";
 import { notFound } from "#lib/errors";
-import { recordActivity } from "#work/activity";
 import { resolveMember } from "#work/members";
+import { reportWork } from "#work/report";
 
 export const activityRoutes = router()
   .openapi(
@@ -106,53 +102,13 @@ export const activityRoutes = router()
       },
     }),
     async (c) => {
-      const ctx = c.get("ctx");
-      const me = c.get("member");
       const input = c.req.valid("json");
-      const card =
-        input.cardNumber === undefined || input.cardNumber === 0
-          ? null
-          : await getCardByNumber(ctx.db, {
-              workspaceId: me.workspaceId,
-              number: input.cardNumber,
-            });
-      const onBehalfOf = await workingFor(ctx, me, input.onBehalfOf);
-      const thread = input.thread ?? input.externalId ?? null;
-      const row = await recordActivity(ctx, {
-        workspaceId: me.workspaceId,
-        actorId: me.id,
+      const { activity } = await reportWork(c.get("ctx"), c.get("member"), {
+        ...input,
         source: "api",
-        kind: input.kind,
-        title: input.title,
-        body: input.body,
-        url: input.url,
-        cardId: card?.id,
-        visibility: input.visibility,
-        externalId: input.externalId,
         occurredAt: input.occurredAt ? new Date(input.occurredAt) : undefined,
-        threadKey: thread,
-        importance:
-          input.importance ?? (input.state === "needs_you" ? 0.8 : undefined),
-        onBehalfOfId: onBehalfOf?.id ?? null,
-        agentState: input.state ?? null,
-        data: input.data,
       });
-      if (row && input.state) {
-        await applyAgentState(ctx, {
-          workspaceId: me.workspaceId,
-          agentName: me.name,
-          onBehalfOfId: onBehalfOf?.id ?? null,
-          state: input.state,
-          title: input.title,
-          body: input.body ?? null,
-          url: input.url ?? null,
-          activityId: row.id,
-          cardId: row.cardId,
-          thread: thread ?? row.id,
-          agentId: me.id,
-        });
-      }
-      return respond(c, Activity.nullable(), withCardNumber(row, card), 201);
+      return respond(c, Activity.nullable(), activity, 201);
     }
   )
   .openapi(
@@ -179,19 +135,3 @@ export const activityRoutes = router()
       return respond(c, Ok, { ok: true }, 200);
     }
   );
-
-async function workingFor(
-  ctx: AppContext,
-  me: Member,
-  ref: string | undefined
-) {
-  const forRef = ref ?? (me.kind === "agent" ? me.ownerId : null);
-  return forRef ? await resolveMember(ctx, me, forRef) : null;
-}
-
-function withCardNumber(
-  row: ActivityRow | null,
-  card: { number: number } | null
-) {
-  return row && { ...row, cardNumber: card?.number ?? null };
-}

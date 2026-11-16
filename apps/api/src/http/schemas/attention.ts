@@ -56,6 +56,13 @@ export const UpdateAttentionRequest = z.object({
 
 export const ActionParams = z.object({ id: z.string(), actionId: z.string() });
 
+export const AnswerRequest = z.object({
+  body: z.string().trim().min(1).max(4000).openapi({
+    description: "Markdown, for the agent to read the next time it checks in",
+    example: "30 days: the security review wants short-lived tokens.",
+  }),
+});
+
 export const FeedbackRequest = z.object({ signal: z.enum(FEEDBACK_SIGNALS) });
 
 export const FeedbackResponse = z.object({

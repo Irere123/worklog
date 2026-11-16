@@ -256,7 +256,7 @@ async function moveCard(
   });
   const col = b.columns.find((x) => x.name.toLowerCase() === to.toLowerCase());
   if (!col) {
-    throw new Error(
+    throw badRequest(
       `No column named "${to}" (columns: ${b.columns.map((x) => x.name).join(", ")})`
     );
   }

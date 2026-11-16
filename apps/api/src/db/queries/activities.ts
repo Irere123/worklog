@@ -1,6 +1,6 @@
 import {
-  and,
   getTableColumns,
+  and,
   count,
   desc,
   eq,
@@ -8,6 +8,7 @@ import {
   ilike,
   inArray,
   isNotNull,
+  isNull,
   lt,
   lte,
   or,
@@ -192,6 +193,81 @@ export async function listActivities(
     .where(and(...where))
     .orderBy(desc(activities.occurredAt), desc(activities.id))
     .limit(Math.min(filters.limit ?? 50, 500));
+}
+
+/**
+ * One thread's entries of the given kinds by the given actors, oldest first: an agent's questions
+ * and its owner's answers. Private entries count only because their actors are named here.
+ */
+export async function listThreadActivities(
+  db: DbOrTx,
+  params: {
+    workspaceId: string;
+    threadKey: string;
+    actorIds: string[];
+    kinds: string[];
+    /** The newest this many; 50 by default. */
+    limit?: number;
+  }
+) {
+  const rows = await db
+    .select()
+    .from(activities)
+    .where(
+      and(
+        eq(activities.workspaceId, params.workspaceId),
+        eq(activities.threadKey, params.threadKey),
+        inArray(activities.actorId, params.actorIds),
+        inArray(activities.kind, params.kinds)
+      )
+    )
+    .orderBy(desc(activities.occurredAt), desc(activities.id))
+    .limit(params.limit ?? 50);
+  return rows.toReversed();
+}
+
+/** The card an actor's thread is about: the one its latest entry with a card names. */
+export async function findThreadCard(
+  db: DbOrTx,
+  params: { workspaceId: string; threadKey: string; actorId: string }
+) {
+  const [row] = await db
+    .select({ id: cards.id, number: cards.number })
+    .from(activities)
+    .innerJoin(cards, eq(cards.id, activities.cardId))
+    .where(
+      and(
+        eq(activities.workspaceId, params.workspaceId),
+        eq(activities.threadKey, params.threadKey),
+        eq(activities.actorId, params.actorId)
+      )
+    )
+    .orderBy(desc(activities.occurredAt))
+    .limit(1);
+  return row;
+}
+
+/** Puts an actor's entries on a thread that have no card yet on this one. */
+export async function setThreadCard(
+  db: DbOrTx,
+  params: {
+    workspaceId: string;
+    threadKey: string;
+    actorId: string;
+    cardId: string;
+  }
+) {
+  await db
+    .update(activities)
+    .set({ cardId: params.cardId })
+    .where(
+      and(
+        eq(activities.workspaceId, params.workspaceId),
+        eq(activities.threadKey, params.threadKey),
+        eq(activities.actorId, params.actorId),
+        isNull(activities.cardId)
+      )
+    );
 }
 
 /**

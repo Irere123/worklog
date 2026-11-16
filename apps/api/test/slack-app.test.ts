@@ -139,7 +139,7 @@ async function installed() {
   );
   expect(url.searchParams.get("scope")).toContain("users:read.email");
   expect(url.searchParams.get("redirect_uri")).toBe(
-    "http://worklog.test/oauth/slack/callback"
+    "https://worklog.test/oauth/slack/callback"
   );
   const state = url.searchParams.get("state") ?? "";
   const res = await env.app.request(

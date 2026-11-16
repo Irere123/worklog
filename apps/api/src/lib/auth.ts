@@ -1,8 +1,11 @@
 import { createHash } from "node:crypto";
 
+import { cimd } from "@better-auth/cimd";
+import { fetchClientMetadataResource } from "@better-auth/cimd/node";
+import { mcp } from "@better-auth/mcp";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
-import { bearer, magicLink } from "better-auth/plugins";
+import { bearer, jwt, magicLink } from "better-auth/plugins";
 
 import type { Config } from "#config";
 import { signInEmail } from "#emails";
@@ -27,6 +30,46 @@ export function enabledSocialProviders(config: Config): SocialProvider[] {
   return out;
 }
 
+/** Where people use the web app: this server when it serves the build, else the first web origin. */
+export function webAppUrl(config: Config) {
+  const [, first] = webOrigins(config);
+  return config.WEB_DIST || first === undefined ? config.PUBLIC_URL : first;
+}
+
+/** The MCP endpoint, which is also the audience every agent's access token is bound to. */
+export function mcpResource(config: Config) {
+  return new URL("/mcp", config.PUBLIC_URL).toString();
+}
+
+/**
+ * Agents send their tokens to this address, so OAuth requires it to be HTTPS. Plain HTTP is
+ * allowed only on this machine, for development. A server on a bare LAN address runs without MCP
+ * rather than failing to start.
+ */
+export function mcpAvailable(config: Config) {
+  const url = new URL(config.PUBLIC_URL);
+  const host = url.hostname.replaceAll(/^\[|\]$/gu, "");
+  return (
+    url.protocol === "https:" ||
+    (url.protocol === "http:" &&
+      (host === "localhost" ||
+        host.endsWith(".localhost") ||
+        host === "::1" ||
+        /^127\.\d+\.\d+\.\d+$/u.test(host)))
+  );
+}
+
+/**
+ * What a coding agent may be granted. They mirror an API key's scopes: `ingest` reports its own
+ * progress, `read` sees the board, `write` changes cards. `offline_access` lets it refresh its
+ * token instead of sending its person back to the browser every hour.
+ */
+export const AGENT_SCOPES = ["ingest", "read", "write"] as const;
+export const AGENT_TOKEN_SCOPES = [...AGENT_SCOPES, "offline_access"];
+
+/** The access-token claim naming the workspace an agent was approved into. */
+export const WORKSPACE_CLAIM = "worklog_workspace";
+
 export function webOrigins(config: Config): string[] {
   return [
     config.PUBLIC_URL,
@@ -42,7 +85,17 @@ export function createAuth(
   db: Parameters<typeof drizzleAdapter>[0],
   config: Config,
   mailer: Mailer,
-  hooks: { onSignIn?: (userId: string) => Promise<void> } = {}
+  hooks: {
+    onSignIn?: (userId: string) => Promise<void>;
+    /**
+     * The workspace an agent's approval is for: the one the person picked on the approval page if
+     * they belong to it, else their only one. Undefined sends them to the page to pick.
+     */
+    agentWorkspace?: (
+      userId: string,
+      picked: string | undefined
+    ) => Promise<string | undefined>;
+  } = {}
 ) {
   const github = oauthApp(config.GITHUB_CLIENT_ID, config.GITHUB_CLIENT_SECRET);
   const discord = oauthApp(
@@ -79,7 +132,17 @@ export function createAuth(
         trustedProviders: ["github", "discord", "slack"],
       },
     },
-    session: { cookieCache: { enabled: true, maxAge: 60 } },
+    session: {
+      cookieCache: { enabled: true, maxAge: 60 },
+      additionalFields: {
+        // Set by the approval page through /update-session, which also refreshes the cookie
+        // cache the OAuth endpoints read the session from.
+        agentWorkspaceId: { type: "string", required: false },
+      },
+    },
+    // The OAuth provider issues its own tokens; the JWT plugin's session-to-JWT route would be a
+    // second, unscoped way to mint one.
+    disabledPaths: ["/token"],
     databaseHooks: {
       session: {
         create: {
@@ -95,11 +158,60 @@ export function createAuth(
         },
       }),
       bearer(),
+      ...(mcpAvailable(config) ? agentAuthorization(config, hooks) : []),
     ],
   });
 }
 
 export type Auth = ReturnType<typeof createAuth>;
+
+/** Worklog as an OAuth server for coding agents: the sign-in and approval behind its MCP endpoint. */
+function agentAuthorization(
+  config: Config,
+  hooks: Parameters<typeof createAuth>[3]
+) {
+  return [
+    jwt({ disableSettingJwtHeader: true }),
+    mcp({
+      loginPage: new URL("/connect/sign-in", webAppUrl(config)).toString(),
+      consentPage: new URL("/connect", webAppUrl(config)).toString(),
+      resource: mcpResource(config),
+      scopes: ["openid", "profile", ...AGENT_TOKEN_SCOPES],
+      // Clients from before Client ID Metadata Documents (older Cursor, Claude Code, VS Code)
+      // register themselves. The person still approves each one, and a self-registered name
+      // is shown as unverified.
+      allowDynamicClientRegistration: true,
+      allowUnauthenticatedClientRegistration: true,
+      clientRegistrationDefaultApplicationType: "infer",
+      clientRegistrationDefaultScopes: [
+        "openid",
+        "profile",
+        ...AGENT_TOKEN_SCOPES,
+      ],
+      refreshTokenExpiresIn: 90 * 24 * 60 * 60,
+      postLogin: {
+        page: new URL("/connect", webAppUrl(config)).toString(),
+        shouldRedirect: () => false,
+        // Consent is kept per workspace, so approving an agent in one doesn't let it into
+        // another. For a person in several who hasn't picked yet this is empty, and the
+        // approval page asks.
+        consentReferenceId: async ({ user, session }) =>
+          await hooks?.agentWorkspace?.(
+            user.id,
+            typeof session.agentWorkspaceId === "string"
+              ? session.agentWorkspaceId
+              : undefined
+          ),
+      },
+      customAccessTokenClaims: ({ referenceId }) =>
+        referenceId ? { [WORKSPACE_CLAIM]: referenceId } : {},
+    }),
+    cimd({
+      fetchClientMetadataResource,
+      metadataProfile: "mcp-2026-07-28",
+    }),
+  ];
+}
 
 function oauthApp(
   clientId: string | undefined,
