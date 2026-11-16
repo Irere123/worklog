@@ -76,8 +76,9 @@ export const product = stylex.defineVars({
   slackYellow: "#ecb22e",
   discord: "#5865f2",
   claude: "#d97757",
-  // Both ship as black marks; on a dark page they turn to near-white, as GitHub's does.
+  // These ship as black marks; on a dark page they turn to near-white, as GitHub's does.
   cursor: "light-dark(#141414, #f0f0f0)",
+  openai: "light-dark(#0d0d0d, #f0f0f0)",
   copilot: "light-dark(#1f2328, #f0f6fc)",
 });
 

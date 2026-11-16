@@ -58,6 +58,7 @@ export function ConnectAgentSteps() {
         label="Claude Code"
         value={`claude mcp add --transport http worklog ${url}`}
       />
+      <Line label="Codex" value={`codex mcp add worklog --url ${url}`} />
       <Line label="Any other tool: add it as a remote MCP server" value={url} />
     </div>
   );

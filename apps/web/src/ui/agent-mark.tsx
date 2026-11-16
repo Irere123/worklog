@@ -11,6 +11,9 @@ const TOOLS: Record<string, Product> = {
   claudecode: "claude",
   claude: "claude",
   cursor: "cursor",
+  // Codex wears its maker's mark, as Claude Code does.
+  codex: "openai",
+  openaicodex: "openai",
   copilot: "copilot",
   githubcopilot: "copilot",
 };

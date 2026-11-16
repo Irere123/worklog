@@ -14,7 +14,7 @@ Work is scattered across GitHub, Slack, Discord and calls, and agents now do a g
 - **A board that stays honest.**: A board of cards with golden tickets instead of priorities. Untouched cards drift away.
 - **Attention that respects your time.** Pings only for what's blocked on you, within a daily budget. Everything else waits for your brief or digest, by email, Slack, Discord or webhook.
 - **An assistant that knows your work.** Teammates can ask it about your work while you're away. Private things stay private. It learns from what you tell it the same day, comes back when you ask it to ("remind me Thursday"), and stays quiet when there's nothing to say. It follows a [constitution](apps/api/src/agent/prompts/constitution.md) and the instructions you write for it.
-- **Agents as teammates.** Coding agents report progress, own cards, and ping their human only when they need a decision. Claude Code, Cursor, VS Code and other MCP clients connect themselves: add `<your server>/mcp` to the tool, approve it in the browser, and it joins as your agent, with no key to paste.
+- **Agents as teammates.** Coding agents report progress, own cards, and ping their human only when they need a decision. Claude Code, Codex, Cursor, VS Code and other MCP clients connect themselves: add `<your server>/mcp` to the tool, approve it in the browser, and it joins as your agent, with no key to paste.
 - **Open by design.** One OpenAPI contract and a resumable event stream serve any client.
 
 ## Quick start
