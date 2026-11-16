@@ -326,6 +326,8 @@ describe("the team at a glance", () => {
       token: ana.token,
       body: { text: "Paired on the importer", visibility: "team" },
     });
+    // Times are kept to the millisecond: two logs inside one would tie for latest.
+    await Bun.sleep(2);
     await env.call("POST", "/v1/logs", {
       token: ana.token,
       body: { text: "Interviewing elsewhere", visibility: "private" },

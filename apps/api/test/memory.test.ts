@@ -803,8 +803,10 @@ test("the pass after a conversation can only forget lines it was shown", async (
       body: { content: "Oldest fact: owns the billing cron", kind: "fact" },
     })
   ).body;
-  // Newer facts push the oldest off the page the pass reads.
+  // Newer facts push the oldest off the page the pass reads. Times are kept to the millisecond,
+  // and writes this fast would otherwise tie, leaving which is newest to chance.
   for (let i = 0; i < 60; i += 1) {
+    await Bun.sleep(2);
     await env.call("POST", "/v1/memories", {
       token: owner.token,
       body: { content: `Fact number ${i}`, kind: "fact" },
