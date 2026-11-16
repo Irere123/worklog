@@ -59,7 +59,7 @@ describe("board (Fizzy rules)", () => {
     expect(await titles("assignee=me")).toEqual(["Sam's"]);
   });
 
-  test("searching a card's number finds it, with or without the #", async () => {
+  test("search finds a card by its words in any order, or by its number with or without the #", async () => {
     const { token, board } = await boardSetup();
     for (const title of ["Ship the export", "Fix 2FA", "Review the copy"]) {
       await env.call("POST", "/v1/cards", {
@@ -74,6 +74,9 @@ describe("board (Fizzy rules)", () => {
         })
       ).body.map((c: { title: string }) => c.title);
 
+    expect(await titles("export ship")).toEqual(["Ship the export"]);
+    expect(await titles("the review")).toEqual(["Review the copy"]);
+    expect(await titles("100%")).toEqual([]);
     expect(await titles("3")).toEqual(["Review the copy"]);
     expect(await titles("#3")).toEqual(["Review the copy"]);
     expect(await titles("2")).toEqual(["Fix 2FA"]);

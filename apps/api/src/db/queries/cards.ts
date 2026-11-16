@@ -121,15 +121,21 @@ export async function listCardRows(
   if (params.golden !== undefined) {
     where.push(eq(cards.golden, params.golden));
   }
-  if (params.q) {
+  const words = params.q?.trim().split(/\s+/u).filter(Boolean) ?? [];
+  if (words.length) {
     // "14" or "#14" is how people name a card, so a number finds that card as well as text.
-    const number = /^#?(?<n>\d{1,9})$/u.exec(params.q.trim())?.groups?.n;
-    where.push(
-      or(
-        ilike(cards.title, `%${params.q}%`),
-        ilike(cards.body, `%${params.q}%`),
-        number === undefined ? undefined : eq(cards.number, Number(number))
+    const number = /^#?(?<n>\d{1,9})$/u.exec(params.q?.trim() ?? "")?.groups?.n;
+    // Every word, in any order: people and agents describe a task in their own words, not its title's.
+    const text = and(
+      ...words.map((word) =>
+        or(
+          ilike(cards.title, contains(word)),
+          ilike(cards.body, contains(word))
+        )
       )
+    );
+    where.push(
+      number === undefined ? text : or(text, eq(cards.number, Number(number)))
     );
   }
   if (params.assigneeId) {
@@ -440,4 +446,9 @@ export async function listCurrentCards(
       desc(cards.golden),
       desc(cards.lastActiveAt)
     );
+}
+
+// ILIKE reads % and _ as wildcards; a search means them literally.
+function contains(word: string) {
+  return `%${word.replaceAll(/[\\%_]/gu, "\\$&")}%`;
 }
