@@ -348,16 +348,14 @@ function ActivityTitle({
       </a>
     );
   }
-  const cardNumber = hideCard
-    ? undefined
-    : /^#(?<number>\d+)\s/u.exec(activity.title)?.groups?.number;
-  if (cardNumber && activity.cardId) {
+  const cardNumber = hideCard ? null : activity.cardNumber;
+  if (cardNumber !== null) {
     return (
       <Link
         to="."
         search={(prev: Record<string, unknown>) => ({
           ...prev,
-          card: Number(cardNumber),
+          card: cardNumber,
         })}
         {...stylex.props(styles.titleLink)}
       >

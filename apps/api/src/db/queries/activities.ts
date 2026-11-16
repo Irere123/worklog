@@ -1,5 +1,6 @@
 import {
   and,
+  getTableColumns,
   count,
   desc,
   eq,
@@ -144,7 +145,7 @@ export async function listActivitiesByIds(
 export async function listActivities(
   db: DbOrTx,
   params: { workspaceId: string; privateFor: string[] } & ActivityFilters
-): Promise<ActivityRow[]> {
+): Promise<(ActivityRow & { cardNumber: number | null })[]> {
   const { workspaceId, privateFor, ...filters } = params;
   const where: (SQL | undefined)[] = [
     eq(activities.workspaceId, workspaceId),
@@ -185,8 +186,9 @@ export async function listActivities(
     );
   }
   return await db
-    .select()
+    .select({ ...getTableColumns(activities), cardNumber: cards.number })
     .from(activities)
+    .leftJoin(cards, eq(cards.id, activities.cardId))
     .where(and(...where))
     .orderBy(desc(activities.occurredAt), desc(activities.id))
     .limit(Math.min(filters.limit ?? 50, 500));

@@ -21,7 +21,12 @@ const STATES: Record<string, { label: string; tone: Tone; order: number }> = {
   finished: { label: "Finished", tone: "green", order: 3 },
 };
 
-type Session = { thread: string; latest: Activity; steps: number };
+type Session = {
+  thread: string;
+  latest: Activity;
+  steps: number;
+  card: number | null;
+};
 
 /**
  * An agent's work as sessions rather than a stream: one row per thread, showing where it stands
@@ -44,10 +49,9 @@ export function AgentSessions({ handle }: { handle: string }) {
     <section aria-label="Sessions" {...stylex.props(styles.wrap)}>
       <h3 {...stylex.props(styles.title)}>Sessions</h3>
       <ul {...stylex.props(styles.list)}>
-        {sessions.map(({ thread, latest, steps }) => {
+        {sessions.map(({ thread, latest, steps, card }) => {
           const key = latest.agentState ?? "working";
           const state = STATES[key] ?? STATES.working;
-          const card = /^#(?<n>\d+)\s/u.exec(latest.title)?.groups?.n;
           return (
             <li key={thread} {...stylex.props(styles.row)}>
               {state && (
@@ -61,12 +65,12 @@ export function AgentSessions({ handle }: { handle: string }) {
                   <p {...stylex.props(styles.body)}>{latest.body}</p>
                 )}
               </div>
-              {card && (
+              {card !== null && (
                 <Link
                   to="."
                   search={(prev: Record<string, unknown>) => ({
                     ...prev,
-                    card: Number(card),
+                    card,
                   })}
                   {...stylex.props(styles.card)}
                 >
@@ -98,8 +102,14 @@ export function sessionsOf(activities: Activity[]): Session[] {
     const known = byThread.get(thread);
     if (known) {
       known.steps += 1;
+      known.card ??= activity.cardNumber;
     } else {
-      byThread.set(thread, { thread, latest: activity, steps: 1 });
+      byThread.set(thread, {
+        thread,
+        latest: activity,
+        steps: 1,
+        card: activity.cardNumber,
+      });
     }
   }
   return [...byThread.values()].toSorted(

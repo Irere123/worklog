@@ -6,6 +6,7 @@ import {
   deleteOwnActivity,
   listActivities,
 } from "#db/queries/activities";
+import type { ActivityRow } from "#db/queries/activities";
 import { getCardByNumber } from "#db/queries/cards";
 import type { Member } from "#db/queries/members";
 import { body, errors, Id, json, Ok, respond, router } from "#http/router";
@@ -151,7 +152,7 @@ export const activityRoutes = router()
           agentId: me.id,
         });
       }
-      return respond(c, Activity.nullable(), row, 201);
+      return respond(c, Activity.nullable(), withCardNumber(row, card), 201);
     }
   )
   .openapi(
@@ -186,4 +187,11 @@ async function workingFor(
 ) {
   const forRef = ref ?? (me.kind === "agent" ? me.ownerId : null);
   return forRef ? await resolveMember(ctx, me, forRef) : null;
+}
+
+function withCardNumber(
+  row: ActivityRow | null,
+  card: { number: number } | null
+) {
+  return row && { ...row, cardNumber: card?.number ?? null };
 }

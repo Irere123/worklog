@@ -14,6 +14,7 @@ export const Activity = z
     body: z.string().nullable(),
     url: z.string().nullable(),
     cardId: z.string().nullable(),
+    cardNumber: z.number().int().nullable(),
     visibility: z.enum(VISIBILITY),
     data: z.record(z.string(), z.unknown()),
     connectionId: z.string().nullable(),

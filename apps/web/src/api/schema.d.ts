@@ -1716,6 +1716,7 @@ export interface components {
             body: string | null;
             url: string | null;
             cardId: string | null;
+            cardNumber: number | null;
             /** @enum {string} */
             visibility: "team" | "private";
             data: {

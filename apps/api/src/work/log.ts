@@ -65,7 +65,10 @@ export async function logWork(
           cardGiven: Boolean(card),
         })
       : Promise.resolve();
-  return { activity, enrichment };
+  return {
+    activity: { ...activity, cardNumber: card?.number ?? null },
+    enrichment,
+  };
 }
 
 function firstLine(text: string) {
