@@ -106,7 +106,6 @@ function BoardPage() {
     <>
       <PageHeader
         title={board.data.name}
-        subtitle={board.data.description ?? undefined}
         actions={
           <>
             <Input
