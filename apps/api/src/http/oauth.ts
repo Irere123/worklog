@@ -107,10 +107,20 @@ export function oauthRoutes() {
             "<p>The change reaches Worklog on its own; you can close this tab.</p>"
           );
         }
-        const conn = await completeInstall(ctx, c.req.param("provider"), query);
+        const { connection, returnTo } = await completeInstall(
+          ctx,
+          c.req.param("provider"),
+          query
+        );
+        if (returnTo) {
+          return c.redirect(
+            `${returnTo}/settings/connections/${encodeURIComponent(connection.id)}`,
+            302
+          );
+        }
         return page(
           "Connected",
-          `<p>${escapeHtml(conn.name)} is connected to Worklog. Recent history is on its way into your work stream; you can close this tab.</p>`
+          `<p>${escapeHtml(connection.name)} is connected to Worklog. Recent history is on its way into your work stream; you can close this tab.</p>`
         );
       })
   );

@@ -22,11 +22,11 @@ Everything Worklog does depends on the activity stream: the board, briefs, "what
 A provider app has one webhook URL, so each Worklog server registers its own, once; every workspace on the server then installs it with one click.
 
 1. **Register the app** (once per server, an admin):
-   - **GitHub:** `POST /v1/apps/github/manifest` returns a link. GitHub creates the app with the right webhook, permissions and redirects, hands its credentials back, and goes straight on to installing it. From the next start it also signs people in with GitHub, unless `GITHUB_CLIENT_ID` says otherwise; the same goes for the Slack and Discord apps.
+   - **GitHub:** Settings → Connections → **Set up GitHub App** in the web app, or `POST /v1/apps/github/manifest`, which returns a link. GitHub creates the app with the right webhook, permissions and redirects, hands its credentials back, and goes straight on to installing it. From the next start it also signs people in with GitHub, unless `GITHUB_CLIENT_ID` says otherwise; the same goes for the Slack and Discord apps. GitHub can't reach a server at `localhost`, so there the app is created with its webhook off and history arrives through sync; give the server a public `PUBLIC_URL` (or a tunnel) for live events.
    - **Slack:** create an app at api.slack.com with the scopes in `GET /v1/apps`, point Event Subscriptions at `webhookUrls.events`, slash commands at `webhookUrls.commands` and the redirect at `callbackUrl`, then `PUT /v1/apps/slack` with its client id, client secret and signing secret.
    - **Discord:** create an application in the developer portal, set its Interactions Endpoint URL to `webhookUrls.interactions` and add `callbackUrl` as a redirect, then `PUT /v1/apps/discord` with its client id, client secret, public key and bot token. Installing registers the slash commands.
    - Or set the app's variables in the environment (`GITHUB_APP_*`, `SLACK_*`, `DISCORD_*`; see `.env.example`). The server follows them: change a secret there and restart.
-2. **Install it:** `POST /v1/apps/{provider}/install` returns the provider's install page. Approving there creates the connection and starts reading `BACKFILL_DAYS` of history.
+2. **Install it:** `POST /v1/apps/{provider}/install` returns the provider's install page. Approving there creates the connection and starts reading `BACKFILL_DAYS` of history. With `returnTo` (one of the server's web origins) the browser comes back to the new connection in the web app, instead of a page that says it's done.
 3. **Choose what counts:** `GET /v1/connections/{id}/sources` lists the repos or channels, `PUT` picks them, and their history is read too.
 
 **Security:**

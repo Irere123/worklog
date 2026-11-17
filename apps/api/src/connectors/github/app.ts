@@ -372,7 +372,12 @@ export function githubManifest(publicUrl: string, name: string) {
   return {
     name,
     url: publicUrl,
-    hook_attributes: { url: `${publicUrl}/hooks/apps/github`, active: true },
+    // GitHub can't deliver to a server on this machine; an inactive hook still gets the app a
+    // webhook secret, and history arrives through sync instead.
+    hook_attributes: {
+      url: `${publicUrl}/hooks/apps/github`,
+      active: !isLocal(publicUrl),
+    },
     redirect_url: `${publicUrl}/oauth/github/app`,
     callback_urls: [
       `${publicUrl}/oauth/github/callback`,
@@ -398,6 +403,17 @@ export function githubManifest(publicUrl: string, name: string) {
       "release",
     ],
   };
+}
+
+/** A server only this machine can reach, as in development. */
+export function isLocal(url: string) {
+  const host = new URL(url).hostname;
+  return (
+    host === "localhost" ||
+    host.endsWith(".localhost") ||
+    host === "[::1]" ||
+    host.startsWith("127.")
+  );
 }
 
 const Conversion = z.object({

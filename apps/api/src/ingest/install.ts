@@ -21,6 +21,7 @@ import type { InstallState } from "#db/queries/install-states";
 import { findMemberById } from "#db/queries/members";
 import type { Member } from "#db/queries/members";
 import { transact } from "#db/transact";
+import { webOrigins } from "#lib/auth";
 import { hashToken } from "#lib/crypto";
 import { ApiError, badRequest, conflict } from "#lib/errors";
 import { generateId } from "#lib/ids";
@@ -106,13 +107,38 @@ async function installable(ctx: AppContext, provider: string) {
   return { spec, app };
 }
 
+/**
+ * Where the admin's browser goes once the provider is done with it. Only the web app's own
+ * origins: anything else would make this server an open redirect.
+ */
+function returnOrigin(ctx: AppContext, returnTo: unknown) {
+  if (typeof returnTo !== "string") {
+    return null;
+  }
+  const allowed = webOrigins(ctx.config).map((o) =>
+    URL.canParse(o) ? new URL(o).origin : o
+  );
+  const origin = URL.canParse(returnTo) ? new URL(returnTo).origin : null;
+  if (!origin || !allowed.includes(origin)) {
+    throw badRequest("returnTo must be one of this server's web app origins");
+  }
+  return origin;
+}
+
 export async function beginInstall(
   ctx: AppContext,
   member: Member,
-  provider: string
+  provider: string,
+  opts: { returnTo?: string | null } = {}
 ) {
   const { spec, app } = await installable(ctx, provider);
-  const state = await newState(ctx, { provider, purpose: "install", member });
+  const returnTo = returnOrigin(ctx, opts.returnTo);
+  const state = await newState(ctx, {
+    provider,
+    purpose: "install",
+    member,
+    data: returnTo ? { returnTo } : {},
+  });
   return { url: spec.installUrl(app, state, callbackUrl(ctx, provider)) };
 }
 
@@ -128,10 +154,12 @@ export async function beginAppCreation(
     name?: string;
     organization?: string;
     replace?: boolean;
+    returnTo?: string;
     secret?: string;
   }
 ) {
   await requireServerAdmin(ctx, input.secret);
+  const returnTo = returnOrigin(ctx, input.returnTo);
   if (input.replace !== true && (await loadApp(ctx, "github"))) {
     throw conflict(
       "This server already has a GitHub App. Pass replace to create a new one anyway; installations made with the old one stop working."
@@ -141,7 +169,7 @@ export async function beginAppCreation(
     provider: "github",
     purpose: "create_app",
     member,
-    data: { replace: input.replace === true },
+    data: { replace: input.replace === true, returnTo },
   });
   const { host } = new URL(ctx.config.PUBLIC_URL);
   const query = new URLSearchParams({
@@ -191,7 +219,12 @@ export async function finishAppCreation(
   }
   const member = await findMemberById(ctx.db, { id: state.memberId });
   return member
-    ? { type: "install", ...(await beginInstall(ctx, member, "github")) }
+    ? {
+        type: "install",
+        ...(await beginInstall(ctx, member, "github", {
+          returnTo: returnOrigin(ctx, state.data.returnTo),
+        })),
+      }
     : { type: "saved" };
 }
 
@@ -213,12 +246,13 @@ export async function completeInstall(
     callbackUrl(ctx, provider)
   );
   const state = await takeState(ctx, token);
-  return await connectInstallation(ctx, {
+  const connection = await connectInstallation(ctx, {
     provider,
     workspaceId: state.workspaceId,
     memberId: state.memberId,
     installed,
   });
+  return { connection, returnTo: returnOrigin(ctx, state.data.returnTo) };
 }
 
 /**

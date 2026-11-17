@@ -11,6 +11,7 @@ import {
 } from "#http/router";
 import {
   App,
+  InstallRequest,
   Link,
   ManifestRequest,
   ProviderParam,
@@ -98,7 +99,13 @@ export const appRoutes = router()
       summary: "Connect this workspace through the server's app (admins)",
       description:
         "Returns a link to the provider's install page. Approving it there creates the connection, routes the app's webhooks to it and starts reading recent history. The link works once, for an hour.",
-      request: { params: ProviderParam },
+      request: {
+        params: ProviderParam,
+        body: {
+          content: { "application/json": { schema: InstallRequest } },
+          required: false,
+        },
+      },
       responses: { 200: json(Link), ...errors },
     }),
     async (c) => {
@@ -109,6 +116,7 @@ export const appRoutes = router()
       if (!getConnector(provider)) {
         throw badRequest(`Unknown connector "${provider}"`);
       }
-      return respond(c, Link, await beginInstall(ctx, me, provider), 200);
+      const link = await beginInstall(ctx, me, provider, c.req.valid("json"));
+      return respond(c, Link, link, 200);
     }
   );

@@ -387,6 +387,38 @@ describe("GitHub App", () => {
     ).toHaveLength(0);
   });
 
+  test("an install started in the web app comes back to the new connection there", async () => {
+    const owner = await env.workspace();
+    await registerApp(owner);
+    const installationId = String(randomInt(1_000_000, 900_000_000));
+    env.ctx.fetch = github(installationId);
+    const link = await env.call("POST", "/v1/apps/github/install", {
+      token: owner.token,
+      body: { returnTo: "https://worklog.test/settings/connections" },
+    });
+    const state = new URL(link.body.url).searchParams.get("state") ?? "";
+    const res = await env.app.request(
+      `/oauth/github/callback?code=c&installation_id=${installationId}&setup_action=install&state=${encodeURIComponent(state)}`
+    );
+    const [conn] = (
+      await env.call("GET", "/v1/connections", { token: owner.token })
+    ).body;
+    expect(res.status).toBe(302);
+    expect(res.headers.get("location")).toBe(
+      `https://worklog.test/settings/connections/${conn.id}`
+    );
+  });
+
+  test("an install won't send the browser anywhere but the web app", async () => {
+    const owner = await env.workspace();
+    await registerApp(owner);
+    const res = await env.call("POST", "/v1/apps/github/install", {
+      token: owner.token,
+      body: { returnTo: "https://elsewhere.example" },
+    });
+    expect(res.status).toBe(400);
+  });
+
   test("editing the installation on GitHub's side comes back to a page that says it's fine", async () => {
     const res = await env.app.request(
       "/oauth/github/callback?code=x&installation_id=1&setup_action=update"
@@ -634,7 +666,7 @@ describe("GitHub App", () => {
     const link = await env.call("POST", "/v1/apps/github/manifest", {
       token: owner.token,
       headers: SETUP,
-      body: { name: "Worklog test" },
+      body: { name: "Worklog test", returnTo: "https://worklog.test" },
     });
     expect(link.status).toBe(200);
     const form = await env.app.request(
@@ -666,6 +698,17 @@ describe("GitHub App", () => {
     expect(back.status).toBe(302);
     expect(back.headers.get("location")).toStartWith(
       "https://github.com/apps/worklog-test-2/installations/new?state="
+    );
+    const installState =
+      new URL(back.headers.get("location") ?? "").searchParams.get("state") ??
+      "";
+    const installationId = String(randomInt(1_000_000, 900_000_000));
+    env.ctx.fetch = github(installationId);
+    const done = await env.app.request(
+      `/oauth/github/callback?code=c&installation_id=${installationId}&setup_action=install&state=${encodeURIComponent(installState)}`
+    );
+    expect(done.headers.get("location")).toStartWith(
+      "https://worklog.test/settings/connections/"
     );
     const app = (
       await env.call("GET", "/v1/apps", { token: owner.token })

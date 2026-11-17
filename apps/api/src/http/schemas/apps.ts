@@ -59,6 +59,13 @@ export const SetupSecretHeaders = z.object({
   "x-setup-secret": z.string().optional(),
 });
 
+const ReturnTo = z.url().optional().openapi({
+  description:
+    "The web app's origin, to send the browser back to the new connection when it's done. One of the server's web origins",
+});
+
+export const InstallRequest = z.object({ returnTo: ReturnTo });
+
 export const ManifestRequest = z.object({
   name: z.string().min(1).max(34).optional().openapi({
     description: "Unique on GitHub. Default: Worklog (<your host>)",
@@ -71,6 +78,7 @@ export const ManifestRequest = z.object({
     description:
       "Replace the server's existing GitHub App. Installations made with it stop working",
   }),
+  returnTo: ReturnTo,
 });
 
 export const Link = z
