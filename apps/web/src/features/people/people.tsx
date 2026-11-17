@@ -10,12 +10,13 @@ import type { ReactNode } from "react";
 import { useMemo } from "react";
 import { toast } from "sonner";
 
-import { api, unwrap } from "#api/client";
+import { ApiError, api, unwrap } from "#api/client";
 import type { Schemas } from "#api/client";
 import { q } from "#api/queries";
 import { Feed } from "#features/activity/feed";
 import { useMe } from "#features/auth/session";
 import { providerName, roleOf, useMembers } from "#features/cards/card-bits";
+import { NotFound } from "#features/shell/fallbacks";
 import { ago, agoPhrase } from "#lib/time";
 import { Avatar } from "#ui/avatar";
 import { Button } from "#ui/button";
@@ -358,9 +359,12 @@ export function Person({ handle }: { handle: string }) {
   }
   if (member.isError) {
     return (
-      <Page>
-        <ErrorNote error={member.error} />
-      </Page>
+      <PersonError
+        error={member.error}
+        retry={() => {
+          void member.refetch();
+        }}
+      />
     );
   }
   const m = member.data;
@@ -692,6 +696,18 @@ function NowList({
 }
 
 const PHONE = "@media (max-width: 640px)";
+
+/** Nobody with that handle is a wrong address, not a failure: it gets the not-found page. */
+function PersonError({ error, retry }: { error: Error; retry: () => void }) {
+  if (error instanceof ApiError && error.status === 404) {
+    return <NotFound />;
+  }
+  return (
+    <Page>
+      <ErrorNote error={error} retry={retry} />
+    </Page>
+  );
+}
 
 const styles = stylex.create({
   sections: { gap: space.x4 },

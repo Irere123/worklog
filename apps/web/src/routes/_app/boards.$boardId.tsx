@@ -33,7 +33,6 @@ import { BoardView } from "#features/board/board-view";
 import { PromptDialog } from "#features/board/prompt-dialog";
 import { NewCardDialog } from "#features/cards/new-card";
 import { Button } from "#ui/button";
-import { ErrorNote } from "#ui/feedback";
 import { Input, Segmented } from "#ui/field";
 import { PageHeader } from "#ui/layout";
 import { Menu, MenuItem, MenuSeparator } from "#ui/overlay";
@@ -69,7 +68,6 @@ export const Route = createFileRoute("/_app/boards/$boardId")({
     meta: [{ title: `${loaderData?.name ?? "Board"} · Worklog` }],
   }),
   component: BoardPage,
-  errorComponent: ({ error }) => <ErrorNote error={error} />,
 });
 
 function BoardPage() {

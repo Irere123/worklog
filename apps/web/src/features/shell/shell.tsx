@@ -18,6 +18,7 @@ import { showDesktopAlert } from "#lib/desktop-alerts";
 import { setSidebarFolded, useNarrow, useSidebarFolded } from "#lib/sidebar";
 import { color, motion } from "#ui/tokens.stylex";
 
+import { InShell } from "./fallbacks";
 import { MobileBar } from "./mobile-bar";
 import { Sidebar } from "./sidebar";
 
@@ -225,7 +226,9 @@ export function Shell() {
           onSearch={() => show("palette")}
         />
         <main id="main" tabIndex={-1} {...stylex.props(styles.main)}>
-          <Outlet />
+          <InShell value>
+            <Outlet />
+          </InShell>
         </main>
       </div>
       <CardPreviews />

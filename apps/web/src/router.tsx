@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createRouter } from "@tanstack/react-router";
 
 import { ApiError } from "#api/client";
+import { NotFound, RouteError } from "#features/shell/fallbacks";
 
 import { routeTree } from "./routeTree.gen";
 
@@ -24,6 +25,9 @@ export function getRouter() {
     scrollRestoration: true,
     defaultPreload: "intent",
     defaultPreloadStaleTime: 0,
+    // Caught at the route that failed, so a page inside the app keeps its sidebar.
+    defaultErrorComponent: RouteError,
+    defaultNotFoundComponent: NotFound,
     Wrap: ({ children }) => (
       <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
     ),
