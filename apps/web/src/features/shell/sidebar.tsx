@@ -249,8 +249,9 @@ function SidebarHead({
             onClick={onToggle}
             {...stylex.props(styles.footerAction)}
           >
-            {/* The same icon as the rail's expand button, its panel shaded while the sidebar is out. */}
-            <SidebarSimpleIcon size={16} weight="duotone" />
+            {/* The same icon as the rail's expand button, its panel filled while the sidebar is out.
+                Not duotone: the build drops that weight (ICON_WEIGHTS in vite.config.ts). */}
+            <SidebarSimpleIcon size={16} weight="fill" />
           </button>
         </Tooltip>
       )}
