@@ -12,6 +12,7 @@
     "dev": "bun run --filter '*' dev",
     "dev:api": "bun run --filter @worklog/api dev",
     "dev:web": "bun run --filter @worklog/web dev",
+    "github-app": "cd apps/api && bun scripts/github-app.ts",
     "seed": "bun run --filter @worklog/api seed",
     "test": "bun run --filter '*' test",
     "typecheck": "bun run --filter '*' typecheck",

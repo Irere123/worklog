@@ -44,9 +44,12 @@ function retryAfter(res: Response, now: Date): Date | null {
   return res.status === 429 ? new Date(now.getTime() + MINUTE_MS) : null;
 }
 
+/** All a provider call needs, so a script without a database can make one too. */
+export type Caller = Pick<AppContext, "fetch" | "now">;
+
 /** A provider API call that throws `ProviderError` for anything but a 2xx. */
 export async function call(
-  ctx: AppContext,
+  ctx: Caller,
   what: string,
   url: string,
   init: RequestInit = {}
@@ -83,7 +86,7 @@ export async function call(
 }
 
 export async function callJson(
-  ctx: AppContext,
+  ctx: Caller,
   what: string,
   url: string,
   init: RequestInit = {}

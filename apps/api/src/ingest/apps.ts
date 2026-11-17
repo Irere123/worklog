@@ -76,7 +76,7 @@ const sameApp = (a: Omit<AppView, "provider">, b: AppView) =>
   JSON.stringify(a.credentials) === JSON.stringify(b.credentials);
 
 // An app that came from the environment follows it: an operator rotating a secret there expects
-// it to take effect. One created through the API or the manifest flow is the database's.
+// it to take effect. One registered through the API is the database's.
 async function fromEnvIfChanged(
   ctx: AppContext,
   row: ConnectorAppRow,

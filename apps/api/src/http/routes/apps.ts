@@ -13,13 +13,12 @@ import {
   App,
   InstallRequest,
   Link,
-  ManifestRequest,
   ProviderParam,
   SaveAppRequest,
   SetupSecretHeaders,
 } from "#http/schemas/apps";
 import { describeApps, registerApp } from "#ingest/apps";
-import { beginAppCreation, beginInstall } from "#ingest/install";
+import { beginInstall } from "#ingest/install";
 import { badRequest } from "#lib/errors";
 
 export const appRoutes = router()
@@ -47,7 +46,7 @@ export const appRoutes = router()
       summary:
         "Register this server's app with a provider, from its credentials",
       description:
-        "For apps created by hand on the provider's site. Point the app's webhooks at `webhookUrls` and its redirect at `callbackUrl` (see `GET /v1/apps`). GitHub can create its app in one step instead: `POST /v1/apps/github/manifest`.",
+        "For apps created by hand on the provider's site. Point the app's webhooks at `webhookUrls` and its redirect at `callbackUrl` (see `GET /v1/apps`). GitHub's is created with `bun run github-app` and set in the environment instead.",
       request: {
         params: ProviderParam,
         headers: SetupSecretHeaders,
@@ -66,28 +65,6 @@ export const appRoutes = router()
         }
       );
       return respond(c, App, app, 200);
-    }
-  )
-  .openapi(
-    createRoute({
-      method: "post",
-      path: "/v1/apps/github/manifest",
-      operationId: "app.createGithub",
-      tags: ["Connections"],
-      summary: "Create this server's GitHub App in one click",
-      description:
-        "Returns a link to open in a browser. GitHub asks to confirm the app, creates it with the right webhooks, permissions and redirects, and hands its credentials back to this server; then it goes straight on to installing it. The link works once, for an hour.",
-      request: { headers: SetupSecretHeaders, ...body(ManifestRequest) },
-      responses: { 200: json(Link), ...errors },
-    }),
-    async (c) => {
-      const me = c.get("member");
-      requireAdmin(me);
-      const link = await beginAppCreation(c.get("ctx"), me, {
-        ...c.req.valid("json"),
-        secret: c.req.valid("header")["x-setup-secret"],
-      });
-      return respond(c, Link, link, 200);
     }
   )
   .openapi(

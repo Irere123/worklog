@@ -3,6 +3,7 @@ import { createPrivateKey, sign } from "node:crypto";
 import { z } from "zod";
 
 import { call, callJson, ProviderError } from "#connectors/http";
+import type { Caller } from "#connectors/http";
 import type { AppSpec, AppView, ConnectionView } from "#connectors/types";
 import type { AppContext } from "#context";
 import { badRequest, forbidden } from "#lib/errors";
@@ -368,24 +369,25 @@ export const githubApp: AppSpec = {
  * The app GitHub creates from a manifest. User authorization during install is what lets the
  * callback check who installed it; the same client id and secret sign people in.
  */
-export function githubManifest(publicUrl: string, name: string) {
+export function githubManifest(
+  publicUrl: string,
+  name: string,
+  opts: { public: boolean; redirectUrl: string }
+) {
   return {
     name,
     url: publicUrl,
-    // GitHub can't deliver to a server on this machine; an inactive hook still gets the app a
-    // webhook secret, and history arrives through sync instead.
-    hook_attributes: {
-      url: `${publicUrl}/hooks/apps/github`,
-      active: !isLocal(publicUrl),
-    },
-    redirect_url: `${publicUrl}/oauth/github/app`,
+    hook_attributes: { url: `${publicUrl}/hooks/apps/github`, active: true },
+    // Only where GitHub hands the new app's credentials back: `bun run github-app` listens there.
+    redirect_url: opts.redirectUrl,
     callback_urls: [
       `${publicUrl}/oauth/github/callback`,
       `${publicUrl}/api/auth/callback/github`,
     ],
     request_oauth_on_install: true,
     setup_on_update: true,
-    public: false,
+    // A private app installs only on the account that owns it.
+    public: opts.public,
     default_permissions: {
       contents: "read",
       issues: "read",
@@ -405,17 +407,6 @@ export function githubManifest(publicUrl: string, name: string) {
   };
 }
 
-/** A server only this machine can reach, as in development. */
-export function isLocal(url: string) {
-  const host = new URL(url).hostname;
-  return (
-    host === "localhost" ||
-    host.endsWith(".localhost") ||
-    host === "[::1]" ||
-    host.startsWith("127.")
-  );
-}
-
 const Conversion = z.object({
   id: z.number(),
   slug: z.string(),
@@ -428,11 +419,7 @@ const Conversion = z.object({
 });
 
 /** Trades the manifest flow's one-hour code for the new app's credentials. */
-export async function convertManifest(
-  ctx: AppContext,
-  code: string,
-  api = API
-) {
+export async function convertManifest(ctx: Caller, code: string, api = API) {
   const app = Conversion.parse(
     await callJson(
       ctx,

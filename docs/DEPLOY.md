@@ -57,6 +57,11 @@ Worklog runs as three processes and a database. Each process has its own image, 
 
 - **Deploys:** merge to `main`. CI checks the code, builds the three images, starts them together against Postgres and probes them; Railway waits for those checks (`checkSuites`) before building, so what deploys is what CI tested. `api` runs migrations as its pre-deploy step; each service keeps serving until its replacement passes its health check.
 - **Integrations** (AI, email, GitHub, Slack, Discord, Tinybird): set the variable as a shared variable, add its name to `INTEGRATIONS` in `.railway/railway.ts`, commit, then `railway config apply`. [`apps/api/.env.example`](../apps/api/.env.example) lists them all.
+- **The GitHub App:** one app serves every workspace on the server, so teams install it with one click from Settings → Connections. Create it once, against the deployed domain:
+  1. `bun run github-app --url https://your-domain` from a checkout, and open the address it prints in a browser on the same machine (over SSH, forward the port first, or paste back the address GitHub leaves you on). GitHub asks you to confirm the app's name; `--org acme` creates it under an organization, and `--private` limits installs to its owner.
+  2. Set each line of the `github-app.env` it writes as a shared variable, then delete the file.
+  3. Their names are already in `INTEGRATIONS`: `railway config apply`, and `api` and `worker` restart with the app. Every workspace admin now sees **Install** on GitHub.
+
 - **Rolling back:** redeploy an earlier deployment from the service's Deployments tab. Migrations don't roll back, which is why they stay additive.
 - **Scaling:** the API is stateless (events reach every replica through Postgres) and Graphile Worker shares jobs safely between workers, so both take `replicas` in `.railway/railway.ts`. Each process opens up to `DATABASE_POOL_SIZE` (20) connections; keep the total under Postgres's `max_connections` (100 on Railway's), with room for the migrate step and your own sessions.
 
@@ -78,6 +83,7 @@ docker compose -f compose.yaml -f compose.https.yaml up -d
 - **Images:** while the repository is private, its images are too: `docker login ghcr.io` with a token that can read packages, or build this checkout with `docker compose up -d --build`. `WORKLOG_VERSION` picks a published tag (`latest`, `1.2.0`, `sha-9fceb02`).
 - **Upgrading:** `docker compose pull && docker compose up -d`. The migrate step runs first; the API and the worker start only once it succeeds.
 - **Backups:** a compressed `pg_dump` every day into `./backups`, kept 14 days (`BACKUP_*` in `.env`). Copy them off the machine too. To restore one into a fresh stack: `docker compose up -d postgres`, then `docker compose exec -T postgres pg_restore -U worklog -d worklog --clean --if-exists < backups/worklog-….dump`, then `docker compose up -d`.
+- **The GitHub App:** create it as for Railway, with `bun run github-app --url <PUBLIC_URL>` from a checkout, and add the lines of the `github-app.env` it writes to `.env`. `docker compose up -d` picks them up.
 - **Logs:** `docker compose logs -f api worker`. Each container's log is capped at five 10 MB files.
 
 ## Email that reaches the inbox

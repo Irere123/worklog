@@ -1518,30 +1518,10 @@ export interface paths {
         get?: never;
         /**
          * Register this server's app with a provider, from its credentials
-         * @description For apps created by hand on the provider's site. Point the app's webhooks at `webhookUrls` and its redirect at `callbackUrl` (see `GET /v1/apps`). GitHub can create its app in one step instead: `POST /v1/apps/github/manifest`.
+         * @description For apps created by hand on the provider's site. Point the app's webhooks at `webhookUrls` and its redirect at `callbackUrl` (see `GET /v1/apps`). GitHub's is created with `bun run github-app` and set in the environment instead.
          */
         put: operations["app.save"];
         post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/apps/github/manifest": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Create this server's GitHub App in one click
-         * @description Returns a link to open in a browser. GitHub asks to confirm the app, creates it with the right webhooks, permissions and redirects, and hands its credentials back to this server; then it goes straight on to installing it. The link works once, for an hour.
-         */
-        post: operations["app.createGithub"];
         delete?: never;
         options?: never;
         head?: never;
@@ -8604,71 +8584,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["App"];
-                };
-            };
-            /** @description Invalid request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Missing or invalid credentials */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Not found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-        };
-    };
-    "app.createGithub": {
-        parameters: {
-            query?: never;
-            header?: {
-                "x-setup-secret"?: string;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    /** @description Unique on GitHub. Default: Worklog (<your host>) */
-                    name?: string;
-                    /** @description Create the app in this organization */
-                    organization?: string;
-                    /** @description Replace the server's existing GitHub App. Installations made with it stop working */
-                    replace?: boolean;
-                    /**
-                     * Format: uri
-                     * @description The web app's origin, to send the browser back to the new connection when it's done. One of the server's web origins
-                     */
-                    returnTo?: string;
-                };
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Link"];
                 };
             };
             /** @description Invalid request */

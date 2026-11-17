@@ -17,6 +17,7 @@
     "openapi": "bun scripts/openapi.ts",
     "secrets:reseal": "bun scripts/reseal-secrets.ts",
     "ratings:replay": "bun scripts/replay-ratings.ts",
+    "github-app": "bun scripts/github-app.ts",
     "seed": "bun scripts/seed.ts",
     "typecheck": "tsc --noEmit",
     "test": "bun test --timeout 60000"

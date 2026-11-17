@@ -57,7 +57,7 @@ export async function createContext(
     env.WORKLOG_SECRET_KEY,
     env.WORKLOG_SECRET_KEYS_PREVIOUS
   );
-  // An app registered through the API (GitHub's manifest flow) also signs people in, from the
+  // An app registered through the API (PUT /v1/apps/{provider}) also signs people in, from the
   // next start; what the environment sets wins.
   const config = withAppSignIn(env, await listConnectorApps(db), secrets);
   const mailer = overrides.mailer ?? createMailer(config);

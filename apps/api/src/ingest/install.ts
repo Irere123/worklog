@@ -1,7 +1,6 @@
 import { randomBytes } from "node:crypto";
 
 import { getConnector } from "#connectors";
-import { convertManifest } from "#connectors/github/app";
 import type { Installed } from "#connectors/types";
 import type { AppContext } from "#context";
 import { violates } from "#db/errors";
@@ -18,16 +17,15 @@ import {
   insertInstallState,
 } from "#db/queries/install-states";
 import type { InstallState } from "#db/queries/install-states";
-import { findMemberById } from "#db/queries/members";
 import type { Member } from "#db/queries/members";
 import { transact } from "#db/transact";
 import { webOrigins } from "#lib/auth";
 import { hashToken } from "#lib/crypto";
-import { ApiError, badRequest, conflict } from "#lib/errors";
+import { badRequest, conflict } from "#lib/errors";
 import { generateId } from "#lib/ids";
 import { HOUR_MS } from "#lib/time";
 
-import { callbackUrl, loadApp, requireServerAdmin, saveApp } from "./apps";
+import { callbackUrl, loadApp } from "./apps";
 import { queueSync } from "./sync-queue";
 
 /**
@@ -140,92 +138,6 @@ export async function beginInstall(
     data: returnTo ? { returnTo } : {},
   });
   return { url: spec.installUrl(app, state, callbackUrl(ctx, provider)) };
-}
-
-/**
- * The first step of GitHub's manifest flow: a link to the page that posts the manifest to GitHub.
- * Refused before GitHub creates anything when the server has an app: a second one there would
- * only be orphaned.
- */
-export async function beginAppCreation(
-  ctx: AppContext,
-  member: Member,
-  input: {
-    name?: string;
-    organization?: string;
-    replace?: boolean;
-    returnTo?: string;
-    secret?: string;
-  }
-) {
-  await requireServerAdmin(ctx, input.secret);
-  const returnTo = returnOrigin(ctx, input.returnTo);
-  if (input.replace !== true && (await loadApp(ctx, "github"))) {
-    throw conflict(
-      "This server already has a GitHub App. Pass replace to create a new one anyway; installations made with the old one stop working."
-    );
-  }
-  const state = await newState(ctx, {
-    provider: "github",
-    purpose: "create_app",
-    member,
-    data: { replace: input.replace === true, returnTo },
-  });
-  const { host } = new URL(ctx.config.PUBLIC_URL);
-  const query = new URLSearchParams({
-    state,
-    name: input.name ?? `Worklog (${host})`.slice(0, 34),
-    ...(input.organization ? { organization: input.organization } : {}),
-  });
-  return {
-    url: `${ctx.config.PUBLIC_URL}/oauth/github/manifest?${query.toString()}`,
-  };
-}
-
-/**
- * GitHub made the app from the manifest: store it, then install it. When another app was stored
- * meanwhile, this one stays unused and the admin is told where to delete it.
- */
-export async function finishAppCreation(
-  ctx: AppContext,
-  query: { state?: string; code?: string }
-): Promise<
-  | { type: "install"; url: string }
-  | { type: "saved" }
-  | { type: "orphaned"; slug: string; url: string }
-> {
-  const state = await takeState(ctx, {
-    provider: "github",
-    purpose: "create_app",
-    token: query.state,
-  });
-  if (!query.code) {
-    throw badRequest("GitHub sent no code back, so no app was created.");
-  }
-  const { url, ...created } = await convertManifest(ctx, query.code);
-  try {
-    await saveApp(
-      ctx,
-      "github",
-      { ...created, createdVia: "manifest" },
-      { replace: state.data.replace === true }
-    );
-  } catch (error) {
-    // GitHub has already made the app; its credentials are only ever handed over once.
-    if (error instanceof ApiError && error.status === 409) {
-      return { type: "orphaned", slug: created.slug, url };
-    }
-    throw error;
-  }
-  const member = await findMemberById(ctx.db, { id: state.memberId });
-  return member
-    ? {
-        type: "install",
-        ...(await beginInstall(ctx, member, "github", {
-          returnTo: returnOrigin(ctx, state.data.returnTo),
-        })),
-      }
-    : { type: "saved" };
 }
 
 /** The provider redirected back: verify, then connect the installation to the admin's workspace. */

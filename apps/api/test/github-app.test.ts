@@ -8,7 +8,11 @@ import {
 
 import { sql } from "drizzle-orm";
 
-import { forgetToken } from "#connectors/github/app";
+import {
+  convertManifest,
+  forgetToken,
+  githubManifest,
+} from "#connectors/github/app";
 import { forgetCachedApps, loadApp } from "#ingest/apps";
 import { withAppSignIn } from "#ingest/sign-in";
 import { hmacHex } from "#lib/crypto";
@@ -657,69 +661,6 @@ describe("GitHub App", () => {
     );
   });
 
-  test("the manifest flow creates the app and goes on to install it", async () => {
-    const owner = await env.workspace();
-    await env.ctx.db.execute(
-      sql`delete from connector_apps where provider = 'github'`
-    );
-    forgetCachedApps();
-    const link = await env.call("POST", "/v1/apps/github/manifest", {
-      token: owner.token,
-      headers: SETUP,
-      body: { name: "Worklog test", returnTo: "https://worklog.test" },
-    });
-    expect(link.status).toBe(200);
-    const form = await env.app.request(
-      new URL(link.body.url).pathname + new URL(link.body.url).search
-    );
-    const html = await form.text();
-    expect(html).toContain(
-      'action="https://github.com/settings/apps/new?state='
-    );
-    expect(html).toContain("https://worklog.test/hooks/apps/github");
-    const state = new URL(link.body.url).searchParams.get("state") ?? "";
-    env.ctx.fetch = routedFetch([
-      [
-        "POST https://api.github.com/app-manifests/m-code/conversions",
-        () => ({
-          id: 5150,
-          slug: "worklog-test-2",
-          name: "Worklog test",
-          client_id: "Iv1.new",
-          client_secret: "new-secret",
-          webhook_secret: "new-hook-secret",
-          pem,
-        }),
-      ],
-    ]);
-    const back = await env.app.request(
-      `/oauth/github/app?code=m-code&state=${encodeURIComponent(state)}`
-    );
-    expect(back.status).toBe(302);
-    expect(back.headers.get("location")).toStartWith(
-      "https://github.com/apps/worklog-test-2/installations/new?state="
-    );
-    const installState =
-      new URL(back.headers.get("location") ?? "").searchParams.get("state") ??
-      "";
-    const installationId = String(randomInt(1_000_000, 900_000_000));
-    env.ctx.fetch = github(installationId);
-    const done = await env.app.request(
-      `/oauth/github/callback?code=c&installation_id=${installationId}&setup_action=install&state=${encodeURIComponent(installState)}`
-    );
-    expect(done.headers.get("location")).toStartWith(
-      "https://worklog.test/settings/connections/"
-    );
-    const app = (
-      await env.call("GET", "/v1/apps", { token: owner.token })
-    ).body.find((a: any) => a.provider === "github");
-    expect(app).toMatchObject({
-      configured: true,
-      createdVia: "manifest",
-      appId: "5150",
-    });
-  });
-
   test("an app from the environment follows it when its secrets change there", async () => {
     await env.ctx.db.execute(
       sql`delete from connector_apps where provider = 'github'`
@@ -758,17 +699,6 @@ describe("GitHub App", () => {
     }
   });
 
-  test("the manifest flow won't create a second app unless asked to replace the first", async () => {
-    const owner = await env.workspace();
-    await registerApp(owner);
-    const res = await env.call("POST", "/v1/apps/github/manifest", {
-      token: owner.token,
-      headers: SETUP,
-      body: {},
-    });
-    expect(res.status).toBe(409);
-  });
-
   test("a registered app signs people in too, unless the environment says otherwise", () => {
     const row = {
       provider: "github",
@@ -779,7 +709,7 @@ describe("GitHub App", () => {
         clientId: "Iv1.app",
         clientSecret: "app-secret",
       }),
-      createdVia: "manifest" as const,
+      createdVia: "manual" as const,
       unrouted: 0,
       lastUnroutedAt: null,
       rejections: 0,
@@ -815,40 +745,49 @@ describe("GitHub App", () => {
     expect(half.GITHUB_CLIENT_SECRET).toBeUndefined();
   });
 
-  test("an app registered while the manifest flow ran is kept, and the new one named for deletion", async () => {
-    const owner = await env.workspace();
-    await env.ctx.db.execute(
-      sql`delete from connector_apps where provider = 'github'`
-    );
-    forgetCachedApps();
-    const link = await env.call("POST", "/v1/apps/github/manifest", {
-      token: owner.token,
-      headers: SETUP,
-      body: {},
+  test("the app `bun run github-app` creates installs anywhere and points back at the server", async () => {
+    const manifest = githubManifest("https://worklog.example", "Worklog", {
+      public: true,
+      redirectUrl: "http://localhost:4590/done",
     });
-    const state = new URL(link.body.url).searchParams.get("state") ?? "";
-    await registerApp(owner);
-    env.ctx.fetch = routedFetch([
-      [
-        "POST https://api.github.com/app-manifests/late/conversions",
-        () => ({
-          id: 6060,
-          slug: "worklog-late",
-          name: "Worklog late",
-          html_url: "https://github.com/apps/worklog-late",
-          client_id: "Iv1.late",
-          client_secret: "s",
-          webhook_secret: "w",
-          pem,
-        }),
+    expect(manifest).toMatchObject({
+      public: true,
+      hook_attributes: {
+        url: "https://worklog.example/hooks/apps/github",
+        active: true,
+      },
+      redirect_url: "http://localhost:4590/done",
+      callback_urls: [
+        "https://worklog.example/oauth/github/callback",
+        "https://worklog.example/api/auth/callback/github",
       ],
-    ]);
-    const back = await env.app.request(
-      `/oauth/github/app?code=late&state=${encodeURIComponent(state)}`
+      request_oauth_on_install: true,
+    });
+    const app = await convertManifest(
+      {
+        now: () => new Date(),
+        fetch: routedFetch([
+          [
+            "POST https://api.github.com/app-manifests/m-code/conversions",
+            () => ({
+              id: 5150,
+              slug: "worklog",
+              name: "Worklog",
+              client_id: "Iv1.new",
+              client_secret: "new-secret",
+              webhook_secret: "new-hook-secret",
+              pem,
+            }),
+          ],
+        ]),
+      },
+      "m-code"
     );
-    expect(back.status).toBe(409);
-    expect(await back.text()).toContain("https://github.com/apps/worklog-late");
-    expect((await loadApp(env.ctx, "github"))?.slug).toBe("worklog-test");
+    expect(app).toMatchObject({
+      appId: "5150",
+      slug: "worklog",
+      credentials: { clientId: "Iv1.new", webhookSecret: "new-hook-secret" },
+    });
   });
 
   test("registering an app on a server with several workspaces takes the setup secret", async () => {

@@ -23,7 +23,16 @@ const REQUIRED = ["WORKLOG_SECRET_KEY", "AUTH_SECRET", "PUBLIC_URL"];
 // Add a name once it's set as a shared variable: a reference to one that isn't set has no value
 // to resolve to. apps/api/.env.example lists them all (OPENROUTER_API_KEY, RESEND_API_KEY,
 // TINYBIRD_TOKEN, the GitHub, Slack and Discord apps…).
-const INTEGRATIONS: string[] = [];
+const INTEGRATIONS: string[] = [
+  // The GitHub App, from `bun run github-app` (docs/DEPLOY.md). Its client id and secret also
+  // sign people in with GitHub.
+  "GITHUB_APP_ID",
+  "GITHUB_APP_SLUG",
+  "GITHUB_APP_PRIVATE_KEY",
+  "GITHUB_APP_WEBHOOK_SECRET",
+  "GITHUB_CLIENT_ID",
+  "GITHUB_CLIENT_SECRET",
+];
 
 const API_PORT = "4000";
 const WORKER_PORT = "4001";

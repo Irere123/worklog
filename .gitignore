@@ -9,3 +9,5 @@ dist/
 # Tinybird CLI login and local state
 tinybird/.tinyb*
 backups/
+# Credentials `bun run github-app` writes for the operator to move into the environment
+github-app.env

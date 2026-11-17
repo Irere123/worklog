@@ -46,9 +46,9 @@ const Env = z.object({
   WEB_DIST: z.string().optional(),
   GITHUB_CLIENT_ID: z.string().optional(),
   GITHUB_CLIENT_SECRET: z.string().optional(),
-  // The instance's GitHub App, if it isn't created from the API (POST /v1/apps/github/manifest).
-  // The client id and secret above are the same app's, so one app signs people in and connects
-  // repos. The private key may use \n for line breaks.
+  // The instance's GitHub App, as `bun run github-app` writes it. The client id and secret above
+  // are the same app's, so one app signs people in and connects repos. The private key may use
+  // \n for line breaks.
   GITHUB_APP_ID: z.string().optional(),
   GITHUB_APP_SLUG: z.string().optional(),
   GITHUB_APP_PRIVATE_KEY: z.string().optional(),

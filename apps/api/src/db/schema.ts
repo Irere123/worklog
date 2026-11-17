@@ -271,7 +271,7 @@ export const connectorApps = pgTable("connector_apps", {
 export const installStates = pgTable("install_states", {
   id: text("id").primaryKey(),
   provider: text("provider").notNull(),
-  purpose: text("purpose", { enum: ["install", "create_app"] }).notNull(),
+  purpose: text("purpose", { enum: ["install"] }).notNull(),
   workspaceId: text("workspace_id")
     .notNull()
     .references(() => workspaces.id, { onDelete: "cascade" }),

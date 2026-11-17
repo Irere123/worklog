@@ -66,21 +66,6 @@ const ReturnTo = z.url().optional().openapi({
 
 export const InstallRequest = z.object({ returnTo: ReturnTo });
 
-export const ManifestRequest = z.object({
-  name: z.string().min(1).max(34).optional().openapi({
-    description: "Unique on GitHub. Default: Worklog (<your host>)",
-  }),
-  organization: z
-    .string()
-    .optional()
-    .openapi({ description: "Create the app in this organization" }),
-  replace: z.boolean().optional().openapi({
-    description:
-      "Replace the server's existing GitHub App. Installations made with it stop working",
-  }),
-  returnTo: ReturnTo,
-});
-
 export const Link = z
   .object({ url: z.string().openapi({ description: "Open in a browser" }) })
   .openapi("Link");
