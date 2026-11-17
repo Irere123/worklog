@@ -8653,6 +8653,11 @@ export interface operations {
                     organization?: string;
                     /** @description Replace the server's existing GitHub App. Installations made with it stop working */
                     replace?: boolean;
+                    /**
+                     * Format: uri
+                     * @description The web app's origin, to send the browser back to the new connection when it's done. One of the server's web origins
+                     */
+                    returnTo?: string;
                 };
             };
         };
@@ -8704,7 +8709,17 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": {
+                    /**
+                     * Format: uri
+                     * @description The web app's origin, to send the browser back to the new connection when it's done. One of the server's web origins
+                     */
+                    returnTo?: string;
+                };
+            };
+        };
         responses: {
             /** @description OK */
             200: {

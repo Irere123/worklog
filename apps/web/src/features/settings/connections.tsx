@@ -63,11 +63,13 @@ export function Connections() {
   const connections = useQuery(q.connections());
   const apps = useQuery(q.apps());
   const [connecting, setConnecting] = useState<Connector | null>(null);
+  const [creatingApp, setCreatingApp] = useState(false);
   const install = useMutation({
     mutationFn: async (provider: string) =>
       await unwrap(
         api.POST("/v1/apps/{provider}/install", {
           params: { path: { provider } },
+          body: { returnTo: location.origin },
         })
       ),
     onSuccess: (link) => location.assign(link.url),
@@ -75,6 +77,10 @@ export function Connections() {
   });
   const appReady = (provider: string) =>
     apps.data?.some((a) => a.provider === provider && a.configured) ?? false;
+  // Only admins can list apps, so only they are offered to create one.
+  const githubApp = apps.data?.find(
+    (a) => a.provider === "github" && !a.configured
+  );
 
   return (
     <SettingsPage
@@ -149,12 +155,22 @@ export function Connections() {
                     Install
                   </Button>
                 )}
+                {c.id === "github" && githubApp && (
+                  <Button
+                    size="sm"
+                    variant="primary"
+                    onClick={() => setCreatingApp(true)}
+                  >
+                    Set up GitHub App
+                  </Button>
+                )}
                 <Button
                   size="sm"
                   icon={<PlusIcon size={13} />}
                   onClick={() => setConnecting(c)}
                 >
-                  {c.capabilities.app && appReady(c.id)
+                  {c.capabilities.app &&
+                  (appReady(c.id) || (c.id === "github" && githubApp))
                     ? "Connect manually"
                     : "Connect"}
                 </Button>
@@ -163,6 +179,12 @@ export function Connections() {
           ))}
         </ul>
       </Card>
+      {creatingApp && githubApp && (
+        <GithubAppDialog
+          webhookUrl={githubApp.webhookUrls.webhook ?? ""}
+          onClose={() => setCreatingApp(false)}
+        />
+      )}
       {connecting?.id === "webhook" && (
         <WebhookConnectDialog onClose={() => setConnecting(null)} />
       )}
@@ -173,6 +195,94 @@ export function Connections() {
         />
       )}
     </SettingsPage>
+  );
+}
+
+/**
+ * GitHub creates the server's app from a manifest, so nobody copies keys around: it asks to
+ * confirm the name, hands the credentials back to the server, then asks where to install it.
+ */
+function GithubAppDialog({
+  webhookUrl,
+  onClose,
+}: {
+  webhookUrl: string;
+  onClose: () => void;
+}) {
+  const [organization, setOrganization] = useState("");
+  const create = useMutation({
+    mutationFn: async () =>
+      await unwrap(
+        api.POST("/v1/apps/github/manifest", {
+          body: {
+            ...(organization.trim()
+              ? { organization: organization.trim() }
+              : {}),
+            returnTo: location.origin,
+          },
+        })
+      ),
+    onSuccess: (link) => location.assign(link.url),
+    onError: (error) => toast.error(error.message),
+  });
+  const host = URL.canParse(webhookUrl) ? new URL(webhookUrl).hostname : "";
+  const local =
+    host === "localhost" ||
+    host.endsWith(".localhost") ||
+    host.startsWith("127.");
+  return (
+    <Dialog
+      open
+      onOpenChange={(o) => {
+        if (!o) {
+          onClose();
+        }
+      }}
+      title="Set up the GitHub App"
+      description="GitHub creates an app for this Worklog server, then asks which repositories to install it on. It reads code, issues and pull requests, and never writes to them."
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button
+            variant="primary"
+            busy={create.isPending || create.isSuccess}
+            onClick={() => create.mutate()}
+          >
+            Continue to GitHub
+          </Button>
+        </>
+      }
+    >
+      <div {...stylex.props(styles.form)}>
+        <Field
+          label="Organization (optional)"
+          hint="Leave empty to own the app yourself. Name a GitHub organization you own and its owners can manage the app too."
+        >
+          {(id) => (
+            <Input
+              id={id}
+              placeholder="acme"
+              spellCheck={false}
+              autoComplete="off"
+              value={organization}
+              onChange={(e) => setOrganization(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !create.isPending) {
+                  create.mutate();
+                }
+              }}
+            />
+          )}
+        </Field>
+        {local && (
+          <p {...stylex.props(styles.note)}>
+            {`This server's address is ${host}, which GitHub can't reach, so events won't arrive as they happen: history comes in when Worklog syncs. Set PUBLIC_URL to a public address first to get them live.`}
+          </p>
+        )}
+      </div>
+    </Dialog>
   );
 }
 
@@ -771,6 +881,14 @@ const styles = stylex.create({
       default: color.fgMuted,
       ":hover": { default: null, [media.hover]: color.fg },
     },
+  },
+  note: {
+    paddingBlock: space.md,
+    paddingInline: space.lg,
+    borderRadius: radius.md,
+    fontSize: text.label,
+    color: color.amberFg,
+    backgroundColor: color.amberSubtle,
   },
   alert: {
     display: "flex",
