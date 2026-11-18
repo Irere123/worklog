@@ -20,7 +20,7 @@
     "ratings:replay": "bun scripts/replay-ratings.ts",
     "github-app": "bun scripts/github-app.ts",
     "seed": "bun scripts/seed.ts",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "bun check",
     "test": "bun test --timeout 60000"
   },
   "dependencies": {
