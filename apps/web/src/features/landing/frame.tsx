@@ -122,7 +122,6 @@ export function AppWindow({
           <span>{ada.name}</span>
         </div>
       </aside>
-      {/* On a phone the app trades its sidebar for this bar, so the miniature does too. */}
       <div {...stylex.props(styles.mobileBar)}>
         <ListIcon size={18} />
         <Logo size={20} />
@@ -269,7 +268,6 @@ const styles = stylex.create({
     color: color.fg,
     textAlign: "start",
     userSelect: "none",
-    // The demo sits inside someone's page: its own type never inherits the page's headings.
     letterSpacing: "normal",
   },
   sidebar: {
@@ -447,7 +445,6 @@ const styles = stylex.create({
     },
     boxShadow: `0 0 0 1px ${color.line}`,
   },
-  // A new chapter changes only the page: the window and its sidebar stay solid, as in the app.
   page: {
     height: "100%",
     animationName: stylex.keyframes({
@@ -464,7 +461,6 @@ const styles = stylex.create({
     zIndex: 5,
     width: 24,
     height: 24,
-    // The arrow's tip sits at (10, 7) of its 32-unit box, drawn at 24px.
     marginTop: -5,
     marginLeft: -7.5,
     opacity: 0,

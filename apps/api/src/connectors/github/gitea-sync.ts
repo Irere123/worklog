@@ -12,9 +12,7 @@ import type { AppContext } from "#context";
 import { normalizeGithubLike } from "./events";
 import type { Issue, Payload, User } from "./events";
 
-// A run re-reads a little of what the last one saw; the ledger drops the overlap.
 const OVERLAP_MS = 5 * 60_000;
-// Gitea's default MAX_RESPONSE_ITEMS: asking for more returns this many anyway.
 const LIMIT = 50;
 const STAGES = ["issues", "comments", "releases", "pushes"] as const;
 type Stage = (typeof STAGES)[number];
@@ -77,9 +75,7 @@ const Cursor = z.object({
       started: z.string(),
       stage: z.enum(STAGES),
       page: z.number(),
-      /** The partition webhooks use (`repository.id`), so history and live events share a lane. */
       repoId: z.number().optional(),
-      /** Pushes of merge commits to it are dropped, as their webhooks are. */
       defaultBranch: z.string().optional(),
     })
     .optional(),
@@ -93,7 +89,6 @@ const Page = z.object({
   since: z.string(),
   stage: z.enum(STAGES),
   items: z.array(z.unknown()),
-  /** Comments carry only their issue's URL: the titles come along from the issues stage. */
   titles: z
     .record(z.string(), z.object({ title: z.string(), pr: z.boolean() }))
     .optional(),
@@ -102,7 +97,6 @@ const Page = z.object({
 const userOf = (u: z.infer<typeof GiteaUser>): User => ({
   login: u.login,
   id: u.id ?? null,
-  // Gitea sends "" for a user without a full name.
   name: u.full_name === "" ? undefined : u.full_name,
 });
 
@@ -144,10 +138,6 @@ const PATHS: Record<
     `/repos/${repo}/activities/feeds?limit=${LIMIT}&page=${page}`,
 };
 
-/**
- * Gitea and Forgejo have no apps: a token (a bot user's, limited to the chosen repos) reads each
- * repo's issues, PRs, comments and releases since the last run, the way GitHub's GraphQL sync does.
- */
 async function readRepo(
   ctx: AppContext,
   conn: ConnectionView,
@@ -179,8 +169,6 @@ async function readRepo(
       titles,
     },
   };
-  // Releases come newest first with no `since`; one page covers any reasonable window. The
-  // feed is newest first too: a page reaching past the window is the last.
   const more =
     run.stage === "pushes"
       ? items.length === LIMIT && !reachesBack(items, run.since)
@@ -227,7 +215,6 @@ async function repoOf(ctx: AppContext, conn: ConnectionView, repo: string) {
   return { repoId: info.id, defaultBranch: info.default_branch };
 }
 
-/** One stage's page. The feed only exists from Gitea and Forgejo 1.21: older servers skip it. */
 async function readItems(
   ctx: AppContext,
   conn: ConnectionView,
@@ -270,8 +257,6 @@ const issueNumber = (url: string | undefined) => {
   return n === undefined ? null : Number(n);
 };
 
-// A comment on an issue updated in the window: one lookup per issue, while the page is read, so
-// normalize stays pure.
 async function titlesFor(
   ctx: AppContext,
   conn: ConnectionView,
@@ -406,7 +391,6 @@ function commentDelivery(
   ];
 }
 
-// A push in the feed carries its commits as JSON: what a push webhook carries, rebuilt.
 function pushDelivery(raw: unknown) {
   const item = FeedItem.safeParse(raw);
   if (
@@ -520,7 +504,6 @@ export function normalizeGiteaPage(
       events.length === 0
         ? `nothing new in ${repo.full_name} ${stage}`
         : undefined,
-    // History before the window isn't noise; what the rules turned into nothing is.
     skipped: normalized.filter((e) => e.length === 0).length,
   };
 }

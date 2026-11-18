@@ -18,9 +18,6 @@ import review from "./prompts/review.md" with { type: "text" };
 import teammate from "./prompts/teammate.md" with { type: "text" };
 import untrusted from "./prompts/untrusted.md" with { type: "text" };
 
-// Every prompt the assistant speaks with lives in this folder as Markdown, so what it is told can
-// be read and diffed without reading code. Placeholders are `{{name}}`; a missing one throws, so a
-// renamed placeholder fails the first time it runs rather than reaching the model as braces.
 const PROMPTS = {
   brief,
   check,
@@ -53,15 +50,10 @@ export function prompt(name: PromptName, vars: Record<string, string> = {}) {
     });
 }
 
-// Who the assistant is, the same for every owner and for everything it writes: conversations,
-// briefs and automations. Only a reviewed commit changes it: no tool writes it, so nothing planted
-// in ingested text can rewrite it.
 export const CONSTITUTION = constitution.trim();
 
 export const UNTRUSTED_NOTE = untrusted.trim();
 
-// For what is delivered rather than said in a conversation. The data behind a team version is
-// already team-visible only; this tells the model why, so it doesn't hint at what was left out.
 export function audienceNote(visibility: Visibility, name: string) {
   return visibility === "private"
     ? `Only ${name} reads this.`

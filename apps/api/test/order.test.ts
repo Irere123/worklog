@@ -23,7 +23,6 @@ const pr = (updated: string) => ({
   updated_at: updated,
 });
 
-// One afternoon on one PR, as GitHub would send it.
 const history: [string, object][] = [
   [
     "pull_request",
@@ -77,7 +76,6 @@ const history: [string, object][] = [
   ],
 ];
 
-// Deterministic shuffles, so a failure can be reproduced.
 function shuffled<T>(items: T[], seed: number) {
   const out = [...items];
   let state = seed;
@@ -114,7 +112,6 @@ async function play(order: [string, object][], seed: number) {
       headers: {
         "content-type": "application/json",
         "x-github-event": event,
-        // Every third delivery is redelivered under a new id, as a sync re-reading it would be.
         "x-github-delivery": `${seed}-${i}`,
         "x-hub-signature-256": `sha256=${hmacHex("s", raw)}`,
       },

@@ -83,8 +83,6 @@ async function github(settings: Record<string, unknown> = {}) {
   return { owner, teammate, conn, deliver, activities };
 }
 
-// A body without a length, as a chunked upload sends it. A provider with no app answers without
-// touching the database.
 async function streamed(body: string, path = "/hooks/apps/nobody") {
   return await env.app.request(path, {
     method: "POST",
@@ -93,7 +91,6 @@ async function streamed(body: string, path = "/hooks/apps/nobody") {
   });
 }
 
-// A message in channel C1 from U1, in a thread when given its first message's time.
 function slackMessage(ts: number, text: string, thread?: number) {
   return {
     type: "message",
@@ -118,7 +115,6 @@ describe("exactly once", () => {
     const { deliver, activities } = await github();
     await deliver("push", push("a1", ["1", "2"]));
     await deliver("push", push("a2", ["3"]));
-    // The same pushes again under new delivery ids: what a sync re-reading them looks like.
     await deliver("push", push("a2", ["3"]));
     await deliver("push", push("a1", ["1", "2"]));
     const [burst] = await activities("?kind=code.pushed");
@@ -159,7 +155,6 @@ describe("exactly once", () => {
   test("a redelivery of a delivery that failed is processed again", async () => {
     const { conn, deliver, activities } = await github();
     await deliver("push", push("c1", ["1"]), { delivery: "flaky" });
-    // As if every attempt had failed and the queue had given up.
     await env.ctx.db.execute(sql`
       update inbound_events set status = 'failed', error = 'boom'
       where connection_id = ${conn.id}`);
@@ -249,7 +244,6 @@ describe("exactly once", () => {
         sql`select id, lane from inbound_events where connection_id = ${conn.id}`
       )
     ).rows;
-    // A job queued before lanes, running beside the lane's drain.
     await Promise.all([
       processInbound(env.ctx, row?.id ?? ""),
       drainLane(env.ctx, conn.id, row?.lane ?? 0),
@@ -280,8 +274,6 @@ describe("exactly once", () => {
         sql`select lane from inbound_events where connection_id = ${conn.id} limit 1`
       )
     ).rows;
-    // Slows the drain after it has locked its deliveries and before its first write refers to the
-    // connection (the check of that reference comes after the row), where the delete lands.
     await env.ctx.db.execute(
       sql.raw(`
         create function test_slow() returns trigger language plpgsql as $$
@@ -311,13 +303,11 @@ describe("exactly once", () => {
   test("a delivery whose drain was lost is picked up within a minute", async () => {
     const { conn, deliver, activities } = await github();
     await deliver("push", push("lost", ["1"]), { drain: false });
-    // As if the job queuing had lost its race with a drain already under way.
     await env.ctx.db.execute(sql`
       delete from graphile_worker._private_jobs
       where key like ${`%:${conn.id}:%`}`);
     await env.drain();
     expect(await activities("?kind=code.pushed")).toHaveLength(0);
-    // Not yet: a drain may just be busy.
     await enqueue(env.ctx, "ingest:sweep", {});
     await env.drain();
     expect(await activities("?kind=code.pushed")).toHaveLength(0);
@@ -337,7 +327,6 @@ describe("exactly once", () => {
         sql`select lane from inbound_events where connection_id = ${conn.id} limit 1`
       )
     ).rows;
-    // Failed, due in an hour, and the job that held its retry already ran.
     await env.ctx.db.execute(sql`
       update inbound_events set status = 'failed', attempts = 1,
         retry_at = now() + interval '1 hour'
@@ -355,8 +344,6 @@ describe("exactly once", () => {
   test("a lane held by a worker that died is freed and drained", async () => {
     const { conn, deliver, activities } = await github();
     await deliver("push", push("dead", ["1"]), { drain: false });
-    // Its drain started on a worker that was then killed: the job and its lane's queue stay
-    // locked, and Graphile Worker would wait four hours to free them.
     await env.ctx.db.execute(sql`
       update graphile_worker._private_jobs
       set locked_at = now() - interval '15 minutes', locked_by = 'dead-worker', attempts = 1
@@ -381,7 +368,6 @@ describe("exactly once", () => {
       { ...push("f2", ["2"]), ref: "refs/heads/other" },
       { delivery: "later" }
     );
-    // As if both had failed: one is due now, the other in an hour.
     await env.ctx.db.execute(sql`
       update inbound_events set status = 'failed',
         retry_at = case delivery_id when 'due' then now() - interval '1 second' else now() + interval '1 hour' end
@@ -438,7 +424,6 @@ describe("ordering", () => {
       0
     );
 
-    // Asked again after that review: a new request.
     await deliver("pull_request", {
       action: "review_requested",
       sender: emma,
@@ -511,7 +496,6 @@ describe("ordering", () => {
       pull_request: { ...pr, updated_at: "2026-10-26T10:00:00Z" },
       requested_reviewer: sam,
     });
-    // The removal of an earlier request, arriving after the new one was made.
     await deliver("pull_request", {
       action: "review_request_removed",
       sender: emma,
@@ -551,7 +535,6 @@ describe("ordering", () => {
       "501",
       "502",
     ]);
-    // Stored as sent, including what no mapping reads yet, so a replay can use it later.
     const stored = await env.ctx.db.execute<{ pusher: string }>(sql`
       select payload->'pusher'->>'name' as pusher from inbound_events
       where connection_id = ${conn.id} and partition_key = '501'`);
@@ -571,8 +554,6 @@ describe("reading webhooks", () => {
     expect(pushed.body).toContain("Strip  from exports");
   });
 
-  // Bun (1.3) fails to read a request rebuilt around a new stream, which is how Hono's bodyLimit
-  // bounds a body without a length: a run of a hundred or so after nine thousand requests.
   test("bodies without a length are read whole, however many arrive, and the cap holds for them", async () => {
     const statuses = new Map<number, number>();
     let left = 12_000;
@@ -702,7 +683,6 @@ describe("replay", () => {
     expect(
       titles.toSorted((a: string, b: string) => a.localeCompare(b))
     ).toEqual(["Closed T-1", "Closed T-2"]);
-    // The one that failed stays done, with why, for the next replay to try again.
     const poison = await env.ctx.db.execute<{ status: string; error: string }>(
       sql`select status, error from inbound_events where id = ${`inb_poison_${conn.id}`}`
     );
@@ -731,7 +711,6 @@ describe("replay and live work", () => {
   test("a replay leaves deliveries still waiting to the drain, effects and all", async () => {
     const { owner, teammate, conn, deliver } = await github();
     await deliver("push", push("r1", ["1"]));
-    // Waiting in its lane, not yet processed.
     await deliver(
       "pull_request",
       {
@@ -754,7 +733,6 @@ describe("replay and live work", () => {
       sql`select status from inbound_events where connection_id = ${conn.id} and event_type = 'pull_request'`
     );
     expect(waiting.rows[0]?.status).toBe("pending");
-    // The drain gets to it later, with its effects.
     const lane = await env.ctx.db.execute<{ lane: number }>(
       sql`select lane from inbound_events where connection_id = ${conn.id} limit 1`
     );
@@ -873,7 +851,6 @@ describe("Slack deletions", () => {
     expect(burst.count).toBe(2);
     expect(burst.body).toBeNull();
 
-    // The burst's first message going too leaves the burst: it stands for the others.
     await post("E4", {
       type: "message",
       subtype: "message_deleted",
@@ -932,7 +909,6 @@ describe("Slack deletions", () => {
       "F2",
       slackMessage(base + 1, "Password is hunter2-SECRET", base - 100)
     );
-    // A link preview arriving is a change with the same text: the burst keeps it.
     await post("F2b", {
       type: "message",
       subtype: "message_changed",

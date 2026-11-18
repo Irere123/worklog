@@ -156,7 +156,6 @@ export async function teamNow(
             title: last.title,
           }
         : null,
-      // Waiting on someone is the news, whatever else the agent did since.
       agent:
         runs.find((r) => r.state === "needs_you") ??
         (latestRun ? (asRun(latestRun)[0] ?? null) : null),
@@ -169,8 +168,6 @@ export async function teamNow(
 
 type RunRow = Awaited<ReturnType<typeof listRunsInPlay>>[number];
 
-// A question its person has settled no longer holds the agent up: it's back at work until its next
-// update says otherwise.
 function asRun(row: RunRow) {
   if (row.state === null) {
     return [];
@@ -200,10 +197,6 @@ function waitingFirst(
   );
 }
 
-/**
- * Activities per day over the last `days` of each member's own calendar, oldest first and today
- * last. Private entries count only for `privateFor`.
- */
 async function rhythmsOf(
   ctx: AppContext,
   params: {
@@ -215,7 +208,6 @@ async function rhythmsOf(
 ) {
   const { workspaceId, days } = params;
   const now = ctx.now();
-  // A day more than shown: the zones furthest ahead of UTC start their days earlier.
   const hours = await countActivitiesByActorHour(ctx.db, {
     workspaceId,
     privateFor: params.privateFor,
@@ -233,7 +225,6 @@ async function rhythmsOf(
   const zones = new Map(
     people.map((m) => {
       const zone = timezoneOf(m, workspace);
-      // Member time zones are free text; one Intl can't read falls back to the workspace's.
       return [m.id, isValidTimeZone(zone) ? zone : workspace.timezone];
     })
   );
@@ -247,7 +238,6 @@ async function rhythmsOf(
       localDate(new Date(row.hour), zone),
       localDate(now, zone)
     );
-    // Hours are UTC buckets: in a half-hour zone up to 30 minutes land on the neighbouring day.
     if (back < 0 || back >= days) {
       continue;
     }
@@ -292,14 +282,12 @@ export function renderSnapshot(s: WorkSnapshot): string {
   return lines.join("\n");
 }
 
-/** One line per card, as the app shows it: "Added this card · Marked done", not two entries. */
 function foldRuns(recent: WorkSnapshot["recent"]) {
   const runs: { title: string; details: string[] }[] = [];
   for (const a of recent) {
     const detail = a.detail?.split("\n")[0]?.trim();
     const run = runs.find((r) => r.title === a.title);
     if (run) {
-      // Newest first, so an earlier step goes in front of what followed it.
       if (detail && !run.details.includes(detail)) {
         run.details.unshift(detail);
       }

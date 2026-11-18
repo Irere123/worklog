@@ -4,8 +4,6 @@ import type { Telemetry } from "ai";
 import { runIn, startSpan } from "./trace";
 import type { Span } from "./trace";
 
-// Spans of generations still running, by the call id the SDK's events share. One whose end never
-// arrives is let go once this many are open.
 const MAX_OPEN = 1000;
 const operations = new Map<string, Span>();
 const modelCalls = new Map<string, Span>();
@@ -97,7 +95,6 @@ function integration(): Telemetry {
       span?.set({ "ai.aborted": true });
       span?.end();
     },
-    // A tool's queries and the model calls it makes count toward its span, not the request's.
     executeTool: async ({ toolCallId, execute }) => {
       const span = tools.get(toolCallId);
       return span ? await runIn(span, execute) : await execute();

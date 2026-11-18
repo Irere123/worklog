@@ -86,7 +86,6 @@ type AskState = {
   words: number;
 };
 
-// The question is asked and the lookup under way: the first frame is already a working assistant.
 const ASK_START: AskState = {
   asked: true,
   mood: "thinking",
@@ -117,8 +116,6 @@ function Ask() {
       await a.wait(900);
       set({ folded: true, mood: "writing" });
       await a.wait(300);
-      // Streams in word by word, the way the assistant really answers. Every word is laid out
-      // from the start and shown in turn, so the answer grows in place instead of reflowing.
       for (let words = 1; words <= WORDS.length; words += 1) {
         set({ words });
         // oxlint-disable-next-line no-await-in-loop -- one word after another
@@ -217,7 +214,6 @@ function Ask() {
 
 type Phase = "working" | "asking" | "allowed";
 
-// The ghost wears the run's state, as every agent's does across the app.
 const MOODS: Record<Phase, Mood> = {
   working: "thinking",
   asking: "waiting",
@@ -269,7 +265,6 @@ function Approve() {
       }
       await a.wait(100);
       set({ phase: "allowed" });
-      // Its job done, the pointer fades where it is rather than coming to rest on the record.
       await a.wait(700);
       set({ shown: false });
     },
@@ -397,7 +392,6 @@ const styles = stylex.create({
     overflow: "hidden",
   },
   plate: {
-    // Sized to what the two windows hold once they've played, so neither ends on a blank band.
     height: {
       default: 400,
       "@media (max-width: 640px)": 380,
@@ -431,7 +425,6 @@ const styles = stylex.create({
     flexDirection: "column",
     width: "100%",
     maxWidth: 420,
-    // Runs off the plate's foot, like the product shots above it.
     minHeight: 400,
     borderRadius: radius.lg,
     backgroundColor: color.bg,
@@ -460,7 +453,6 @@ const styles = stylex.create({
     overflow: "hidden",
     textOverflow: "ellipsis",
   },
-  // A phone's header keeps the title and its status whole and drops the card's icon and number.
   wideOnly: {
     display: {
       default: "inline",
@@ -504,7 +496,6 @@ const styles = stylex.create({
     fontSize: text.meta,
     color: color.fgMuted,
   },
-  // Sits on the step's first line when its words wrap.
   stepIcon: {
     flexShrink: 0,
     marginTop: 2,
@@ -616,7 +607,6 @@ const styles = stylex.create({
     backgroundColor: color.amberSubtle,
     boxShadow: `inset 0 0 0 1px oklch(0.85 0.08 75)`,
   },
-  // The state can't wrap mid-roll, so on a narrow phone the whole state drops to its own line.
   runHead: {
     display: "flex",
     flexWrap: "wrap",

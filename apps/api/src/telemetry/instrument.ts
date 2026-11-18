@@ -30,8 +30,6 @@ export function tracedFetch(inner: typeof fetch): typeof fetch {
   return Object.assign(wrapped, inner);
 }
 
-// Below this a query only counts toward its span's totals; at or above it, it gets a span of its
-// own with its SQL. Drizzle sends parameters apart from the text, so no values are recorded.
 const SLOW_QUERY_MS = 250;
 const MAX_STATEMENT = 2000;
 
@@ -48,12 +46,6 @@ export function instrumentPool(pool: Pool) {
   });
 }
 
-// The promise form is what Drizzle, Better Auth and Graphile Worker call, on the pool and on the
-// clients it lends for transactions. Pool#query runs on a client through pg's callback form,
-// which passes through untimed, so a query counts once. It's timed at the pool, not the client,
-// because pg hands a waiting query its connection in the context of whoever released it: timed
-// there, it would count toward another request. So a query's time includes waiting for a
-// connection, and a slow one says how busy the pool was when it was asked.
 function wrapQuery(target: Pool | PoolClient) {
   if (instrumented.has(target)) {
     return;

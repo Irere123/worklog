@@ -63,7 +63,6 @@ type Stored = Schemas["Message"];
 type Meta = { steps?: Step[]; createdAt?: string };
 type ChatMessage = UIMessage<Meta>;
 
-// The thread follows a reply as it grows while you're within this distance of the bottom.
 const FOLLOW_PX = 120;
 
 function toUi(messages: Stored[]): ChatMessage[] {
@@ -98,8 +97,6 @@ export function Chat({
   const transport = useTransport(conversation.id);
   const initial = useMemo(() => toUi(stored), [stored]);
 
-  // The reply that just came in whole, for the moment its ghost looks pleased. Set by the finish
-  // itself, so a stopped, failed or interrupted reply never looks done.
   const [landed, setLanded] = useState<string | null>(null);
   useEffect(() => {
     const timer =
@@ -119,14 +116,10 @@ export function Chat({
         setLanded(message.id);
       }
       void client.invalidateQueries({ queryKey: ["conversations"] });
-      // A long answer finished while the person looked elsewhere: tell them, if they asked for
-      // desktop alerts (the helper stays quiet when the tab is in view or alerts are off).
       showDesktopAlert({
         title: "Your assistant answered",
         body: clip(textOf(message).replaceAll(/[*_`#>]/gu, ""), 120),
         tag: `reply-${conversation.id}`,
-        // Clicking it focuses this tab, which is already on the conversation.
-        onOpen: ignore,
       });
     },
   });
@@ -237,8 +230,6 @@ export function Chat({
             .findLast((said) => !DELIVERY.test(said))
         }
         onStartTyping={() => {
-          // The provider caches the prompt's start while the question is typed, so the answer
-          // starts sooner. The server ignores repeats within a few minutes.
           if (!busy) {
             void api
               .POST("/v1/conversations/{id}/warm", {
@@ -252,7 +243,6 @@ export function Chat({
   );
 }
 
-/** How the composer addresses the assistant, and the name over its replies. */
 function namesFor(teammate: boolean, agent?: Member, owner?: Member) {
   if (!teammate) {
     return { name: "your assistant", agentName: "Your assistant" };
@@ -261,7 +251,6 @@ function namesFor(teammate: boolean, agent?: Member, owner?: Member) {
   return { name, agentName: agent?.name ?? name };
 }
 
-/** Where the newest message stands: whether it's answering, and a size that grows with it. */
 function replyProgress(messages: ChatMessage[]) {
   const last = messages.at(-1);
   const length =
@@ -276,14 +265,6 @@ function replyProgress(messages: ChatMessage[]) {
   };
 }
 
-/**
- * After a reply settles, the stored transcript replaces the streamed copy, so message ids match
- * the server's and replies can be rated.
- */
-/**
- * An answer counts as seen once it's on screen in a tab someone is looking at, so the assistant
- * stops showing it as news. A tab in the background waits until it's looked at again.
- */
 function useMarkSeen(conversation: Conversation) {
   const client = useQueryClient();
   const { id } = conversation;
@@ -335,11 +316,6 @@ function useAdoptStored(
   }, [stored, busy]);
 }
 
-/**
- * A question asked from Home or ⌘K arrives with the new conversation. It's sent from a
- * cancellable timer: a dev double-mount tears down the first chat instance, and a message sent
- * straight from the effect would die with it.
- */
 function useFirstMessage(
   message: string | undefined,
   hasHistory: boolean,
@@ -367,8 +343,6 @@ function useTransport(id: string) {
         api: `/v1/conversations/${id}/chat`,
         credentials: "include",
         headers: () => authHeaders(),
-        // The server keeps the history; it wants only the newest message, plus whether this one
-        // steers a reply that's still being written.
         prepareSendMessagesRequest: ({ messages, body }) => ({
           body: {
             message: messages.at(-1),
@@ -382,10 +356,6 @@ function useTransport(id: string) {
   );
 }
 
-/**
- * How long each turn worked before it answered, by its position in the thread: a reply keeps
- * its place when the stored transcript replaces the streamed copy, but not its id.
- */
 function useTurnTimer(answering: boolean, index: number) {
   const startedAt = useRef<number | null>(null);
   const [took, setTook] = useState<ReadonlyMap<number, number>>(new Map());
@@ -407,10 +377,6 @@ function useTurnTimer(answering: boolean, index: number) {
   };
 }
 
-/**
- * Follows a reply as it grows while the reader is at the bottom; once they scroll up to read,
- * the thread stays put and offers a way back down.
- */
 function useStickToBottom(contentSize: string) {
   const ref = useRef<HTMLDivElement>(null);
   const following = useRef(true);
@@ -423,7 +389,6 @@ function useStickToBottom(contentSize: string) {
       el.scrollTop = el.scrollHeight;
     }
   });
-  // The route keys this view by conversation, so mounting means a conversation was opened.
   useEffect(() => {
     ref.current?.scrollTo({ top: ref.current.scrollHeight });
   }, []);
@@ -453,11 +418,6 @@ function useStickToBottom(contentSize: string) {
   };
 }
 
-// The pending thread's controls answer nothing until the conversation exists.
-function ignore() {
-  // Nothing to do yet.
-}
-
 /**
  * A question on its way, drawn as the conversation will be, while the server opens it: the
  * thread, the assistant's line and the composer are all where they'll be when it arrives.
@@ -478,10 +438,6 @@ export function PendingThread({ question }: { question: string }) {
         teammate={false}
         name="your assistant"
         away={false}
-        onJump={ignore}
-        onSend={ignore}
-        onStop={ignore}
-        onStartTyping={ignore}
         inputRef={{ current: null }}
       />
     </div>
@@ -519,7 +475,6 @@ function Messages({
   askAgain: (question: string) => void;
 }) {
   const lastIndex = messages.length - 1;
-  // A thread kept for days (briefs arrive in one) marks where each day starts.
   let shownDay = messages[0]?.metadata?.createdAt
     ? dayKey(messages[0].metadata.createdAt)
     : null;
@@ -530,8 +485,6 @@ function Messages({
     if (day !== null) {
       shownDay = day;
     }
-    // A reply stopped before it answered, or the latest one, offers its question again. The
-    // history is append-only, so asking again is a new turn, not a replaced answer.
     const previous = messages[i - 1];
     const question =
       message.role === "assistant" &&
@@ -605,10 +558,10 @@ function Dock({
   teammate: boolean;
   name: string;
   away: boolean;
-  onJump: () => void;
-  onSend: (text: string) => void;
-  onStop: () => void;
-  onStartTyping: () => void;
+  onJump?: () => void;
+  onSend?: (text: string) => void;
+  onStop?: () => void;
+  onStartTyping?: () => void;
   inputRef: RefObject<HTMLTextAreaElement | null>;
   recall?: () => string | undefined;
 }) {
@@ -722,7 +675,6 @@ function Welcome({
 }
 
 function Waiting({ name }: { name: string }) {
-  // Shown only if nothing has arrived after a moment, so a quick reply never flashes it.
   const shown = useDelayed(300);
   return (
     <div {...stylex.props(styles.reply)}>
@@ -732,7 +684,6 @@ function Waiting({ name }: { name: string }) {
   );
 }
 
-/** Who is answering and when, as a log line reads: the agent's face, its name, the time. */
 function AgentLine({
   name,
   at,
@@ -740,7 +691,6 @@ function AgentLine({
 }: {
   name: string;
   at?: string;
-  /** Only the reply that's live moves; an earlier one holds still. */
   mood?: Mood;
 }) {
   return (
@@ -760,15 +710,10 @@ function AgentLine({
   );
 }
 
-// What the server stores for a reply stopped before it wrote anything (agent/loop.ts).
 const STOPPED = "Stopped before finishing.";
 
-// Briefs and pings the assistant posts on its own are stored after a marker in the person's turn,
-// so the next question has them as context. The marker isn't something they said.
 const DELIVERY = /^\[Worklog automation: (?<label>.+)\]$/u;
 
-// A streamed chunk replaces only the newest message; the ones above keep their identity, so
-// memoizing them keeps a long conversation from re-rendering every turn on every chunk.
 const SentMessage = memo(UserMessage);
 const AssistantReply = memo(Reply);
 
@@ -788,7 +733,6 @@ function UserMessage({ message }: { message: ChatMessage }) {
       </p>
     );
   }
-  // Only what arrives while the conversation is open moves in; a stored thread just appears.
   const arriving = message.metadata?.createdAt === undefined;
   return (
     <div {...stylex.props(styles.user, arriving && styles.arriving)}>
@@ -890,7 +834,6 @@ function Reply({
 
 const OFF = ["Wrong", "Out of date", "Missed something", "Too long"];
 
-/** Why a reply didn't help, in a tap or a sentence; the rating itself is already saved. */
 function WhatWasOff({ onSend }: { onSend: (note: string) => void }) {
   const [picked, setPicked] = useState<string[]>([]);
   const [more, setMore] = useState("");
@@ -940,17 +883,12 @@ function WhatWasOff({ onSend }: { onSend: (note: string) => void }) {
   );
 }
 
-/**
- * A card drafted from a reply: its first sentence as the title, in plain words, and the whole
- * reply as the description, so nothing it said is lost. The person edits it before adding.
- */
 function cardFrom(reply: string) {
   const plain = reply
     .replaceAll(/[*_`>#]+/gu, "")
     .replaceAll(/\[(?<label>[^\]]+)\]\([^)]+\)/gu, "$<label>")
     .trim();
   const [first = plain] = plain.split(/(?<=[.!?])\s|\n/u);
-  // Card titles read as names, not sentences, so the closing full stop goes.
   return { title: clip(first.replace(/\.$/u, ""), 90), body: reply };
 }
 
@@ -968,7 +906,6 @@ function ReplyActions({
   conversationId: string;
   rating: string | null;
   rateable: boolean;
-  /** The latest reply keeps its actions in view; older ones show them on hover. */
   pinned: boolean;
   onAskAgain?: () => void;
 }) {
@@ -1126,10 +1063,6 @@ const rise = stylex.keyframes({
 
 const COLUMN = 720;
 
-/**
- * The live reply's ghost: thinking until its words start, writing while they come, pleased for a
- * moment once they're done. Earlier replies get no mood and hold still.
- */
 function replyMood(
   streaming: boolean,
   latest: boolean,
@@ -1145,7 +1078,6 @@ function replyMood(
   return latest ? "idle" : undefined;
 }
 
-// Long enough to see the answer land, short enough that it's not still celebrating as you read.
 const LANDED_MS = 2400;
 
 const styles = stylex.create({

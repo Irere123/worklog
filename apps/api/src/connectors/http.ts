@@ -27,7 +27,6 @@ export class ProviderError extends Error {
 
 const MINUTE_MS = 60_000;
 
-// GitHub signals its limits with 403 or 429 plus headers; others with 429 and Retry-After.
 function retryAfter(res: Response, now: Date): Date | null {
   const after = res.headers.get("retry-after");
   if (after && /^\d+$/u.test(after)) {

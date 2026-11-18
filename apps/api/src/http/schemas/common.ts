@@ -1,19 +1,14 @@
 import { z } from "@hono/zod-openapi";
 
-// Rows carry Dates; the contract carries ISO strings. Parsing a response does the conversion, and
-// the OpenAPI generator documents a date as a date-time string.
 export const Timestamp = z
   .date()
   .transform((d) => d.toISOString())
   .openapi({ format: "date-time", example: "2026-10-26T08:30:00.000Z" });
 
-// For values already formatted upstream, such as a work snapshot.
 export const IsoTimestamp = z
   .string()
   .openapi({ format: "date-time", example: "2026-10-26T08:30:00.000Z" });
 
-// The OpenAPI generator publishes a regex with its flags appended (`…$/u`),
-// which no client can use, so patterns that reach the spec go without flags.
 // oxlint-disable-next-line require-unicode-regexp -- see above
 export const HH_MM = /^\d{1,2}:\d{2}$/;
 
@@ -27,8 +22,6 @@ export function derived<I, S extends z.ZodType>(
   schema: S,
   from: (row: I) => z.input<S>
 ): z.ZodPipe<z.ZodTransform<z.input<S>, I>, S> {
-  // `preprocess` leaves the mapper and the schema untied, which is what lets this compile for any
-  // S; the declared return type ties them back together for callers.
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- see above
   return z.preprocess(
     // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- rows only ever come from `respond`, typed by the return type above

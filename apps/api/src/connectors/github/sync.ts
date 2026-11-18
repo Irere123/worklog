@@ -14,14 +14,11 @@ import type { GithubAuth } from "./app";
 import { actorFor, normalizeGithubLike } from "./events";
 import type { Issue, Payload, User } from "./events";
 
-// Reconcile runs re-read a little of what the last run saw: the ledger drops the overlap, and an
-// event that committed late on GitHub's side isn't skipped.
 const OVERLAP_MS = 5 * 60_000;
 const STAGES = ["pulls", "issues", "releases", "pushes"] as const;
 type Stage = (typeof STAGES)[number];
 type GraphStage = Exclude<Stage, "pushes">;
 
-// A compare call per push: a run reads this many per repo, the newest first, a page at a time.
 const PUSHES_PER_PAGE = 25;
 const MAX_PUSHES = 100;
 const NO_COMMIT = /^0+$/u;
@@ -62,7 +59,6 @@ export const PullNode = z.object({
   mergedBy: Actor,
   reviewRequests: z.object({
     nodes: z.array(
-      // A team has no login; only people are asked by name.
       z.object({
         requestedReviewer: z
           .looseObject({ login: z.string().optional() })
@@ -206,16 +202,13 @@ const Response = z.object({
 });
 
 const Cursor = z.object({
-  /** Where the next run starts reading. */
   next: z.string().optional(),
-  /** The run in progress. */
   run: z
     .object({
       since: z.string(),
       started: z.string(),
       stage: z.enum(STAGES),
       after: z.string().nullish(),
-      /** From the GraphQL stages, for the pushes stage's partition. */
       repoId: z.number().optional(),
       offset: z.number().optional(),
     })
@@ -283,7 +276,6 @@ export async function readRepo(
     owner,
     name,
     after: run.after ?? null,
-    // Only the issues query declares it; GraphQL refuses variables a query doesn't.
     ...(run.stage === "issues" ? { since: run.since } : {}),
   });
   const { nodes, pageInfo } = repo.items;
@@ -291,7 +283,6 @@ export async function readRepo(
   const fresh = nodes.filter(
     (n) => !n.updatedAt || Date.parse(n.updatedAt) >= since
   );
-  // Newest first: one item older than the window means the rest are too.
   const exhausted =
     !pageInfo.hasNextPage ||
     fresh.length < nodes.length ||
@@ -355,10 +346,6 @@ const RepoInfo = z.object({ default_branch: z.string() });
 
 type Run = NonNullable<z.infer<typeof Cursor>["run"]>;
 
-/**
- * Pushes, from the repository's activity, each with its commits from a compare: what a push
- * webhook carries, so the same rules drop force pushes and merge commits and merge bursts.
- */
 async function readPushes(
   ctx: AppContext,
   auth: GithubAuth,
@@ -416,7 +403,6 @@ async function readPushes(
   return { page, cursor: { next }, done: true };
 }
 
-// A new branch has nothing to compare with: its tip commit stands for it.
 async function commitsOf(
   get: (what: string, path: string) => Promise<unknown>,
   fullName: string,
@@ -482,7 +468,6 @@ const userOf = (a: GqlActor): User | null =>
 const closerOf = (items: z.infer<typeof Closer>) =>
   userOf(items.nodes.at(-1)?.actor ?? null);
 
-/** What the webhooks would have said, rebuilt from current state, for the same mapping. */
 function pullDeliveries(node: z.infer<typeof PullNode>) {
   const author = userOf(node.author);
   const pr: Issue = {
@@ -553,7 +538,6 @@ function pullDeliveries(node: z.infer<typeof PullNode>) {
   return out;
 }
 
-// What `pull_request_review_comment` webhooks carry: the same mapping, the same ids.
 function lineCommentDeliveries(
   comments: z.infer<typeof Comment>[],
   pr: Issue
@@ -681,10 +665,6 @@ function releaseDelivery(node: z.infer<typeof ReleaseNode>) {
   };
 }
 
-/**
- * An open PR's outstanding review requests, read now. Hidden: the request itself was news when
- * it was made; this only makes sure the reviewer has it in front of them.
- */
 function awaitingReview(
   ns: string,
   repo: string,
@@ -782,7 +762,6 @@ export function normalizeSyncPage(
       events.length === 0
         ? `nothing new in ${repo.full_name} ${stage}`
         : undefined,
-    // History before the window isn't noise; what the rules turned into nothing is.
     skipped: normalized.filter((e) => e.length === 0).length,
   };
 }

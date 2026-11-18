@@ -41,7 +41,6 @@ export function ApiKeys() {
     prefix: string;
   } | null>(null);
   const client = useQueryClient();
-  // Browsers usually sign in with a cookie; when it's a key, revoking it here signs this tab out.
   const inUse = auth.key();
   const revoke = useMutation({
     mutationFn: async (id: string) =>
@@ -348,7 +347,6 @@ export function Members() {
       description="Everyone whose work shows up in Worklog. Agents act for a person, who stays accountable for them."
       actions={
         <>
-          {/* Anyone can connect their own coding tool: it works for them, and they approve it. */}
           <Button
             size="sm"
             icon={<Ghost size={14} still tinted />}
@@ -402,9 +400,7 @@ function MemberRows({
   onKey,
 }: {
   members: Schemas["Member"][];
-  /** Agents that connected themselves over MCP, by agent id. */
   connected?: Map<string, Schemas["AgentConnection"]>;
-  /** For agents the viewer may issue keys to: opens the new-key dialog for that agent. */
   onKey?: (member: Schemas["Member"]) => (() => void) | undefined;
 }) {
   return (
@@ -444,7 +440,6 @@ function MemberRow({
         {link && <ConnectionLine connection={link} />}
       </div>
       {self && <Badge>You</Badge>}
-      {/* Someone using Worklog through an API key has no account but is plainly here. */}
       {m.kind === "human" && !m.signedUp && !self && (
         <Badge tone="amber" status="waiting">
           Invited
@@ -465,7 +460,6 @@ function aboutMember(
   m: Schemas["Member"],
   owner: Schemas["Member"] | undefined
 ) {
-  // "Ada’s assistant" already says whom it works for.
   const namedForOwner = owner !== undefined && m.name.startsWith(owner.name);
   return [
     `@${m.handle}`,
@@ -564,7 +558,6 @@ function AddMember({
   onClose,
 }: {
   kind: "human" | "agent" | null;
-  /** Only admins add members by hand; anyone connects their own coding tool. */
   admin: boolean;
   onClose: () => void;
 }) {

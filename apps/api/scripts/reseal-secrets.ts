@@ -2,7 +2,6 @@ import { loadConfig } from "#config";
 import { createContext } from "#context";
 import { resealSecrets } from "#ingest/reseal";
 
-// After rotating WORKLOG_SECRET_KEY: re-seals now instead of waiting for the nightly run.
 const ctx = await createContext(
   loadConfig({ ...process.env, OPENROUTER_API_KEY: "" }),
   { models: null }

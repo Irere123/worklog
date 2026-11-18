@@ -82,8 +82,6 @@ export async function writeJournal(
   });
 }
 
-// One active digest per visibility: the team one is built from team memory only, so teammate
-// conversations can start with it.
 export async function writeDigest(
   ctx: AppContext,
   workspaceId: string,
@@ -192,15 +190,8 @@ export async function loadMemory(
   };
 }
 
-/** Lines changed since the digest that a memory page or a note carries; recall has the rest. */
 const CHANGES_LIMIT = 20;
 
-// What a conversation starts with, and keeps until its next summary. Owners get the digest built
-// from all their memory, teammates the one built from team memory, followed by what memory learned
-// and forgot since it was written, so a preference told this morning shapes this afternoon's
-// answers instead of waiting for tonight's rewrite. Without a digest yet (a new member, or no AI)
-// it's rendered raw. Unconfirmed lines stay out of all of it, since whatever is here reaches every
-// conversation; recall still finds them, marked.
 export async function memoryPage(
   ctx: AppContext,
   memberId: string,
@@ -291,8 +282,6 @@ async function replaceLatest(
   });
 }
 
-// A team-visible line keeps only the activity it cites: what the owner said to their own assistant
-// stays private even when the line it taught is shared, so no pass over team memory can read it.
 function keptEvidence(evidence: MemoryEvidence[], visibility: Visibility) {
   return evidence
     .filter((e) => visibility === "private" || e.kind === "activity")

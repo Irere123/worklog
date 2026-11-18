@@ -35,7 +35,6 @@ type Said = { id: string; text: string | null; createdAt: Date };
 const EVIDENCE_SHOWN = 3;
 const EVIDENCE_CHARS = 300;
 
-// Every field is required: providers' strict structured-output modes reject optional properties.
 const Remembered = {
   content: z.string().describe("One self-contained statement"),
   aliases: z
@@ -62,9 +61,6 @@ const Cited = {
     .describe("Ids of the activity entries and messages above that show it"),
 };
 
-// Privacy by construction: team-visible memory is only ever written from team-visible activity;
-// private activity, and what the member told their own assistant, produce private memory in a
-// separate pass.
 const Consolidation = z.object({
   journal: z
     .string()
@@ -131,7 +127,6 @@ export async function runConsolidate(
     until,
     limit: 200,
   });
-  // Without a model there's nothing to extract from chat; the journal comes from activity alone.
   const said = ctx.models
     ? await listOwnerMessages(ctx.db, {
         ownerId: member.id,
@@ -208,8 +203,6 @@ async function consolidatePart(
     );
     return `${visibility} journal (${items.length} items)`;
   }
-  // The team pass never sees private memory either, so nothing private can leak into its outputs,
-  // and it can only replace lines it was shown.
   const memory = await loadMemory(ctx, member.id, {
     includePrivate: visibility === "private",
   });
@@ -272,10 +265,6 @@ async function consolidatePart(
   return `${visibility}: journal +${output.facts.length} fact(s) +${output.profile.length} profile`;
 }
 
-// Memory only grows night by night; once a week the model rewrites it: merging duplicates, turning
-// repeated examples into one trait, dropping what stopped being true. Each line comes with the
-// record it was learned from, so a line that misread its source is corrected against the source
-// rather than trusted because it was written down. Superseded lines stay as history.
 async function reconcile(
   ctx: AppContext,
   member: Member,
@@ -317,7 +306,6 @@ async function reconcile(
   await transact(ctx, async (tx) => {
     for (const r of output.rewrites) {
       const replaces = r.replaces.filter((id) => known.has(id));
-      // A rewrite stands for lines that exist; reconciling never invents knowledge.
       if (replaces.length) {
         await addMemory(tx, {
           workspaceId: member.workspaceId,
@@ -351,7 +339,6 @@ async function reconcile(
   return `${visibility}: ${merged} line(s) merged, ${retired} retired, ${confirmed} confirmed`;
 }
 
-// The team digest is written from team memory only, so teammate conversations can start with it.
 async function rebuildDigests(ctx: AppContext, member: Member, day: string) {
   if (!ctx.models) {
     return;
@@ -384,8 +371,6 @@ async function rebuildDigests(ctx: AppContext, member: Member, day: string) {
   }
 }
 
-// The team pass reads only the activity a line cites: what the owner told their own assistant never
-// reaches a model writing team memory.
 function withEvidence(
   r: MemoryRow,
   tz: string,
@@ -419,8 +404,6 @@ function evidenceLine(
   return `activity (${localDate(a.occurredAt, tz)}, ${a.source}): ${JSON.stringify(`${a.title}${detail}`.slice(0, EVIDENCE_CHARS))}`;
 }
 
-// A pass may cite only what it was shown; what the owner said is quoted, since a quote outlives
-// the conversation it came from.
 function citer(items: ActivityRow[], said: Said[]) {
   const activity = new Set(items.map((a) => a.id));
   const messages = new Map(said.map((m) => [m.id, m]));
@@ -436,7 +419,6 @@ function citer(items: ActivityRow[], said: Said[]) {
     });
 }
 
-// Expires at the end of that local day.
 function expiry(expiresOn: string | null, tz: string) {
   return expiresOn ? (startOfLocalDate(expiresOn, tz, 1) ?? null) : null;
 }

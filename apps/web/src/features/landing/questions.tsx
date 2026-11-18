@@ -3,8 +3,6 @@ import type { ReactNode } from "react";
 export type Question = { ask: string; answer: ReactNode };
 export type QuestionGroup = { title: string; questions: Question[] };
 
-// One place for every answer, so the front page, the FAQ and pricing never disagree.
-
 export const START: Question[] = [
   {
     ask: "What is Worklog?",

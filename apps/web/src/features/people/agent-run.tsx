@@ -75,7 +75,6 @@ export function runFace(run: Run | null | undefined): {
   return { mood: runMood(run.state), live: inPlay(run.state) };
 }
 
-// An agent that says it's working but hasn't said anything for this long has probably stalled.
 const STALE_MS = 2 * 3_600_000;
 
 /** Who an agent waits on, as the reader says it: "you" for their own agents. */

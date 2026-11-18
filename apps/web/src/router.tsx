@@ -13,7 +13,6 @@ export function getRouter() {
     defaultOptions: {
       queries: {
         staleTime: 15_000,
-        // A 4xx won't fix itself; retrying only delays the error the person needs to see.
         retry: (count, error) =>
           !(error instanceof ApiError && error.status < 500) && count < 2,
       },
@@ -25,7 +24,6 @@ export function getRouter() {
     scrollRestoration: true,
     defaultPreload: "intent",
     defaultPreloadStaleTime: 0,
-    // Caught at the route that failed, so a page inside the app keeps its sidebar.
     defaultErrorComponent: RouteError,
     defaultNotFoundComponent: NotFound,
     Wrap: ({ children }) => (

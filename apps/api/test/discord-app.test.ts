@@ -62,7 +62,6 @@ describe("Discord app", () => {
     const url = new URL(link.body.url);
     expect(url.searchParams.get("scope")).toBe("bot applications.commands");
     const state = url.searchParams.get("state") ?? "";
-    // A forged guild_id in the redirect changes nothing: the server comes from the code.
     const res = await env.app.request(
       `/oauth/discord/callback?code=c&guild_id=666&state=${encodeURIComponent(state)}`
     );
@@ -114,8 +113,6 @@ describe("Discord app", () => {
     ).body;
     expect(logged.title).toContain("billing design");
 
-    // A brief to a channel goes out as the app's one bot. That bot refused is the app's problem:
-    // the server's connection stays.
     env.ctx.fetch = routedFetch([
       [
         "GET https://discord.com/api/v10/channels/C-OTHER",
@@ -126,7 +123,6 @@ describe("Discord app", () => {
         () => ({ id: "C-1", guild_id: guild }),
       ],
     ]);
-    // A webhook posts as itself, not as the shared bot: nothing to check.
     const hook = await env.call("POST", "/v1/delivery-targets", {
       token: owner.token,
       body: {
@@ -136,7 +132,6 @@ describe("Discord app", () => {
       },
     });
     expect(hook.status).toBe(201);
-    // The shared bot is in other servers too: a channel outside this one is refused.
     const elsewhere = await env.call("POST", "/v1/delivery-targets", {
       token: owner.token,
       body: { kind: "discord", address: "C-OTHER", connectionId: conn.id },
@@ -165,7 +160,6 @@ describe("Discord app", () => {
     ).body;
     expect(kept[0].status).toBe("active");
 
-    // The app's token refused while listing channels is the app's problem too.
     env.ctx.fetch = routedFetch([
       [
         `GET https://discord.com/api/v10/guilds/${guild}/channels`,
@@ -185,7 +179,6 @@ describe("Discord app", () => {
     ).body;
     expect(stillActive[0].status).toBe("active");
 
-    // Discord never says the bot was removed: the daily check asks which servers it's in.
     env.ctx.fetch = routedFetch([
       [
         "GET https://discord.com/api/v10/users/@me/guilds",
@@ -229,7 +222,6 @@ describe("Discord app", () => {
       { id: "C1", name: "general", private: false },
       { id: "C2", name: "leads", private: true },
     ]);
-    // A #welcome open to all, the rest behind a Member role, and one channel for leads alone.
     expect(
       await channelsOf([
         { id: "C0", name: "welcome", type: 0 },
@@ -261,7 +253,6 @@ describe("Discord app", () => {
   });
 });
 
-// The channels Discord lists for server G1, as Worklog offers them.
 async function channelsOf(channels: object[]) {
   env.ctx.fetch = routedFetch([
     ["GET https://discord.com/api/v10/guilds/G1/channels", () => channels],
@@ -269,7 +260,6 @@ async function channelsOf(channels: object[]) {
   return await guildChannels(env.ctx, "G1", "bot");
 }
 
-// A role's overwrite that lets it read the channel.
 function letIn(role: string) {
   return { id: role, type: 0, allow: "1024", deny: "0" };
 }

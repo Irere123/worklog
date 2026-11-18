@@ -109,7 +109,6 @@ function slack(
 
 async function installed() {
   const owner = await env.workspace();
-  // Unique, so signing in as this address in another test claims no workspace from here.
   const email = `sam-${randomInt(1_000_000, 9_000_000)}@example.com`;
   const sam = await env.teammate(owner.token, "Sam", { email });
   const registered = await env.call("PUT", "/v1/apps/slack", {
@@ -226,7 +225,6 @@ describe("Slack app", () => {
       "Replied 1 time in a #standup thread",
     ]);
     expect(messages.every((m: any) => m.actorId === sam.member.id)).toBe(true);
-    // Counted per message, not per page of history: "ok" is the one dropped.
     const health = (
       await env.call("GET", `/v1/connections/${conn.id}/health`, {
         token: owner.token,
@@ -234,8 +232,6 @@ describe("Slack app", () => {
     ).body;
     expect(health.signalRate).toBeGreaterThan(0);
     expect(health.signalRate).toBeLessThan(1);
-    // Later, the thread gets a reply. The thread's first message is older than where the next
-    // run reads from, but the run remembers the thread and asks for it.
     const remembered = await env.ctx.db.execute<{ threads: string[] }>(
       sql`select cursor->'threads' as threads from connection_cursors where connection_id = ${conn.id} and stream = 'channel:C0STANDUP'`
     );
@@ -330,7 +326,6 @@ describe("Slack app", () => {
     });
     expect((await post("events", mention)).status).toBe(200);
     await post("events", mention, { "x-slack-retry-num": "1" });
-    // The same message as a channel message, which Slack sends as well: not a post to record.
     await post(
       "events",
       event("Ev-mention-message", {
@@ -342,7 +337,6 @@ describe("Slack app", () => {
         ts: "1793000000.000100",
       })
     );
-    // Only the person who asked sees the answer: it can hold what's private to them.
     expect(
       fetch.calls.filter((c) => c.url === `${API}/chat.postMessage`)
     ).toHaveLength(0);
@@ -354,7 +348,6 @@ describe("Slack app", () => {
       channel: "C0STANDUP",
       user: "U0EMMA",
     });
-    // Asked at the top of the channel: Slack wouldn't show a private reply in a thread not there.
     expect(replies[0]?.body).not.toHaveProperty("thread_ts");
     expect(replies[0]?.headers.get("authorization")).toBe(
       "Bearer xoxb-installed"

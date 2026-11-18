@@ -122,7 +122,6 @@ export function SetupChecklist({ meId }: { meId: string }) {
           <XIcon size={14} />
         </button>
       </header>
-      {/* Finished steps drop out: once most are done, the card is the one thing left to do. */}
       <ol {...stylex.props(styles.steps)}>
         {steps
           .filter((step) => !step.done)
@@ -152,7 +151,6 @@ const styles = stylex.create({
     paddingBottom: space.sm,
     paddingInline: space.sm,
     borderRadius: radius.lg,
-    // Flat and tinted so it reads as a note beside the page, not a second thing to type into.
     backgroundColor: color.surface,
     boxShadow: `inset 0 0 0 1px ${color.line}`,
   },

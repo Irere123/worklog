@@ -20,8 +20,6 @@ export const PushedEvent = z.object({
     .describe(
       "Unique per event in your system — retries with the same id are ignored"
     ),
-  // Published in the OpenAPI spec, which can't carry regex flags (see HH_MM
-  // in api/schemas/common.ts).
   // oxlint-disable-next-line require-unicode-regexp -- flags break the published pattern
   kind: z.string().regex(/^[a-z][a-z0-9_]*(?:\.[a-z0-9_]+)+$/),
   occurredAt: z.iso.datetime(),

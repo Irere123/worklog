@@ -63,13 +63,10 @@ export async function accept(
   if (received.type === "respond") {
     return { status: received.status ?? 200, body: received.body };
   }
-  // A command is someone asking, not something to record: a pause doesn't silence it.
   const answers =
     received.type === "interaction" &&
     (conn.status === "active" || conn.status === "paused");
   if (conn.status !== "active" && !answers) {
-    // Acknowledged, so the tool doesn't give up on the hook, and dropped: a connection that isn't
-    // active records nothing.
     const message = `Worklog's connection here is ${conn.status}; an admin can reconnect it.`;
     return {
       status: 200,
@@ -158,7 +155,6 @@ export async function store(
     return row.id;
   }
   return await transact(ctx, async (tx) => {
-    // A redelivery of one that failed gets another go, even after it used up its attempts.
     const existing = await findInboundEventByDelivery(tx.db, {
       connectionId: conn.id,
       deliveryId: delivery.deliveryId,
@@ -171,8 +167,6 @@ export async function store(
   });
 }
 
-// Postgres can't keep U+0000 in jsonb, and the provider would send the delivery again on every
-// retry. Rare, so the payload is only walked when its JSON has one.
 function storable(payload: unknown) {
   return JSON.stringify(payload).includes(String.raw`\u0000`)
     ? withoutNul(payload)
@@ -212,9 +206,7 @@ export async function enqueueDrain(
   await addJob(ctx.db, drainJob(connectionId, lane, runAt, why));
 }
 
-/** A minute, to stay clear of drains that are merely busy. */
 const STRANDED_MS = 60_000;
-/** A drain hands over after about 20 seconds; one locked this long has lost its worker. */
 const DEAD_DRAIN_MS = 5 * 60_000;
 
 /**
@@ -244,7 +236,6 @@ function drainJob(
   runAt?: Date,
   why: "retry" | "stuck" = "retry"
 ) {
-  // Each reason its own job: one can't move another's time.
   const key = `${runAt ? why : "lane"}:${connectionId}:${lane}`;
   return {
     ...newJob(

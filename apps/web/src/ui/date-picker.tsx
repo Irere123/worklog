@@ -73,7 +73,6 @@ function Month({
   const today = localDay();
   const [shown, setShown] = useState(() => (value ?? today).slice(0, 7));
   const first = parse(`${shown}-01`);
-  // Weeks start on Monday, as they do on the team's calendars.
   const lead = (first.getDay() + 6) % 7;
   const start = addDays(`${shown}-01`, -lead);
   const days = Array.from({ length: 42 }, (_, i) => addDays(start, i));
@@ -157,7 +156,6 @@ function quickPicks(): [string, string][] {
   return [
     ["Today", today],
     ["Tomorrow", tomorrow],
-    // On a Sunday, next Monday is tomorrow: offer the week after instead of the same day twice.
     monday === tomorrow
       ? ["Next week", addDays(today, 8)]
       : ["Next Monday", monday],

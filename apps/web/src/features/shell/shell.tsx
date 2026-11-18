@@ -22,8 +22,6 @@ import { InShell } from "./fallbacks";
 import { MobileBar } from "./mobile-bar";
 import { Sidebar } from "./sidebar";
 
-// Dialogs and the card panel stay out of the first download: they load once the page is idle,
-// so the first press of ⌘K or C still opens at once.
 const loaders = {
   palette: async () => await import("./command"),
   shortcuts: async () => await import("./shortcuts"),
@@ -76,8 +74,6 @@ function destinationOf(news: SentNews) {
 export function Shell() {
   const client = useQueryClient();
   const navigate = useNavigate();
-  // While the app is open, something new that needs you shows up where you are; low-priority
-  // items wait quietly in the inbox, as they would for a push.
   const live = useLiveEvents(client, true, {
     attention: (news) => {
       if (news.priority === "low") {
@@ -105,7 +101,6 @@ export function Shell() {
     },
   });
   const [dialog, setDialog] = useState<ShellDialog>(null);
-  // A dialog mounts on first use and stays, so its closing animation can play.
   const [used, setUsed] = useState<ReadonlySet<ShellDialog>>(new Set());
   const show = (next: ShellDialog) => {
     setDialog(next);
@@ -115,7 +110,6 @@ export function Shell() {
   };
   const [drawer, setDrawer] = useState(false);
   const router = useRouter();
-  // Any navigation, from a link in the drawer or anywhere else, puts the drawer away.
   useEffect(
     () => router.subscribe("onBeforeNavigate", () => setDrawer(false)),
     [router]
@@ -123,7 +117,6 @@ export function Shell() {
   const narrow = useNarrow();
   const folded = useSidebarFolded();
   const rail = folded && !narrow;
-  // On a phone the same button puts the drawer away; there's no rail to fold to.
   const toggleSidebar = () => {
     if (narrow) {
       setDrawer(false);
@@ -186,7 +179,6 @@ export function Shell() {
   useHotkey(["G", "S"], go("/settings"), {
     meta: { name: "Go to Settings", group: "Navigate" },
   });
-  // Single keys pause while a card is open, where digits sort a Maybe? card.
   const cardOpen = card !== undefined;
   useHotkey("1", go("/home"), {
     enabled: !cardOpen,
@@ -262,7 +254,6 @@ const styles = stylex.create({
       default: "232px minmax(0, 1fr)",
       "@media (max-width: 860px)": "minmax(0, 1fr)",
     },
-    // The column itself moves, so the page beside it follows on the same curve.
     transitionProperty: "grid-template-columns",
     transitionDuration: {
       default: motion.slow,

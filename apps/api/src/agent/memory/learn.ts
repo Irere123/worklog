@@ -17,13 +17,11 @@ import type { MemoryEvidence } from "#db/schema";
 import { transact } from "#db/transact";
 import { startOfLocalDate, timezoneOf } from "#lib/time";
 
-// The newest messages of a conversation that went on for long, which is where corrections land.
 const MAX_MESSAGES = 40;
 const MAX_LINE_CHARS = 2000;
 const RATED_REPLY_CHARS = 300;
 const AUTOMATION_POST = "[Worklog automation:";
 
-// Every field is required: providers' strict structured-output modes reject optional properties.
 const Learned = z.object({
   remember: z
     .array(
@@ -79,7 +77,6 @@ export async function learnFromConversation(
   ctx: AppContext,
   conversation: ConversationRow
 ) {
-  // A teammate's words aren't the owner's, so only the owner's own conversations teach anything.
   const own = conversation.mode === "owner";
   const rows = await listMessagesAfter(ctx.db, {
     conversationId: conversation.id,
@@ -114,7 +111,6 @@ export async function learnFromConversation(
     journalDays: 0,
   });
   const quotes = new Map<string, MemoryEvidence>();
-  // JSON with who said each thing, so a reply that quotes "Emma: …" can't pass for Emma speaking.
   const transcript = rows.slice(-MAX_MESSAGES).flatMap((r) => {
     const said = ownerSaid(r);
     if (said !== null) {
@@ -154,7 +150,6 @@ export async function learnFromConversation(
   );
   const shown = (ids: string[]) => ids.filter((id) => memory.shown.has(id));
   return await transact(ctx, async (tx) => {
-    // Another pass got here first and learned these already.
     if (!(await setConversationLearned(tx.db, watermark))) {
       return null;
     }
@@ -184,7 +179,6 @@ export async function learnFromConversation(
   });
 }
 
-// What the owner typed (stored apart from what Worklog added around it); null for anything else.
 function ownerSaid(row: MessageRow) {
   const words = row.role === "user" ? row.text?.trim() : undefined;
   return words && !words.startsWith(AUTOMATION_POST) ? words : null;

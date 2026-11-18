@@ -53,8 +53,6 @@ import type { ShellDialog } from "./shell";
 
 type Member = Schemas["Member"];
 
-// A working connection says nothing: the page updating is the signal. Only a broken one shows,
-// because then the page goes stale without looking any different.
 const BROKEN: Record<
   Exclude<LiveStatus, "live">,
   { tone: "amber" | "neutral"; label: string }
@@ -65,7 +63,6 @@ const BROKEN: Record<
 
 const graphemes = new Intl.Segmenter(undefined, { granularity: "grapheme" });
 
-// The tooltip's spelling of Mod+\, which the shell binds.
 const FOLD_KEY = "⌘ \\";
 
 export function Sidebar({
@@ -104,7 +101,6 @@ export function Sidebar({
 
       <SidebarActions rail={rail} onOpen={onOpen} />
 
-      {/* Yours first, where counts wait on you; then the team's; then the boards. */}
       <div {...stylex.props(styles.group)}>
         <NavItem to="/home" icon={HouseIcon} rail={rail}>
           Home
@@ -150,7 +146,6 @@ export function Sidebar({
             aria-hidden
             {...stylex.props(styles.rule, rail && styles.ruleIn)}
           />
-          {/* Folded, there's no room beside the heading; the palette still makes cards and boards. */}
           {!rail && (
             <Menu
               align="end"
@@ -198,7 +193,6 @@ export function Sidebar({
       </div>
 
       <div {...stylex.props(styles.spacer)} />
-      {/* Its fanned-out list needs the sidebar's width; P still reaches the cards from the page. */}
       {!rail && <PinStack />}
 
       <SidebarFooter
@@ -211,10 +205,6 @@ export function Sidebar({
   );
 }
 
-/**
- * The workspace's name and logo, and the button that folds the sidebar to a rail. Folded, only the
- * logo stays up here; the way back sits by your face at the foot, always in sight.
- */
 function SidebarHead({
   name,
   drawer,
@@ -249,8 +239,6 @@ function SidebarHead({
             onClick={onToggle}
             {...stylex.props(styles.footerAction)}
           >
-            {/* The same icon as the rail's expand button, its panel filled while the sidebar is out.
-                Not duotone: the build drops that weight (ICON_WEIGHTS in vite.config.ts). */}
             <SidebarSimpleIcon size={16} weight="fill" />
           </button>
         </Tooltip>
@@ -259,7 +247,6 @@ function SidebarHead({
   );
 }
 
-/** Search, and logging work; folded, only search stays, since the palette can log work too. */
 function SidebarActions({
   rail,
   onOpen,
@@ -324,7 +311,6 @@ function SidebarFooter({
       {me.data && (
         <ProfileMenu member={me.data.member} rail={rail} onOpen={onOpen} />
       )}
-      {/* Stacked above your face: folded, the way back is never hidden or a guess. */}
       {rail && (
         <Tooltip label="Expand sidebar" shortcut={FOLD_KEY} side="right">
           <button
@@ -337,7 +323,6 @@ function SidebarFooter({
           </button>
         </Tooltip>
       )}
-      {/* Folded, Settings moves into your menu rather than stacking a second button. */}
       {!rail && (
         <Tooltip label="Settings" side="top">
           <Link
@@ -365,11 +350,6 @@ function SidebarFooter({
   );
 }
 
-/**
- * The assistant is a colleague, not a page: its face sits here and shows what it's doing, and
- * resting on it says in words. A count is what waits for your OK; a dot, an answer you haven't
- * read.
- */
 function AssistantItem({ rail }: { rail: boolean }) {
   const { agent, presence, mood, glance } = usePresence();
   const line = glance?.line;
@@ -407,10 +387,6 @@ function AssistantItem({ rail }: { rail: boolean }) {
   );
 }
 
-/**
- * A row is the same element folded or open: its icon eases to the rail's centre line and grows,
- * and its label fades as the sidebar narrows over it, so the fold reads as one motion, not a swap.
- */
 function NavItem({
   icon,
   mark,
@@ -424,7 +400,6 @@ function NavItem({
   rail: boolean;
 } & ({ icon: Icon; mark?: never } | { icon?: never; mark: ReactNode })) {
   const Glyph = icon;
-  // Always inside its tooltip, so folding never remounts the row and its label can fade.
   const row = (
     <Link
       {...link}
@@ -433,7 +408,6 @@ function NavItem({
     >
       {({ isActive }) => (
         <>
-          {/* Filled where you are, like a tab bar: the place reads from the icon as well as the row. */}
           <span {...stylex.props(styles.itemIcon, rail && styles.grown)}>
             {Glyph ? (
               <Glyph size={16} weight={isActive ? "fill" : "regular"} />
@@ -458,10 +432,6 @@ function NavItem({
   );
 }
 
-/**
- * A board's initial on its own tint, the way a person gets an avatar: folded to a rail, identical
- * glyphs would leave every board looking the same.
- */
 function BoardMark({ id, name }: { id: string; name: string }) {
   return (
     <span aria-hidden {...stylex.props(styles.board, styles.tint(hueOf(id)))}>
@@ -470,16 +440,11 @@ function BoardMark({ id, name }: { id: string; name: string }) {
   );
 }
 
-// A board named with an emoji shows the whole emoji, not half of one.
 function firstGrapheme(name: string) {
   const [first] = graphemes.segment(name.trim());
   return first?.segment.toUpperCase() ?? "?";
 }
 
-/**
- * You, at the foot of the sidebar: your profile, and the settings that are yours rather than the
- * team's, such as the theme and signing out.
- */
 function ProfileMenu({
   member,
   rail,
@@ -590,8 +555,6 @@ function ProfileMenu({
   );
 }
 
-// Folded, every control is the same 40 by 36 target on one centre line, and its icon grows by an
-// eighth; padding, height and scale ease on the column's own curve, so the fold is one motion.
 const RAIL_TARGET = { width: 40, height: 36 };
 const GROW = "scale(1.125)";
 const REDUCED = "@media (prefers-reduced-motion: reduce)";
@@ -683,7 +646,6 @@ const styles = stylex.create({
     boxShadow: `0 0 0 1px ${color.line}`,
     outline: { default: "none", ":focus-visible": `2px solid ${color.focus}` },
   },
-  // Square, so the folded field reads as a button; its padding is unchanged, so the icon doesn't move.
   searchRail: { flexGrow: 0, ...RAIL_TARGET, paddingInline: 13 },
   noShrink: { flexShrink: 0 },
   square: {
@@ -711,8 +673,6 @@ const styles = stylex.create({
     whiteSpace: "nowrap",
   },
   group: { display: "flex", flexDirection: "column", gap: 1 },
-  // Kept at full height when folded: the empty line still parts the sections, and nothing below
-  // it moves when the sidebar opens.
   groupHead: {
     position: "relative",
     display: "flex",
@@ -739,7 +699,6 @@ const styles = stylex.create({
       ":hover": { default: null, [media.hover]: color.uiHover },
     },
   },
-  // Opening, words wait a beat for room to appear; folding, they go at once, before they're cut.
   label: {
     whiteSpace: "nowrap",
     transitionProperty: "opacity",
@@ -769,7 +728,6 @@ const styles = stylex.create({
     display: "flex",
     alignItems: "center",
     gap: space.md,
-    // The sidebar is a drawer on phones, where a 28px row is a near miss for a thumb.
     height: { default: 28, [media.touch]: 40 },
     paddingInline: space.md,
     borderRadius: radius.sm,
@@ -802,7 +760,6 @@ const styles = stylex.create({
   },
   grown: { transform: GROW },
   railTarget: { ...RAIL_TARGET },
-  // Folded, a count rides on its icon's top corner instead of trailing a label.
   badge: {
     position: "absolute",
     top: 1,
@@ -831,7 +788,6 @@ const styles = stylex.create({
     fontWeight: 600,
     lineHeight: 1,
   },
-  // The avatar's tint, so a board's colour comes from the same family as a person's.
   tint: (hue: number) => ({
     color: `light-dark(oklch(0.38 0.09 ${hue}), oklch(0.9 0.06 ${hue}))`,
     backgroundColor: `light-dark(oklch(0.9 0.05 ${hue}), oklch(0.36 0.07 ${hue}))`,
@@ -857,7 +813,6 @@ const styles = stylex.create({
     borderTopStyle: "solid",
     borderTopColor: color.line,
   },
-  // Your face stays on the bottom line, the way back just above it, then any connection warning.
   footerRail: { flexDirection: "column-reverse", alignItems: "center" },
   me: {
     display: "flex",

@@ -25,8 +25,6 @@ import { handleProviderError } from "./lifecycle";
 import { queueSync } from "./sync-queue";
 import { viewOf } from "./view";
 
-// Issues become cards on this board, so a new choice must be one of the workspace's boards in
-// use. One archived since stays as it is; it just takes no more cards.
 async function requireBoard(
   ctx: AppContext,
   workspaceId: string,
@@ -45,7 +43,6 @@ async function requireBoard(
   }
 }
 
-// A connection installed through the instance's app has no pasted secrets to require.
 function validate(
   provider: string,
   secrets: Record<string, string>,
@@ -71,10 +68,6 @@ function validate(
       `${connector.name} connections need: ${missing.join(", ")}`
     );
   }
-  // Generic connectors get their own identity namespace: they must not be able to act as the
-  // users of a built-in one (GitHub's, a Gitea server's, Slack's, Discord's).
-  // Checked when it changes: one chosen before a namespace was reserved doesn't lock the rest
-  // (ingestion doesn't use it).
   const ns = settings.identityNamespace;
   if (typeof ns === "string" && ns !== before.identityNamespace) {
     if (isBuiltInNamespace(ns)) {
@@ -82,8 +75,6 @@ function validate(
         `identityNamespace "${ns}" is reserved for the built-in ${ns.split(":")[0] ?? ns} connector`
       );
     }
-    // A connection's own is the default: there's no need to name it, and naming another's is
-    // acting as its users.
     if (isConnectionNamespace(ns)) {
       throw badRequest(
         `identityNamespace "${ns}" is a connection's own; leave it out to use this one's`
@@ -173,8 +164,6 @@ export async function updateConnection(
     ...ctx.secrets.open(current.secrets),
     ...patch.secrets,
   };
-  // An app install's settings hold what the install found (its account, its team's URL): an
-  // admin's change goes on top of them instead of replacing them.
   const settings =
     patch.settings && current.externalId
       ? { ...current.settings, ...patch.settings }
@@ -201,11 +190,9 @@ export async function updateConnection(
         secrets: tx.secrets.seal(secrets),
       },
     });
-    // Whatever happened while it was paused comes in from the provider's API, where it can.
     if (resumed) {
       await queueSync(tx, row);
     }
-    // New repos or a new token: their hooks, where Worklog manages them.
     if (
       getConnector(row.provider)?.hooks &&
       (patch.settings || patch.secrets || resumed)

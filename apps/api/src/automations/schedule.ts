@@ -1,7 +1,6 @@
 import type { MemberSettings, Schedule } from "#db/schema";
 import { isWithinHours, localParts, parseHHMM, zonedToUtc } from "#lib/time";
 
-// Strictly after `after`, on the member's local clock.
 export function nextRun(
   schedule: Schedule,
   timeZone: string,

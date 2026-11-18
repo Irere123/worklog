@@ -23,8 +23,6 @@ const PROMPTS: Record<Kind, string> = {
   win: "What shipped or went well?",
 };
 
-/** Work that happened off the connected tools: calls, decisions, a blocker worth raising. */
-// An @ being typed at the end of the text, with what follows it so far.
 const MENTION = /(?:^|\s)@(?<handle>[\w-]*)$/u;
 
 function withMention(value: string, handle: string) {
@@ -55,8 +53,6 @@ export function QuickLog({
   const [card, setCard] = useState("");
   const [visibility, setVisibility] = useState<"team" | "private">("team");
   const client = useQueryClient();
-  // Spoken entries are marked as such, so their wording is read as dictation, not typing. A ref,
-  // since logging mid-dictation sends in the same tick the last words land, before a re-render.
   const spoken = useRef(false);
   const dictation = useDictation({
     value: draft,
@@ -98,7 +94,6 @@ export function QuickLog({
     onError: (error) => toast.error(error.message),
   });
 
-  // Logging mid-dictation logs the last words too, once they're written down.
   const submit = () =>
     dictation.finish((said) => {
       if (said.trim() && !log.isPending) {
@@ -286,8 +281,6 @@ const styles = stylex.create({
     marginInlineStart: space.xs,
   },
   textarea: { minHeight: 110, fontSize: text.copy, lineHeight: leading.copy },
-  // On a phone the card field, Dictate and who-sees-it don't fit one line; wrapping keeps
-  // "Only me" on screen.
   row: {
     display: "flex",
     flexWrap: "wrap",
@@ -298,8 +291,6 @@ const styles = stylex.create({
   },
   card: { width: 160 },
   spacer: { flexGrow: 1 },
-  // Keyboard hints mean nothing on a touch screen; hidden rather than removed, it still pushes
-  // the buttons to the end.
   hint: {
     marginInlineEnd: "auto",
     display: "flex",

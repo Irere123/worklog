@@ -161,7 +161,6 @@ export const attentionRoutes = router()
         200
       )
   )
-  // After /metrics, which it would otherwise capture as an id.
   .openapi(
     createRoute({
       method: "get",

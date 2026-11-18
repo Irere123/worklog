@@ -5,11 +5,6 @@ import { ribbonSince, startOfYesterday } from "#lib/time";
 import type { ActivityFilter } from "./queries";
 import { q } from "./queries";
 
-// Route loaders start these while the route's code downloads, so the page renders with its data
-// instead of mounting and then asking. They aren't awaited: a slow list must not hold navigation,
-// and the page shows its own skeleton until the data lands. Keys must match the components'.
-
-// A failed prefetch is retried by the page that needs it, which also shows the error.
 function ignore() {
   return null;
 }
@@ -53,7 +48,6 @@ export function preloadBoard(client: QueryClient, board: string) {
   void client
     .query(q.cards({ board, stage: "done", limit: 100 }))
     .catch(ignore);
-  // Agents at work show on their cards; asked alongside the cards so the line doesn't pop in.
   void client.query(q.teamNow(3)).catch(ignore);
 }
 

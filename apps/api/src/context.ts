@@ -23,15 +23,12 @@ import { claimMemberships } from "./work/members";
 
 export type AppContext = {
   config: Config;
-  // The transaction inside `transact`; the pool everywhere else.
   db: DbOrTx;
-  // For Graphile Worker, which takes a pg Pool.
   pool: Pool;
   auth: Auth;
   bus: EventBus;
   tally: Tally;
   secrets: SecretBox;
-  // null when no OPENROUTER_API_KEY: AI features fall back to deterministic templates.
   models: Models | null;
   mailer: Mailer;
   fetch: typeof fetch;
@@ -57,8 +54,6 @@ export async function createContext(
     env.WORKLOG_SECRET_KEY,
     env.WORKLOG_SECRET_KEYS_PREVIOUS
   );
-  // An app registered through the API (PUT /v1/apps/{provider}) also signs people in, from the
-  // next start; what the environment sets wins.
   const config = withAppSignIn(env, await listConnectorApps(db), secrets);
   const mailer = overrides.mailer ?? createMailer(config);
   const tally = new Tally(db);
@@ -68,7 +63,6 @@ export async function createContext(
     db,
     pool: db.$client,
     auth: createAuth(db, config, mailer, {
-      // Runs after sign-in, long after ctx is built.
       onSignIn: async (userId) => {
         const user = await findUserById(db, { id: userId });
         if (user) {
@@ -87,7 +81,6 @@ export async function createContext(
     fetch: tracedFetch(rawFetch),
     now: overrides.now ?? (() => new Date()),
     close: async () => {
-      // Last, and whatever fails before it: what went wrong while closing is in what it ships.
       try {
         stopTally();
         await tally.flush();

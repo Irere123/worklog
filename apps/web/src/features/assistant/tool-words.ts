@@ -2,9 +2,6 @@ import type { Member } from "#features/cards/card-bits";
 
 import type { Step } from "./steps";
 
-// How the assistant's tool calls read in a person's words. Kept apart from the components so the
-// wording can be read, and changed, in one place.
-
 type Words = { doing: string; did: string };
 
 const VERBS: Record<string, Words> = {
@@ -59,7 +56,6 @@ const STAGES: Record<string, string> = {
 type Said = {
   running: boolean;
   input: unknown;
-  /** A person's first name for a handle the tool was given. */
   name: (handle: string | undefined) => string | undefined;
 };
 
@@ -73,7 +69,6 @@ function quoted(value: string | undefined, max = 48) {
 const cardOf = (input: unknown) =>
   field(input, "number") ?? field(input, "cardNumber");
 
-// Tools whose line names its subject: "Read #4", "Checked what Jean is on".
 const SENTENCES: Record<string, (said: Said) => string | null | undefined> = {
   work_snapshot: ({ running, input, name }) => {
     const who = name(field(input, "person"));
@@ -96,7 +91,6 @@ const SENTENCES: Record<string, (said: Said) => string | null | undefined> = {
   },
 };
 
-// Tools whose verb takes what they were asked: "Searched activity for “blocked”".
 const DETAILS: Record<string, (said: Said) => string | null | undefined> = {
   search_activity: ({ input, name }) => {
     const query = quoted(field(input, "query"));
@@ -164,7 +158,6 @@ export function summarize(reads: Step[], people: Map<string, Member>) {
   return `Checked ${tools.length} things`;
 }
 
-// What a held write would do, as the end of "Wants your OK to …".
 export const ASKS: Record<string, (input: unknown) => string> = {
   comment_on_card: (input) => `comment on #${cardOf(input) ?? "a card"}`,
   move_card: (input) => {

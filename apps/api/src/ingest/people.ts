@@ -17,7 +17,6 @@ export type Person = {
 /** Everyone a delivery's events name, by account id. */
 export type People = Map<string, Person>;
 
-// A mention carries only an id, an author a login and a name: `first` wins, `then` fills in.
 function fill(first: ExternalActor, then: ExternalActor): ExternalActor {
   return {
     id: first.id,
@@ -27,8 +26,6 @@ function fill(first: ExternalActor, then: ExternalActor): ExternalActor {
   };
 }
 
-// `acted`: the account did something in these events, not only got named in them (a mention,
-// an assignment): only that counts as seeing it, and when.
 function named(events: WorklogEvent[]) {
   const seen = new Map<string, Sighting>();
   const add = (
@@ -51,13 +48,11 @@ function named(events: WorklogEvent[]) {
       return;
     }
     if (!acted) {
-      // What others call it only stands in until it acts, and only fills in what they left out.
       if (entry.acted !== true) {
         entry.actor = fill(entry.actor, actor);
       }
       return;
     }
-    // Only what it says of itself when acting describes it.
     entry.actor = entry.acted === true ? fill(actor, entry.actor) : actor;
     entry.since =
       entry.acted === true && entry.since && entry.since < at

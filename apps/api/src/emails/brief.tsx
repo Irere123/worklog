@@ -20,7 +20,6 @@ export async function briefEmail(props: Props) {
       "",
       `Change when this comes, or stop it: ${settings}`,
     ],
-    // Mailbox providers look for a way to stop a message that comes on a schedule.
     headers: { "List-Unsubscribe": `<${settings}>` },
   });
 }
@@ -54,7 +53,6 @@ function automations(home: string) {
   return new URL("/settings/automations", home).href;
 }
 
-// The inbox line after the subject: the brief's opening words.
 function opening(html: string) {
   const words = html
     .replaceAll(/<[^>]+>/gu, " ")

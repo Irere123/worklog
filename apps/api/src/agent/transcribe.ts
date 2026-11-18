@@ -22,14 +22,12 @@ export const AUDIO_FORMATS = {
 
 export type AudioType = keyof typeof AUDIO_FORMATS;
 
-// Minutes of compressed speech, far more than a message; it bounds what one request can buffer.
 export const MAX_AUDIO_BYTES = 8 * 1024 * 1024;
 
 const ENDPOINT = "https://openrouter.ai/api/v1/audio/transcriptions";
 const TIMEOUT_MS = 30_000;
 const MAX_TERMS = 200;
 const MAX_CARDS = 30;
-// Whisper reads at most 224 tokens of prompt.
 const HINT_CHARS = 600;
 
 const Heard = z.object({
@@ -88,8 +86,6 @@ async function hear(
   signal?: AbortSignal
 ) {
   const model = ctx.config.WORKLOG_TRANSCRIBE_MODEL;
-  // A timeout, a dropped connection or a body that isn't a transcript fails like a refusal: a 502
-  // the client falls back from, not an unhandled 500.
   let res: Response;
   try {
     res = await ctx.fetch(ENDPOINT, {
@@ -108,13 +104,10 @@ async function hear(
         },
         temperature: 0,
         provider: {
-          // Work data never goes to providers that train on it, as for every other model call.
           data_collection: "deny",
-          // Forwarded only to the provider that serves the request; the others drop it.
           options: { groq: { prompt: hint(vocabulary) } },
         },
       }),
-      // The person who stopped waiting (cancelled, or left the page) shouldn't still be billed.
       signal: signal
         ? AbortSignal.any([signal, AbortSignal.timeout(TIMEOUT_MS)])
         : AbortSignal.timeout(TIMEOUT_MS),
@@ -147,8 +140,6 @@ async function fixNames(
   try {
     const fixed = await structured(models, {
       model: "fast",
-      // The vocabulary rides in the instructions, the same for every dictation in a workspace, so
-      // it's the cached part of the prompt; only the words heard change.
       instructions: prompt("dictation", {
         terms: vocabulary.terms.join("\n"),
         cards: vocabulary.cards.join("\n"),
@@ -172,10 +163,6 @@ async function fixNames(
   }
 }
 
-/**
- * Whether the second pass stayed a proofread. A fixed name changes a word or two ("get hub" →
- * GitHub), so a length that moved more than that means it rewrote, summarised or answered.
- */
 function onlyFixes(heard: string, fixed: string) {
   const before = words(heard);
   return (

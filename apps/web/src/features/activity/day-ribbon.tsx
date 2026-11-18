@@ -23,7 +23,6 @@ export type Ribbon = ReturnType<typeof useRibbon>;
 
 /** The ribbon's data, held by the page so the feed below can wait for it instead of jumping. */
 export function useRibbon() {
-  // Held in state so the query key is stable; the window slides along every ten minutes.
   const [end, setEnd] = useState(() => Date.now());
   useEffect(() => {
     const timer = setInterval(() => setEnd(Date.now()), 10 * 60_000);
@@ -31,7 +30,6 @@ export function useRibbon() {
   }, []);
   const recent = useQuery({
     ...q.recentActivities({ since: ribbonSince(end), limit: 500 }),
-    // A slide shouldn't blank the lanes while the next window loads.
     placeholderData: keepPreviousData,
   });
   return { end, recent };
@@ -162,14 +160,12 @@ export function DayRibbon({
   );
 }
 
-/** Midnight, 06:00, noon and 18:00 inside the window, placed as percentages along it. */
 function hourMarks(end: number) {
   const start = end - SPAN;
   const first = new Date(start);
   first.setMinutes(0, 0, 0);
   first.setHours(Math.ceil(first.getHours() / 6) * 6);
   const marks: { at: number; x: number; label: string }[] = [];
-  // Five hours clear of the right edge: on a phone's 230px track, three left "18:00now".
   for (let t = first.getTime(); t < end - 5 * HOUR; t += 6 * HOUR) {
     if (t > start + HOUR) {
       marks.push({
@@ -240,7 +236,6 @@ const styles = stylex.create({
     fontSize: text.meta,
     color: color.fg,
   },
-  // A thin baseline gives empty stretches of the day a shape, so quiet hours read as quiet.
   track: {
     position: "relative",
     height: "100%",

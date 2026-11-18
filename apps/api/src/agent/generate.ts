@@ -6,15 +6,11 @@ import type { Models } from "./models";
 
 type Call = {
   model: keyof Models;
-  // Joined with blank lines; empty parts are dropped, so optional sections can be written inline.
   instructions: string | string[];
   prompt: string;
   timeout: keyof typeof TIMEOUTS;
 };
 
-// Every one-shot model call outside a conversation goes through here, so the shape of a call
-// (tier, instructions, prompt, timeout, structured output) is written once. Callers decide what
-// happens without a model; this takes one.
 export async function structured<T>(
   models: Models,
   call: Call & { schema: z.ZodType<T> }

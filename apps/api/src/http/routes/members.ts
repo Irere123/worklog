@@ -113,7 +113,6 @@ export const memberRoutes = router()
       const ctx = c.get("ctx");
       const me = c.get("member");
       const { issueToken, ...input } = c.req.valid("json");
-      // Anyone may register an agent that works for them; adding people or other agents is for admins.
       if (!(input.kind === "agent" && input.ownerId === me.id)) {
         requireAdmin(me);
       }
@@ -223,7 +222,6 @@ export const memberRoutes = router()
     }
   );
 
-/** Not awaited by the route: a slow or failing mail server must not fail the invite. */
 async function sendInvite(
   ctx: AppContext,
   to: string,

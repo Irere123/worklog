@@ -23,8 +23,6 @@ const listOf = (values: string[]) =>
     sql`, `
   )})`;
 
-// The scheduler runs what is due everywhere: the automations of every workspace that earlier
-// tests made would come due too.
 async function onlyDue(workspaceId: string) {
   await env.ctx.db.execute(sql`
     update automations set next_run_at = next_run_at + interval '10 years'
@@ -37,25 +35,21 @@ beforeEach(() => {
   env.reset();
 });
 
-// What a routine does when it has something to say: send it, which ends the run.
 function notify(message: string) {
   return { tool: "send_message", input: { message, summary: "sent" } };
 }
 
 describe("schedules follow each person's local clock", () => {
-  // UTC+2, no DST
   const kigali = "Africa/Kigali";
   const ny = "America/New_York";
 
   test("daily on weekdays skips the weekend", () => {
-    // Fri 09:00 Kigali
     const friday9 = new Date("2026-10-30T07:00:00Z");
     const next = nextRun(
       { type: "daily", at: "08:30", weekdays: [1, 2, 3, 4, 5] },
       kigali,
       friday9
     );
-    // Mon 08:30 Kigali
     expect(next.toISOString()).toBe("2026-11-02T06:30:00.000Z");
   });
 
@@ -69,7 +63,6 @@ describe("schedules follow each person's local clock", () => {
   });
 
   test("handles daylight-saving transitions", () => {
-    // US clocks fall back on 2026-11-01; 08:30 local is 12:30Z before and 13:30Z after.
     const before = nextRun(
       { type: "daily", at: "08:30" },
       ny,
@@ -85,7 +78,6 @@ describe("schedules follow each person's local clock", () => {
   });
 
   test("interval checks wait for active hours", () => {
-    // Tue 20:50 Kigali
     const evening = new Date("2026-10-27T18:50:00Z");
     const next = nextRun(
       { type: "interval", minutes: 30, activeHoursOnly: true },
@@ -96,7 +88,6 @@ describe("schedules follow each person's local clock", () => {
         workdays: [1, 2, 3, 4, 5],
       }
     );
-    // Wed 08:00 Kigali
     expect(next.toISOString()).toBe("2026-10-28T06:00:00.000Z");
   });
 
@@ -513,7 +504,6 @@ describe("automations", () => {
       token: owner.token,
       body: { body: "fyi" },
     });
-    // A watcher heads-up can wait for the brief
     expect((await run()).status).toBe("quiet");
 
     await env.call("POST", `/v1/cards/${card.number}/comments`, {
@@ -528,7 +518,6 @@ describe("automations", () => {
     });
     const pinged = await run().finally(unsubscribe);
     expect(pinged.status).toBe("delivered");
-    // An open tab hears about the ping itself, so it can show it as the one interruption.
     const sent = seen.find((e) => e.type === "notification.sent");
     expect(sent?.data).toMatchObject({
       kind: "push",
@@ -569,14 +558,11 @@ describe("automations", () => {
     );
     const due = new Date(latest + 1000);
     env.ctx.now = () => due;
-    // Two processes' schedulers in the same minute.
     const queued = await Promise.all([
       queueDueAutomations(env.ctx),
       queueDueAutomations(env.ctx),
     ]);
     expect(queued[0] + queued[1]).toBe(autos.length);
-    // A run that never happened (its worker died) comes due again once its lease is up, and is
-    // queued in place of the one still waiting, not beside it.
     env.ctx.now = () => new Date(due.getTime() + 16 * 60_000);
     expect(await queueDueAutomations(env.ctx)).toBe(autos.length);
     const jobs = await env.ctx.db.execute<{ n: number }>(sql`
@@ -608,7 +594,6 @@ describe("automations", () => {
     );
     env.ctx.now = () => due;
     expect(await queueDueAutomations(env.ctx)).toBe(2);
-    // Renamed and run by hand while waiting: neither cancels the scheduled run or delays it.
     await env.call("PATCH", `/v1/automations/${morning.id}`, {
       token,
       body: { name: "Morning" },
@@ -617,7 +602,6 @@ describe("automations", () => {
       (await env.call("POST", `/v1/automations/${morning.id}/run`, { token }))
         .status
     ).toBe(200);
-    // The digest runs, then fails to say so; the job is retried.
     const { bus } = env.ctx;
     const publish = bus.publish.bind(bus);
     let failed = false;
@@ -637,7 +621,6 @@ describe("automations", () => {
     } finally {
       bus.publish = publish;
     }
-    // Byte order, as toSorted compares: ids mix cases, which a locale's collation orders otherwise.
     const runs = await env.ctx.db.execute<{ id: string; n: number }>(sql`
       select automation_id as id, count(*)::int as n from automation_runs
       where automation_id in (${digest.id}, ${morning.id}) group by 1 order by automation_id collate "C"`);
@@ -651,7 +634,6 @@ describe("automations", () => {
     for (const a of after.filter((x: any) =>
       [digest.id, morning.id].includes(x.id)
     )) {
-      // The next slot, not the lease the claim left.
       expect(new Date(a.nextRunAt).getTime()).toBeGreaterThan(
         due.getTime() + 60 * 60_000
       );
@@ -668,7 +650,6 @@ describe("automations", () => {
       where workspace_id = ${workspace.id} and id <> ${digest.id}`);
     env.ctx.now = () => new Date(new Date(digest.nextRunAt).getTime() + 1000);
     expect(await queueDueAutomations(env.ctx)).toBe(1);
-    // Taken by a worker that was then killed: the job and the person's queue stay locked.
     await env.ctx.db.execute(sql`
       update graphile_worker._private_jobs
       set locked_at = now() - interval '2 hours', locked_by = 'dead-worker', attempts = 1

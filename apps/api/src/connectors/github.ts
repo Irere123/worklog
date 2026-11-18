@@ -95,10 +95,6 @@ function required(auth: GithubAuth | null) {
 
 const REPO_STREAM = /^repo:(?<name>[^/\s]+\/[^/\s]+)$/u;
 
-/**
- * History and catch-up through the API, for an app installation or a connection with a `token`.
- * An installation reads every repo it was given (narrowed by `repos`); a token reads `repos`.
- */
 const githubSync: SyncSpec = {
   available: (conn, app) =>
     Boolean((conn.externalId && app) ?? conn.secrets.token),
@@ -142,7 +138,6 @@ async function githubRepos(
   return names.map((name) => ({ id: name, name }));
 }
 
-// Stored as it came, so a replay reads everything it said; read through `parsePayload`.
 function parse(rawBody: string): object | null {
   try {
     const value: unknown = JSON.parse(rawBody);
@@ -152,7 +147,6 @@ function parse(rawBody: string): object | null {
   }
 }
 
-// The repo id survives renames. Deliveries without a repo (installation events) share lane 0.
 function partitionOf(p: Payload) {
   const repo = p.repository;
   if (repo?.id !== undefined) {

@@ -26,13 +26,10 @@ import { returned } from "#lib/assert";
 import { conflict, notFound } from "#lib/errors";
 import { generateId } from "#lib/ids";
 
-/** Logins compare case-insensitively; ids are stored as given. */
 const handleKey = (handle: string) => `handle:${handle.toLowerCase()}`;
 
-/** Sign-in providers whose account ids are the same ids their webhooks carry. */
 const SIGN_IN_NAMESPACES = new Set(["github", "slack", "discord"]);
 
-// Unknown actors are still recorded (memberId null) so admins can link them later and get their history attributed.
 export async function resolveActor(
   ctx: AppContext,
   workspaceId: string,
@@ -78,8 +75,6 @@ type Details = Pick<
   "memberId" | "externalHandle" | "displayName" | "isBot" | "avatarUrl"
 >;
 
-// Most sightings change nothing, and a write per sighting would make a busy bot's row the one every
-// event waits on.
 function changes(current: Identity, next: Details): Partial<Details> | null {
   const set: Partial<Details> = {};
   if (next.memberId !== current.memberId) {
@@ -144,7 +139,6 @@ export async function resolveActors(
     sightings
   );
   known.push(...(await recordIdentities(ctx, workspaceId, namespace, unseen)));
-  // By the identity's id, not the sighting's: a mention by login resolves to the account itself.
   const signedIn = await signedInMembers(
     ctx,
     workspaceId,
@@ -169,22 +163,10 @@ export async function resolveActors(
   return out;
 }
 
-/**
- * Whether a sighting's login may link the account to a placeholder (a member linked by login),
- * moving its history there. An account's own action says its login, and so does what a built-in
- * connector's provider says of someone it names (a GitHub assignee); what a generic connection's
- * sender writes of someone else is only their word.
- */
 function trustsLogin(sighting: Pick<Sighting, "acted">, namespace: string) {
   return sighting.acted !== false || isBuiltInNamespace(namespace);
 }
 
-/**
- * The sighting as far as it can be taken at its word: a generic connection's sender naming
- * someone else says nothing about their login, name or being a bot that can link, describe or
- * silence them, even when it's what first records them (a member linked by that login later
- * would match it).
- */
 function told(sighting: Sighting, namespace: string): Sighting {
   return trustsLogin(sighting, namespace)
     ? sighting
@@ -221,8 +203,6 @@ async function sortSightings(
   for (const sighting of sightings) {
     const named = found.get(sighting.actor.id);
     const account = byLogin.get(sighting.actor.id);
-    // A mention names a login, never an id: the account last seen with that login, unless only
-    // the placeholder says whose it is.
     const exact =
       account && !(named?.memberId && !account.memberId) ? account : named;
     const key = trustsLogin(sighting, namespace)
@@ -241,8 +221,6 @@ async function sortSightings(
   return { known, unseen, intricate };
 }
 
-// For sightings that only know a login (`handle:<login>`), the accounts seen with that login, the
-// most recently seen first.
 async function accountsByLogin(
   ctx: AppContext,
   workspaceId: string,
@@ -277,8 +255,6 @@ async function sighted(
   memberId: string | null
 ): Promise<Resolved> {
   const { actor, at, n } = sighting;
-  // Named rather than seen acting (a mention, found by its login or not): what it says (a
-  // login, lowercased) isn't news about the account, and naming it isn't a sighting.
   const seen = sighting.acted !== false && actor.id === identity.externalId;
   const set = changes(identity, {
     memberId,
@@ -295,7 +271,6 @@ async function sighted(
   });
   const avatarUrl = set?.avatarUrl ?? identity.avatarUrl;
   if (set?.memberId) {
-    // Linked just now (the account signed in): what it did before is theirs too.
     const linked = memberId;
     await transact(ctx, async (tx) => {
       await updateIdentityDetails(tx.db, { id: identity.id, set });
@@ -322,7 +297,6 @@ async function sighted(
   };
 }
 
-// One insert for every new account; those another delivery created first are read back.
 async function recordIdentities(
   ctx: AppContext,
   workspaceId: string,
@@ -334,7 +308,6 @@ async function recordIdentities(
   }
   const enrich = Boolean(getConnector(namespace)?.enrich);
   const created = await transact(ctx, async (tx) => {
-    // In one order everywhere: two lanes inserting the same new people mustn't deadlock.
     const ordered = sightings.toSorted((a, b) =>
       a.actor.id.localeCompare(b.actor.id)
     );
@@ -351,7 +324,6 @@ async function recordIdentities(
           displayName: actor.name ?? null,
           isBot: actor.bot ?? false,
           avatarUrl: actor.avatarUrl ?? null,
-          // Being named isn't being seen: its first action dates it.
           firstSeenAt: acted === false ? null : (since ?? at),
           createdAt: tx.now(),
         };
@@ -417,21 +389,17 @@ async function matchIdentity(
     externalIds: handle ? [actor.id, handleKey(handle)] : [actor.id],
   });
   const exact = candidates.find((i) => i.externalId === actor.id);
-  // A manual link by login is a placeholder (`handle:<login>`) until the account is seen with its stable id.
   const placeholder = candidates.find((i) =>
     i.externalId.startsWith("handle:")
   );
 
   if (!exact && placeholder) {
-    // First sighting with a stable id: upgrade the placeholder in place. Only placeholders — an identity
-    // that already has a different stable id is a different account (logins get reused after renames).
     return await updateIdentityById(ctx.db, {
       id: placeholder.id,
       set: { externalId: actor.id },
     });
   }
   if (exact && placeholder && !exact.memberId && placeholder.memberId) {
-    // Seen before linking, then linked by login: fold the link into the real identity and re-attribute.
     const { memberId } = placeholder;
     await transact(ctx, async (tx) => {
       await deleteIdentityById(tx.db, { id: placeholder.id });
@@ -462,7 +430,6 @@ async function recordIdentity(
       firstSeenAt: seenAt,
       createdAt: tx.now(),
     });
-    // Where the provider has a directory, look the account up once: its email can link it.
     if (
       row &&
       getConnector(namespace)?.enrich &&
@@ -480,7 +447,6 @@ async function recordIdentity(
   if (created) {
     return created;
   }
-  // Lost a race with a concurrent insert: use the row that won.
   const winner = await listIdentitiesByExternalIds(ctx.db, {
     workspaceId,
     provider: namespace,
@@ -498,7 +464,6 @@ async function signedInMember(
   if (!SIGN_IN_NAMESPACES.has(namespace)) {
     return null;
   }
-  // Only reached for an identity with no member, so the explicit-link lookup can't match.
   const signedIn = await findMemberBySignIn(ctx.db, {
     workspaceId,
     provider: namespace,
@@ -552,7 +517,6 @@ export async function linkByHandle(
     handle?: string | null;
   }
 ) {
-  // A forge login passed as the id (non-numeric) is really a handle.
   const link =
     input.externalId &&
     !input.handle &&

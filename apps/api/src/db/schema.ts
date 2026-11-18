@@ -35,7 +35,6 @@ export const workspaces = pgTable("workspaces", {
 export const MEMBER_KINDS = ["human", "agent"] as const;
 export const ROLES = ["owner", "admin", "member"] as const;
 
-// Every human gets a personal assistant agent (ownerId = the human).
 export const members = pgTable(
   "members",
   {
@@ -80,7 +79,6 @@ export type MemberSettings = {
   };
 };
 
-// Linking an unmatched identity later re-attributes all of its past activity.
 export const identities = pgTable(
   "identities",
   {
@@ -114,7 +112,6 @@ export const identities = pgTable(
       t.externalId
     ),
     index("identities_member_idx").on(t.memberId),
-    // A mention carries only the login, matched case-insensitively.
     index("identities_handle_idx")
       .on(t.workspaceId, t.provider, sql`lower(${t.externalHandle})`)
       .concurrently(),
@@ -124,7 +121,6 @@ export const identities = pgTable(
 export const API_SCOPES = ["read", "write", "ingest"] as const;
 export type ApiScope = (typeof API_SCOPES)[number];
 
-// Scopes: read (GET), write (other changes), ingest (report activity / logs only).
 export const apiTokens = pgTable("api_tokens", {
   id: text("id").primaryKey(),
   workspaceId: text("workspace_id")
@@ -229,7 +225,6 @@ export const connections = pgTable(
     createdAt: createdAt(),
   },
   (t) => [
-    // One workspace per installation: the app's webhooks for it route to exactly one connection.
     uniqueIndex("connections_external_uq")
       .on(t.provider, t.externalId)
       .concurrently(),
@@ -305,7 +300,6 @@ export const connectionCursors = pgTable(
   (t) => [primaryKey({ columns: [t.connectionId, t.stream] })]
 );
 
-// Deliveries are stored before they are interpreted, so ingestion is idempotent and replayable after a connector fix.
 export const inboundEvents = pgTable(
   "inbound_events",
   {
@@ -343,7 +337,6 @@ export const inboundEvents = pgTable(
   (t) => [
     uniqueIndex("inbound_delivery_uq").on(t.connectionId, t.deliveryId),
     index("inbound_connection_time_idx").on(t.connectionId, t.receivedAt),
-    // What a lane's drain reads next: small, since processed rows leave it.
     index("inbound_waiting_idx")
       .on(t.connectionId, t.lane, t.receivedAt)
       .concurrently()
@@ -649,7 +642,6 @@ export const attentionItems = pgTable(
   (t) => [
     uniqueIndex("attention_dedupe_uq").on(t.memberId, t.dedupeKey),
     index("attention_member_state_idx").on(t.memberId, t.state),
-    // Closing a PR resolves its review requests for everyone, by thread alone.
     index("attention_open_thread_idx")
       .on(t.workspaceId, t.dedupeKey)
       .concurrently()
@@ -674,7 +666,6 @@ export const attentionResolutions = pgTable(
   },
   (t) => [
     primaryKey({ columns: [t.workspaceId, t.dedupeKey, t.memberId] }),
-    // Pruned by when the thread was last resolved, not first.
     index("attention_resolutions_time_idx").on(t.resolvedThrough),
   ]
 );
@@ -947,7 +938,6 @@ export const memories = pgTable(
   },
   (t) => [
     index("memories_member_idx").on(t.memberId, t.kind, t.status),
-    // Walking a line's history backwards looks up the lines each one replaced.
     index("memories_superseded_by_idx")
       .on(t.supersededBy)
       .concurrently()
@@ -1026,7 +1016,6 @@ export const conversations = pgTable(
   },
   (t) => [
     index("conversations_asker_idx").on(t.askerId, t.updatedAt),
-    // Presence asks which of an agent's conversations hold a turn: only a few rows ever do.
     index("conversations_turning_idx")
       .on(t.agentId)
       .where(sql`${t.turnUntil} is not null`)

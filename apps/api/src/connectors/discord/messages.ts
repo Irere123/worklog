@@ -38,7 +38,6 @@ function channelName(settings: Record<string, unknown>, channel: string) {
   return (names.success ? names.data[channel] : undefined) ?? channel;
 }
 
-// Discord writes people as <@id> and channels as <#id>; custom emoji as <:name:id>.
 function plain(m: Message, settings: Record<string, unknown>) {
   const names = new Map(
     (m.mentions ?? []).map((u) => [u.id, u.global_name ?? u.username ?? u.id])
@@ -59,7 +58,6 @@ function plain(m: Message, settings: Record<string, unknown>) {
     .trim();
 }
 
-// A time that doesn't parse would make an event Postgres can't store.
 function dated(iso: string | null | undefined, fallback: Date) {
   const at = iso ? new Date(iso) : fallback;
   return Number.isNaN(at.getTime()) ? fallback : at;
@@ -87,7 +85,6 @@ function revision(
       title: "deleted",
     };
   }
-  // Only an edit has an edit time; Discord also updates a message when it adds an embed.
   if (
     eventType === "MESSAGE_UPDATE" &&
     m.content !== undefined &&
@@ -107,7 +104,6 @@ function revision(
   return null;
 }
 
-// Chat mentions are conversation, not requests: normal priority.
 function mentionsOf(m: Message, authorId: string, text: string): Signal[] {
   return (m.mentions ?? [])
     .filter((u) => u.id !== authorId && u.bot !== true)
@@ -161,7 +157,6 @@ export function normalizeDiscordMessage(
       id: author.id,
       handle: author.username ?? null,
       name: author.global_name ?? null,
-      // Discord sends only the image's hash; the CDN path is fixed.
       avatarUrl: author.avatar
         ? `https://cdn.discordapp.com/avatars/${author.id}/${author.avatar}.png`
         : null,
@@ -174,7 +169,6 @@ export function normalizeDiscordMessage(
     object: { type: "message", key: `discord:${m.channel_id}:${m.id}`, url },
     cardRefs: { numbers: cardNumbersIn(text) },
     signals,
-    // As in Slack, what only some can read stays the author's own.
     visibility: listed(settings, "privateChannels").includes(m.channel_id)
       ? "private"
       : "team",

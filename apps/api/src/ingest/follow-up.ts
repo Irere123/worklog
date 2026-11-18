@@ -32,7 +32,6 @@ export async function queueFollowUp(
         return false;
       }
     }
-    // Twice at most: a second attempt re-runs the answer, which is only worth it once.
     await enqueue(
       tx,
       "chat:follow-up",

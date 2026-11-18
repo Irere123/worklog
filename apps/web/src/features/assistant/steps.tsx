@@ -75,7 +75,6 @@ export type Step =
 type StoredStep = Schemas["MessageStep"];
 type Found = Schemas["StepFound"];
 
-// As many as the server keeps on a stored step, so a reply looks the same before and after.
 const FOUND_SHOWN = 8;
 
 export function storedSteps(steps: StoredStep[]): Step[] {
@@ -136,7 +135,6 @@ function foundIn(output: unknown): Found[] {
   });
 }
 
-// The review returns `{ blocked: true, approvalId }` in place of a write it held back.
 function heldFor(output: unknown) {
   if (typeof output !== "object" || output === null) {
     return null;
@@ -153,7 +151,6 @@ function heldFor(output: unknown) {
     output,
     "proposed"
   )?.value;
-  // A proposed routine waits on the same Allow as a held write.
   return (blocked === true || proposed === true) && typeof id === "string"
     ? id
     : null;
@@ -189,7 +186,6 @@ export function liveSteps(parts: UIMessage["parts"]): Step[] {
   return steps;
 }
 
-// Writes change the record, so they stay in view as their own lines; only lookups fold away.
 const WRITES = new Set([
   "remember",
   "forget",
@@ -299,7 +295,6 @@ function StepRow({
   );
 }
 
-/** Reasoning stays folded, even while it streams: the reply is what people came for. */
 function Thought({ step }: { step: Extract<Step, { kind: "thought" }> }) {
   const [open, setOpen] = useState(false);
   return (
@@ -331,7 +326,6 @@ function Thought({ step }: { step: Extract<Step, { kind: "thought" }> }) {
   );
 }
 
-// Memory changes are the ones people most want to check, so they link to the memory page.
 const MEMORY_WRITES = new Set(["remember", "forget"]);
 
 const ICONS: Record<string, ComponentType<IconProps>> = {
@@ -425,10 +419,6 @@ const ANSWERED: Record<Answer, string> = {
   deny: "you declined it",
 };
 
-/**
- * A write teammates would see that the review held back: it waits here and in the inbox for the
- * owner's Allow or Deny, and a tap runs exactly what was proposed.
- */
 function HeldRow({
   step,
   approvalId,
@@ -438,14 +428,12 @@ function HeldRow({
   approvalId: string;
   people: Map<string, Member>;
 }) {
-  // Asked by id: the open list is capped and leaves out snoozed items, both still waiting.
   const request = useQuery(q.attentionItem(approvalId));
   const act = useAnswerApproval();
   const answer = act.isError ? null : (act.variables?.answer ?? null);
   const waiting =
     answer === null &&
     (request.data?.state === "open" || request.data?.state === "snoozed");
-  // Until the request is read, the row claims neither way; one that's gone was dealt with.
   const settled =
     answer !== null ||
     request.isError ||
@@ -477,7 +465,6 @@ function HeldRow({
   );
 }
 
-/** What the tool was asked and what came back, as fields; the raw JSON is one click further. */
 function ToolDetail({ step }: { step: Extract<Step, { kind: "tool" }> }) {
   const [raw, setRaw] = useState(false);
   const fields = fieldsOf(step.input);
@@ -534,7 +521,6 @@ function ToolDetail({ step }: { step: Extract<Step, { kind: "tool" }> }) {
   );
 }
 
-/** One thing a lookup found: a card opens over the page, an event links to where it happened. */
 function FoundRow({ item }: { item: Found }) {
   const { number } = item;
   if (number !== null) {
@@ -580,7 +566,6 @@ function FoundRow({ item }: { item: Found }) {
   );
 }
 
-// `look_into` hands a question to a helper and gets a short report back.
 function reportOf(output: unknown) {
   const report: unknown =
     typeof output === "object" && output !== null

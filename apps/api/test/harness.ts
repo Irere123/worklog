@@ -12,9 +12,6 @@ import { ConsoleMailer } from "#lib/mailer";
 export { hmacHex } from "#lib/crypto";
 export { DAY_MS } from "#lib/time";
 
-// One database for the whole run (bun runs every test file in one process), recreated at the start
-// so rows from an earlier run can't make a test pass. Isolation comes from each test creating its
-// own workspace.
 const TEST_DATABASE_URL =
   process.env.TEST_DATABASE_URL ??
   "postgres://postgres:postgres@localhost:5432/worklog_test";
@@ -103,8 +100,6 @@ export async function testEnv() {
     return { token: res.body.token.token as string, member: res.body.member };
   }
 
-  // `later` also runs what that workspace has waiting for a quiet moment, as if it had come. Only
-  // that workspace's: other tests' would spend this test's scripted model replies.
   const drain = async (opts: { later?: string } = {}) => {
     if (opts.later !== undefined) {
       await ctx.pool.query(
@@ -119,7 +114,6 @@ export async function testEnv() {
   return { ctx, app, call, workspace, teammate, reset, drain };
 }
 
-// Drops and recreates a database next to the test database, and returns its URL.
 export async function freshDatabase(name: string) {
   const server = new URL(TEST_DATABASE_URL);
   server.pathname = "/postgres";
@@ -227,8 +221,6 @@ const usage = {
   outputTokens: { total: 10, text: 10, reasoning: undefined },
 };
 
-// `until` holds a step's reply back until it settles, to catch a turn while it's still running;
-// `cacheRead` is how many input tokens the provider says came from its prompt cache.
 type Step =
   | { text: string; until?: Promise<unknown>; cacheRead?: number }
   | { tool: string; input: unknown };

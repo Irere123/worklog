@@ -49,11 +49,6 @@ type Message = {
   reason?: string;
 };
 
-/**
- * Private data only reaches private targets. The inbox and private targets get `message`; team
- * targets get `forTeam()`, a version built from team-visible data alone, which is composed only when
- * there are team targets and skipped when it is null because there's nothing the team can see.
- */
 async function send(
   ctx: AppContext,
   automation: Automation,
@@ -100,7 +95,6 @@ async function send(
   return { delivered, failed };
 }
 
-// Every outbound body is sanitized against the URLs in its source data, so injected content can't smuggle links out.
 function sanitized(ctx: AppContext, message: Message) {
   return sanitizeMarkdown(
     message.markdown,
@@ -123,7 +117,6 @@ function outgoing(
   };
 }
 
-// Quiet is allowed: a scheduled brief with nothing in it isn't sent. Run by hand, it always is.
 export async function runBrief(
   ctx: AppContext,
   automation: Automation,
@@ -170,7 +163,6 @@ export async function runBrief(
       };
     }
   );
-  // The brief's "Needs your attention" section counts as having shown these.
   const shown = await listOpenAttention(ctx.db, {
     memberId: member.id,
     now: ctx.now(),
@@ -230,8 +222,6 @@ function digestLine(a: AttentionItem) {
   return `- ${bold}${a.title}${bold}${a.count > 1 ? ` (×${a.count})` : ""}${a.url ? ` — ${a.url}` : ""}`;
 }
 
-// Deterministic gates first (models over-trigger: ~50% false alarms), then the model as a
-// classifier inside them.
 const DEFAULT_LIMITS = {
   dailyPushCap: 4,
   minGapMinutes: 90,
@@ -260,7 +250,6 @@ type Decision = {
   reason: string;
 };
 
-/** Kinds that only the member themselves raise, for themselves, at a time they chose. */
 const ASKED_FOR = new Set(["follow_up"]);
 
 export async function runCheck(
@@ -284,8 +273,6 @@ export async function runCheck(
   const limits = { ...DEFAULT_LIMITS, ...member.settings.notify };
   const now = ctx.now().getTime();
   const muted = await mutedKinds(ctx, member.id);
-  // What they asked to have brought back comes back when they asked: it's their own request, not
-  // an interruption, so neither the budget nor the model holds it.
   const decisions: Decision[] = pending
     .filter((item) => ASKED_FOR.has(item.kind))
     .map((item) => ({
@@ -306,7 +293,6 @@ export async function runCheck(
   if (candidates.length) {
     const budget = await pingBudget(ctx, member.id, tz, limits, now);
     if (budget === "hold" && !decisions.some((d) => d.disposition === "push")) {
-      // Leave them unconsidered so the next check (after the gap) decides.
       await markConsidered(ctx, decisions);
       return {
         status: "quiet",
@@ -314,7 +300,6 @@ export async function runCheck(
       };
     }
     if (budget === "hold") {
-      // Left unconsidered, as above; what they asked for goes out on its own.
       candidates = [];
     }
     if (budget === "spent") {
@@ -382,7 +367,6 @@ async function pingBudget(
   return "ok";
 }
 
-// The model may only demote a push to the digest; without one, everything that got this far is pushed.
 async function classify(
   ctx: AppContext,
   automation: Automation,
@@ -458,7 +442,6 @@ async function pushDecided(
       rows.map((r) => r.item)
     );
     const shared = new Set(visibleItems.map((i) => i.id));
-    // The model wrote its reasons with private memory in view, so the team gets the plain ones.
     const visible = rows
       .filter((r) => shared.has(r.item.id))
       .map((r) => ({ item: r.item, reason: defaultReason(r.item) }));

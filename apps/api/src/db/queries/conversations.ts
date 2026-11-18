@@ -91,7 +91,6 @@ export async function updateConversationById(
     .where(eq(conversations.id, params.id));
 }
 
-// Its messages and ratings go with it (foreign keys cascade).
 export async function deleteConversationById(
   db: DbOrTx,
   params: { id: string; workspaceId: string }
@@ -106,7 +105,6 @@ export async function deleteConversationById(
     );
 }
 
-// Joins the line for a turn in this conversation.
 export async function enqueueConversationTurn(
   db: DbOrTx,
   params: { id: string; token: string }
@@ -119,7 +117,6 @@ export async function enqueueConversationTurn(
     .where(eq(conversations.id, params.id));
 }
 
-// Takes the turn for whoever is first in line, once the turn before has let go or its lease ran out.
 export async function claimConversationTurn(
   db: DbOrTx,
   params: { id: string; token: string; now: Date; until: Date }
@@ -156,8 +153,6 @@ export async function leaveConversationTurnQueue(
     .where(eq(conversations.id, params.id));
 }
 
-// A place in line taken before `beforeMs` belongs to a request that would have given up by now, so
-// its process is gone; dropping it lets the ones behind it through.
 export async function dropStaleTurnTokens(
   db: DbOrTx,
   params: { id: string; beforeMs: number }
@@ -181,7 +176,6 @@ export async function dropStaleTurnTokens(
     );
 }
 
-// Asks the turn running now, if one is, to stop: it watches for its own lease here.
 export async function requestTurnStop(
   db: DbOrTx,
   params: { id: string; now: Date }
@@ -207,7 +201,6 @@ export async function findTurnStop(db: DbOrTx, params: { id: string }) {
   return row?.until ?? null;
 }
 
-// Only the turn that holds the lease lets it go, so a turn that outlived it can't free the next one's.
 export async function releaseConversationTurn(
   db: DbOrTx,
   params: { id: string; until: Date }
@@ -223,7 +216,6 @@ export async function releaseConversationTurn(
     );
 }
 
-// Only while the turn that took this lease still holds it: a step reported late can't outlive it.
 export async function setConversationTurnStep(
   db: DbOrTx,
   params: { id: string; until: Date; step: TurnStep }
@@ -239,7 +231,6 @@ export async function setConversationTurnStep(
     );
 }
 
-// Never moves back, so a tab that reports late can't make an older reply news again.
 export async function setConversationSeen(
   db: DbOrTx,
   params: { id: string; askerId: string; now: Date }
@@ -259,7 +250,6 @@ export async function setConversationSeen(
   return rows.length > 0;
 }
 
-// Turns an agent is taking now, in anyone's conversation with it.
 export async function listRunningTurns(
   db: DbOrTx,
   params: { agentId: string; now: Date }
@@ -283,7 +273,6 @@ export async function listRunningTurns(
     .orderBy(asc(conversations.updatedAt));
 }
 
-// Replies the asker hasn't opened the conversation to see since they were written.
 export async function listUnseenReplies(
   db: DbOrTx,
   params: { askerId: string; agentId: string }
@@ -307,7 +296,6 @@ export async function listUnseenReplies(
     .limit(20);
 }
 
-// Only moves forward from the watermark the caller read, so two passes can't both learn the same messages.
 export async function setConversationLearned(
   db: DbOrTx,
   params: { id: string; fromSeq: number; throughSeq: number }
@@ -325,7 +313,6 @@ export async function setConversationLearned(
   return rows.length > 0;
 }
 
-// Holds the row until the transaction ends, so concurrent appends take turns assigning `seq`.
 export async function lockConversation(db: DbOrTx, params: { id: string }) {
   await db
     .select({ id: conversations.id })
@@ -345,7 +332,6 @@ export async function listMessages(
     .orderBy(asc(messages.seq));
 }
 
-// What the model replays: everything after the recap.
 export async function listMessagesAfter(
   db: DbOrTx,
   params: { conversationId: string; afterSeq: number }
@@ -362,7 +348,6 @@ export async function listMessagesAfter(
     .orderBy(asc(messages.seq));
 }
 
-// Characters of stored message JSON the model would replay, a cheap stand-in for tokens.
 export async function measureReplay(
   db: DbOrTx,
   params: { conversationId: string }
@@ -385,9 +370,6 @@ export async function measureReplay(
   return row?.chars ?? 0;
 }
 
-// Only moves forward from the recap the caller read, so two compactions can't overwrite each other.
-// The memory page is let go too: the prompt's start changes with the recap anyway, so the next turn
-// takes a fresh one.
 export async function setConversationRecap(
   db: DbOrTx,
   params: {
@@ -415,8 +397,6 @@ export async function setConversationRecap(
   return rows.length > 0;
 }
 
-// What a member said to their own assistant that its conversation hasn't learned from yet, without
-// the automation posts in their inbox.
 export async function listOwnerMessages(
   db: DbOrTx,
   params: { ownerId: string; since: Date; until: Date; limit: number }
@@ -468,7 +448,6 @@ export async function insertMessages(db: DbOrTx, rows: MessageRow[]) {
   }
 }
 
-// The newest things the person in a conversation typed, oldest first, without automation posts.
 export async function listRecentSaid(
   db: DbOrTx,
   params: { conversationId: string; limit: number }
@@ -488,7 +467,6 @@ export async function listRecentSaid(
   return rows.flatMap((r) => (r.text ? [r.text] : [])).toReversed();
 }
 
-// When the oldest message the conversation hasn't learned from was written, if there is one.
 export async function findFirstUnlearnedAt(
   db: DbOrTx,
   params: { conversationId: string }
@@ -540,7 +518,6 @@ export async function findMessageById(
   return row;
 }
 
-// A new rating, or a changed one, waits to be learned from again.
 export async function upsertReplyRating(db: DbOrTx, row: ReplyRatingRow) {
   const rows = await db
     .insert(replyRatings)
@@ -573,7 +550,6 @@ export async function listConversationRatings(
     );
 }
 
-// Ratings in a conversation the memory pass hasn't read yet, with the reply they rate.
 export async function listUnlearnedRatings(
   db: DbOrTx,
   params: { conversationId: string }
@@ -598,7 +574,6 @@ export async function listUnlearnedRatings(
     .limit(20);
 }
 
-// Only ratings still as they were read: one changed while the pass ran is read again next time.
 export async function setRatingsLearned(
   db: DbOrTx,
   params: { read: { id: string; updatedAt: Date }[]; at: Date }
@@ -621,8 +596,6 @@ export async function setRatingsLearned(
     );
 }
 
-// A member's ratings, newest first, each with the reply and the message it answered: the cases a
-// prompt or model change is checked against.
 export async function listReplyRatings(
   db: DbOrTx,
   params: {
@@ -660,7 +633,6 @@ export async function listReplyRatings(
     .limit(params.limit);
 }
 
-// What a member's own turns cost since then, and how much of their input the prompt cache served.
 export async function sumTurnUsage(
   db: DbOrTx,
   params: { askerId: string; since: Date }
@@ -695,7 +667,6 @@ export async function sumTurnUsage(
   );
 }
 
-// Takes the right to warm a conversation's cache, at most once in `gapMs`.
 export async function claimConversationWarmth(
   db: DbOrTx,
   params: { id: string; now: Date; gapMs: number }
@@ -738,7 +709,6 @@ export async function getReplyRating(
   return rows[0];
 }
 
-// The workspace's unhelpful ratings, newest first: the cases a changed prompt or model is run on.
 export async function listUnhelpfulRatings(
   db: DbOrTx,
   params: { workspaceId: string; limit: number }

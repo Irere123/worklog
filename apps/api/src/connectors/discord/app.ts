@@ -27,7 +27,6 @@ export async function asApp<T>(run: () => Promise<T>): Promise<T> {
   }
 }
 
-// View Channels and Send Messages: enough to deliver briefs to a channel and answer commands.
 const PERMISSIONS = String(1024 + 2048);
 
 const Token = z.object({
@@ -99,7 +98,6 @@ const VIEW_CHANNEL = 1024;
 const grants = (bits: string) =>
   Math.floor(Number(bits) / VIEW_CHANNEL) % 2 === 1;
 
-// Overwrites of type 0 are roles; @everyone is the role with the server's own id.
 const hiddenFromEveryone = (overwrites: Overwrite[], guildId: string) =>
   overwrites.some((o) => o.type === 0 && o.id === guildId && grants(o.deny));
 const rolesLetIn = (overwrites: Overwrite[]) =>
@@ -107,12 +105,6 @@ const rolesLetIn = (overwrites: Overwrite[]) =>
     overwrites.filter((o) => o.type === 0 && grants(o.allow)).map((o) => o.id)
   );
 
-/**
- * The role a server lets its members in by, if it hides most channels from @everyone (a #welcome
- * open to all, everything else behind a "Member" role): the role most hidden channels let in. A
- * channel that role reads is no more private than the server. A small server whose hidden
- * channels are mostly one team's reads as gated by that team's role.
- */
 function membersRole(
   hidden: Overwrite[][],
   readable: number
@@ -130,7 +122,6 @@ function membersRole(
   return n !== undefined && n > hidden.length / 2 ? role : undefined;
 }
 
-// Text and announcement channels: where people write updates.
 const READABLE = new Set([0, 5]);
 
 /** The server's channels the bot can post in and read, for choosing which count as work. */
@@ -212,12 +203,10 @@ export function discordApp(commands: unknown[]): AppSpec {
             },
           }
         : null,
-    // Commands in a server name it; a DM to the bot belongs to no workspace.
     route(received) {
       const parsed = Routed.safeParse(received.payload);
       return parsed.success ? (parsed.data.guild_id ?? null) : null;
     },
-    // Discord says nothing when the bot is removed from a server: the servers it's still in.
     async installations(ctx, app) {
       const ids = new Set<string>();
       let after = "0";
@@ -239,7 +228,6 @@ export function discordApp(commands: unknown[]): AppSpec {
         }
         after = last.id;
       }
-      // A list cut short would read as servers the bot left.
       throw new ProviderError(
         "Discord listed more servers than Worklog reads",
         "failed"
@@ -254,7 +242,6 @@ export function discordApp(commands: unknown[]): AppSpec {
         redirect_uri: callbackUrl,
         state,
       }).toString()}`,
-    // The redirect's guild_id is only a hint; the server comes from exchanging the code.
     async completeInstall(ctx, app, query, callbackUrl) {
       if (!query.code) {
         throw badRequest(

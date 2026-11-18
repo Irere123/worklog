@@ -193,7 +193,6 @@ const styles = stylex.create({
     gap: space.md,
     alignItems: "stretch",
   },
-  // A tablet fits the two Cloud plans side by side; self-hosting takes the row under them.
   lastPlan: {
     gridColumn: {
       default: "auto",
@@ -208,7 +207,6 @@ const styles = stylex.create({
     borderRadius: 16,
     backgroundColor: "oklch(0.2 0.01 80 / 0.04)",
   },
-  // The plan most teams grow into stands a step forward, as resurf's paid card does.
   lead: {
     backgroundColor: color.raised,
     boxShadow: shadow.lift,

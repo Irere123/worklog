@@ -61,7 +61,6 @@ export function rememberTool({ ctx, owner, said }: Scope) {
           visibility: isPrivate ? "private" : "team",
           source: "agent",
           confirmed,
-          // Quoted, since this turn's message is stored only once the turn ends.
           evidence: said.trim()
             ? [{ kind: "said", at: ctx.now().toISOString(), text: said }]
             : [],

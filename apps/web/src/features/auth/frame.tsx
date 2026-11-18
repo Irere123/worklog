@@ -12,6 +12,7 @@ import {
   radius,
   space,
   text,
+  weight,
 } from "#ui/tokens.stylex";
 
 /**
@@ -161,7 +162,6 @@ const styles = stylex.create({
     },
     outlineOffset: 3,
   },
-  // The form sits a little above the middle, where the eye starts on a tall screen.
   column: {
     display: "flex",
     flexDirection: "column",
@@ -182,8 +182,7 @@ const styles = stylex.create({
     fontFamily: font.display,
     fontSize: 34,
     lineHeight: "40px",
-    // design-allow: the public pages' serif headline weight, between Newsreader's light and regular
-    fontWeight: 360,
+    fontWeight: weight.display,
     fontOpticalSizing: "none",
     fontVariationSettings: "'opsz' 18",
     letterSpacing: "-0.025em",
@@ -224,9 +223,6 @@ const styles = stylex.create({
     },
     outlineOffset: 2,
   },
-  // The picture is always light, as the front page is, whatever theme the app is in.
-  // Its text colour is set here too: inherited from a dark page, it would stay light on the
-  // picture's white cards.
   art: {
     colorScheme: "light",
     color: color.fg,
@@ -253,7 +249,6 @@ const styles = stylex.create({
     height: "100%",
     objectFit: "cover",
   },
-  // Drawn at the grid's own size and enlarged, so the panel shows it at a reading size.
   preview: {
     width: "100%",
     maxWidth: 560,

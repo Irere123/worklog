@@ -17,7 +17,6 @@ function page(title: string, body: string, status = 200) {
   );
 }
 
-// These are browser redirects, so failures become a page a person can read, not JSON.
 async function shown(run: () => Promise<Response>) {
   try {
     return await run();
@@ -58,8 +57,6 @@ export function oauthRoutes() {
       await shown(async () => {
         const ctx = c.get("ctx");
         const query = c.req.query();
-        // Editing an installation on GitHub's side comes back here without a state: there is
-        // nothing to finish, and the change reaches Worklog by webhook.
         if (!query.state && query.setup_action === "update") {
           return page(
             "Saved",

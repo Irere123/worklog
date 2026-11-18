@@ -7,9 +7,6 @@ import type {
   WorklogEvent,
 } from "#connectors/types";
 
-// Payloads are only signature-verified. Parsed leniently, so the handlers can trust these types: a
-// field of the wrong type reads as missing, an object without what it can't do without as absent,
-// a bad item drops out of its list, and a date that doesn't parse isn't one.
 const optional = <T extends z.ZodType>(schema: T) =>
   schema.optional().catch(undefined);
 const listOf = <T extends z.ZodType>(item: T) =>
@@ -39,7 +36,6 @@ const IssueSchema = z.object({
   title: z.string(),
   html_url: z.string(),
   body: optional(z.string().nullable()),
-  // GitHub allows these to be null; a missing author doesn't make the event less real.
   user: optional(UserSchema),
   draft: optional(z.boolean()),
   merged: optional(z.boolean()),
@@ -59,7 +55,6 @@ const PayloadSchema = z
     pull_request: optional(IssueSchema),
     review: optional(
       z.object({
-        /** Gitea's review webhooks carry no id: theirs is built from the PR, reviewer and time. */
         id: z.union([z.number(), z.string()]),
         state: z.string(),
         body: optional(z.string().nullable()),
@@ -105,7 +100,6 @@ const PayloadSchema = z
         })
       )
     ),
-    /** Gitea/Forgejo cap the commit list; this is the real count. */
     total_commits: optional(z.number()),
     head_commit: optional(z.object({ timestamp: optional(when) }).nullable()),
   })
@@ -140,7 +134,6 @@ export const actorFor = (u: User): ExternalActor => ({
 const actorOf = (u?: User | null): ExternalActor | null =>
   u ? actorFor(u) : null;
 
-// Mentions carry no id, so they resolve by login.
 const byLogin = (login: string): ExternalActor => ({
   id: `handle:${login.toLowerCase()}`,
   handle: login,
@@ -180,20 +173,15 @@ const ignore = (reason: string): Normalized => ({
 });
 
 type Delivery = {
-  /** Key prefix: "github" or "gitea:git.example.com". */
   ns: string;
   repo: string;
   eventType: string;
   p: Payload;
   receivedAt: Date;
   actor: ExternalActor | null;
-  /** The source's timestamp, or the arrival time when it has none. */
   at: (iso?: string | null) => Date;
-  /** Same fallback as `at`, as a string for event ids. */
   stamp: (iso?: string | null) => string;
-  /** "acme/api#7", for titles. */
   ref: (n: number) => string;
-  /** "github:acme/api#7", for threads, objects and card links. */
   key: (n: number) => string;
   event: (e: Omit<WorklogEvent, "actor" | "container">) => WorklogEvent;
 };
@@ -210,7 +198,6 @@ const EVENTS = new Map<string, (d: Delivery) => Normalized>([
   ["release", onRelease],
 ]);
 
-// Syncs, edits and labels are deliberately absent: they aren't work signals.
 const PR_ACTIONS = new Map<
   string,
   (d: Delivery, pr: Issue, common: Common) => Normalized
@@ -373,8 +360,6 @@ function onPrOpened(
     return ignore("draft pull request");
   }
   const reopened = p.action === "reopened";
-  // A PR is opened once, whether it was opened ready or marked ready later: one id, which a
-  // backfill reading the PR's current state reproduces.
   const id = reopened
     ? `pr:${key(pr.number)}:reopened:${stamp(pr.updated_at)}`
     : `pr:${key(pr.number)}:opened`;
@@ -417,7 +402,6 @@ function onPrClosed(
         kind: merged ? "pr.merged" : "pr.closed",
         occurredAt: at(pr.merged_at ?? pr.closed_at),
         title: `${merged ? "Merged" : "Closed"} PR ${ref(pr.number)}: ${pr.title}`,
-        // Nobody needs to review a closed PR any more.
         signals: [{ type: "resolve", what: "review_requested" }],
       }),
     ],

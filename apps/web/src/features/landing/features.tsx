@@ -81,17 +81,13 @@ function Tile({
   title: string;
   copy: string;
   badge?: string;
-  /** A third of the row, or two thirds for a lead. */
   size?: "third" | "wide";
   at: number;
   children: (on: boolean) => ReactNode;
 }) {
-  // Each tile watches itself: a whole grid is never a quarter on screen on a phone. Tiles that
-  // arrive together still take turns across the row, so a row settles as one wave.
   const ref = useRef<HTMLElement>(null);
   const on = useInView(ref, { margin: "0px 0px -10% 0px", once: true });
   const [turn, setTurn] = useState(false);
-  // With reduced motion every tile is simply finished: nothing waits to be scrolled to.
   const reduced = useReducedMotion();
   useEffect(() => {
     const timer = on
@@ -354,7 +350,6 @@ function Budget() {
 const ARRIVE = "cubic-bezier(0.25, 0.8, 0.25, 1)";
 
 const styles = stylex.create({
-  // Six columns, so a row is a third and two thirds, or two halves.
   grid: {
     display: "grid",
     gridTemplateColumns: {
@@ -396,7 +391,6 @@ const styles = stylex.create({
     flexBasis: 0,
     minWidth: 0,
   },
-  // A phone keeps two columns of the board, so no card's words are cut.
   boardMaybe: {
     display: {
       default: "flex",
@@ -429,8 +423,6 @@ const styles = stylex.create({
   art: {
     display: "grid",
     placeItems: "center",
-    // A phone gives each picture the height it needs, from a floor, so a taller one (the AI
-    // tile's two panels) never runs into its own title.
     height: {
       default: 200,
       "@media (max-width: 600px)": "auto",
@@ -492,7 +484,6 @@ const styles = stylex.create({
   drift: {
     opacity: 1,
   },
-  // Faded enough to read as drifting, not so far that its words stop being legible.
   driftOn: {
     opacity: 0.8,
     transform: "translateY(6px) scale(0.985)",
@@ -514,7 +505,6 @@ const styles = stylex.create({
     fontSize: text.meta,
     color: color.fgMuted,
   },
-  // The card it sits on is already faded, so its number starts a step darker to stay legible.
   numberFaded: {
     color: color.fg,
   },
@@ -535,8 +525,6 @@ const styles = stylex.create({
     fontWeight: 500,
     textWrap: "balance",
   },
-  // A phone's card is too narrow to share its title's line with the stamp, so the stamp moves up
-  // beside the card's number and the title gets the whole width.
   stamped: {
     paddingRight: {
       default: 64,
@@ -582,7 +570,6 @@ const styles = stylex.create({
     textTransform: "uppercase",
     letterSpacing: "0.06em",
   },
-  // Up beside the number on a phone, the stamp keeps to one line: the date would reach the title.
   stampDate: {
     display: {
       default: "inline",
@@ -733,8 +720,6 @@ const styles = stylex.create({
     transitionProperty: "color",
     transitionDuration: "600ms",
   },
-  // Noise is struck out, not hidden: the point is seeing it left out. Grey, not faded, so it
-  // stays legible.
   struck: {
     color: color.fgMuted,
     textDecorationLine: "line-through",

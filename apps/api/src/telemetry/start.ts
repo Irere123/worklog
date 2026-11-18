@@ -50,14 +50,10 @@ export function reportCrashes() {
 
 async function crash(kind: string, error: unknown) {
   log.error(`process: ${kind}`, { error });
-  // Tinybird being down must not keep a crashed process alive.
   await Promise.race([flush(), sleep(5000)]);
   process.exit(1);
 }
 
-// The event loop's lag, memory, CPU, the connection pool and telemetry's own health, every 30
-// seconds: a slow endpoint can't tell you on its own whether the whole process was struggling,
-// and a quiet hour can't tell you whether its rows were lost. The samples double as a heartbeat.
 function sampleRuntime(pool: Pool) {
   let cpu = process.cpuUsage();
   let lagMs = 0;
@@ -84,7 +80,6 @@ function sampleRuntime(pool: Pool) {
       "db.pool.total": pool.totalCount,
       "db.pool.idle": pool.idleCount,
       "db.pool.waiting": pool.waitingCount,
-      // Counted since the process started: a rise means rows went missing.
       "telemetry.dropped_rows": sink.dropped,
       "telemetry.quarantined_rows": sink.quarantined,
       "telemetry.failed_sends": sink.failedSends,

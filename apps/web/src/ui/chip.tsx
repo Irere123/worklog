@@ -39,8 +39,6 @@ export type Status =
 
 const GLYPH_SIZE = 12;
 
-// Filled shapes in the label's own colour: a solid mark carries at 12px where an outline thins
-// out, and "not started" is the one hollow, dashed shape because nothing is there yet.
 const GLYPHS: Record<Status, ReactNode> = {
   idle: <CircleDashedIcon size={GLYPH_SIZE} weight="bold" />,
   maybe: <QuestionIcon size={GLYPH_SIZE} weight="fill" />,
@@ -100,7 +98,6 @@ export function Dot({
   );
 }
 
-// Hotkeys bind "Mod", which is Control off Apple devices; a ⌘ hint there names a key that isn't.
 const APPLE =
   typeof navigator !== "undefined" &&
   /Mac|iPhone|iPad/u.test(navigator.userAgent);
@@ -137,7 +134,6 @@ export function Count({
   );
 }
 
-// Opacity only, so the browser animates it without repainting the page each frame.
 const pulse = stylex.keyframes({
   "0%, 100%": { opacity: 1 },
   "50%": { opacity: 0.35 },
@@ -157,7 +153,6 @@ const styles = stylex.create({
     whiteSpace: "nowrap",
     flexShrink: 0,
   },
-  // A round glyph sits optically further in than a letter's straight edge.
   badgeGlyph: { paddingInlineStart: space.xs },
   glyph: { display: "inline-flex", flexShrink: 0 },
   dot: {
@@ -174,7 +169,6 @@ const styles = stylex.create({
     animationIterationCount: "infinite",
     "@media (prefers-reduced-motion: reduce)": { animationName: "none" },
   },
-  // Keyboard hints mean nothing on a touch screen.
   keys: {
     display: {
       default: "inline-flex",

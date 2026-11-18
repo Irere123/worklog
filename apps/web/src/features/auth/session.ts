@@ -17,7 +17,6 @@ export function useMe() {
 export async function signOut(client: QueryClient) {
   auth.setKey(null);
   rememberSignedIn(false);
-  // Signing out locally must still work when the server can't be reached.
   await fetch("/api/auth/sign-out", {
     method: "POST",
     credentials: "include",

@@ -17,7 +17,6 @@ export async function signInEmail(props: Props) {
       "",
       "If you didn't ask to sign in, ignore this email: nothing happens until the link is opened.",
     ],
-    // Gmail threads emails with the same subject, which would bury a new link under expired ones.
     headers: { "X-Entity-Ref-ID": crypto.randomUUID() },
   });
 }

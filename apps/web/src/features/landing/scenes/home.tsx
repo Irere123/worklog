@@ -35,7 +35,6 @@ const START: State = {
   hover: false,
 };
 
-// The finished frame: what someone with reduced motion sees, and the beat the story builds to.
 const END: State = { ...START, arrived: true };
 
 /**
@@ -235,14 +234,11 @@ const styles = stylex.create({
     lineHeight: "23px",
   },
   underline: {
-    // A border rather than text-decoration: the rolling digit is its own box, which an
-    // underline wouldn't cross.
     paddingBottom: 1,
     borderBottomWidth: 1,
     borderBottomStyle: "solid",
     borderBottomColor: color.lineStrong,
   },
-  // On a phone the composer gives its room to what needs you, the point of the page.
   composer: {
     display: {
       default: "flex",
@@ -309,7 +305,6 @@ const styles = stylex.create({
   rowHover: {
     backgroundColor: color.uiHover,
   },
-  // The click lands on the row itself, not only on the pointer.
   rowPressed: {
     backgroundColor: color.uiActive,
   },

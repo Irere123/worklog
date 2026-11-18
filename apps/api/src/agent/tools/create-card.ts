@@ -6,7 +6,6 @@ import { reviewed } from "#agent/review";
 import { safe } from "./scope";
 import type { Scope } from "./scope";
 
-// The team sees the card, so it's made only once the review finds the owner asked for it.
 export function createCardTool(scope: Scope) {
   return tool({
     description:

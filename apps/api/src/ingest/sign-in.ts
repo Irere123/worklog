@@ -26,7 +26,6 @@ export function withAppSignIn(
   const filled: Config = { ...config };
   for (const app of apps) {
     const keys = SIGN_IN.get(app.provider);
-    // Either one set means the environment chose an OAuth app; half of another app is no use.
     if (!keys || filled[keys[0]] || filled[keys[1]]) {
       continue;
     }

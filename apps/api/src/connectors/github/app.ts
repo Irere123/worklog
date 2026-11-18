@@ -48,8 +48,6 @@ export const headers = (token: string) => ({
 
 const Token = z.object({ token: z.string(), expires_at: z.string() });
 
-// Installation tokens last an hour. Minted on demand and kept until five minutes before they
-// expire, per process; never stored.
 const tokens = new Map<string, { token: string; expiresAt: number }>();
 const REFRESH_MS = 5 * 60_000;
 
@@ -67,8 +65,6 @@ export async function installationToken(
     `${apiUrl(app.credentials)}/app/installations/${installationId}/access_tokens`,
     { method: "POST", headers: headers(appJwt(app, ctx.now())) }
   );
-  // 404: uninstalled, perhaps while Worklog was down and missed the webhook. A 401 is about the
-  // app itself (its key, its id, the clock), not this installation, so it revokes nothing.
   if (res.status === 404) {
     throw new ProviderError(
       `GitHub installation ${installationId} is gone`,
@@ -151,7 +147,6 @@ const Installation = z.object({
   repository_selection: z.string().optional(),
 });
 
-// Page by page: someone in a large organization can manage more than a page of installations.
 async function canManage(
   ctx: AppContext,
   app: AppView,
@@ -177,11 +172,6 @@ async function canManage(
   return false;
 }
 
-/**
- * The redirect's `installation_id` is only a claim: anyone can put any id in a URL. The code,
- * exchanged with the app's secret, says who came back, and only an installation that person can
- * see is connected.
- */
 async function verifiedInstallation(
   ctx: AppContext,
   app: AppView,
@@ -341,7 +331,6 @@ export const githubApp: AppSpec = {
         return ids;
       }
     }
-    // A list cut short would read as installations gone.
     throw new ProviderError(
       "GitHub listed more installations than Worklog reads",
       "failed"
@@ -378,7 +367,6 @@ export function githubManifest(
     name,
     url: publicUrl,
     hook_attributes: { url: `${publicUrl}/hooks/apps/github`, active: true },
-    // Only where GitHub hands the new app's credentials back: `bun run github-app` listens there.
     redirect_url: opts.redirectUrl,
     callback_urls: [
       `${publicUrl}/oauth/github/callback`,
@@ -386,7 +374,6 @@ export function githubManifest(
     ],
     request_oauth_on_install: true,
     setup_on_update: true,
-    // A private app installs only on the account that owns it.
     public: opts.public,
     default_permissions: {
       contents: "read",
@@ -459,7 +446,6 @@ export async function withToken(
   try {
     return await run(await auth.token());
   } catch (error) {
-    // Only a refused token is worth a fresh one; an installation that's gone stays gone.
     if (
       !(error instanceof ProviderError) ||
       error.status !== 401 ||

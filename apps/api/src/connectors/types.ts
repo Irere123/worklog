@@ -12,7 +12,6 @@ export type ExternalActor = {
 
 export type Signal =
   | { type: "review_requested"; who: ExternalActor }
-  /** High priority by default; chat platforms pass "normal" (conversation, not a request). */
   | {
       type: "mentioned";
       who: ExternalActor;
@@ -25,7 +24,6 @@ export type Signal =
       who: ExternalActor;
       state: "approved" | "changes_requested" | "commented";
     }
-  /** Closes their attention item for this thread. */
   | {
       type: "resolve";
       who?: ExternalActor;
@@ -127,7 +125,6 @@ export type Received =
       /** The repo or channel it concerns: deliveries in one partition are processed in order. */
       partition?: string;
     }
-  /** Handshakes (Slack url_verification, Discord PING): answer right away, store nothing. */
   | { type: "respond"; body: unknown; status?: number }
   | { type: "interaction"; payload: unknown }
   | { type: "reject"; status: 400 | 401 | 404; error: string };
@@ -307,7 +304,6 @@ export type AccountDetails = {
   avatarUrl?: string | null;
 };
 
-// `normalize` is pure (no database, no network) so mappings can be tested against recorded payloads.
 export type Connector = {
   id: string;
   name: string;

@@ -9,7 +9,6 @@ import { links, page, type } from "./styles";
 
 type Entry = { date: string; title: string; body: string; tags: string[] };
 
-// Written from the repository's history, newest first. One entry per day something shipped.
 const ENTRIES: Entry[] = [
   {
     date: "2026-11-15",
@@ -131,7 +130,6 @@ const styles = stylex.create({
     marginInline: "auto",
     listStyle: "none",
   },
-  // A date in the margin and the note beside it, ruled off from the next, like a dated log.
   entry: {
     display: "grid",
     gridTemplateColumns: {

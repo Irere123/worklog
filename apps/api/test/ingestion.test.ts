@@ -267,11 +267,9 @@ describe("Slack normalizer", () => {
     expect(toBot("<@UBOT> log Shipped the retry queue").ignored).toBe(
       "addressed to Worklog"
     );
-    // Asking Sam's assistant is how not to interrupt Sam.
     expect(
       toBot("<@UBOT> ask <@U0SAM> where is the retry logic?").events
     ).toEqual([]);
-    // Another bot whose id starts the same way is someone else.
     expect(
       toBot("<@UBOTX> Shipped the retry queue to staging").ignored
     ).not.toBe("addressed to Worklog");
@@ -351,7 +349,6 @@ beforeEach(() => {
   env.reset();
 });
 
-// A pushed comment by u2 that mentions u1, under another handle and name than u1's own.
 const mentionOfU1 = (id: string, at: string) => ({
   id,
   kind: "ticket.commented",
@@ -361,7 +358,6 @@ const mentionOfU1 = (id: string, at: string) => ({
   mentions: [{ id: "u1", handle: "SAMMY", name: "wrong" }],
 });
 
-// A pushed ticket close by u1, known by its login "sam".
 const closedByU1 = (id: string, at: string) => ({
   id,
   kind: "ticket.closed",
@@ -370,8 +366,6 @@ const closedByU1 = (id: string, at: string) => ({
   title: `Closed ${id}`,
 });
 
-// u1 closes a ticket and another person names it by the wrong login, in either order, while
-// Sammy is linked by that login: who the close is credited to.
 async function closerAfterWrongMention(mentionFirst: boolean) {
   const owner = await env.workspace();
   const sammy = await env.teammate(owner.token, "Sammy");
@@ -468,7 +462,6 @@ describe("ingestion pipeline", () => {
         created_at: new Date().toISOString(),
       },
     });
-    // Sam's account is seen (by id, with its login) before anyone mentions it.
     await send(
       "issue_comment",
       comment(1, { login: "Sam-GH", id: 202 }, "Taking a look at the retries")
@@ -484,8 +477,6 @@ describe("ingestion pipeline", () => {
       select count(*)::int as n from identities
       where workspace_id = ${owner.workspace.id} and external_id like 'handle:%'`);
     expect(placeholders.rows[0]?.n).toBe(0);
-    // Being mentioned isn't being seen: Sam's account keeps its login as written, and its count.
-    // (The same goes for a placeholder: see below.)
     const account = await env.ctx.db.execute<{ handle: string; n: number }>(sql`
       select external_handle as handle, event_count as n from identities
       where workspace_id = ${owner.workspace.id} and external_id = '202'`);
@@ -522,7 +513,6 @@ describe("ingestion pipeline", () => {
   test("a mention of a login placeholder isn't a sighting of it", async () => {
     const { owner, send } = await github();
     const sam = await env.teammate(owner.token, "Sam");
-    // Linked by login, before the account was ever seen.
     await env.call("POST", `/v1/members/${sam.member.id}/identities`, {
       token: sam.token,
       body: { provider: "github", handle: "Sam-GH" },
@@ -559,7 +549,6 @@ describe("ingestion pipeline", () => {
 
   test("bursts read back newest first stay apart by days, and together within minutes", async () => {
     const { owner, send } = await github();
-    // A backfill reads history newest first.
     const times = [daysAgo(1, 2), daysAgo(1), daysAgo(5), daysAgo(9)];
     for (const [i, at] of times.entries()) {
       await send("push", {
@@ -580,7 +569,6 @@ describe("ingestion pipeline", () => {
       "Pushed 1 commit to acme/api:main",
       "Pushed 1 commit to acme/api:main",
     ]);
-    // The burst spans both pushes: from the older, though it came second.
     const [burst] = pushes;
     expect(burst.occurredAt).toBe(times[1]);
   });
@@ -734,7 +722,6 @@ describe("ingestion pipeline", () => {
         user: { login: "alice", id: 1 },
       },
     });
-    // Alice renames; a stranger takes the login "alice".
     await send("pull_request", {
       action: "opened",
       sender: { login: "alice", id: 2 },
@@ -894,7 +881,6 @@ describe("ingestion pipeline", () => {
       },
     });
 
-    // The ledger goes with the deliveries.
     await env.ctx.db.execute(sql`
       update ingested_events set created_at = now() - interval '100 days'
       where connection_id = ${conn.id} and external_id like 'push:%'`);
@@ -1050,7 +1036,6 @@ describe("custom integrations", () => {
       verify: { type: "token", header: "X-Gitlab-Token" },
       eventType: { header: "X-Gitlab-Event" },
       deliveryId: { header: "X-Gitlab-Event-UUID" },
-      // GitLab has its own connector, whose namespace is reserved: a hand-mapped forge takes its own.
       identityNamespace: "forge:git.example.com",
       rules: [
         {
@@ -1244,7 +1229,6 @@ describe("custom integrations", () => {
       },
     });
     expect(taking.status).toBe(400);
-    // One that held a reserved namespace from before uses its own, and says so.
     await env.ctx.db.execute(sql`
       update connections set settings = jsonb_set(settings, '{identityNamespace}', '"github"')
       where id = ${other.id}`);
@@ -1356,7 +1340,6 @@ describe("custom integrations", () => {
     expect(new Date(u1?.last ?? 0).toISOString()).toBe(
       "2026-10-05T09:00:00.000Z"
     );
-    // Not taken for a bot, so its own closes are recorded.
     const closed = (
       await env.call("GET", "/v1/activities?kind=ticket.closed", {
         token: owner.token,
@@ -1725,12 +1708,10 @@ describe("upgrading to ids counted within the connection", () => {
       await env.drain();
     };
     await push();
-    // As it was recorded before ids were scoped to their connection.
     await env.ctx.db.execute(sql`
       update activities set external_id = 'PAY-12:closed' where connection_id = ${conn.id}`);
     await env.ctx.db.execute(sql`
       update ingested_events set external_id = 'PAY-12:closed' where connection_id = ${conn.id}`);
-    // And an event redelivered between the two changes, recorded both ways.
     await env.call("POST", `/v1/connections/${conn.id}/events`, {
       token: owner.token,
       body: {
@@ -1864,7 +1845,6 @@ describe("agents as teammates", () => {
   });
 });
 
-// The id GitHub's webhook for this would give the event.
 const webhook = (type: string, payload: object) =>
   gh(type, payload).events[0]?.id ?? "none";
 

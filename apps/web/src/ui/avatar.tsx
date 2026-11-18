@@ -59,7 +59,6 @@ export function Avatar({
    */
   labelled?: boolean;
 }) {
-  // A dead link (a revoked GitHub avatar, an expired Slack URL) falls back to initials.
   const [broken, setBroken] = useState<string | null>(null);
   if (!person) {
     return (
@@ -72,7 +71,6 @@ export function Avatar({
   const agent = person.kind === "agent";
   const picture =
     person.avatarUrl && person.avatarUrl !== broken ? person.avatarUrl : null;
-  // A tool's mark brings its own colours, which a tinted ground would clash with.
   const neutral =
     picture !== null || (agent && toolOf(person.agentProvider) !== undefined);
   return (
@@ -192,7 +190,6 @@ const styles = stylex.create({
     color: `light-dark(oklch(0.38 0.09 ${hue}), oklch(0.9 0.06 ${hue}))`,
     backgroundColor: `light-dark(oklch(0.9 0.05 ${hue}), oklch(0.36 0.07 ${hue}))`,
   }),
-  // An inset hairline keeps a pale photo from melting into the page behind it.
   picture: {
     width: "100%",
     height: "100%",
@@ -201,8 +198,6 @@ const styles = stylex.create({
     outline: `1px solid ${color.line}`,
     outlineOffset: -1,
   },
-  // While a picture loads, a neutral ground rather than a colored disc that flashes away; a
-  // tool's mark sits on it too, in its own colours.
   neutralGround: { backgroundColor: color.ui },
   human: { borderRadius: "50%" },
   agent: { borderRadius: "28%" },

@@ -34,8 +34,6 @@ export async function createDefaultAutomations(
 ) {
   const briefTargets = emailTargetId ? [emailTargetId] : [];
   const weekdays = [1, 2, 3, 4, 5];
-  // Three batches a day (brief + two digests) plus pings only for what's blocked on you:
-  // batching ~3x/day is what improved attention and stress in the field studies.
   const defaults: {
     kind: AutomationKind;
     name: string;
@@ -159,7 +157,6 @@ export async function listRuns(ctx: AppContext, memberId: string, id: string) {
   return await listAutomationRuns(ctx.db, { automationId: id });
 }
 
-// Unannounced: a member's defaults are made in a transaction, before their assistant exists.
 async function addAutomation(
   ctx: AppContext,
   member: Member,

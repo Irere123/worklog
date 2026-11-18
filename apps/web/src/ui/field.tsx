@@ -398,7 +398,6 @@ const styles = stylex.create({
     },
     backgroundColor: color.raised,
     color: color.fg,
-    // iOS zooms into any field under 16px, so phones get a larger size.
     fontSize: { default: text.label, "@media (max-width: 640px)": 16 },
     outline: "none",
     transitionProperty: "border-color, box-shadow",
@@ -428,7 +427,6 @@ const styles = stylex.create({
     paddingBlock: space.md,
     paddingInline: space.md,
     lineHeight: leading.label,
-    // It grows with what's typed, so the browser's corner grip would only be clutter.
     resize: "none",
     fieldSizing: "content",
   },

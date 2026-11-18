@@ -19,19 +19,13 @@ import { getCard, listCards } from "#work/board";
 import { resolveMember } from "#work/members";
 import { reportWork } from "#work/report";
 
-// Agents call these all day, and every reply lands in their context: search and card reads stop
-// at a size a model can use, and the rest says where to look.
 const CARDS_SHOWN = 20;
 const COMMENTS_SHOWN = 20;
-// A held check_in answers before MCP clients' one-minute request timeout, and proxies' idle ones.
 const WAIT_MAX_S = 50;
 
-// A looping agent shouldn't fill its team's feed. A model takes seconds a turn, so a working agent,
-// subagents and all, stays well inside this; a loop runs out within a minute.
 const WRITE_BURST = 60;
 const WRITE_REFILL_MS = 2000;
 
-// What check_in calls an inbox item's state, from the agent's side of the question.
 const STATUS = {
   open: "waiting",
   snoozed: "snoozed",
@@ -76,8 +70,6 @@ function instructions(
   can: { read: boolean; write: boolean }
 ) {
   const first = firstName(owner);
-  // Agents treat a request as the whole job and drop anything optional-sounding, so this is
-  // framed as part of every task: in testing, "when worth it" meant never.
   return [
     `You're ${agent.name}, the coding agent of ${owner.name} (@${owner.handle}) in ${workspaceName} on Worklog, where the team sees what everyone, people and agents, is working on. Keeping it current is part of every task you're given here, even when the request doesn't mention it:`,
     ...(can.read
@@ -214,7 +206,6 @@ function reportTools(server: McpServer, ctx: AppContext, grant: AgentGrant) {
           status,
           resolvedAt: asked.item.resolvedAt,
           replies: asked.replies,
-          // Models given an unanswered question tend to end their turn; this says how to stay.
           next:
             status === "waiting" &&
             (wait ?? 0) === 0 &&
@@ -396,8 +387,6 @@ function writeTools(server: McpServer, ctx: AppContext, grant: AgentGrant) {
   );
 }
 
-// Per process: a limit to stop runaways, not a quota to account for, so replicas each keeping
-// their own is fine.
 const writeBuckets = new Map<string, { left: number; at: number }>();
 
 function spendWrite(ctx: AppContext, agent: Member) {
@@ -427,7 +416,6 @@ async function assigneeOf(
   return member.id;
 }
 
-/** Handles by member id, as `@handle`, in one query. */
 async function handlesOf(ctx: AppContext, ids: (string | null)[]) {
   const unique = [...new Set(ids.filter((id) => id !== null))];
   const people = unique.length
@@ -440,8 +428,6 @@ function handlesIn(handles: Map<string, string>, ids: string[]) {
   return ids.flatMap((id) => handles.get(id) ?? []);
 }
 
-// A shared action answers in the assistant's shape; the agent needs only what changed, and a
-// refusal it returns rather than throws is still a refusal.
 function outcome(result: unknown) {
   if (typeof result !== "object" || result === null) {
     return result;
@@ -455,7 +441,6 @@ function outcome(result: unknown) {
   return Object.keys(rest).length ? rest : "Done.";
 }
 
-/** A tool's result as text the model reads, and a refusal as an error it can recover from. */
 async function reply(run: () => Promise<unknown>): Promise<CallToolResult> {
   try {
     const value = await run();
@@ -484,8 +469,6 @@ async function reply(run: () => Promise<unknown>): Promise<CallToolResult> {
 
 const ISO = /^(?<minute>\d{4}-\d\d-\d\dT\d\d:\d\d):\d\d(?:\.\d+)?Z$/u;
 
-// Every reply is read by a model, which pays for each character: no indentation, nothing for
-// empty fields, and times to the minute, which is all a person's answer or a card's activity needs.
 function lean(_key: string, value: unknown) {
   if (typeof value === "string") {
     const time = ISO.exec(value);

@@ -43,10 +43,8 @@ import { AgentSessions, sessionsOf } from "./sessions";
 type Member = Schemas["Member"];
 type Snap = Schemas["TeamNow"][number];
 
-// The window "Last" and "active" lines look back over; the rhythm always covers two weeks.
 const RECENT_DAYS = 3;
 
-/** Personal assistants answer for their person and have no work of their own to list. */
 function isAssistant(m: Member) {
   return m.agentProvider === "worklog";
 }
@@ -235,7 +233,6 @@ function PersonRow({
   );
 }
 
-/** What they're on, in the order a teammate asks: a run waiting on someone, their card, their last move. */
 function NowCell({ member: m, snap }: { member: Member; snap?: Snap }) {
   const { byId } = useMembers();
   const me = useMe();
@@ -428,8 +425,6 @@ export function Person({ handle }: { handle: string }) {
             />
           </div>
           {m.kind === "agent" && <AgentSessions handle={handle} />}
-          {/* An agent's sessions already show each thread's latest step; the log below holds the
-              rest, and goes when there is no rest. */}
           {(m.kind === "human" || inSessions.hasMore) && (
             <>
               <h3 {...stylex.props(styles.feedTitle)}>
@@ -451,9 +446,7 @@ export function Person({ handle }: { handle: string }) {
   );
 }
 
-/** Which of an agent's events its sessions already show, and whether anything is left over. */
 function useSessionSteps(handle: string) {
-  // The same query AgentSessions reads, so this costs no extra request.
   const recent = useQuery(q.recentActivities({ actor: handle, limit: 60 }));
   return useMemo(() => {
     const all = recent.data ?? [];
@@ -477,14 +470,12 @@ function Profile({
   const now = useMinute();
   const clock = clockOf(m, now);
   const first = firstName(m);
-  // The same query as the People list, so arriving from there costs nothing.
   const team = useQuery(q.teamNow(RECENT_DAYS));
   const row = team.data?.find((r) => r.memberId === m.id);
 
   return (
     <>
       <div {...stylex.props(styles.identity)}>
-        {/* Its own page is the one place an agent's face moves with nothing under way. */}
         <Avatar person={m} size={72} mood={runFace(row?.agent).mood} live />
         <p {...stylex.props(styles.handle)}>
           @{m.handle} · {roleOf(m)}
@@ -543,7 +534,6 @@ function workdaysOf(m: Member) {
   return m.settings.workdays ?? [0, 1, 2, 3, 4, 5, 6];
 }
 
-/** An agent mid-run or waiting on someone says so first, as on Home and its card. */
 function LiveRun({ member: m, row }: { member: Member; row: Snap }) {
   const { byId } = useMembers();
   const me = useMe();
@@ -697,7 +687,6 @@ function NowList({
 
 const PHONE = "@media (max-width: 640px)";
 
-/** Nobody with that handle is a wrong address, not a failure: it gets the not-found page. */
 function PersonError({ error, retry }: { error: Error; retry: () => void }) {
   if (error instanceof ApiError && error.status === 404) {
     return <NotFound />;
@@ -773,7 +762,6 @@ const styles = stylex.create({
     gap: space.lg,
     minWidth: 0,
   },
-  // Only the person cell indents, so an agent's other cells stay in their owner's columns.
   whoNested: { paddingLeft: { default: 44, [PHONE]: 20 } },
   name: {
     display: "block",
@@ -786,7 +774,6 @@ const styles = stylex.create({
     whiteSpace: "nowrap",
     outline: "none",
   },
-  // The whole row opens the person; links inside it sit above this layer.
   stretch: {
     "::after": {
       content: '""',
@@ -825,7 +812,6 @@ const styles = stylex.create({
     overflow: "hidden",
   },
   quiet: { color: color.fgFaint },
-  // Taller than its line so a thumb that lands just off the title still opens the card.
   cardLink: {
     display: "block",
     paddingBlock: 4,
@@ -859,7 +845,6 @@ const styles = stylex.create({
     display: { default: "flex", [PHONE]: "none" },
     alignItems: "center",
   },
-  // Its tooltip needs hover, so on touch a tap opens the person, whose page shows the calendar.
   passTap: { pointerEvents: { default: null, "@media (hover: none)": "none" } },
   clock: {
     gridArea: "clock",
@@ -980,8 +965,6 @@ const styles = stylex.create({
   },
   nowBlock: {
     display: "grid",
-    // The pane's width, not the window's: beside the sidebar and profile a laptop leaves it
-    // too narrow for titles next to their stage and date.
     gridTemplateColumns: {
       default: "minmax(0, 3fr) minmax(0, 2fr)",
       "@container (max-width: 680px)": "minmax(0, 1fr)",

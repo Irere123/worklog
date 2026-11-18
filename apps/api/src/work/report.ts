@@ -79,9 +79,6 @@ export async function reportWork(
   };
 }
 
-// A thread is one task. A report that leaves out its card is about the one the thread already
-// named, and a card named later also takes the reports made before it was looked up, so the card
-// shows the work from its start. 0 means no card.
 async function cardOf(
   ctx: AppContext,
   me: Member,

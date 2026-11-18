@@ -6,7 +6,6 @@ import { reviewed } from "#agent/review";
 import { safe } from "./scope";
 import type { Scope } from "./scope";
 
-// Answers can move a card for everyone, so they run only once the review finds the owner asked.
 export function answerAttentionTool(scope: Scope) {
   return tool({
     description:

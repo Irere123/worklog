@@ -43,13 +43,11 @@ type BoardEdit = NonNullable<
   paths["/v1/boards/{id}"]["patch"]["requestBody"]
 >["content"]["application/json"];
 
-// The list view brings a table library the board itself doesn't need; it loads when chosen.
 const BoardList = lazy(async () => {
   const { BoardList: list } = await import("#features/board/board-list");
   return { default: list };
 });
 
-// Typing in the filter re-renders the page at once; the board waits for the deferred text.
 const StillBoard = memo(BoardView);
 
 const DRIFT_DAYS = [3, 7, 30, 90, 365] as const;
@@ -76,7 +74,6 @@ function BoardPage() {
   const me = useMe();
   const [mine, setMine] = useState<"all" | "mine">("all");
   const [textFilter, setTextFilter] = useState("");
-  // The box answers each keystroke at once; a full board re-filters just behind it.
   const filterText = useDeferredValue(textFilter);
   const meId = me?.member.id;
   const filter = useMemo(
@@ -93,7 +90,6 @@ function BoardPage() {
     { meta: { name: "Filter the board", group: "Board" } }
   );
   const [adding, setAdding] = useState(false);
-  // Selected, so opening a card (?card=) doesn't render the whole board again.
   const view = Route.useSearch({ select: (s) => s.view });
   const navigate = useNavigate({ from: Route.fullPath });
 

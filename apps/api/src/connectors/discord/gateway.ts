@@ -6,8 +6,6 @@ import { log } from "#telemetry/log";
 
 import { API, botGet } from "./app";
 
-// GUILDS (to hear the bot leave a server), GUILD_MESSAGES, MESSAGE_CONTENT. The last is
-// privileged: enable it under Bot → Privileged Gateway Intents.
 const INTENTS = 1 + 512 + 32_768;
 
 const Frame = z.object({
@@ -31,24 +29,19 @@ const Dispatched = z.object({
 });
 const GatewayBot = z.object({ url: z.string() });
 
-/** Kept across reconnects: what a Resume needs, and why the Gateway refused, if it did. */
 type Session = {
   sessionId?: string;
-  /** The last dispatch received, which heartbeats report. */
   seq?: number;
-  /** The last dispatch handed over: a resume starts after it, so a failed one is sent again. */
   stored?: number;
   resumeUrl?: string;
   refused?: string;
 };
 
-// Close codes after which reconnecting changes nothing until someone fixes the app.
 const REFUSED: Record<number, string> = {
   4004: "the bot token was refused",
   4013: "invalid intents",
   4014: "the Message Content intent isn't enabled for the bot",
 };
-// Close codes after which the session can't be resumed, only started again.
 const FRESH = new Set([4007, 4009]);
 
 const MESSAGES = new Set([
@@ -57,8 +50,6 @@ const MESSAGES = new Set([
   "MESSAGE_DELETE",
 ]);
 
-// Replayed after a resume, or sent again in a second session, a dispatch gets the same delivery
-// id, and the inbox drops it. Only what the dispatch says goes in, never the session's seq.
 function deliveryOf(t: string, d: z.infer<typeof Dispatched>) {
   if (t === "MESSAGE_CREATE") {
     return `msg:${d.id}`;
@@ -85,7 +76,6 @@ function itemOf(t: string, raw: unknown): Streamed | null {
       partition: d.data.channel_id,
     };
   }
-  // A server that's only unavailable (an outage) comes back; one the bot left doesn't.
   if (t === "GUILD_DELETE" && d.data.unavailable !== true) {
     return {
       type: "change",
@@ -118,14 +108,12 @@ export const discordGateway: StreamSpec = {
     let beat: ReturnType<typeof setInterval> | null = null;
     let acked = true;
     let failed = false;
-    // Dispatches are handed over one at a time, in the order they came.
     let pending: Promise<unknown> = Promise.resolve();
     const send = (op: number, d: unknown) => {
       ws.send(JSON.stringify({ op, d }));
     };
     const heartbeat = () => {
       if (!acked) {
-        // No answer to the last one: the connection is a zombie.
         ws.close(4000, "no heartbeat ack");
         return;
       }
@@ -185,7 +173,6 @@ export const discordGateway: StreamSpec = {
             }
             session.stored = at;
           } catch (error) {
-            // Reconnect and resume from the last one stored: Discord sends the rest again.
             failed = true;
             log.error("discord: couldn't store a dispatch", { error });
             ws.close(4000, "couldn't store a dispatch");

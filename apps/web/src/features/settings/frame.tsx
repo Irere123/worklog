@@ -133,16 +133,11 @@ export function SettingsFrame({ children }: { children: ReactNode }) {
   );
 }
 
-/**
- * On a phone the sections are one scrolling row, and a page opened from a link can be off its
- * edge; this brings the current one to the middle. Only the row scrolls, never the page.
- */
 function useActiveInView() {
   const ref = useRef<HTMLElement>(null);
   const pathname = useLocation({ select: (l) => l.pathname });
   useEffect(() => {
     const row = ref.current;
-    // A nested page, like one connection, has no link of its own; its section's is current.
     const current =
       row?.querySelector<HTMLElement>(`a[href="${CSS.escape(pathname)}"]`) ??
       row?.querySelector<HTMLElement>('[aria-current="page"]');
@@ -257,8 +252,6 @@ export const settingsStyles = stylex.create({
     borderTopColor: { default: color.line, ":first-child": "transparent" },
   },
   main: { flexGrow: 1, minWidth: 0 },
-  // For a row with several controls: in a narrow card they drop to a line of their own, right
-  // aligned, so the name and its details keep the width instead of a word a line.
   rowWraps: { flexWrap: { default: null, [NARROW]: "wrap" } },
   mainWraps: {
     flexBasis: { default: null, [NARROW]: "calc(100% - 40px)" },
@@ -354,7 +347,6 @@ const styles = stylex.create({
     paddingBottom: 96,
   },
   page: { display: "flex", flexDirection: "column", gap: space.xl },
-  // The description spans under the actions too: squeezed beside them on a phone, it reads a word a line.
   pageHead: {
     display: "grid",
     gridTemplateColumns: "minmax(0, 1fr) auto",

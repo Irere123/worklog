@@ -112,7 +112,6 @@ export async function findAutomationById(db: DbOrTx, params: { id: string }) {
   return row;
 }
 
-// Never pushes the check later than it already was.
 export async function setCheckDueBy(
   db: DbOrTx,
   params: { memberId: string; at: Date }

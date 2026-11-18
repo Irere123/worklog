@@ -1,9 +1,6 @@
 import * as stylex from "@stylexjs/stylex";
 
-import { color, font, media, motion, space } from "#ui/tokens.stylex";
-
-// The landing page's measure and type. The app inside the demos keeps the app's own sizes; the
-// page around them is quieter: a light serif over small, grey sans, and a 960px column.
+import { color, font, media, motion, space, weight } from "#ui/tokens.stylex";
 
 const PHONE = "@media (max-width: 640px)";
 
@@ -31,8 +28,6 @@ export const page = stylex.create({
       default: 128,
       [PHONE]: 96,
     },
-    // A nav link lands with the heading a comfortable step under the sticky bar, not a whole
-    // section's padding below it.
     scrollMarginTop: {
       default: -64,
       [PHONE]: -40,
@@ -49,7 +44,6 @@ export const page = stylex.create({
     },
     textAlign: "center",
   },
-  // The page's surfaces: a quiet fill a step off the page, with no edge drawn.
   tile: {
     borderRadius: 16,
     backgroundColor: "oklch(0.2 0.01 80 / 0.04)",
@@ -60,8 +54,6 @@ export const type = stylex.create({
   display: {
     margin: 0,
     fontFamily: font.display,
-    // A step above resurf's 45px: Newsreader's x-height is smaller than Signifier's, so the same
-    // size reads small beside it.
     fontSize: {
       default: 48,
       "@media (max-width: 768px)": 42,
@@ -72,10 +64,7 @@ export const type = stylex.create({
       "@media (max-width: 768px)": "48px",
       [PHONE]: "41px",
     },
-    // Newsreader's display cut is all hairline at this weight; its text cut, set large, has the
-    // even, sturdy stroke of a book face, which is the voice the page wants.
-    // design-allow: the serif headlines sit between Newsreader's light and regular
-    fontWeight: 360,
+    fontWeight: weight.display,
     fontOpticalSizing: "none",
     fontVariationSettings: "'opsz' 18",
     letterSpacing: "-0.035em",
@@ -91,8 +80,7 @@ export const type = stylex.create({
       [PHONE]: 34,
     },
     lineHeight: 1.1,
-    // design-allow: the serif headlines sit between Newsreader's light and regular
-    fontWeight: 360,
+    fontWeight: weight.display,
     fontOpticalSizing: "none",
     fontVariationSettings: "'opsz' 18",
     letterSpacing: "-0.025em",
@@ -136,7 +124,6 @@ export const type = stylex.create({
   },
 });
 
-// The ring a keyboard focus draws, shared by every control on the public pages.
 const RING = {
   outline: {
     default: "none",
@@ -149,8 +136,6 @@ export const focus = stylex.create({
   ring: RING,
 });
 
-// The two kinds of link the pages use: a quiet grey one that darkens on hover (facts, footers),
-// and an underlined one inside a sentence.
 export const links = stylex.create({
   quiet: {
     color: {

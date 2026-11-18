@@ -32,7 +32,6 @@ export async function findConnectionCursor(
   return row;
 }
 
-// `cursor` is only written when given, so recording a failure keeps the last good position.
 export async function upsertConnectionCursor(
   db: DbOrTx,
   params: {

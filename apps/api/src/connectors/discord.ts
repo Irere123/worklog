@@ -85,7 +85,6 @@ export const DISCORD_COMMANDS = [
   { name: "brief", description: "Your brief, right now" },
 ];
 
-// Options are strings: text (type 3) and user ids (type 6).
 const InteractionSchema = z.object({
   type: z.number(),
   id: z.string(),
@@ -150,7 +149,6 @@ async function handleInteraction(
       },
     };
   }
-  // Type 5: deferred, shown as "Worklog is thinking…" until the follow-up edits it.
   return {
     body: { type: 5, data: { flags: EPHEMERAL } },
     later: {
@@ -193,7 +191,6 @@ async function answer(
   });
 }
 
-// The person is waiting on the deferred reply: a failure gets an answer that says so.
 async function followUpDiscord(
   ctx: AppContext,
   conn: ConnectionView,
@@ -289,7 +286,6 @@ export const discordConnector: Connector = {
     } catch {
       return { type: "reject", status: 400, error: "body is not JSON" };
     }
-    // Discord pings the endpoint to verify it; it expects a PONG (type 1).
     if (Ping.safeParse(payload).success) {
       return { type: "respond", body: { type: 1 } };
     }

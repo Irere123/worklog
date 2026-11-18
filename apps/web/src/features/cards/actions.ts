@@ -93,7 +93,6 @@ async function perform(number: number, action: CardAction): Promise<unknown> {
   }
 }
 
-/** The local guess at what an action does, so the board moves before the server answers. */
 function predict(
   card: Card,
   action: CardAction,
@@ -168,7 +167,6 @@ const UNDO: Partial<Record<CardAction["type"], (card: Card) => CardAction>> = {
   gild: () => ({ type: "ungild" }),
 };
 
-// Long enough to read the message and change your mind; the default four seconds isn't.
 export const UNDO_MS = 8000;
 
 const DONE_MESSAGE: Partial<Record<CardAction["type"], string>> = {

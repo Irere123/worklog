@@ -78,7 +78,6 @@ export function RhythmCalendar({ counts, today, workdays, name }: Props) {
   );
   return (
     <figure {...stylex.props(styles.figure)}>
-      {/* The counts are on the squares, so the summary is only for assistive tech. */}
       <div aria-hidden {...stylex.props(styles.calendar)}>
         <div {...stylex.props(styles.column)}>
           <span {...stylex.props(styles.month)} />
@@ -134,7 +133,6 @@ export function RhythmCalendar({ counts, today, workdays, name }: Props) {
 
 const LEVELS = ["l0", "l1", "l2", "l3", "l4"] as const;
 
-// Monday first; GitHub labels every other row so the column stays narrow.
 const WEEKDAY_LABELS = [
   { key: "mon", text: "Mon" },
   { key: "tue", text: "" },
@@ -145,7 +143,6 @@ const WEEKDAY_LABELS = [
   { key: "sun", text: "" },
 ];
 
-// The rest are a tooltip trigger's handlers and ref; without them the tooltip never opens.
 function Square({
   day,
   scale,
@@ -175,12 +172,10 @@ function Square({
   );
 }
 
-// Three digits don't fit a square.
 function countLabel(count: number) {
   return count > 99 ? "99+" : count;
 }
 
-// Square roots keep one busy day from washing every other day out to the palest green.
 function levelOf(count: number, scale: number) {
   if (count <= 0) {
     return 0;
@@ -196,7 +191,6 @@ function daysOf(counts: number[], today: string): Day[] {
   });
 }
 
-/** Columns of Monday-first weeks; slots before the first day and after today stay empty. */
 function weeksOf(days: Day[]) {
   const weeks: { key: number; days: (Day | null)[] }[] = [];
   for (const d of days) {
@@ -212,7 +206,6 @@ function weeksOf(days: Day[]) {
   return weeks;
 }
 
-/** A month's name over the first week that starts in it, as GitHub labels its calendar. */
 function monthLabel(weeks: { key: number }[], index: number) {
   const week = weeks[index];
   if (!week) {
@@ -223,7 +216,6 @@ function monthLabel(weeks: { key: number }[], index: number) {
   if (previous && new Date(previous.key).getUTCMonth() === month) {
     return "";
   }
-  // A month that ends within two columns of the start has no room for its name.
   const after = weeks[index + 2];
   if (index === 0 && after && new Date(after.key).getUTCMonth() !== month) {
     return "";
@@ -323,7 +315,6 @@ const styles = stylex.create({
   },
 });
 
-// OKLab, not OKLCH: mixing toward the warm neutral in polar space swings the pale greens to olive.
 const levels = stylex.create({
   l0: { backgroundColor: color.ui, boxShadow: `inset 0 0 0 1px ${color.line}` },
   l1: {

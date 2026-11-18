@@ -84,7 +84,6 @@ export function BoardView({
   );
   const actions = useCardActions(columnNames);
   const [open, setOpen] = useEdgeColumns(board.id);
-  // Arrow keys walk the cards like a grid, as in Fizzy; Enter opens the focused one.
   const boardRef = useRef<HTMLDivElement>(null);
   const walk = (dx: number, dy: number) => () => {
     if (boardRef.current) {
@@ -96,8 +95,6 @@ export function BoardView({
   useHotkey("ArrowRight", walk(1, 0), { target: boardRef });
   useHotkey("ArrowLeft", walk(-1, 0), { target: boardRef });
 
-  // Optimistic moves change a card's stage inside the list it came from, so regroup across all
-  // four lists by what each card says now rather than by which request returned it.
   const cards = useMemo(() => {
     const seen = new Map<number, Card>();
     for (const list of [active.data, triage.data, later.data, done.data]) {
@@ -153,7 +150,6 @@ export function BoardView({
     [cards, actions]
   );
 
-  // A filtered-out column isn't empty: saying "Drop a card here" would hide that cards exist.
   const narrowed = filter.mine || filter.text.trim() !== "";
   const noMatch = filter.mine ? "None of yours here." : "No cards match here.";
 
@@ -322,8 +318,6 @@ function readEdges(key: string): Edges {
 function useDropTarget(target: Target) {
   const ref = useRef<HTMLDivElement>(null);
   const [over, setOver] = useState(false);
-  // Callers build the target inline on every render, so the effect keys on its parts and
-  // rebuilds it rather than re-registering the drop target each time.
   const { kind } = target;
   const columnId = target.kind === "column" ? target.columnId : undefined;
   useEffect(() => {
@@ -381,7 +375,6 @@ function ColumnShell({
   );
 }
 
-/** Not now and Done sit folded at the edges as tall pills, so the middle stays about current work. */
 function EdgeColumn({
   title,
   target,
@@ -729,7 +722,6 @@ const styles = stylex.create({
     paddingInline: space.xs,
   },
   columnDot: { width: 8, height: 8, borderRadius: "50%", flexShrink: 0 },
-  // Inline, not swatchColor(): StyleX compiles dynamic styles apart from this module's functions.
   hue: (hue: number) => ({
     backgroundColor: hue < 0 ? color.fgFaint : `oklch(0.66 0.15 ${hue})`,
   }),

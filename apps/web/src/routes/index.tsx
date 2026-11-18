@@ -16,10 +16,7 @@ export const Route = createFileRoute("/")({
     ],
     links: DISPLAY_FONT,
   }),
-  // Someone signed in came for the app, not the pitch. On a first load the prerendered page's
-  // head script sends them on (lib/boot.ts); this covers arriving here from inside the app.
   beforeLoad: async ({ context }) => {
-    // The build renders this page with no visitor at all.
     if (import.meta.env.SSR) {
       return;
     }

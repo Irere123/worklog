@@ -7,9 +7,7 @@ import { raiseAttention } from "#work/attention";
 
 import { installerOf } from "./lifecycle";
 
-/** Longer than a long weekend, so a team's days off aren't mistaken for a broken hook. */
 const QUIET_DAYS = 4;
-/** Deliveries in the fortnight before going quiet that make silence unusual. */
 const USUAL = 20;
 const LOOKBACK_DAYS = 14;
 
@@ -49,7 +47,6 @@ async function tell(ctx: AppContext, conn: ConnectionRow) {
     title: `${conn.name} has received nothing since ${last.toISOString().slice(0, 10)}`,
     body: "It usually hears from its tool every day. Check that its webhook is still enabled and its secret matches; GET /v1/connections/{id}/health shows any rejected deliveries.",
     priority: "normal",
-    // One per silence: dismissing it holds until the connection goes quiet again.
     dedupeKey: `connection-silent:${conn.id}:${last.toISOString()}`,
     onlyIfNew: true,
   });

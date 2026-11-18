@@ -10,7 +10,6 @@ export type AppSearch = { card?: number };
 
 export const Route = createFileRoute("/_app")({
   ssr: false,
-  // Any page can open a card over itself: the card lives in the URL, so links and Back work.
   validateSearch: (search: Record<string, unknown>): AppSearch => {
     const card = Number(search.card);
     return Number.isInteger(card) && card > 0 ? { card } : {};

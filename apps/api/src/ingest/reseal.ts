@@ -47,8 +47,6 @@ export async function resealSecrets(ctx: AppContext) {
   return resealed;
 }
 
-// Null when it's current, or can't be opened: one value sealed with a key that's no longer
-// configured mustn't stop the rest from moving to the current key.
 function resealedValue(ctx: AppContext, sealed: string, what: string) {
   if (!ctx.secrets.stale(sealed)) {
     return null;

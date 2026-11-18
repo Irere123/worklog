@@ -96,14 +96,9 @@ const CHAPTERS: Chapter[] = [
 
 const PLATES = [ink, ticket, sage, sky, clay];
 
-// The window is laid out at the app's own size and scaled to the wallpaper, as a screenshot would
-// be: the miniature keeps the app's proportions instead of reflowing into a cramped one.
 const DESIGN_WIDTH = 1000;
-// A tablet's window lays out narrower instead of shrinking further, so its words stay readable.
 const NARROWEST = 860;
-// What a 1440px screen shows, so the first paint is already the right size.
 const FIRST_SCALE = 0.806;
-// The slide lasts as long as resurf's: long enough to read as one window leaving for the next.
 const SLIDE = 700;
 
 type Shown = { index: number; round: number; from: 1 | -1 };
@@ -119,8 +114,6 @@ export function Tour() {
   const reduced = useReducedMotion();
   const [shown, setShown] = useState<Shown>({ index: 0, round: 0, from: 1 });
   const [leaving, setLeaving] = useState<Shown | null>(null);
-  // Wallpapers mount as the tour reaches them, plus the next one so its change can crossfade: a
-  // first visit fetches two, not five. Once mounted they stay, so the loop back fades too.
   const [reached, setReached] = useState(0);
   const [paused, setPaused] = useState(false);
   const [scale, setScale] = useState(FIRST_SCALE);
@@ -175,7 +168,6 @@ export function Tour() {
           priority
           sx={styles.plate}
         >
-          {/* A picture of the app: the caption below says what it shows, in words. */}
           <div ref={stage} aria-hidden {...stylex.props(styles.stage)}>
             {slides.map((slide) => {
               const each = CHAPTERS.at(slide.index) ?? HOME;
@@ -296,10 +288,6 @@ export function Tour() {
   );
 }
 
-/**
- * Holds the tour where it is. On a wide screen it rests on the wallpaper's corner; a phone's window
- * fills the wallpaper, so there it ends the row of chapters instead of covering the app's words.
- */
 function Pause({
   paused,
   onToggle,
@@ -348,7 +336,6 @@ const GLIDE = "cubic-bezier(0.32, 0.72, 0, 1)";
 
 const styles = stylex.create({
   tour: {
-    // Clears the sticky nav, so "Tour" lands on the whole wallpaper.
     scrollMarginTop: 72,
     marginTop: {
       default: 64,
@@ -374,8 +361,6 @@ const styles = stylex.create({
     boxShadow:
       "inset 0 0 0 1px oklch(0.2 0.01 80 / 0.1), 0 2px 6px oklch(0 0 0 / 0.03), 0 16px 40px oklch(0 0 0 / 0.05), 0 40px 100px oklch(0 0 0 / 0.07)",
   },
-  // Where the window stands on the wallpaper: resurf's proportions, an even margin either side and
-  // a little more air above than below, like a window on a desktop.
   stage: {
     position: "absolute",
     top: {
@@ -390,8 +375,6 @@ const styles = stylex.create({
       default: "84%",
       [PHONE]: `calc(100% - 2 * ${space.xl})`,
     },
-    // A phone's window runs off the wallpaper's foot instead: whole, it would be too small to read.
-    // It fades out just above the edge, so no line of the app is sliced through.
     height: {
       default: "84%",
       [PHONE]: 520,
@@ -445,8 +428,6 @@ const styles = stylex.create({
     position: "absolute",
     top: "50%",
     zIndex: 2,
-    // A phone's window fills the wallpaper, so an arrow there would sit on the app's words; the
-    // row of chapters below is the way through.
     display: {
       default: "grid",
       [PHONE]: "none",
@@ -532,7 +513,6 @@ const styles = stylex.create({
     transitionDuration: "200ms",
     transform: { default: null, ":active": "scale(0.96)" },
   },
-  // Inside the window's corner, as a player's control sits on its video, not astride the frame.
   pauseOnPlate: {
     position: "absolute",
     right: `calc(8% + ${space.xl})`,
@@ -543,7 +523,6 @@ const styles = stylex.create({
       [PHONE]: "none",
     },
   },
-  // First in the row, where a thumb reaches it without scrolling the chapters along.
   pauseInRow: {
     order: -1,
     alignSelf: "center",
@@ -562,7 +541,6 @@ const styles = stylex.create({
       [PHONE]: "none",
     },
   },
-  // Every caption is laid in one cell, so the line below never jumps as they change.
   captions: {
     display: "grid",
     maxWidth: 640,
@@ -660,7 +638,6 @@ const styles = stylex.create({
     transitionProperty: "opacity, box-shadow, transform, outline-color",
     transitionDuration: "200ms",
     transitionTimingFunction: "ease-out",
-    // A hairline inside the picture's edge, so a pale screenshot doesn't melt into the page.
     "::after": {
       content: '""',
       position: "absolute",

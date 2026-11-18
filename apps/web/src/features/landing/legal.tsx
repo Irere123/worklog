@@ -12,7 +12,6 @@ const UPDATED = "15 November 2026";
 
 type Section = { title: string; body: ReactNode };
 
-/** A legal page: plain sections in a reading column, and when it last changed. */
 function Legal({
   title,
   intro,
@@ -52,7 +51,6 @@ function Mail() {
   );
 }
 
-// Built on call, not at load: the sections use the styles declared at the foot of the file.
 function privacy(): Section[] {
   return [
     {

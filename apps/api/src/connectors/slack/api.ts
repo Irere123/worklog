@@ -10,7 +10,6 @@ const Result = z.looseObject({
   error: z.string().optional(),
 });
 
-// Slack answers 200 with `ok: false`; these mean the token is gone, not that the call was wrong.
 const REVOKED = new Set([
   "invalid_auth",
   "not_authed",

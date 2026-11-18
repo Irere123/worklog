@@ -174,10 +174,6 @@ function lengthAt(data: Data, ...path: string[]) {
   return typeof value === "number" ? value : null;
 }
 
-/**
- * The numbers the brief was written from, read before the prose: how much needs you, how much
- * moved. Missing fields simply don't show, so older briefs still render.
- */
 function BriefNumbers({ data }: { data: Data }) {
   const stats = [
     {
@@ -244,7 +240,6 @@ const styles = stylex.create({
     borderStyle: "solid",
     borderColor: color.line,
   },
-  // On a phone the reader sits under the list, so the list keeps its loaded height while empty.
   listPending: {
     minHeight: { default: null, "@media (max-width: 860px)": 168 },
   },
@@ -286,10 +281,6 @@ const styles = stylex.create({
     flexDirection: "column",
     gap: space.xl,
   },
-  // A ruled strip, like the figures box in a printed report: a brief is a document, and five
-  // boxed tiles made it read as a dashboard.
-  // Five figures can't share one row on a phone, and wrapped they leave a ruled cell hanging, so
-  // there they become a figures list: label, then number, one per line.
   stats: {
     display: "grid",
     gridTemplateColumns: {
@@ -298,7 +289,6 @@ const styles = stylex.create({
     },
     rowGap: { default: space.md, "@media (max-width: 640px)": 0 },
     paddingBottom: { default: space.md, "@media (max-width: 640px)": 0 },
-    // The heading's rule above closes the strip's top edge.
     borderBottomWidth: 1,
     borderBottomStyle: "solid",
     borderBottomColor: color.line,

@@ -1,3 +1,5 @@
+import { store } from "./storage";
+
 type Boot = Partial<Record<string, Promise<Response>>>;
 
 declare global {
@@ -5,7 +7,6 @@ declare global {
   var __worklogBoot: Boot | undefined;
 }
 
-// Set while this browser has a session, so the front page can step aside before it paints.
 export const SIGNED_IN = "worklog.signedIn";
 
 /**
@@ -22,15 +23,7 @@ export const BOOT_SCRIPT = `try{var f=location.pathname==="/";if(f&&(localStorag
 
 /** Whether this browser has a session, as the front page's head script reads it. */
 export function rememberSignedIn(signedIn: boolean) {
-  try {
-    if (signedIn) {
-      localStorage.setItem(SIGNED_IN, "1");
-    } else {
-      localStorage.removeItem(SIGNED_IN);
-    }
-  } catch {
-    // Storage can be blocked; the session request still redirects, a moment later.
-  }
+  store(SIGNED_IN, signedIn ? "1" : null);
 }
 
 /**
@@ -44,6 +37,5 @@ export async function takeBootResponse(path: string): Promise<Response | null> {
     return null;
   }
   Reflect.deleteProperty(boot, path);
-  // A failed early request (offline, a stale key) falls back to the normal path.
   return await response.catch(() => null);
 }

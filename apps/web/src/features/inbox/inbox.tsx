@@ -70,8 +70,6 @@ const TABS: { value: AttentionState; label: string }[] = [
   { value: "dismissed", label: "Dismissed" },
 ];
 
-/** Why an item is here, in the reader's words: every row must be able to explain itself. */
-// A decision gets help weighing it; anything else, the context around it.
 function askAbout(item: Item) {
   return item.kind === "agent.needs_you"
     ? `Help me decide: ${item.title.replace(/^[^:]+ needs you:\s*/u, "")} What are the trade-offs, and what would you do?`
@@ -92,14 +90,12 @@ const SNOOZES: { label: string; at: () => Date }[] = [
     label: "Next week",
     at: () => {
       const d = tomorrowMorning();
-      // On a Sunday, the coming Monday is tomorrow: a week later is what "next week" means.
       d.setDate(d.getDate() + ((8 - d.getDay()) % 7 || 7));
       return d;
     },
   },
 ];
 
-/** When a snooze ends, so the choice isn't a guess: "21:40", "Mon 09:00", "Mon 9 Nov". */
 function wakeLabel(at: Date) {
   const days = Math.round((at.getTime() - Date.now()) / 86_400_000);
   if (at.toDateString() === new Date().toDateString()) {
@@ -136,7 +132,6 @@ export function Inbox({
   const [selectedId, setSelectedId] = useState<string | null>(
     initialItem ?? null
   );
-  // Phones show one pane: the detail opens over the list when a row is tapped.
   const [opened, setOpened] = useState(initialItem !== undefined);
   const actions = useInboxActions(state);
   const rowActions = useRowActions({
@@ -192,8 +187,6 @@ export function Inbox({
     }
   };
 
-  // A card opened from here sits on top with its own keys (E edits it, D closes it): the inbox
-  // underneath must not act on the same keypress.
   const free = useSearch({
     from: "/_app",
     select: (s) => s.card === undefined,
@@ -362,10 +355,6 @@ const FOR_YOU = new Set([
   "review.requested",
 ]);
 
-/**
- * Open items in the order they deserve: decisions first, then what's addressed to you, then
- * updates. Other tabs are history and stay in time order.
- */
 function groupOf(items: Item[], state: AttentionState) {
   if (state !== "open") {
     return [{ title: "All", items }];
@@ -389,10 +378,6 @@ function groupOf(items: Item[], state: AttentionState) {
   return groups.filter((g) => g.items.length > 0);
 }
 
-/**
- * The interruption budget, in view: how many of today's pings Worklog has spent. Beyond the cap,
- * items wait for the brief instead of pinging.
- */
 function Budget() {
   const me = useMe();
   const today = useQuery(q.attentionMetrics(1));
@@ -415,10 +400,6 @@ type RowActions = {
   snooze: (item: Item) => void;
 };
 
-/**
- * Row handlers that keep one identity for the page's life but always call the latest code, so a
- * memoized row stays put while J and K move the selection.
- */
 function useRowActions(latest: RowActions) {
   const ref = useRef(latest);
   useLayoutEffect(() => {
@@ -434,7 +415,6 @@ function useRowActions(latest: RowActions) {
   );
 }
 
-// Moving through the list changes two rows; the rest keep their render.
 const InboxRow = memo(Row);
 
 function Row({
@@ -491,7 +471,6 @@ function Row({
           {ago(item.updatedAt)}
         </time>
       </button>
-      {/* With a mouse, a row can be cleared where it is; the keys and the detail pane do the same. */}
       <span {...stylex.props(styles.quick)}>
         {canFinish && (
           <Tooltip label="Done" shortcut="E">
@@ -739,16 +718,11 @@ function Detail({
   );
 }
 
-/**
- * Where the card stands and what last happened on it, so most decisions can be made from the
- * inbox without opening the card.
- */
 function CardContext({
   number,
   raisedBy,
 }: {
   number: number;
-  /** The event behind the item, already shown above it. */
   raisedBy: string | null;
 }) {
   const card = useQuery(q.card(number));
@@ -853,7 +827,6 @@ function Empty({ state }: { state: AttentionState }) {
   );
 }
 
-// What each tab would hold and how something gets there, so an empty tab teaches its key.
 const OTHER_EMPTY: Record<
   Exclude<AttentionState, "open">,
   { icon: ReactNode; title: string; say: string }
@@ -877,7 +850,6 @@ const OTHER_EMPTY: Record<
 
 type Undo = { item: Item; from: AttentionState; toast?: string | number };
 
-/** Inbox writes are optimistic and the last one can be undone with Z. */
 function useInboxActions(state: AttentionState) {
   const client = useQueryClient();
   const last = useRef<Undo | null>(null);
@@ -915,8 +887,6 @@ function useInboxActions(state: AttentionState) {
           body: { state: next, snoozedUntil: until?.toISOString() },
         })
       ),
-    // Undo puts the row back before the server answers: the live feed then sees an item it
-    // already holds, instead of announcing it as a new ping.
     onMutate: ({ item, next }) => {
       if (next === state) {
         restore(item);
@@ -961,7 +931,6 @@ function useInboxActions(state: AttentionState) {
     open: "Moved back to open",
   };
 
-  // Each toast's Undo reverts the change it announced, even after a newer one; Z reverts the newest.
   const revert = (entry: Undo) => {
     if (last.current === entry) {
       last.current = null;
@@ -975,8 +944,6 @@ function useInboxActions(state: AttentionState) {
     }
   };
 
-  // The moment someone dismisses a ping is when they know whether they want its kind at all,
-  // so the toast asks then rather than leaving it to a menu on a row that's gone.
   const lessMutation = useMutation({
     mutationFn: async ({ item }: { item: Item; dismissal: Undo }) =>
       await unwrap(
@@ -985,8 +952,6 @@ function useInboxActions(state: AttentionState) {
           body: { signal: "less_like_this" },
         })
       ),
-    // The dismissal's own toast says what happened, so one toast tells the whole story and its
-    // Undo still brings the item back.
     onSuccess: (result, { item, dismissal }) => {
       toast(
         result.muted
@@ -1044,7 +1009,6 @@ function useInboxActions(state: AttentionState) {
 }
 
 const styles = stylex.create({
-  // In a narrow pane the time drops to its own line rather than breaking a word a line.
   detailHead: { flexWrap: "wrap", rowGap: space.xs },
   stamp: { marginInlineStart: "auto", whiteSpace: "nowrap" },
   split: {
@@ -1057,7 +1021,6 @@ const styles = stylex.create({
     },
     position: "relative",
   },
-  // Nothing to read means nothing to show beside it: the empty state takes the page.
   splitEmpty: { gridTemplateColumns: "minmax(0, 1fr)" },
   detailHidden: { display: "none" },
   listPane: {
@@ -1131,7 +1094,6 @@ const styles = stylex.create({
     transitionProperty: "transform",
     transitionDuration: motion.fast,
   },
-  // The selected row's fill is a step darker, so its faint text steps up to stay readable.
   onSelected: { color: color.fgMuted },
   rowSelected: {
     backgroundColor: {

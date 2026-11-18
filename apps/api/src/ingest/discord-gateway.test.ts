@@ -12,11 +12,9 @@ let env: TestEnv;
 const identified: { token: string; intents: number }[] = [];
 const resumed: { token: string; session_id: string; seq: number }[] = [];
 let script: object[] = [];
-// Sent after a Resume; when set, the socket closes right after the scripted dispatches.
 let afterResume: object[] = [];
 let dropAfterScript = false;
 
-// Discord's Gateway, as far as Worklog uses it: Hello, then on Identify whatever the test scripts.
 const gateway = Bun.serve({
   port: 0,
   fetch(req, server) {
@@ -87,7 +85,6 @@ describe("Discord Gateway", () => {
         `GET https://discord.com/api/v10/guilds/${guild}/channels`,
         () => [
           { id: "CH1", name: "standup", type: 0 },
-          // Hidden from @everyone (the role with the server's id).
           {
             id: "CH2",
             name: "leads",
@@ -146,7 +143,6 @@ describe("Discord Gateway", () => {
     script = [
       { op: 0, t: "READY", s: 1, d: { session_id: "sess-1" } },
       { op: 0, t: "MESSAGE_CREATE", s: 2, d: message },
-      // Sent again, as after a resume.
       { op: 0, t: "MESSAGE_CREATE", s: 3, d: message },
       {
         op: 0,
@@ -189,7 +185,6 @@ describe("Discord Gateway", () => {
       await stop();
     }
     expect(identified.at(-1)).toMatchObject({ token: "bot-token" });
-    // The Message Content intent, without which messages arrive empty.
     expect(Math.floor((identified.at(-1)?.intents ?? 0) / 32_768) % 2).toBe(1);
 
     await env.drain();
@@ -211,7 +206,6 @@ describe("Discord Gateway", () => {
       ],
     ]);
     expect(activities[0].actorId).toBe(owner.member.id);
-    // What only some can read in Discord stays the author's in Worklog.
     const seenBySam = (
       await env.call("GET", "/v1/activities?source=discord", {
         token: sam.token,

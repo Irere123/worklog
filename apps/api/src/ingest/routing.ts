@@ -34,7 +34,6 @@ export async function receiveForApp(
     settings: {},
   });
   if (received.type === "reject" && mayRecheck(provider)) {
-    // The app may have just been replaced by another process: check against what's stored now.
     const fresh = await loadApp(ctx, provider, { fresh: true });
     if (fresh) {
       received = await connector.receive(req, {
@@ -55,8 +54,6 @@ export async function receiveForApp(
     ? await findConnectionByExternalId(ctx.db, { provider, externalId })
     : undefined;
   if (!conn) {
-    // Installed on the provider's side without being connected here, or already disconnected.
-    // Acknowledged, so the provider doesn't retry, and nothing is kept.
     ctx.tally.unrouted(provider, req.receivedAt);
     return {
       status: 200,
@@ -68,8 +65,6 @@ export async function receiveForApp(
       ? connector.app.lifecycle?.(received.eventType, received.payload)
       : null;
   if (change && received.type === "event") {
-    // Stored first, so a provider's retry of it is a duplicate and changes nothing: a retried
-    // uninstall mustn't revoke the reinstall that came in between.
     const stored = await store(ctx, conn, {
       deliveryId: received.deliveryId,
       eventType: received.eventType,
@@ -93,8 +88,6 @@ export async function receiveForApp(
   );
 }
 
-// Anyone can post junk to the app endpoint: re-reading the app for a failed signature happens at
-// most every few seconds, so forged requests stay as cheap as a cache hit.
 function mayRecheck(provider: string) {
   const last = rechecked.get(provider) ?? 0;
   if (Date.now() - last < RECHECK_MS) {

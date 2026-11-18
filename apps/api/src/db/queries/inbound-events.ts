@@ -102,7 +102,6 @@ export async function listWaitingDeliveries(
         eq(inboundEvents.lane, params.lane),
         or(
           eq(inboundEvents.status, "pending"),
-          // The database's clock, which also decides when the retry's job runs.
           and(
             eq(inboundEvents.status, "failed"),
             isNotNull(inboundEvents.retryAt),
@@ -151,7 +150,6 @@ export async function listStrandedLanes(
     .limit(params.limit);
 }
 
-// A live delivery waiting in the lane, so history can step aside for it.
 export async function findLiveWaiting(
   db: DbOrTx,
   params: { connectionId: string; lane: number }
@@ -171,7 +169,6 @@ export async function findLiveWaiting(
   return row;
 }
 
-// The next failed delivery in the lane due another try, if any.
 export async function findNextRetryAt(
   db: DbOrTx,
   params: { connectionId: string; lane: number }
@@ -192,8 +189,6 @@ export async function findNextRetryAt(
   return row?.at ?? null;
 }
 
-// A redelivery of one that failed for good: back in line, with its attempts kept for the record.
-// Only one that failed: a retry may have just succeeded.
 export async function requeueInboundEvent(db: DbOrTx, params: { id: string }) {
   await db
     .update(inboundEvents)
@@ -225,8 +220,6 @@ export async function lockWaitingDeliveries(
   return new Set(rows.map((r) => r.id));
 }
 
-// Counts the attempt, whether it succeeded or failed. `retryInMs` sets when a failed one is tried
-// again, on the database's clock, which is also the one its job and the drain go by.
 export async function updateInboundAttempt(
   db: DbOrTx,
   params: {
@@ -315,7 +308,6 @@ export async function listInboundEvents(
     .limit(params.limit);
 }
 
-// Oldest first: replay must process deliveries in the order they arrived.
 export async function listInboundEventIds(
   db: DbOrTx,
   params: {
@@ -334,7 +326,6 @@ export async function listInboundEventIds(
         eq(inboundEvents.connectionId, params.connectionId),
         eq(inboundEvents.workspaceId, params.workspaceId),
         eq(inboundEvents.lane, params.lane),
-        // Pending and failed ones are still the drain's: replayed, their effects would be lost.
         inArray(inboundEvents.status, ["processed", "ignored"]),
         params.since ? gte(inboundEvents.receivedAt, params.since) : undefined,
         lte(inboundEvents.receivedAt, params.until)
@@ -381,7 +372,6 @@ export async function countPendingInboundEvents(
   return { n: row?.n ?? 0, oldest: row?.oldest ?? null };
 }
 
-// How long deliveries waited to be processed, over the most recent ones.
 export async function listInboundLags(
   db: DbOrTx,
   params: { connectionId: string; since: Date; limit: number }
@@ -438,7 +428,6 @@ export async function countInboundEventsBetween(
   return row?.n ?? 0;
 }
 
-// The most recent ones, so a busy connection's health reflects what it does now.
 export async function listInboundOutcomes(
   db: DbOrTx,
   params: { connectionId: string; since: Date; limit: number }
@@ -478,9 +467,6 @@ export async function listInboundFailures(
     .limit(params.limit);
 }
 
-// One connection and a bounded batch per call: each delete is then a short range on
-// (connection_id, received_at) that holds few locks and doesn't keep autovacuum waiting. Pending
-// deliveries stay, because the queue hasn't processed them yet.
 export async function deleteFinishedDeliveries(
   db: DbOrTx,
   params: { connectionId: string; before: Date; limit: number }

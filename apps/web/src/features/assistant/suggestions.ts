@@ -9,11 +9,6 @@ const FALLBACK = [
   "Draft my standup",
 ];
 
-/**
- * First questions built from what's in front of the person right now: what's waiting on them,
- * the card they're on, a decision an agent needs. Generic ones fill in when there's little to go
- * on, so a new workspace still gets three.
- */
 /** What a suggestion shows, and the full question it sends. */
 export type Suggestion = { label: string; ask: string };
 
@@ -30,7 +25,6 @@ export function useSuggestions(): Suggestion[] {
   const decision = waiting.find((item) => item.kind === "agent.needs_you");
   if (decision) {
     const about = decision.title.replace(/^[^:]+ needs you:\s*/u, "");
-    // The chip shows a short line; the question carries the whole request.
     picked.push({
       label: `Help me decide: ${clip(about, 48)}`,
       ask: `Help me decide: ${about} What are the trade-offs, and what would you do?`,

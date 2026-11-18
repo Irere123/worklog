@@ -53,7 +53,6 @@ type Item = {
 
 const TEAM_PER_PERSON = 6;
 
-// Daily briefs cover the previous workday, so a Monday brief includes Friday and the weekend; weekly briefs cover the last 7 days.
 export function briefWindow(
   now: Date,
   timeZone: string,
@@ -72,7 +71,6 @@ export function briefWindow(
   return { start: startOfLocalDay(now, timeZone, -back), end: now, key: today };
 }
 
-// A team version leaves out private activity and the attention items private activity raised.
 export async function gatherBriefData(
   ctx: AppContext,
   member: Member,
@@ -138,14 +136,12 @@ export async function gatherBriefData(
     at: a.occurredAt.toISOString(),
   });
 
-  // Skip the personal assistants' own bookkeeping; keep humans and working agents.
   const team = people
     .filter((p) => p.agentProvider !== "worklog")
     .map((p) => ({
       name: p.name,
       handle: p.handle,
       kind: p.kind,
-      // What mattered most first (merges, releases, decisions), not just what happened last.
       did: everyone
         .filter((a) => a.actorId === p.id)
         .toSorted(
@@ -231,7 +227,6 @@ export async function composeBrief(
   return { title, body: text, composedBy: modelId };
 }
 
-// What goes to team-visible targets. Not saved: the member's brief is the private one.
 export async function composeTeamBrief(
   ctx: AppContext,
   member: Member,
@@ -304,7 +299,6 @@ export function templateBrief(data: BriefData): string {
   return out.join("\n");
 }
 
-// A card touched three times is one line with three changes, not three lines with one title.
 function collapse(did: { title: string; detail: string | null }[]) {
   const byTitle = new Map<string, string[]>();
   for (const d of did) {

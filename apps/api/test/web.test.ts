@@ -102,7 +102,6 @@ describe("serving the web app", () => {
     expect(outsideAssets.status).toBe(404);
     expect(await outsideAssets.text()).not.toContain("root:");
 
-    // A chunk from an older build is a clean 404, not the shell posing as a script.
     const gone = await app.request("/assets/app-old999.js");
     expect(gone.status).toBe(404);
 
@@ -125,17 +124,14 @@ describe("serving the web app", () => {
     expect(front.headers.get("cache-control")).toBe("no-cache");
     expect(await front.text()).toContain("Your team’s logbook");
 
-    // Another prerendered page answers with or without its trailing slash.
     for (const url of ["/pricing", "/pricing/"]) {
       const pricing = await app.request(url);
       expect(await pricing.text()).toContain("Pricing · Worklog");
     }
 
-    // Every other route is still the shell, which routes in the browser.
     const home = await app.request("/home");
     expect(await home.text()).toContain("<title>Worklog</title>");
 
-    // A folder outside the build is never looked in.
     const escaped = await app.request("/..%2f..%2f/");
     expect(await escaped.text()).toContain("<title>Worklog</title>");
   });

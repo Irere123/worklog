@@ -1,7 +1,3 @@
-// Traced from the hand-drawn mark (crayon lobes, one cursive "ee" thread) on a 100-unit square.
-// The thread and the seam between the lobes are centrelines, cut out with a mask, so they can be
-// drawn on and so the mark shows whatever sits behind it.
-
 export const MARK_VIEWBOX = 100;
 export const MARK_THREAD_WIDTH = 3.63;
 

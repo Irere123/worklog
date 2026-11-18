@@ -8,7 +8,6 @@ import { q } from "#api/queries";
 
 type Heard = { results: SpeechRecognitionResultList };
 
-// The Web Speech API isn't in TypeScript's DOM types; this is the part dictation uses.
 type Recognizer = {
   lang: string;
   continuous: boolean;
@@ -27,41 +26,30 @@ type RecognizerClass = new () => Recognizer;
 /** Where dictation stands. One at a time; `start`, `stop`, `cancel` and `settle` move it. */
 export type DictationPhase = "idle" | "listening" | "transcribing";
 
-// Opus first: speech at 32 kbps is about 240 KB a minute and transcribes as well as a WAV ten
-// times its size. Safari records only MP4.
 const RECORDINGS = [
   "audio/webm;codecs=opus",
   "audio/ogg;codecs=opus",
   "audio/mp4",
 ];
 const BITRATE = 32_000;
-// A tap on the mic and back isn't worth a call, and a message isn't five minutes long.
 const MIN_MS = 500;
 const MAX_MS = 5 * 60_000;
-// Loudness (RMS × 6, so 0–1) that a voice passes and a quiet room, after noise suppression, doesn't.
 const VOICE = 0.12;
 
 type Session = {
-  /** The box when it started, and the part kept in front of what's heard. */
   started: string;
   before: string;
-  /** What dictation last put in the box: while the box still says it, the person hasn't edited. */
   written: string | null;
-  /** The browser's live words, while it's listening. */
   recognizer: Recognizer | null;
-  /** Whether a recording decides the end: false listening with the browser alone. */
   recording: boolean;
   recorder: MediaRecorder | null;
   stream: MediaStream | null;
   audio: AudioContext | null;
   chunks: Blob[];
-  /** When the recorder started: the microphone prompt before it isn't part of the recording. */
   startedAt: number;
-  /** Unknown until the meter has run: a recording it never heard a voice in isn't sent. */
   voice: "unknown" | "silent" | "heard";
   upload: AbortController;
   timer: number;
-  /** Waiting on the last words to send them: given the box's text once they're in. */
   deliver: ((said: string) => void) | null;
 };
 
@@ -91,12 +79,10 @@ export function useDictation({
   const [phase, setPhase] = useState<DictationPhase>("idle");
   const transcribes = useQuery({ ...q.me(), select: (me) => me.ai }).data;
   const session = useRef<Session | null>(null);
-  // A transcript arrives long after the click that asked for it, and compares with the box then.
   const box = useRef(value);
   useLayoutEffect(() => {
     box.current = value;
   }, [value]);
-  // Cleared first, as `cancel` does, so the recorder's stop event finds no session to transcribe.
   useEffect(
     () => () => {
       const { current } = session;
@@ -126,13 +112,11 @@ export function useDictation({
 
   const transcribe = async (current: Session, recording: Blob) => {
     setPhase("transcribing");
-    // The transcript supersedes the browser's last words; they mustn't land after it.
     current.recognizer?.abort();
     current.recognizer = null;
     try {
       const { text } = await unwrap(
         api.POST("/v1/transcriptions", {
-          // The schema types a binary body as a string; the recording goes out as itself.
           body: "",
           bodySerializer: () => recording,
           headers: { "content-type": recording.type },
@@ -147,7 +131,6 @@ export function useDictation({
       if (current.upload.signal.aborted) {
         return;
       }
-      // Words from the browser already in the box stand; with none, say why nothing came.
       if (current.written === null) {
         toast.error("Couldn't make out what you said. Try again.");
       }
@@ -187,7 +170,6 @@ export function useDictation({
           current.voice = "silent";
         }
       }
-      // Rises at once and falls slowly, so the ring follows a voice instead of flickering.
       level = Math.max(loudness, level * 0.85);
       meter?.current?.style.setProperty("--level", level.toFixed(3));
       requestAnimationFrame(tick);
@@ -206,7 +188,6 @@ export function useDictation({
           autoGainControl: true,
         },
       });
-      // Stopped while the browser asked for the microphone.
       if (session.current !== current || !current.recording) {
         stopTracks(stream);
         return;
@@ -228,7 +209,6 @@ export function useDictation({
             new Blob(current.chunks, { type: recorder.mimeType })
           );
         } else {
-          // A tap and back is a change of mind; a real recording with no voice in it needs a word.
           if (long && current.voice === "silent" && current.written === null) {
             toast.error("Didn't hear anything. Check your microphone.");
           }
@@ -245,7 +225,6 @@ export function useDictation({
       if (session.current !== current) {
         return;
       }
-      // The browser's live words, if it has them, carry on alone and end the dictation.
       current.recording = false;
       if (!current.recognizer) {
         toast.error(
@@ -266,7 +245,6 @@ export function useDictation({
     recognition.continuous = true;
     recognition.interimResults = true;
     recognition.addEventListener("result", (event) => {
-      // Stopping still delivers what was already heard; after a cancel nothing may land.
       if (session.current !== current || current.recognizer !== recognition) {
         return;
       }
@@ -286,7 +264,6 @@ export function useDictation({
         return;
       }
       current.recognizer = null;
-      // With a recording, it decides the end; the live words just stop where they are.
       if (!current.recording) {
         settle(current);
       }
@@ -297,7 +274,6 @@ export function useDictation({
     recognition.start();
   };
 
-  /** Stops listening. What was heard stays and, with a model, is transcribed. */
   const stop = () => {
     const { current } = session;
     if (!current) {
@@ -312,14 +288,12 @@ export function useDictation({
     if (current.recorder) {
       return;
     }
-    // No recording yet: the microphone prompt is still up, or the browser is listening alone.
     current.recording = false;
     if (!current.recognizer) {
       settle(current);
     }
   };
 
-  /** Whether it started: there may be no way to listen, or a dictation already going. */
   const start = () => {
     const live = recognizerClass() !== null;
     const recorded = recordable(transcribes);
@@ -334,7 +308,6 @@ export function useDictation({
       recording: recorded,
       recorder: null,
       stream: null,
-      // Made in the click itself: Safari suspends one made after the microphone prompt.
       audio: recorded ? new AudioContext() : null,
       chunks: [],
       startedAt: 0,
@@ -357,7 +330,6 @@ export function useDictation({
     phase,
     start,
     stop,
-    /** Stops, and hands `deliver` the box's text once the last words are in: to send them. */
     finish: (deliver: (said: string) => void) => {
       const { current } = session;
       if (!current) {
@@ -367,7 +339,6 @@ export function useDictation({
       current.deliver = deliver;
       stop();
     },
-    /** Ends dictation and drops anything still being heard: the words were sent or cleared. */
     cancel: () => {
       const { current } = session;
       session.current = null;
@@ -393,7 +364,6 @@ function recordable(transcribes: boolean | undefined) {
   );
 }
 
-/** Lets go of the microphone and what listens to it; `drop` also abandons the words. */
 function release(current: Session | null, drop: boolean) {
   if (!current) {
     return;

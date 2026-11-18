@@ -38,7 +38,6 @@ const TASKS: Record<
   "ingest:lane": async (ctx, payload) => {
     await drainLane(ctx, String(payload.connectionId), Number(payload.lane));
   },
-  // Queued before lanes were drained as a whole.
   "ingest:process": async (ctx, payload) => {
     await processInbound(ctx, String(payload.inboundEventId));
   },
@@ -49,7 +48,6 @@ const TASKS: Record<
       id: String(payload.connectionId),
       workspaceId: String(payload.workspaceId),
     };
-    // Queued before replays ran per lane.
     if (typeof payload.lane !== "number") {
       await queueReplay(ctx, conn, since);
       return;
@@ -162,9 +160,6 @@ const TASKS: Record<
   },
 };
 
-// One queue, so scheduled tasks never overlap. No retries: the next run catches up on whatever is due.
-// The sweeps stay off that queue, so a long or stuck task there can't hold them up (releasing
-// abandoned jobs frees that queue too); two at once do no harm.
 const CRONTAB = `
 * * * * * ingest:sweep ?max=1
 */5 * * * * jobs:release ?max=1
@@ -189,8 +184,6 @@ export async function startWorker(
     noHandleSignals: true,
     logger,
   });
-  // `done` settles when the runner stops, whether asked to or not: a process that outlives its
-  // runner takes no jobs while looking alive.
   return Object.assign(
     async () => {
       await runner.stop();
@@ -221,8 +214,6 @@ export async function exitWhenRunnerStops(
   }
 }
 
-// runOnce stops when no job is free to run, and a job queued behind a running one in its lane isn't
-// free yet, so one pass can leave work behind.
 export async function runJobsOnce(ctx: AppContext) {
   for (let pass = 0; pass < 100; pass += 1) {
     await runOnce({
@@ -239,9 +230,6 @@ export async function runJobsOnce(ctx: AppContext) {
 
 const PayloadSchema = z.record(z.string(), z.unknown());
 
-// Each run is the root of its own trace: a job can run long after whatever queued it, and a
-// lane's job drains deliveries from many requests. A failure is logged here, once, with the
-// attempt it was, so retries that end in success are still visible.
 function taskList(ctx: AppContext): TaskList {
   return Object.fromEntries(
     Object.entries(TASKS).map(([name, handle]) => [

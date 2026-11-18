@@ -301,7 +301,6 @@ describe("GitHub App", () => {
       "release.published",
       "review.submitted",
     ]);
-    // The approval ten days ago is history; the review asked for an hour ago is still waiting.
     expect(
       (await env.call("GET", "/v1/attention", { token: owner.token })).body
     ).toHaveLength(0);
@@ -363,7 +362,6 @@ describe("GitHub App", () => {
       "Merged PR acme/api#7: Retry payments",
       "Merged PR acme/api#8: Cap the backoff",
     ]);
-    // Merging #8 resolved the review it was waiting on.
     expect(
       (await env.call("GET", "/v1/attention", { token: teammate.token })).body
     ).toHaveLength(0);
@@ -468,7 +466,6 @@ describe("GitHub App", () => {
     ).body.find((a: any) => a.provider === "github");
     expect(app.unrouted).toBeGreaterThan(0);
 
-    // A wrong secret is its own count, not lost among the unrouted.
     await env.app.request("/hooks/apps/github", {
       method: "POST",
       headers: {
@@ -522,13 +519,11 @@ describe("GitHub App", () => {
 
   test("reinstalling after an uninstall brings the same connection back", async () => {
     const { owner, conn, hook } = await installed();
-    // Changing settings keeps the account GitHub named, which is how the reinstall is found.
     await env.call("PATCH", `/v1/connections/${conn.id}`, {
       token: owner.token,
       body: { name: "Acme code", settings: { repos: ["acme/api"] } },
     });
     await hook("installation", { action: "deleted" });
-    // GitHub gives the new installation a new id.
     const again = String(randomInt(1_000_000, 900_000_000));
     env.ctx.fetch = github(again);
     const link = await env.call("POST", "/v1/apps/github/install", {
@@ -635,7 +630,6 @@ describe("GitHub App", () => {
         () => new Response("bad credentials", { status: 401 }),
       ],
     ]);
-    // A token cached by the install would hide the refusal; a new process has none.
     forgetToken(
       {
         provider: "github",
@@ -735,7 +729,6 @@ describe("GitHub App", () => {
     expect(withAppSignIn(set, [row], env.ctx.secrets).GITHUB_CLIENT_ID).toBe(
       "Iv1.env"
     );
-    // Half set is a mistake to show, not one to paper over with the app's other half.
     const half = withAppSignIn(
       { ...bare, GITHUB_CLIENT_ID: "Iv1.env" },
       [row],

@@ -6,8 +6,6 @@ import { requestApproval } from "#agent/review";
 import { safe } from "./scope";
 import type { Scope } from "./scope";
 
-// A routine runs again and again on its own, so it always waits for the owner's own Allow, even
-// when they asked for it: the request shows exactly what will run, and when.
 export function proposeRoutineTool(scope: Scope) {
   const { owner } = scope;
   return tool({

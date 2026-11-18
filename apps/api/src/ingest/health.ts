@@ -49,14 +49,12 @@ export async function connectionHealth(
     days,
     status: conn.status,
     statusReason: conn.statusReason,
-    // As used, which isn't always what settings say (a reserved one held from before isn't).
     identityNamespace: connector
       ? connector.identityNamespace(viewOf(ctx, conn))
       : null,
     lastEventAt: conn.lastEventAt?.toISOString() ?? null,
     deliveries: statuses,
     activities: { kept, merged, duplicates },
-    /** Low isn't bad: it means noise was filtered. */
     signalRate: seen > 0 ? (kept + merged) / seen : null,
     topSkipReasons: [...reasons.entries()]
       .toSorted((a, b) => b[1] - a[1])
@@ -88,7 +86,6 @@ function summarize(outcomes: unknown[]) {
   let kept = 0;
   let merged = 0;
   let duplicates = 0;
-  // Events, not deliveries: a page of history is one delivery holding many.
   let seen = 0;
   for (const outcome of outcomes) {
     const o = (outcome ?? {}) as Partial<Outcome>;
@@ -118,7 +115,6 @@ function rejectionsOf(conn: ConnectionRow) {
     total: conn.rejections,
     lastAt: conn.lastRejectedAt?.toISOString() ?? null,
     last: conn.lastRejection,
-    // Rejected after the last accepted delivery: the secret or signature setup is likely wrong.
     failingNow:
       conn.lastRejectedAt !== null &&
       (conn.lastEventAt === null || conn.lastRejectedAt > conn.lastEventAt),

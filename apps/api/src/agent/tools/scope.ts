@@ -14,9 +14,6 @@ export type Scope = {
   said: string;
 };
 
-// Expected failures (unknown card, bad column name) become results the model can recover from;
-// they're logged so they still show up in observability. An error that says what to do next
-// ("use search_cards to find its number") gets a model further than one that only says what failed.
 export function safe<I, O>(
   fn: (input: I) => Promise<O>,
   next: { notFound?: string } = {}
@@ -36,8 +33,6 @@ export function safe<I, O>(
   };
 }
 
-// Privacy is enforced by what the tools query, not by the prompt: only the owner, in their own
-// conversation, sees their private work.
 export function privateFor(scope: Scope) {
   return scope.mode === "owner" ? [scope.owner.id] : [];
 }
@@ -46,11 +41,8 @@ export function includesPrivate(scope: Scope, person: Member) {
   return scope.mode === "owner" && person.id === scope.owner.id;
 }
 
-/** About 3,000 tokens: more than a lookup should hand the conversation in one go. */
 const MAX_RESULT_CHARS = 12_000;
 
-// A list too long for the conversation keeps its first items and says how to narrow it, so one
-// broad search can't crowd out everything else the model is holding.
 function capped<O>(result: O) {
   if (
     !Array.isArray(result) ||

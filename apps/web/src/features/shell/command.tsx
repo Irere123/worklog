@@ -65,19 +65,13 @@ export function CommandPalette({
     ...q.cards({ q: term, limit: 8 }),
     enabled: open && searching,
   });
-  // Before anything is typed, the cards moving most recently are the likeliest destination.
   const recent = useQuery({
     ...q.cards({ stage: "active", limit: 6 }),
     enabled: open && !searching,
   });
   const cards = searching ? found : recent;
-  // A number opens that card at once: any page can show a card over itself, so there's
-  // nothing to wait for, and Enter can't fall through to "Ask" while the search loads.
   const typed = cardNumberIn(search);
   const { numbered, listed } = splitOut(cards.data, typed);
-  // When results arrive, light the row shown first. cmdk keeps the old highlight while the list
-  // re-sorts under it, so Enter would open whatever was picked from the instant list. A frame
-  // later the DOM is in cmdk's sorted order.
   const [selected, setSelected] = useState("");
   const loadedAt = found.dataUpdatedAt;
   useEffect(() => {
@@ -392,7 +386,6 @@ function cardValue(number: number, title = "open") {
   return `card ${number} ${title}`;
 }
 
-/** Past conversations, matched only against what's typed: unasked, they'd crowd out the pages. */
 function ConversationResults({
   search,
   onPick,

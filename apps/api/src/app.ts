@@ -83,7 +83,6 @@ export function createApp(ctx: AppContext) {
 
   app.use("*", traceRequests());
 
-  // Cookie sessions only from our own web origins; anyone may call with an API key (no cookies → no CSRF).
   const trusted = new Set(webOrigins(ctx.config));
   app.use(
     "*",
@@ -116,7 +115,6 @@ export function createApp(ctx: AppContext) {
     "/api/auth/*",
     async (c) => await ctx.auth.handler(c.req.raw)
   );
-  // JSON only: event streams and the chat's stream must reach the client as they're written.
   app.use("/v1/*", compress({ contentTypeFilter: /^application\/json/u }));
   app.use("/v1/*", authMiddleware(ctx));
 

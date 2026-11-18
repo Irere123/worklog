@@ -42,7 +42,6 @@ export function Collapse({
 export function Roll({ value }: { value: string | number }) {
   const [shown, setShown] = useState({ now: value, before: value, turn: 0 });
   const last = useRef(value);
-  // Once the old value has left, it leaves the layout too, so the slot is the new value's width.
   const [gone, setGone] = useState(false);
   useEffect(() => {
     if (last.current === value) {

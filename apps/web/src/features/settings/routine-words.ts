@@ -6,8 +6,6 @@ type Automation = Schemas["Automation"];
 type Schedule = Automation["schedule"];
 type Kind = Automation["kind"];
 
-// How routines read in a person's words, wherever they're listed: one place to change it.
-
 export const DAYS = [
   "Sunday",
   "Monday",
@@ -92,7 +90,6 @@ export function routineState(
   if (a.nextRunAt === null) {
     return { kind: "unscheduled" };
   }
-  // Past due means the scheduler hasn't reached it yet; it runs on its next pass.
   return {
     kind: "next",
     label:

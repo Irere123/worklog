@@ -20,7 +20,6 @@ class CancelledError extends Error {
   override name = "CancelledError";
 }
 
-// Short enough that Pause feels immediate, long enough not to wake the page for nothing.
 const TICK = 50;
 
 export function useScript(
@@ -135,14 +134,11 @@ export function pointAt(
   fy = 0.62
 ): Point | null {
   const target = root?.querySelector<HTMLElement>(`[data-target="${name}"]`);
-  // A target can be hidden on a narrow screen; the scene then plays without a pointer.
   if (!(root && target && target.offsetParent)) {
     return null;
   }
   const outer = root.getBoundingClientRect();
   const box = target.getBoundingClientRect();
-  // The desktop tour draws the window at its design size and scales it to fit; the cursor lives
-  // inside that scale, so a measured distance is turned back into the window's own pixels.
   const scale = root.offsetWidth > 0 ? outer.width / root.offsetWidth : 1;
   return {
     x: (box.left - outer.left + box.width * fx) / scale,

@@ -15,7 +15,6 @@ import type { Mood } from "#ui/ghost";
 const KINDS: Record<string, { label: string; icon: ReactNode; tone: Tone }> = {
   "agent.needs_you": {
     label: "Agent needs a decision",
-    // The one agent item still waiting on someone, so the one whose ghost moves.
     icon: <Ghost mood="waiting" size={14} tinted />,
     tone: "amber",
   },

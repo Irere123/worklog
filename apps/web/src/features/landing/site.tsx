@@ -14,9 +14,6 @@ import { useSetupOpen } from "./start";
  */
 export function Site({ children }: { children: ReactNode }) {
   const setupOpen = useSetupOpen();
-  // The public pages are always light, whatever theme someone picked in the app. The frame says
-  // so for everything inside it; the root follows while a page is open, so the canvas past the
-  // page's edges and anything portalled to the body match, and goes back to the app's theme after.
   useEffect(() => {
     const root = document.documentElement;
     const before = root.style.colorScheme;

@@ -161,7 +161,6 @@ describe("GitLab webhooks", () => {
     });
 
     await send({ ...mr("approval"), user: sam });
-    // GitLab reports the same approval again once the rules are met: still one event.
     await send({ ...mr("approved"), user: sam });
     samItems = (
       await env.call("GET", "/v1/attention", { token: teammate.token })
@@ -233,7 +232,6 @@ describe("GitLab webhooks", () => {
       "Merged MR acme/api!7: Retry payments",
       "Opened MR acme/api!7: Retry payments",
     ]);
-    // Merged: nobody needs to review it any more.
     const samItems = (
       await env.call("GET", "/v1/attention", { token: teammate.token })
     ).body;
@@ -331,7 +329,6 @@ describe("GitLab with a token", () => {
       confidential_issues_events: false,
     });
 
-    // The secret it made is the one deliveries are checked with.
     const res = await env.app.request(`/hooks/${conn.id}`, {
       method: "POST",
       headers: {
@@ -507,7 +504,6 @@ describe("GitLab with a token", () => {
       new Set(["77"])
     );
 
-    // The same merge arriving as a webhook later is already there.
     await env.app.request(`/hooks/${conn.id}`, {
       method: "POST",
       headers: { "content-type": "application/json", "x-gitlab-token": "hook" },

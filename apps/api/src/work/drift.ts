@@ -40,7 +40,6 @@ const DRIFT_ACTIONS = [
   { id: "done", label: "It's done" },
 ];
 
-// Asks once per quiet spell.
 export async function nudgeDrifting(ctx: AppContext): Promise<number> {
   const rows = await listDriftingAssignments(ctx.db, { now: ctx.now() });
   let raised = 0;
@@ -77,8 +76,6 @@ export async function sweepEntropy(ctx: AppContext): Promise<number> {
   return stale.length;
 }
 
-// The one-click answers on an attention item. Only drift items have actions today; when another
-// kind gets some, this dispatcher moves above the domains it calls.
 export async function performAttentionAction(
   ctx: AppContext,
   member: Member,

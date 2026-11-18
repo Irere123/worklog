@@ -132,8 +132,6 @@ export class Tally {
     return c;
   }
 
-  // Each statement stands alone: one that fails puts its counts back for the next flush, and
-  // the ones that succeeded aren't counted twice.
   private async write() {
     const { identities, connections, apps } = this;
     this.identities = new Map();

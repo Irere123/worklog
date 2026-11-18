@@ -7,11 +7,9 @@ import { useSyncExternalStore } from "react";
  */
 export type AlertState = "unsupported" | "denied" | "off" | "on";
 
-// A per-device choice, like the browser permission it rides on, so it isn't a member setting.
 const KEY = "worklog.desktopAlerts";
 const ICON = "/icon-192.png";
 const listeners = new Set<() => void>();
-// Android Chrome has `Notification` but throws from its constructor; we only learn that by trying.
 let constructorFails = false;
 
 function read(): AlertState {
@@ -58,7 +56,7 @@ export function showDesktopAlert(alert: {
   title: string;
   body?: string;
   tag: string;
-  onOpen: () => void;
+  onOpen?: () => void;
 }) {
   if (document.visibilityState === "visible" || read() !== "on") {
     return;
@@ -97,7 +95,6 @@ function emit() {
 
 function subscribe(listener: () => void) {
   listeners.add(listener);
-  // Permission can change from the browser's own UI while the page is open.
   let status: PermissionStatus | null = null;
   let closed = false;
   void permissionStatus().then((s) => {
@@ -114,7 +111,6 @@ function subscribe(listener: () => void) {
   };
 }
 
-// Older Safari has no Permissions API, and Firefox rejects some names; either way, nothing to watch.
 async function permissionStatus() {
   try {
     return await navigator.permissions.query({ name: "notifications" });

@@ -85,7 +85,6 @@ export const ListMembersQuery = z.object({
   kind: z.enum(MEMBER_KINDS).optional(),
 });
 
-// A same-origin path is allowed so a demo workspace can point at pictures the web app serves itself.
 const AvatarUrl = z
   .string()
   .max(2048)

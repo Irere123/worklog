@@ -11,8 +11,6 @@ import { scheduleFollowUp } from "#work/attention";
 import { safe } from "./scope";
 import type { Scope } from "./scope";
 
-// The assistant coming back on its own, but only to its owner and only when they asked it to: it
-// can't reach anyone else this way.
 export function followUpTool({ ctx, owner }: Scope) {
   return tool({
     description: `Bring something back to ${owner.name} at a time they choose ("remind me Thursday", "check on this after the release"). It reaches them through their attention check, so within their active hours.`,

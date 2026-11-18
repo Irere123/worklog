@@ -42,7 +42,6 @@ export function Feed({
 }) {
   const feed = useInfiniteQuery(q.activities(filter));
   const scrollRef = useRef<HTMLDivElement>(null);
-  // The virtualizer measures rows from the top of the scroller, so it needs the header's height.
   const headerRef = useRef<HTMLDivElement>(null);
   const [headerHeight, setHeaderHeight] = useState(0);
   useLayoutEffect(() => {
@@ -55,8 +54,6 @@ export function Feed({
     }
     return () => watch.disconnect();
   });
-  // Live events land at the top. Someone reading further down keeps their place and gets a
-  // count of what arrived instead of a jump.
   const [atTop, setAtTop] = useState(true);
   const [seenTop, setSeenTop] = useState<string | undefined>();
   const firstId = feed.data?.pages[0]?.[0]?.id;
@@ -180,7 +177,6 @@ export function Feed({
         </div>
       )}
       {pinnedDay && (
-        // Keeps the day in view while reading down it, as a calendar's month does.
         <div aria-hidden {...stylex.props(styles.pinned)}>
           <p {...stylex.props(styles.day, styles.pinnedDay)}>{pinnedDay}</p>
         </div>
@@ -226,7 +222,6 @@ export function Feed({
   );
 }
 
-/** The day heading the reader has scrolled past, unless the next one is already at the top. */
 function dayAbove(
   rows: Row[],
   items: { index: number; start: number; end: number }[],

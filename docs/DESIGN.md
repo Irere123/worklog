@@ -47,7 +47,7 @@ The assistant and every agent follow the same rules, so their work reads as part
 The old design system scaled consistency. Ours has to scale intent, for teammates and agents building without a designer in the room. So the rules live where code is written:
 
 - Tokens in `apps/web/src/ui/tokens.stylex.ts`, and primitives and patterns in `apps/web/src/ui/`. Reach for a pattern (`EmptyState`, `Section`, `ActivityLine`) before composing atoms.
-- `bun run lint` runs `apps/web/scripts/design-check.ts`. It fails on hover outside `media.hover`, font weights off the scale, non-Phosphor icons, sparkles for AI, `transition: all` and copy that says nothing. A deliberate exception names itself: `// design-allow: <reason>`.
+- `bun run lint` runs `apps/web/scripts/design-check.ts`. It fails on hover outside `media.hover`, font weights off the scale, non-Phosphor icons, sparkles for AI, `transition: all` and copy that says nothing. A deliberate exception becomes a named token in `tokens.stylex.ts` (`weight.display`, `weight.stamp`), so the code says what it is.
 - `bun run contrast` checks every text pair against WCAG in light and dark.
 
 ## Done is not good: the editor's pass

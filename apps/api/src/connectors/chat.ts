@@ -1,6 +1,5 @@
 const ACK =
   /^(?:ok(?:ay)?|k|thanks?(?: you)?|thx|ty|cool|nice|great|lol|haha|yes|yep|no|nope|sure|done|\+1|same|agreed|got it|on it|ack)[.!]*$/iu;
-// Slack's <…> markup and :emoji:, Discord's <@…> and <:name:id>, and emoji themselves.
 const NOISE_CHARS = /<[^>]+>|:[a-z0-9_+-]+:|[\p{Extended_Pictographic}️]/gu;
 const SHORT_BUT_NEWS =
   /\b(?:blocked|unblocked|deployed|shipped|merged|released|fixed|reverted|rolled back|on call|down|outage)\b/iu;

@@ -35,7 +35,6 @@ export async function listBoards(db: DbOrTx, params: { workspaceId: string }) {
     .orderBy(asc(boards.createdAt));
 }
 
-// Archived boards take no new cards.
 export async function findActiveBoard(
   db: DbOrTx,
   params: { workspaceId: string; id: string }
@@ -53,7 +52,6 @@ export async function findActiveBoard(
   return row;
 }
 
-// One columns query for every board, not one per board.
 export async function listBoardsWithColumns(
   db: DbOrTx,
   params: { workspaceId: string }
@@ -109,7 +107,6 @@ export async function insertColumns(
   await db.insert(columns).values(rows);
 }
 
-// Columns belong to a workspace through their board.
 export async function getColumnById(
   db: DbOrTx,
   params: { workspaceId: string; id: string }
@@ -143,7 +140,6 @@ export async function deleteColumnById(db: DbOrTx, params: { id: string }) {
   await db.delete(columns).where(eq(columns.id, params.id));
 }
 
-// Keeps positions dense: `by: 1` opens a gap at `from`, `by: -1` closes the one just below it.
 export async function updateColumnPositions(
   db: DbOrTx,
   params: { boardId: string; from: number; by: 1 | -1 }

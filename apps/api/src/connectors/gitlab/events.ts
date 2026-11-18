@@ -87,7 +87,6 @@ const PayloadSchema = z
     ),
     merge_request: optional(ItemSchema),
     issue: optional(ItemSchema),
-    // Push
     ref: optional(z.string()),
     before: optional(z.string()),
     after: optional(z.string()),
@@ -105,7 +104,6 @@ const PayloadSchema = z
         })
       )
     ),
-    // Release
     action: optional(z.string()),
     tag: optional(z.string()),
     name: optional(z.string()),
@@ -130,13 +128,10 @@ const NO_COMMIT = /^0+$/u;
 const CLOSES =
   /\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?|implement(?:s|ed)?)\s+#(?<number>\d+)/giu;
 const WL_REF = /\bWL-(?<number>\d+)\b/giu;
-// GitLab usernames may hold dots, dashes and underscores, but don't end with a dot.
 const MENTION =
   /(?:^|[^\w`/])@(?<login>[a-z0-9_](?:[a-z0-9_.-]*[a-z0-9_])?)/giu;
-// Everyone in the project or group, not a person.
 const GROUP_MENTIONS = new Set(["all", "here", "channel"]);
 const MERGE_COMMIT = /^Merge branch '.+' into '.+'|See merge request \S+!\d+/u;
-// Project and group access tokens act as users named project_<id>_bot_<hash> or group_<id>_bot.
 const BOT = /^(?:project|group)_\d+_bot|[-_]bot$/iu;
 
 export const actorFor = (u: GitlabUser): ExternalActor => ({
@@ -147,7 +142,6 @@ export const actorFor = (u: GitlabUser): ExternalActor => ({
   avatarUrl: u.avatar_url ?? null,
 });
 
-// Mentions carry no id, so they resolve by username.
 const byLogin = (login: string): ExternalActor => ({
   id: `handle:${login.toLowerCase()}`,
   handle: login,
@@ -184,7 +178,6 @@ const ignore = (reason: string): Normalized => ({
   ignored: reason,
 });
 
-// GitLab writes some timestamps as "2026-10-28 09:00:00 UTC" and others as ISO 8601.
 export function gitlabTime(value: string | undefined) {
   const iso = value?.replace(" UTC", "Z").replace(" ", "T") ?? "";
   const parsed = Number.isNaN(Date.parse(value ?? ""))
@@ -200,7 +193,6 @@ type Delivery = {
   actor: ExternalActor | null;
   at: (value?: string) => Date;
   stamp: (value?: string) => string;
-  /** "group/project!5": merge requests and issues are numbered apart. */
   mrRef: (iid: number) => string;
   issueRef: (iid: number) => string;
   mrKey: (iid: number) => string;
@@ -260,7 +252,6 @@ export function normalizeGitlab(
   });
 }
 
-// Pushes name their author in flat fields; everything else carries a user.
 function actorOfPayload(p: GitlabPayload) {
   if (p.user) {
     return actorFor(p.user);
@@ -410,14 +401,11 @@ function onMergeRequest(d: Delivery): Normalized {
             kind: merged ? "pr.merged" : "pr.closed",
             occurredAt: at(mr.updated_at),
             title: `${merged ? "Merged" : "Closed"} MR ${mrRef(iid)}: ${title}`,
-            // Nobody needs to review a closed merge request any more.
             signals: [{ type: "resolve", what: "review_requested" }],
           }),
         ],
       };
     }
-    // "approval" is one approver's; "approved" means the rules are met. Both name the approver
-    // and the same moment, so one approval reported both ways is one event.
     case "approval":
     case "approved": {
       return onApproval(d, iid, title, common);
@@ -485,7 +473,6 @@ function onMergeRequestUpdate(
 ): Normalized {
   const { changes } = p;
   const updated = p.object_attributes?.updated_at;
-  // Marked ready: the merge request is opened now, with the id opening it ready would have had.
   if (changes?.draft?.previous === true && !draft) {
     return opened(`mr:${mrKey(iid)}:opened`, "Opened", updated);
   }
@@ -530,7 +517,6 @@ function onMergeRequestUpdate(
     : ignore("merge_request.update (not a work signal)");
 }
 
-// Internal notes and notes on confidential issues are for project members only.
 function isConfidentialNote(p: GitlabPayload) {
   const note = p.object_attributes;
   return (

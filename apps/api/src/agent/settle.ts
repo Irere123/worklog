@@ -14,7 +14,6 @@ export async function settleConversation(
   workspaceId: string,
   conversationId: string
 ) {
-  // Measured in SQL first: most settle well inside the budget, and reading them would be wasted.
   if (needsCompaction(await measureReplay(ctx.db, { conversationId }))) {
     await compactConversation(ctx, workspaceId, conversationId);
   }

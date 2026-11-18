@@ -49,7 +49,7 @@ export function Composer({
   /** What the assistant can see, shown under the text so nobody has to guess. */
   context?: ReactNode;
   autoFocus?: boolean;
-  onSend: (text: string) => void;
+  onSend?: (text: string) => void;
   onStop?: () => void;
   /** The first keystroke in an empty box: a message is on its way. */
   onStartTyping?: () => void;
@@ -63,7 +63,6 @@ export function Composer({
   const [value, setValue] = useState("");
   const ownRef = useRef<HTMLTextAreaElement>(null);
   const ref = inputRef ?? ownRef;
-  // On a phone, focusing on arrival would throw up the keyboard over the conversation.
   const focusOnArrival = useEffectEvent(() => {
     if (autoFocus && matchMedia("(hover: hover)").matches) {
       ref.current?.focus();
@@ -72,8 +71,6 @@ export function Composer({
   useEffect(() => {
     focusOnArrival();
   }, []);
-  // Told by whatever changes it (a keystroke, a send, dictation starting or ending), so the
-  // parent hears in the same update rather than a render later from an effect.
   const draft = (inBox: string, dictating: boolean) =>
     onDrafting?.(inBox.trim() !== "" || dictating);
   const mic = useRef<HTMLButtonElement>(null);
@@ -88,15 +85,13 @@ export function Composer({
     setValue(next);
     draft(next, dictating);
   };
-  // "#" picks a card, as in comments; the reply's "#8" then opens it.
   const refs = useCardRefs({ value, onChange: write });
   const trimmed = value.trim();
-  // Sending mid-dictation sends the last words too, once they're written down.
   const send = () =>
     dictation.finish((said) => {
       const message = said.trim();
       if (message) {
-        onSend(message);
+        onSend?.(message);
         setValue("");
       }
       onDrafting?.(false);
@@ -279,7 +274,6 @@ const styles = stylex.create({
     zIndex: 2,
   },
   input: {
-    // Grows with what's written, up to about ten lines, then scrolls.
     fieldSizing: "content",
     minHeight: leading.copy,
     maxHeight: 240,
@@ -341,7 +335,6 @@ const styles = stylex.create({
   micOn: {
     color: color.redFg,
     backgroundColor: color.redSubtle,
-    // `--level` is how loudly it hears you, set by dictation each frame: the ring is your voice.
     boxShadow: `0 0 0 calc(var(--level, 0) * 6px) ${color.redSubtle}`,
   },
   spin: {
@@ -359,7 +352,6 @@ const styles = stylex.create({
     height: 30,
     borderRadius: radius.full,
     borderWidth: 0,
-    // The page's own colour on its ink: the button reads in both themes without a new token.
     color: { default: color.bg, ":disabled": color.fgFaint },
     backgroundColor: {
       default: color.fg,

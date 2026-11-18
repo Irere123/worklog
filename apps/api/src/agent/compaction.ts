@@ -11,17 +11,12 @@ import type { ConversationRow, MessageRow } from "#db/queries/conversations";
 import { structured } from "./generate";
 import { prompt, UNTRUSTED_NOTE } from "./prompts";
 
-// Stored messages are JSON, which runs about four characters per token; close enough for a budget.
 const CHARS_PER_TOKEN = 4;
-// Well inside the main model's window, and early enough that replaying stays cheap.
 const COMPACT_AT_TOKENS = 64_000;
-// Waiting for a quiet moment stops here: much more and the replay crowds out the model's window.
 const COMPACT_NOW_TOKENS = 2 * COMPACT_AT_TOKENS;
 const KEEP_TOKENS = 16_000;
 const MAX_LINE_CHARS = 4000;
 
-// Summaries drop details, and these are the details a conversation depends on, so each kind gets
-// its own field and identifiers are copied, not paraphrased ("The Compaction Cliff", arXiv 2608.22752).
 const Recap = z.object({
   openLoops: z
     .array(z.string())
@@ -83,8 +78,6 @@ export async function compactConversation(
   });
 }
 
-// The newest messages that fit the budget, starting at a user turn: a tool result can't lead the
-// replay, and providers expect a user message first. Returns the index of the first kept message.
 function keepFrom(rows: MessageRow[]) {
   let budget = KEEP_TOKENS * CHARS_PER_TOKEN;
   let i = rows.length;
@@ -97,7 +90,6 @@ function keepFrom(rows: MessageRow[]) {
     i -= 1;
   }
   const start = rows.findIndex((r, index) => index >= i && r.role === "user");
-  // The last turn alone is over budget: keep it whole rather than cut into it.
   return start === -1
     ? Math.max(
         rows.findLastIndex((r) => r.role === "user"),

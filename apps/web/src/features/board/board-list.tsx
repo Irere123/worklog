@@ -56,7 +56,6 @@ const STAGE_ORDER: Record<Card["stage"], number> = {
   done: 3,
 };
 
-// A phone has room for the number, the title and where it sits; the rest needs a wide screen.
 const WIDE_ONLY = new Set(["assignees", "dueOn", "lastActiveAt"]);
 
 const ColumnColors = createContext(new Map<string, string>());
@@ -94,7 +93,6 @@ const columns = helper.columns([
   }),
   helper.accessor("lastActiveAt", {
     header: "Last activity",
-    // ISO timestamps order correctly as plain strings.
     sortFn: sortFn_basic,
     cell: (info) => (
       <time title={exactTime(info.getValue())} {...stylex.props(styles.time)}>
@@ -129,7 +127,6 @@ function TitleCell({ card }: { card: Card }) {
 function WhereCell({ card }: { card: Card }) {
   const colors = useContext(ColumnColors);
   const columnColor = card.columnId ? colors.get(card.columnId) : undefined;
-  // A column reads as it does on the board, its dot and name, so it keeps its colour in both views.
   if (card.stage === "active" && columnColor !== undefined) {
     return (
       <Badge
@@ -271,7 +268,6 @@ export function BoardList({
                         {...stylex.props(styles.sort)}
                       >
                         <table.FlexRender header={header} />
-                        {/* The slot stays when unsorted, so sorting doesn't shift the columns. */}
                         <span {...stylex.props(styles.arrow)}>
                           {sorted === "asc" && <ArrowUpIcon size={12} />}
                           {sorted === "desc" && <ArrowDownIcon size={12} />}
@@ -288,7 +284,6 @@ export function BoardList({
               <tr
                 key={row.id}
                 onClick={(event) => {
-                  // The title link already navigated; the row is the larger pointer target.
                   if (
                     event.target instanceof Element &&
                     event.target.closest("a")

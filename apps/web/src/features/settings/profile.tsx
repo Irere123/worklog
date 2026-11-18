@@ -415,7 +415,6 @@ function Stat({ label, value }: { label: string; value: string }) {
 }
 
 const styles = stylex.create({
-  // Beside the fields the picture leaves a phone's inputs too narrow for an email, so it goes above.
   profile: {
     display: "flex",
     flexDirection: { default: "row", "@media (max-width: 640px)": "column" },
@@ -450,7 +449,6 @@ const styles = stylex.create({
       ":hover": { default: null, [media.hover]: color.uiHover },
     },
   },
-  // A tint, not a solid fill: five days on in a row is the usual answer and shouldn't shout.
   dayOn: {
     color: color.accentFg,
     boxShadow: `inset 0 0 0 1px color-mix(in oklch, ${color.accent} 40%, transparent)`,

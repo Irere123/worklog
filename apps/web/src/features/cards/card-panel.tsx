@@ -104,8 +104,6 @@ export function CardPanel({ number }: { number: number }) {
         <BaseDialog.Backdrop {...stylex.props(styles.backdrop)} />
         <BaseDialog.Popup
           ref={panel}
-          // Focus starts on the panel, not its first button: opening a card shouldn't light a
-          // focus ring on the golden ticket as if it had been chosen.
           initialFocus={panel}
           {...stylex.props(styles.panel)}
           aria-label={`Card ${number}`}
@@ -117,7 +115,6 @@ export function CardPanel({ number }: { number: number }) {
           )}
           {card.isError && (
             <div {...stylex.props(styles.pad)}>
-              {/* Trying again can't bring back a card that isn't there; closing is the way on. */}
               {card.error instanceof ApiError && card.error.status === 404 ? (
                 <EmptyState
                   icon={<CardsIcon size={20} />}
@@ -156,12 +153,10 @@ function CardBody({ card }: { card: CardDetail }) {
   const column = board.data?.columns.find((c) => c.id === card.columnId);
 
   useHotkey("Shift+G", () => act({ type: card.golden ? "ungild" : "gild" }));
-  // Triage by number, as in Linear: 1 sends a card in Maybe? to the first column, 2 the second.
   useHotkeys(
     (board.data?.columns ?? []).slice(0, DIGITS.length).map((c, i) => ({
       hotkey: DIGITS[i] ?? "1",
       callback: () => act({ type: "move", columnId: c.id }),
-      // The shell's 1–3 stand down while a card is open, so sharing the keys is on purpose.
       options: { enabled: card.stage === "triage", conflictBehavior: "allow" },
     }))
   );
@@ -176,7 +171,6 @@ function CardBody({ card }: { card: CardDetail }) {
   useHotkey("]", () =>
     act({ type: card.stage === "done" ? "reopen" : "close" })
   );
-  // Fizzy's card keys. E, T and A press the control itself, so a key does exactly what a click does.
   useHotkey("D", () =>
     act({ type: card.stage === "done" ? "reopen" : "close" })
   );
@@ -590,7 +584,6 @@ function EditableTitle({
   );
 }
 
-/** Where the card sits in its life: triage asks "where does this go?", active shows the column. */
 function StageBar({
   card,
   columns,
@@ -744,7 +737,6 @@ function TagEditor({
   );
 }
 
-/** The team's tags, most used first, from recent cards: there's no list of tags to ask for. */
 function useKnownTags() {
   const recent = useQuery(q.cards({ limit: 100 }));
   const counts = new Map<string, number>();
@@ -843,7 +835,6 @@ type Entry =
       earlier: Schemas["Activity"][];
     };
 
-/** Comments and what happened to the card, in one thread, oldest first like a conversation. */
 function Timeline({ card }: { card: CardDetail }) {
   const { byId } = useMembers();
   const activities = useQuery(
@@ -857,7 +848,6 @@ function Timeline({ card }: { card: CardDetail }) {
         comment,
       })),
       ...(activities.data ?? [])
-        // Comments come from the card itself, with their full text; skip their activity echo.
         .filter((a) => !a.kind.startsWith("comment."))
         .map((activity) => ({
           kind: "activity" as const,
@@ -963,7 +953,6 @@ function Composer({ number }: { number: number }) {
   const refs = useCardRefs({ value: body, onChange: setBody, exclude: number });
   const touch = useTouch();
   const dictation = useDictation({ value: body, onChange: setBody });
-  // Commenting mid-dictation posts the last words too, once they're written down.
   const submit = () =>
     dictation.finish((said) => {
       if (said.trim() && !send.isPending) {
@@ -1199,7 +1188,6 @@ const styles = stylex.create({
   crumb: { fontSize: text.label, color: color.fgMuted },
   grow: { flexGrow: 1 },
   toggleOn: { color: color.accentFg },
-  // Above the composer: it sits at the foot of the panel, so a list below would be cut off.
   refsAbove: {
     position: "absolute",
     insetInline: space.lg,
@@ -1291,14 +1279,12 @@ const styles = stylex.create({
   }),
   fields: {
     display: "grid",
-    // Narrower labels on a phone leave the values room for a line instead of a word.
     gridTemplateColumns: {
       default: "96px minmax(0, 1fr)",
       "@media (max-width: 480px)": "72px minmax(0, 1fr)",
     },
     columnGap: space.lg,
     rowGap: space.sm,
-    // Top, not centre: a value that wraps (two assignees, the drift note) keeps its label on line one.
     alignItems: "start",
     fontSize: text.label,
   },
@@ -1315,7 +1301,6 @@ const styles = stylex.create({
     gap: space.sm,
     minHeight: 28,
   },
-  // A sentence that may wrap keeps its icon on the first line instead of alone above it.
   sentence: { flexWrap: "nowrap", alignItems: "flex-start", paddingTop: 4 },
   sentenceIcon: { display: "flex", flexShrink: 0, marginTop: 3 },
   warn: { color: color.amberFg },
@@ -1392,7 +1377,6 @@ const styles = stylex.create({
     },
     outline: { default: "none", ":focus-visible": `2px solid ${color.focus}` },
   },
-  // Fill-less controls among plain values: pull the padding back so the ink keeps the column's edge.
   tagRow: { display: "flex", flexGrow: 1 },
   tagButton: {
     marginInlineStart: `calc(-1 * ${space.xs})`,

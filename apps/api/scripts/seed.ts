@@ -1,7 +1,3 @@
-// A demo workspace for designing and trying the web app, built through the public API so it
-// exercises the same paths real clients do. Run against an empty server:
-//   bun run dev            (in another shell)
-//   bun run seed           → prints the owner's API key
 import process from "node:process";
 
 const BASE = process.env.WORKLOG_URL ?? "http://localhost:4000";
@@ -93,8 +89,6 @@ const scout = await person({
   agentProvider: "claude-code",
 });
 
-// Illustrated portraits the web app serves (Notionists by Zoish, CC0): demo people get pictures
-// without borrowing a real person's face for an invented name.
 for (const [handle, token] of [
   ["ada", ada],
   ["jean", jean.token],

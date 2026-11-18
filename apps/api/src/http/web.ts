@@ -7,13 +7,10 @@ import type { Context } from "hono";
 
 import { router } from "./router";
 
-// Paths the API owns: they keep their JSON 404s instead of falling through to the web app.
 const API_PATH = /^\/(?:v1|api|hooks|docs|openapi\.json|health)(?:\/|$)/u;
 
-// Built assets carry a content hash in their names, so a cached copy is never stale.
 const IMMUTABLE = "public, max-age=31536000, immutable";
 
-// Fonts and images are compressed already; a second pass costs CPU and saves nothing.
 const COMPRESSIBLE =
   /^(?:text\/|application\/(?:javascript|json|manifest\+json)|image\/svg)/u;
 
@@ -35,8 +32,6 @@ type Served = {
  */
 export function webAppRoutes(dist: string) {
   const root = path.resolve(dist);
-  // The build never changes while the server runs, so each file is read and compressed once.
-  // Only files that exist are kept: a request for any other path must not grow the cache.
   const cache = new Map<string, Promise<Served | null>>();
   const load = async (file: string) => {
     let served = cache.get(file);
@@ -50,7 +45,6 @@ export function webAppRoutes(dist: string) {
     }
     return found;
   };
-  // Compressed on the zlib thread pool at startup, so the first visitor doesn't wait on it.
   void warm(root, load);
 
   return router().get("*", async (c) => {
@@ -59,7 +53,6 @@ export function webAppRoutes(dist: string) {
     }
     const name = decoded(c.req.path);
     const wanted = name === null ? null : path.resolve(root, `.${name}`);
-    // Only files inside the build: `..` in a path must not reach the rest of the disk.
     const asset =
       wanted !== null && wanted.startsWith(root + path.sep)
         ? await load(wanted)
@@ -70,9 +63,6 @@ export function webAppRoutes(dist: string) {
       }
       return send(c, asset);
     }
-    // A page the build prerendered (the front page, pricing…) is its folder's index.html, asked
-    // for as /pricing or /pricing/ alike. Like the shell, it names this build's hashed assets, so
-    // it's never served from a cache.
     if (
       wanted !== null &&
       (wanted === root || wanted.startsWith(root + path.sep))
@@ -83,8 +73,6 @@ export function webAppRoutes(dist: string) {
         return send(c, page);
       }
     }
-    // A tab on an older build asks for chunks this one doesn't have: a 404 lets it fail cleanly,
-    // where the shell would arrive as a script and break with a MIME error.
     if (c.req.path.startsWith("/assets/")) {
       return await c.notFound();
     }
@@ -92,13 +80,11 @@ export function webAppRoutes(dist: string) {
     if (!shell) {
       return await c.notFound();
     }
-    // The shell names this build's hashed assets, so a cached copy would load a stale build.
     c.header("cache-control", "no-cache");
     return send(c, shell);
   });
 }
 
-// A malformed escape (`%E0%A4%A`) names no file or page; it gets the shell like any unknown path.
 function decoded(pathname: string) {
   try {
     return decodeURIComponent(pathname);
@@ -110,7 +96,6 @@ function decoded(pathname: string) {
 async function warm(root: string, load: (file: string) => Promise<unknown>) {
   const files = await readdir(root, { recursive: true }).catch(() => []);
   for (const file of files) {
-    // One at a time: warming must not crowd out requests arriving meanwhile.
     await load(path.join(root, file)).catch(() => null);
   }
 }
@@ -140,7 +125,6 @@ async function readServed(file: string): Promise<Served | null> {
   };
 }
 
-// A Buffer may share a larger pool; the response wants exactly its bytes.
 function copied(buffer: Buffer) {
   return Uint8Array.from(buffer).buffer;
 }
@@ -159,7 +143,6 @@ function send(c: Context, served: Served) {
   return c.body(served.raw, 200, headers);
 }
 
-// `br;q=0` names Brotli only to refuse it.
 function accepts(accepted: string, encoding: Encoding) {
   return accepted.split(",").some((part) => {
     const [name, ...params] = part.trim().split(";");

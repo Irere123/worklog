@@ -39,8 +39,6 @@ export function NewCardDialog({
   const navigate = useNavigate();
 
   const live = (boards.data ?? []).filter((b) => !b.archived);
-  // A new workspace has no board yet: the first card names one rather than leaving an empty
-  // picker and a button that never wakes.
   const firstBoard = boards.isSuccess && live.length === 0;
   const boardId = picked ?? onBoard?.params.boardId ?? live[0]?.id ?? "";
   const ready = Boolean(
@@ -219,7 +217,6 @@ const styles = stylex.create({
     justifyContent: "space-between",
     gap: space.md,
   },
-  // At a fixed 220px the picker leaves a phone too little room for the golden ticket beside it.
   board: {
     width: { default: 220, "@media (max-width: 640px)": "auto" },
     flexGrow: { default: 0, "@media (max-width: 640px)": 1 },
@@ -235,8 +232,6 @@ const styles = stylex.create({
     color: color.goldFg,
     cursor: "pointer",
   },
-  // Keyboard hints mean nothing on a touch screen; hidden rather than removed, it still pushes
-  // the buttons to the end.
   hint: {
     marginInlineEnd: "auto",
     display: "flex",

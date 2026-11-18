@@ -5,7 +5,6 @@ import { sql } from "drizzle-orm";
 import { activities } from "#db/schema";
 import { testEnv } from "#test/harness";
 
-// Guards against drivers that store jsonb as strings: reads look fine, but SQL can't see inside.
 test("jsonb is stored as JSON (queryable in SQL), not as a string", async () => {
   const env = await testEnv();
   const { workspace } = await env.workspace();

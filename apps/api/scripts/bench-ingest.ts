@@ -10,32 +10,6 @@ import { createContext } from "#context";
 import { startWorker } from "#jobs/tasks";
 import { hmacHex } from "#lib/crypto";
 
-/**
- * Load test for the ingestion pipeline, against a scratch database (it creates workspaces and
- * thousands of identities). This process is the API; workers are their own processes, as in a
- * deployment. Each team has a GitHub and a Slack connection.
- *
- *   DATABASE_URL=postgres://…/worklog_bench SETUP_SECRET=x bun scripts/bench-ingest.ts
- *
- * Without RATE it is a burst: DELIVERIES are acknowledged as fast as the HTTP path allows, then
- * the workers drain them, and the report gives both rates. With RATE it is a steady stream: RATE
- * deliveries a second for DURATION seconds while the workers run, and the report gives how far
- * behind processing fell (the backlog) and how long deliveries waited from receipt to done.
- *
- * Knobs: TEAMS, PEOPLE (in all), MEMBERS (per team: the people who are members, with their
- * GitHub and Slack accounts linked; half of what happens involves them, the rest is people
- * outside), REPOS and CHANNELS (per team), SLACK (share of deliveries from Slack), DELIVERIES,
- * RATE, DURATION, WORKERS (processes), CONCURRENCY (jobs per worker), IN_FLIGHT (webhooks sent at
- * once in a burst). With APIS, webhooks go over HTTP to that many API processes in turn, as a
- * load balancer would send them, instead of into this process. Connections: 24 for the API (8 for
- * this process and 20 per API process with APIS) and CONCURRENCY + 2 per worker, which must fit
- * under Postgres' max_connections.
- *
- * A steady run also reports what each process used (CPU in cores, memory), Postgres included,
- * read from /proc, so on Linux. KILL_AT kills a worker outright that many seconds in (as a crash
- * or an out-of-memory kill would) and starts another; the report then says how many deliveries
- * took another attempt and whether any event was found recorded twice.
- */
 const num = (name: string, fallback: number) =>
   Number(process.env[name] ?? fallback);
 const TEAMS = num("TEAMS", 10);
@@ -115,7 +89,6 @@ for (let t = 0; t < TEAMS; t += 1) {
     await call("/v1/connections", setup.token.token, {
       provider: "slack",
       secrets: { signingSecret: "bench", botToken: "xoxb-bench" },
-      // Most channels are where work is discussed; the rest only carry mentions.
       settings: {
         channels: Array.from({ length: Math.ceil(CHANNELS * 0.75) }, (_, c) =>
           channelId(t, c)
@@ -153,7 +126,6 @@ let sequence = 0;
 
 type Outgoing = { path: string; headers: Record<string, string>; raw: string };
 
-// What a busy org sends: mostly pushes and comments, some PRs asking for reviews, some reviews.
 function githubEvent(team: number): { event: string; payload: object } {
   sequence += 1;
   const repo = pick(REPOS);
@@ -256,7 +228,6 @@ function githubRequest(team: number): Outgoing {
 
 const recentThreads: string[] = [];
 
-// Chat: updates, replies in threads, mentions, and the "ok"s and "thanks" that are noise.
 function slackRequest(team: number): Outgoing {
   sequence += 1;
   const user = (i: number) => slackId(team, i);
@@ -303,10 +274,8 @@ function slackRequest(team: number): Outgoing {
   };
 }
 
-// The API processes' ports, when webhooks go over HTTP.
 const apiPorts: number[] = [];
 const ackMs: number[] = [];
-// Answers other than 200, by status and body: a provider would retry these.
 const refused = new Map<string, number>();
 let sent = 0;
 
@@ -343,7 +312,6 @@ async function burst() {
   await Promise.all(Array.from({ length: IN_FLIGHT }, sender));
 }
 
-// On schedule, whatever the acknowledgements take; capped so a stalled API shows as a slow rate.
 async function steady() {
   const total = Math.round(RATE * DURATION);
   const started = performance.now();
@@ -379,8 +347,6 @@ const waiting = async () => {
   return result.rows[0]?.n ?? 0;
 };
 
-// Stand-in answers for calls to providers: the bench's tokens are made up, and a provider refusing
-// one would rightly revoke the connection.
 function standInFetch() {
   return Object.assign(
     async (input: string | URL | Request) => {
@@ -410,7 +376,6 @@ async function work(): Promise<never> {
     loadConfig({ ...process.env, OPENROUTER_API_KEY: "" }),
     { models: null, fetch: standInFetch() }
   );
-  // With its cron, as in a deployment: the sweep for lanes left waiting runs there.
   const stop = await startWorker(wctx);
   await untilSignalled();
   await stop();
@@ -418,7 +383,6 @@ async function work(): Promise<never> {
   process.exit(0);
 }
 
-// An API process as `bun start` runs one, relay included, with its jobs left to the workers.
 async function serveApi(): Promise<never> {
   const actx = await createContext(
     loadConfig({ ...process.env, OPENROUTER_API_KEY: "" }),
@@ -462,7 +426,6 @@ async function startApis() {
   return started;
 }
 
-/** CPU time a process has used, in seconds, and its resident memory in MB. */
 function usage(pid: number) {
   try {
     const stat = readFileSync(`/proc/${pid}/stat`, "utf-8");
@@ -493,7 +456,6 @@ function postgresPids() {
   });
 }
 
-/** CPU used by Postgres: by the processes there are now, from what each had used at `from`. */
 function postgresCpu(from: Map<number, number>) {
   let total = 0;
   for (const pid of postgresPids()) {
@@ -517,7 +479,6 @@ function startWorkers(count = WORKERS) {
 }
 
 const backlog: number[] = [];
-// Memory of each process over the run, in MB, keyed by pid.
 const memory = new Map<number, number[]>();
 const sampling = new AbortController();
 let watched: number[] = [];
@@ -594,14 +555,12 @@ const resources =
   RATE > 0
     ? {
         seconds: Math.round(wall),
-        // In cores: 1 is one CPU busy the whole run.
         cpu: {
           load: cores(process.pid),
           apis: apis.map((a) => cores(a.pid)),
           workers: workers.map((w) => cores(w.pid)),
           postgres: Number((postgresCpu(cpuFrom) / wall).toFixed(2)),
         },
-        // First, highest and last sample, in MB: flat means nothing piles up.
         memoryMb: {
           load: [process.pid].map(memoryOf),
           apis: apis.map((a) => memoryOf(a.pid)),
@@ -638,8 +597,6 @@ const activities = await ctx.db.execute<{ n: number }>(
 const attention = await ctx.db.execute<{ n: number }>(
   sql`select count(*)::int as n from attention_items a join workspaces w on w.id = a.workspace_id where w.name like ${`Bench ${run}%`}`
 );
-// Another attempt is fine after a crash; an event found already recorded would mean a delivery
-// was processed twice (the bench never sends one twice).
 const recovery = await ctx.db.execute<{ retried: number; doubled: number }>(
   sql`select
     count(*) filter (where attempts > 1)::int as retried,
@@ -677,7 +634,6 @@ console.log(
           ? {
               target: RATE,
               seconds: DURATION,
-              // Still waiting each second; flat means processing keeps up.
               backlog: {
                 max: Math.max(0, ...backlog),
                 last10s: backlog.slice(-10),

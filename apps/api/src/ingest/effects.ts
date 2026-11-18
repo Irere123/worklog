@@ -71,7 +71,6 @@ async function memberFor(
   return (await findMemberById(ctx.db, { id: memberId })) ?? null;
 }
 
-// Run before the activity is written so it can link to the card. Silent: the source event's own activity is the record.
 export async function applyBoardEffects(
   ctx: AppContext,
   scope: BoardScope,
@@ -109,7 +108,6 @@ async function applyBoardEffect(
       if (card || !scope.boardId) {
         return null;
       }
-      // Archived since it was chosen: the event still counts, without a card.
       const target = await findActiveBoard(ctx.db, {
         workspaceId: scope.workspaceId,
         id: scope.boardId,
@@ -172,7 +170,6 @@ async function applyBoardEffect(
       return null;
     }
     default: {
-      // Effect types this server doesn't know (a newer connector) are ignored.
       return null;
     }
   }
@@ -205,8 +202,6 @@ type SignalContext = {
   onlyIfNew?: boolean;
 };
 
-// With `raise` off (history read back from an API), only resolves run: they catch state up
-// without pinging anyone.
 export async function applySignals(
   ctx: AppContext,
   scope: BoardScope,
@@ -223,7 +218,6 @@ export async function applySignals(
   }
 }
 
-// Never raises attention for the person who acted.
 async function raiseFor(
   ctx: AppContext,
   scope: BoardScope,
@@ -257,7 +251,6 @@ async function raiseFor(
 
 const RESOLVABLE = new Set(["review.requested", "assigned"]);
 
-// A request that happened before its resolution, arriving late (a retry, a backfill), stays resolved.
 async function resolvedSince(
   ctx: AppContext,
   scope: BoardScope,
@@ -276,7 +269,6 @@ async function resolvedSince(
   return through !== null && through >= at;
 }
 
-/** Bots can ask, but they can't interrupt: their signals are never high priority. */
 function capForBots(priority: Priority, actorIsBot: boolean): Priority {
   return actorIsBot && priority === "high" ? "normal" : priority;
 }
@@ -362,10 +354,8 @@ async function resolveItems(
   });
 }
 
-// An inbox item is read at a glance; the full text stays on the activity it links to.
 const AGENT_BODY_MAX = 1000;
 
-// Loud only when the agent is waiting on the human; never notify while it's working.
 export async function applyAgentState(
   ctx: AppContext,
   input: {

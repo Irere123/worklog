@@ -32,7 +32,6 @@ export function useAnswerApproval() {
       toast.error(error.message);
     },
     onSettled: () => {
-      // What it ran may have moved a card or started a routine.
       for (const queryKey of [["attention"], ["cards"], ["automations"]]) {
         void client.invalidateQueries({ queryKey });
       }

@@ -7,7 +7,6 @@ import { raiseAttention } from "#work/attention";
 import { safe } from "./scope";
 import type { Scope } from "./scope";
 
-// The one write a teammate's conversation can make: it goes to the owner's own list, nowhere public.
 export function leaveNoteTool({ ctx, owner, asker, conversationId }: Scope) {
   return tool({
     description: `Leave a note in ${owner.name}'s attention list on behalf of ${asker.name} — use when you can't answer, or ${asker.name} needs ${owner.name} to act.`,

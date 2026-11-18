@@ -2,10 +2,6 @@ import type { Member } from "#db/queries/members";
 
 import { CONSTITUTION, prompt } from "./prompts";
 
-// Only values that hold for many turns go here, most stable first: the voice changes when the owner
-// edits it, the memory page nightly and the recap at compaction. Per-turn context such as the
-// current time travels in the user message, so the prefix stays cache-friendly and the transcript
-// append-only. Rules come before data, and are never part of what gets summarized.
 export function assistantInstructions(opts: {
   owner: Member;
   asker: Member;
@@ -53,8 +49,6 @@ const CHANNEL_NAMES: Record<Channel, string> = {
   discord: "Discord",
 };
 
-// Every turn says where it came from, so the assistant can tell a message typed in Slack from one
-// sent through the API by an app or a script.
 export function turnPreamble(
   now: Date,
   timeZone: string,

@@ -43,7 +43,6 @@ const Found = z
   })
   .openapi("StepFound");
 
-// What a lookup returned, as references: enough to show and open each one, never the full text.
 const FOUND_SHOWN = 8;
 
 const MessageStep = z
@@ -94,15 +93,10 @@ type RatedMessageRow = MessageRow & {
 
 type Step = z.input<typeof MessageStep>;
 
-// A turn is stored as the model saw it: tool calls and results in their own rows. Clients get the
-// readable messages, each reply carrying the steps that led to it. Tool results stay server-side:
-// a step says whether the tool worked, how many results it found and what the first few were.
 export const MessagesResponse = derived(
   z.array(Message),
   (rows: RatedMessageRow[]) => {
     const out: z.input<typeof Message>[] = [];
-    // One reply per question, as it streamed: text written before a tool call ("Let me check")
-    // and the answer after it read as one message, named by its last row so ratings still match.
     let steps: Traced[] = [];
     let said: string[] = [];
     let last: RatedMessageRow | null = null;
@@ -220,8 +214,6 @@ function foundIn(value: unknown): z.input<typeof Found>[] {
   });
 }
 
-// A write the review held back returns `{ blocked: true, approvalId }` instead of running.
-// A held write says `blocked`; a proposed routine says `proposed`. Both wait on the same Allow.
 function heldFor(value: unknown) {
   if (typeof value !== "object" || value === null) {
     return null;
@@ -318,7 +310,6 @@ export const CreateConversationRequest = z.object({
 
 const ClientMessageId = z.string().min(1).max(100);
 
-// A useChat UIMessage is accepted, but only its id and text parts are used.
 const ChatMessage = z.union([
   z.string().min(1),
   z

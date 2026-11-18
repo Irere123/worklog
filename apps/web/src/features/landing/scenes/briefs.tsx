@@ -18,7 +18,6 @@ const FIGURES = [
   { label: "Drifting soon", value: 1 },
 ] as const;
 
-// The lines that need Ada, written into the brief one after another.
 const LINES = [
   {
     key: "atlas",
@@ -281,7 +280,6 @@ const styles = stylex.create({
     }),
     animationDuration: "300ms",
   },
-  // Placeholders at the written content's own size, so nothing moves when the words replace them.
   skeleton: {
     display: "block",
     height: 10,
@@ -304,8 +302,6 @@ const styles = stylex.create({
   paragraph: {
     marginTop: space.xs,
   },
-  // Over the sidebar's empty foot, so the delivered message never hides the brief it carries.
-  // A phone has no sidebar to carry the message, so the brief's own date line says where it went.
   sentNote: {
     display: {
       default: "none",
@@ -329,7 +325,6 @@ const styles = stylex.create({
     bottom: 64,
     flexDirection: "column",
     gap: space.md,
-    // Narrow enough to end before the brief's text column: it covers the sidebar, never words.
     width: 236,
     padding: space.lg,
     borderRadius: radius.lg,

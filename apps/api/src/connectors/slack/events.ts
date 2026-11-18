@@ -99,7 +99,6 @@ function mentionedUserIds(text: string) {
   return [...new Set(ids.filter((id) => id !== undefined))];
 }
 
-// A deleted message must not linger in what we recorded.
 function revisionOf(
   e: SlackEvent,
   settings: Record<string, unknown>,
@@ -192,7 +191,6 @@ function messageEvent(
       ],
     },
     signals,
-    // Private channels stay private to the author; public channels are team-visible.
     visibility: e.channel_type === "group" ? "private" : "team",
     data: { eventId },
   };
@@ -223,9 +221,6 @@ export function normalizeSlackMessage(
     settings,
     receivedAt
   );
-  // Slack sends a message to the bot twice, as a mention too: it's answered as a command, and
-  // what it records (a log) it records itself. Whoever it names is what the command is about
-  // (`ask @sam`), not someone it's said to, so nobody is pinged.
   if (addressedToBot(e.text ?? "", settings.botUserId)) {
     return { events: [], ignored: "addressed to Worklog" };
   }
@@ -242,7 +237,6 @@ export function normalizeSlackMessage(
           : "channel not opted in",
       };
     }
-    // Hidden from the stream, but the mention signals still reach people.
     return { events: [{ ...base, hidden: true }] };
   }
   if (e.thread_ts && e.thread_ts !== e.ts) {
@@ -271,7 +265,6 @@ export const HistoryPage = z.object({
   messages: z.array(z.looseObject({ ts: z.string() })),
 });
 
-// Slack also says a message changed when it only added a link preview.
 function unchangedEdit(e: SlackEvent) {
   return (
     e.subtype === "message_changed" &&
@@ -289,13 +282,11 @@ function addressedToBot(text: string, botUserId: unknown) {
   );
 }
 
-// A message's ts is its send time in seconds; one that isn't a time leaves the delivery's.
 function sentAt(ts: string, receivedAt: Date) {
   const at = new Date(Number(ts) * 1000);
   return at.getTime() > 0 ? at : receivedAt;
 }
 
-// The same rules as live messages, so a message read back gets the same id and the same verdict.
 export function normalizeHistory(
   payload: unknown,
   settings: Record<string, unknown>,
@@ -330,7 +321,6 @@ export function normalizeHistory(
   }
   return {
     events,
-    // The count is in `skipped`: a reason with a number in it would be a new reason each time.
     ignored: events.length === 0 ? "messages without work updates" : undefined,
     skipped,
   };

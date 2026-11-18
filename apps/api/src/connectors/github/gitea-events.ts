@@ -2,7 +2,6 @@ import { z } from "zod";
 
 import type { Payload } from "./events";
 
-// Gitea and Forgejo name review webhooks after the verdict, and older servers without "review".
 const VERDICTS = new Map([
   ["pull_request_approved", "approved"],
   ["pull_request_review_approved", "approved"],

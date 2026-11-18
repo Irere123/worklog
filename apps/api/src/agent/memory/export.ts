@@ -6,7 +6,6 @@ import { getWorkspaceById } from "#db/queries/workspaces";
 import { VISIBILITY } from "#db/schema";
 import { lastLocalDate, localDate, timezoneOf } from "#lib/time";
 
-// Years of nightly journals and digests fit well inside this.
 const MAX_EXPORTED = 10_000;
 
 export type MemoryFile = { path: string; content: string };

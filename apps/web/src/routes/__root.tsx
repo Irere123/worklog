@@ -28,12 +28,9 @@ export const Route = createRootRouteWithContext<RouterContext>()({
       { charSet: "utf-8" },
       {
         name: "viewport",
-        // resizes-content: Android's keyboard shrinks the layout as iOS's does, so the composer
-        // and quick log stay above it.
         content:
           "width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content",
       },
-      // The phone's status bar continues the mobile bar (the sidebar token) in each scheme.
       {
         name: "theme-color",
         media: "(prefers-color-scheme: light)",
@@ -51,8 +48,6 @@ export const Route = createRootRouteWithContext<RouterContext>()({
         name: "description",
         content: "What your team and its agents are working on.",
       },
-      // The shell is the only HTML a link preview sees, whichever page was shared, so the card
-      // lives here. Relative: a self-hosted server doesn't know its public address at build time.
       { property: "og:title", content: "Worklog · Your team’s logbook" },
       {
         property: "og:description",
@@ -69,8 +64,6 @@ export const Route = createRootRouteWithContext<RouterContext>()({
       { rel: "manifest", href: "/manifest.webmanifest" },
       { rel: "apple-touch-icon", href: "/apple-touch-icon.png" },
       { rel: "icon", href: "/favicon.svg", type: "image/svg+xml" },
-      // The stylesheets only ask for a font once text renders, after the app has booted;
-      // fetching the Latin files up front saves that wait and the reflow when they swap in.
       ...[interLatinUrl, monoLatinUrl].map((href) => ({
         rel: "preload",
         href,
@@ -88,8 +81,6 @@ export const Route = createRootRouteWithContext<RouterContext>()({
     scripts: [
       { children: THEME_SCRIPT },
       { children: BOOT_SCRIPT },
-      // Routes load lazily, so their rules compile after the first stylesheet fetch; the runtime
-      // refetches it whenever new rules appear.
       ...(import.meta.env.DEV
         ? [{ type: "module", src: "/@id/virtual:stylex:runtime" }]
         : []),
@@ -100,8 +91,6 @@ export const Route = createRootRouteWithContext<RouterContext>()({
   notFoundComponent: NotFound,
 });
 
-// Agentation's toolbar, for pointing at the screen while giving feedback in development. Loaded
-// only there, so a production build never includes it.
 const Feedback = import.meta.env.DEV
   ? lazy(async () => {
       const { Agentation } = await import("agentation");
@@ -132,7 +121,6 @@ function Root() {
 
 function Document({ children }: { children: ReactNode }) {
   return (
-    // The theme script sets color-scheme before hydration, so the attribute differs on purpose.
     <html lang="en" suppressHydrationWarning>
       <head>
         <HeadContent />

@@ -351,7 +351,6 @@ const styles = stylex.create({
     flexGrow: 1,
     minWidth: 0,
   },
-  // A phone lets a line's title wrap rather than cutting it to a few letters.
   head: {
     display: "flex",
     flexWrap: {

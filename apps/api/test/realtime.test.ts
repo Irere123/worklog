@@ -17,10 +17,8 @@ describe("realtime across processes", () => {
   test("an event another process publishes reaches this one's listeners, once", async () => {
     const owner = await env.workspace();
     const workspaceId = owner.workspace.id as string;
-    // A second process's bus: its own listeners, the same database.
     const elsewhere = new EventBus(env.ctx.db as Db);
     const got: StoredEvent[] = [];
-    // Published before it started listening: history, not news.
     await env.ctx.bus.publish({
       workspaceId,
       type: "activity.created",
@@ -67,7 +65,6 @@ describe("realtime across processes", () => {
       }
     });
     const stop = await elsewhere.listen({ everyMs: 10 });
-    // Holds every read of the table until released.
     const blocker = await env.ctx.pool.connect();
     await blocker.query("begin");
     await blocker.query("lock table events in access exclusive mode");

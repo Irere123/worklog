@@ -10,8 +10,6 @@ import { color, font, leading, radius, space, text } from "./tokens.stylex";
 
 marked.setOptions({ gfm: true, breaks: true });
 
-// Briefs, card bodies and replies quote text from Slack, GitHub and teammates: sanitize before
-// it reaches the DOM, and open links outside the app.
 DOMPurify.addHook("afterSanitizeAttributes", (node) => {
   if (node.tagName === "A") {
     node.setAttribute("target", "_blank");
@@ -60,7 +58,6 @@ export function StreamingMarkdown({
     <div onClick={openCard} {...stylex.props(styles.prose)}>
       {blocks.map((block, i) => (
         <Block
-          // Blocks only ever grow at the end, so their positions are stable keys.
           // oxlint-disable-next-line react/no-array-index-key -- see above
           key={i}
           source={
@@ -83,11 +80,8 @@ function BlockHtml({ source }: { source: string }) {
   );
 }
 
-// A settled block's text never changes, so it never renders again.
 const Block = memo(BlockHtml);
 
-// Recently rendered sources, newest last: moving back and forth through an inbox or a thread
-// shows the same bodies again, and parsing and sanitizing is the slow part of drawing them.
 const rendered = new Map<string, string>();
 const RENDERED_KEPT = 200;
 
@@ -113,7 +107,6 @@ function render(source: string) {
   return html;
 }
 
-// Top-level blocks are separated by a blank line outside a code fence.
 function splitBlocks(source: string) {
   const blocks: string[] = [];
   let current: string[] = [];
@@ -184,12 +177,9 @@ function useOpenCard() {
   };
 }
 
-// "#8" where a brief or reply names a card, but not "PR #31" or "issue #4": those are the
-// source's numbers, not Worklog's.
 const CARD_REF =
   /(?<!\b(?:PR|MR|pr|mr|[Ii]ssue|[Pp]ull)\s)(?<![\w/#&])#(?<number>\d+)\b/gu;
 
-/** Card references become in-app links; text inside code and existing links is left alone. */
 function linkCards(fragment: DocumentFragment) {
   const walker = document.createTreeWalker(fragment, NodeFilter.SHOW_TEXT);
   const texts: Text[] = [];
@@ -200,8 +190,6 @@ function linkCards(fragment: DocumentFragment) {
   }
   for (const node of texts) {
     const value = node.data;
-    // matchAll, not test(): test() on a global regex moves lastIndex, and matchAll copies it,
-    // which would skip the first reference.
     const matches = [...value.matchAll(CARD_REF)];
     if (matches.length === 0) {
       continue;
@@ -222,7 +210,6 @@ function linkCards(fragment: DocumentFragment) {
     parts.append(value.slice(last));
     node.replaceWith(parts);
   }
-  // A command or snippet is copied whole, without selecting around the box.
   for (const pre of fragment.querySelectorAll("pre")) {
     const copy = document.createElement("button");
     copy.type = "button";
@@ -236,8 +223,6 @@ function linkCards(fragment: DocumentFragment) {
 }
 
 const styles = stylex.create({
-  // Keys here are descendant selectors. StyleX scopes only the first part of a selector list, so
-  // each key is one selector with :is() inside it.
   prose: {
     fontSize: text.copy,
     lineHeight: leading.copy,
@@ -310,7 +295,6 @@ const styles = stylex.create({
       marginBlock: space.xl,
     },
     ":is(*) strong": { fontWeight: 600 },
-    // Wide tables scroll inside their own box rather than widening the page.
     ":is(*) table": {
       display: "block",
       maxWidth: "100%",
@@ -332,7 +316,6 @@ const styles = stylex.create({
       borderBottomColor: color.line,
       textAlign: "left",
       verticalAlign: "top",
-      // The prose may break anywhere; cells wrap at words, and the table scrolls instead.
       overflowWrap: "normal",
       minWidth: 72,
     },

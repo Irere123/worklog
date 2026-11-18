@@ -36,13 +36,7 @@ import { generateId } from "#lib/ids";
 import { mustCompactNow } from "./compaction";
 import { presenceChanged } from "./presence";
 
-/**
- * How long a conversation stays quiet before the assistant learns from it and compacts it: long
- * enough that the person has likely stepped away, so neither runs while they wait on a reply or
- * changes the prompt's cached prefix between their turns.
- */
 const SETTLE_AFTER_MS = 10 * 60_000;
-/** A conversation that never goes quiet for that long still settles this often. */
 const SETTLE_AT_MOST_MS = 60 * 60_000;
 
 export async function createConversation(
@@ -78,7 +72,6 @@ export async function createConversation(
   return row;
 }
 
-// Only the asker can read or continue a conversation.
 export async function getConversation(
   ctx: AppContext,
   viewer: Member,
@@ -115,7 +108,6 @@ export async function markConversationSeen(
   });
 }
 
-// What the model replays: the messages after the recap, which travels in the instructions.
 export async function loadHistory(
   ctx: AppContext,
   conversation: ConversationRow
@@ -136,10 +128,6 @@ export function isModelMessage(value: unknown): value is ModelMessage {
   );
 }
 
-// Append-only: history is replayed verbatim every turn until it outgrows its budget, then a job
-// folds the older part into a recap once the conversation goes quiet. The conversation row is
-// locked while sequence numbers are assigned, so a brief landing mid-turn can't collide with a turn
-// after the model call was already paid for.
 const TITLE_MAX = 60;
 
 /** What the person first asked, flattened and cut at a word, as the conversation's name. */
@@ -185,12 +173,8 @@ export async function appendMessages(
         seq: next + i,
         role: m.role,
         content: m,
-        // What the person typed, without what Worklog added around it for the model (the time,
-        // the open loops, which quote titles other people wrote): it's what clients show, and
-        // all that memory may take as their words.
         text:
           leads(i, m) && opts.said !== undefined ? opts.said : displayText(m),
-        // The id names what the client sent, which leads the turn.
         clientId: leads(i, m) ? (opts.clientId ?? null) : null,
         usage: i === items.length - 1 ? (opts.usage ?? null) : null,
         createdAt: tx.now(),
@@ -206,8 +190,6 @@ export async function appendMessages(
       set: {
         updatedAt: tx.now(),
         ...(replied ? { repliedAt: tx.now() } : {}),
-        // Named once, after what the person first asked, so a list of conversations can be told
-        // apart; later turns never rename it.
         ...(next === 1 && conversation.title === null && opening
           ? { title: titleFrom(opening) }
           : {}),
@@ -260,7 +242,6 @@ export async function appendMessages(
   return rows;
 }
 
-// Every append or rating puts it off again, so it runs once, after the last of them.
 async function settleLater(
   ctx: AppContext,
   conversation: ConversationRow,
@@ -408,7 +389,6 @@ export async function answeredBefore(
   });
   const next = after.findIndex((m) => m.role === "user");
   const turn = next === -1 ? after : after.slice(0, next);
-  // The whole reply, joined as the stored transcript shows it, not only its last paragraph.
   return turn
     .flatMap((m) => (m.role === "assistant" && m.text ? [m.text] : []))
     .join("\n\n");
@@ -432,7 +412,6 @@ function displayText(m: ModelMessage): string | null {
   return text || null;
 }
 
-// Deliveries are written into the transcript so follow-ups like "tell me more about #12" have context.
 export async function postToInbox(
   ctx: AppContext,
   owner: Member,

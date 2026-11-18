@@ -55,7 +55,6 @@ function write(level: Level, message: string, fields: LogFields = {}) {
   });
 }
 
-// An error line is an issue even without an error object; any line with one can be grouped.
 function errorColumns(level: Level, message: string, error: unknown) {
   if (error === undefined) {
     return {
@@ -100,8 +99,6 @@ function print(
   }
 }
 
-// Logging must never throw into its caller, so a field that won't serialize (a cycle, a BigInt)
-// is written as text instead.
 function field(value: unknown): string | number | boolean {
   if (typeof value === "number" || typeof value === "boolean") {
     return value;

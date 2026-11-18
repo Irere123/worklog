@@ -49,7 +49,6 @@ function AnswerForm({
 }) {
   const id = useId();
   const input = useRef<HTMLTextAreaElement>(null);
-  // A card open over the inbox owns the keyboard, as it does for the inbox's other keys.
   const free = useSearch({
     from: "/_app",
     select: (search) => search.card === undefined,

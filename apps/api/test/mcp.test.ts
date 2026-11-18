@@ -18,7 +18,6 @@ const ORIGIN = "https://worklog.test";
 const RESOURCE = `${ORIGIN}/mcp`;
 const REDIRECT = "http://127.0.0.1:33418/callback";
 
-// The browser's half of a sign-in, for requests that also carry an API key.
 const cookies = new Map<string, string>();
 
 async function signIn(email: string) {
@@ -42,7 +41,6 @@ async function signIn(email: string) {
   throw new Error(`No sign-in link reached ${email}`);
 }
 
-/** What an MCP client does on its own: register, as Claude Code does without a metadata document. */
 async function register(name: string) {
   const res = await env.app.request("/api/auth/oauth2/register", {
     method: "POST",
@@ -59,10 +57,6 @@ async function register(name: string) {
   return ((await res.json()) as { client_id: string }).client_id;
 }
 
-/**
- * The browser half of connecting: the client opens the authorize URL, Worklog sends the signed-in
- * person to the approval page, and approving sends the browser back to the client with a code.
- */
 async function approve(
   session: string,
   clientId: string,
@@ -133,7 +127,6 @@ async function approve(
 
 let rpcId = 0;
 
-/** One JSON-RPC call to /mcp, as a 2025-era client makes it. */
 async function rpc(token: string, method: string, params: unknown = {}) {
   rpcId += 1;
   const res = await env.app.request("/mcp", {
@@ -222,7 +215,6 @@ describe("coding agents over MCP", () => {
       { token: session }
     );
     expect(approval.body.signedInAs).toBe("ada@larkspur.test");
-    // The web app may also hold an API key; the OAuth server only sees the session, so must this.
     const approvalPath = `/v1/agent-approval?clientId=${encodeURIComponent(clientId)}`;
     const byKey = await env.call("GET", approvalPath, { token: ws.token });
     expect(byKey.status).toBe(401);
@@ -291,7 +283,6 @@ describe("coding agents over MCP", () => {
     const waiting = await call(tokens.access_token, "check_in", { thread });
     expect(waiting.value.status).toBe("waiting");
 
-    // A second laptop registers its own client, and joins the agent Ada already has.
     const again = await approve(session, await register("Claude Code"));
     await call(again.access_token, "report_progress", {
       state: "working",
@@ -324,7 +315,6 @@ describe("coding agents over MCP", () => {
         .body as any[]
     ).find((i) => i.kind === "agent.needs_you");
 
-    // The agent holds one call open rather than polling, and hears the answer as it lands.
     const started = Date.now();
     const holding = call(tokens.access_token, "check_in", { thread, wait: 20 });
     await Bun.sleep(100);
@@ -352,7 +342,6 @@ describe("coding agents over MCP", () => {
       ],
     });
 
-    // Agents ask for credentials, so the answer stays out of teammates' feeds.
     const jean = await env.teammate(ws.token, "Jean Ndayisaba");
     const seen = await env.call(
       "GET",
@@ -363,7 +352,6 @@ describe("coding agents over MCP", () => {
     );
     expect(seen.body).toEqual([]);
 
-    // A new question on the same thread starts with no answers, not the last one's.
     await call(tokens.access_token, "report_progress", {
       state: "needs_you",
       title: "And for the mobile app?",
@@ -375,7 +363,6 @@ describe("coding agents over MCP", () => {
       next: "Not answered yet. check_in with wait: 50 to hold for it.",
     });
 
-    // With no answer, a hold ends when its time does.
     const before = Date.now();
     const unheard = await call(tokens.access_token, "check_in", {
       thread,
@@ -384,7 +371,6 @@ describe("coding agents over MCP", () => {
     expect(unheard.value).toEqual({ status: "waiting" });
     expect(Date.now() - before).toBeGreaterThanOrEqual(900);
 
-    // The same question sent again, as a client's retry would, doesn't reopen it once answered.
     const mobile = (
       (await env.call("GET", "/v1/attention", { token: ws.token }))
         .body as any[]
@@ -432,7 +418,6 @@ describe("coding agents over MCP", () => {
         (await env.call("GET", "/v1/attention", { token: ws.token }))
           .body as Item[]
       ).filter((i) => i.kind === "agent.needs_you");
-    // Each blocks the work Eli gave it, so none waits for a digest.
     expect((await questions()).map((q) => q.priority)).toEqual([
       "high",
       "high",
@@ -443,7 +428,6 @@ describe("coding agents over MCP", () => {
     expect(fourth.isError).toBe(true);
     expect(fourth.text).toContain("hasn't answered 3 of your questions");
     expect(fourth.text).toContain(queue);
-    // Asking again on a thread already waiting adds nothing to the pile.
     const followUp = await ask("Which queue, given the new limits?", queue);
     expect(followUp.isError).toBe(false);
 
@@ -481,7 +465,6 @@ describe("coding agents over MCP", () => {
       (await call(tokens.access_token, "report_progress", args)).value
         .thread as string;
 
-    // Agents often report before they've looked the card up.
     const thread = await report({ state: "working", title: "Exporting" });
     await report({ state: "needs_you", title: "CSV or PDF?", thread, card: 1 });
     await report({ state: "finished", title: "Exported as CSV", thread });
@@ -498,7 +481,6 @@ describe("coding agents over MCP", () => {
       ["needs_you", 1],
       ["working", 1],
     ]);
-    // The thread's one inbox item, now saying it's finished, opens on the card too.
     const [item] = (await env.call("GET", "/v1/attention", { token: ws.token }))
       .body as any[];
     expect(item).toMatchObject({ kind: "agent.finished", cardNumber: 1 });
@@ -527,7 +509,6 @@ describe("coding agents over MCP", () => {
     const report = async (args: Record<string, unknown>) =>
       (await call(tokens.access_token, "report_progress", args)).value
         .thread as string;
-    // Two sessions of one tool are one agent.
     const exporting = await report({
       state: "working",
       title: "Exporting",
@@ -734,7 +715,6 @@ describe("coding agents over MCP", () => {
     });
     expect(refresh.status).toBe(400);
 
-    // Approving again (the consent was revoked, so Cy is asked) brings the same agent back.
     await Bun.sleep(1100);
     const second = await approve(session, clientId);
     const back = await rpc(second.access_token, "tools/list");

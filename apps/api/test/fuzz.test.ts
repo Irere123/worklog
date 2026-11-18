@@ -3,10 +3,6 @@ import { describe, expect, test } from "bun:test";
 import { getConnector } from "#connectors";
 import type { ConnectionView, WorklogEvent } from "#connectors/types";
 
-// Payloads are only signature-verified, never schema-validated, and a normalizer that throws or
-// returns an event Postgres can't store fails its whole delivery on every attempt. So: real-looking
-// payloads, broken at random, must still come out as storable events or a reason to ignore them.
-
 const now = new Date("2026-10-27T12:00:00Z");
 const user = { login: "emma-gh", id: 101, type: "User" };
 const repository = { id: 501, full_name: "acme/api", default_branch: "main" };
@@ -120,7 +116,6 @@ const githubSeeds: [string, unknown][] = [
     },
   ],
   ["issues", { action: "opened", repository, sender: user, issue }],
-  // GitHub allows a missing author; the issue still happened.
   [
     "issues",
     {
@@ -311,7 +306,6 @@ const giteaSeeds: [string, unknown][] = [
   ],
 ];
 
-// A self-hosted GitLab through the no-code connector: its rules read whatever paths they name.
 const gitlab = {
   verify: { type: "token", header: "X-Gitlab-Token" },
   identityNamespace: "gitlab:git.example.com",
@@ -378,8 +372,6 @@ const JUNK: unknown[] = [
   "a".repeat(20_000),
 ];
 
-// Deterministic, so a failure can be replayed from its seed. In BigInt: the product overflows a
-// double's precision, and then every draw comes out even.
 function random(seed: number) {
   let state = BigInt(seed);
   return (n: number) => {
@@ -477,8 +469,6 @@ function fuzz(
     secrets: {},
   };
   const failures: string[] = [];
-  // Unbroken, every seed is something worth recording: a parser that dropped everything would
-  // pass the rest.
   for (const [eventType, payload] of seeds) {
     const out = connector.normalize(
       { eventType, payload, receivedAt: now },

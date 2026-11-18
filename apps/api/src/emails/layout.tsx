@@ -13,7 +13,6 @@ import {
   Text,
 } from "react-email";
 
-// The web app's light tokens in hex: mail clients don't read oklch() or CSS variables.
 export const palette = {
   page: "#faf9f7",
   line: "#e4e2de",
@@ -24,7 +23,6 @@ export const palette = {
 
 const sans =
   '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
-// Newsreader where the reader has it, as on the front page; web fonts aren't loaded in mail.
 const serif = 'Newsreader, Georgia, "Times New Roman", serif';
 
 /**

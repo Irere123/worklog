@@ -2,8 +2,6 @@ import { useEffect } from "react";
 
 import { markMarkup } from "#ui/logo-mark";
 
-// The logo's own geometry, so the badged icon is the same mark with a count, not a different one.
-// A tab draws it at 16px, so the cuts are sized for that.
 const LOGO = `<svg width="32" height="32" viewBox="0 0 100 100">${markMarkup(16)}</svg>`;
 
 /**
@@ -12,8 +10,6 @@ const LOGO = `<svg width="32" height="32" viewBox="0 0 100 100">${markMarkup(16)
  */
 export function useTabBadge(count: number) {
   useEffect(() => {
-    // Its own link, last in <head> so the browser prefers it. React re-renders the plain icon
-    // into <head> whenever it likes, so the badge moves back to the end each time.
     const link = document.createElement("link");
     link.rel = "icon";
     link.type = "image/svg+xml";
@@ -34,7 +30,6 @@ export function useTabBadge(count: number) {
 }
 
 function badged(count: number) {
-  // Past nine the digits blur at 16px; the amber dot alone still says "something's waiting".
   const label =
     count <= 9
       ? `<text x="24" y="11.4" text-anchor="middle" font-family="system-ui,sans-serif" font-size="11" font-weight="700" fill="#2a1a00">${count}</text>`

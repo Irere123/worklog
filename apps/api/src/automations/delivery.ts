@@ -91,11 +91,6 @@ export async function createTarget(
 
 const Channel = z.object({ guild_id: z.string().optional() });
 
-/**
- * Discord servers that added the server's app share its one bot, which can post wherever it's
- * been added: a target must be a channel in this connection's own server, or one workspace could
- * post into another's.
- */
 async function requireOwnChannel(
   ctx: AppContext,
   provider: string,
@@ -116,7 +111,6 @@ async function requireOwnChannel(
       token
     );
   } catch (error) {
-    // The bot can't see a channel it isn't in; anything else is Discord's answer, passed on.
     if (
       error instanceof ProviderError &&
       (error.status === 403 || error.status === 404)
@@ -177,7 +171,6 @@ export async function deleteTarget(
   }
 }
 
-// Failures are collected, not thrown, so one bad channel can't block the rest.
 export async function deliver(
   ctx: AppContext,
   memberId: string,
@@ -210,9 +203,6 @@ export async function deliver(
   return { delivered, failed };
 }
 
-// Private only when the member alone certainly reads it: their own email address, or a Slack DM to
-// their own linked user. A channel, Discord or a webhook could reach anyone, so they start as team
-// until the member says otherwise.
 async function readBy(
   ctx: AppContext,
   member: Member,
@@ -248,13 +238,9 @@ async function botToken(
   if (!conn) {
     throw new Error("Connection no longer exists");
   }
-  // Paused means record nothing, not say nothing: briefs still go out.
   if (conn.status === "revoked" || conn.status === "suspended") {
     throw new Error(`The ${conn.provider} connection is ${conn.status}`);
   }
-  // A Discord server that added the server's app posts as that app's one bot. Installing created
-  // the app's row, so it's read directly (ingest/apps would load the connector registry, which
-  // imports this module), and every process brings env-sourced rows up to date when it starts.
   const app = conn.externalId
     ? await findConnectorApp(ctx.db, { provider: conn.provider })
     : undefined;
@@ -267,9 +253,6 @@ async function botToken(
   return { connectionId, token, own: own !== undefined };
 }
 
-// A connection's own token the provider refused revokes it and tells whoever installed it, so a
-// dead bot doesn't fail every brief in silence. The app's shared bot token is about the app, not
-// this connection: refused, it fails the send and revokes nothing.
 async function asBot(
   ctx: AppContext,
   bot: { connectionId: string; own: boolean },
@@ -330,7 +313,6 @@ async function sendTo(ctx: AppContext, target: TargetRow, message: Outgoing) {
       const body = JSON.stringify({
         content,
         allowed_mentions: { parse: [] },
-        // SUPPRESS_EMBEDS: no link previews fetched on our behalf.
         flags: 4,
       });
       if (target.address.startsWith("https://")) {

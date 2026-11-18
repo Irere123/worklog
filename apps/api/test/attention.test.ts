@@ -14,7 +14,6 @@ beforeEach(() => {
   env.reset();
 });
 
-// YYYY-MM-DDTHH:MM on the harness's default workspace clock.
 function kigaliMinute(date: Date) {
   return new Intl.DateTimeFormat("sv-SE", {
     timeZone: "Africa/Kigali",
@@ -81,7 +80,6 @@ describe("interruption budget", () => {
     const held = await runCheck();
     expect(held).toMatchObject({ status: "quiet" });
     expect(held.summary).toContain("Holding");
-    // Still unconsidered — it'll be decided after the gap.
     const items = (await env.call("GET", "/v1/attention", { token: sam.token }))
       .body;
     expect(items.filter((i: any) => i.disposition === null).length).toBe(1);
@@ -187,7 +185,6 @@ describe("learning from what people do", () => {
         },
       },
     });
-    // A different sender each time: one sender's third urgent item in a day isn't urgent any more.
     let n = 0;
     const mentionFromSomeone = async () => {
       n += 1;
@@ -277,7 +274,6 @@ describe("follow-ups", () => {
 
     await mentionSam();
     expect((await runCheck()).status).toBe("delivered");
-    // A scheduled check before then still comes back at that minute, not half an hour on.
     await runAutomation(
       env.ctx,
       (await findAutomationById(env.ctx.db, { id: check.id }))!
@@ -345,7 +341,6 @@ describe("follow-ups", () => {
       .body;
     const followUp = items.find((i: any) => i.kind === "follow_up");
     expect(followUp.disposition).toBe("push");
-    // Held for the next check after the gap, not decided.
     expect(
       items.filter((i: any) => i.kind !== "follow_up" && i.disposition === null)
     ).toHaveLength(1);

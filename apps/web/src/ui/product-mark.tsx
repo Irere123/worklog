@@ -2,11 +2,6 @@ import * as stylex from "@stylexjs/stylex";
 
 import { product } from "./tokens.stylex";
 
-// Paths are the products' own marks, as Simple Icons (CC0; Copilot's is GitHub's Octicon, MIT) and
-// GitLab's press kit publish them.
-// Phosphor redraws logos in its own stroke, and Gitea and others it lacks, so a feed of them read
-// as generic glyphs rather than the tools people use.
-
 type Part = { d: string; fill: keyof typeof fills };
 
 const MARKS = {

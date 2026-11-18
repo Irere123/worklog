@@ -29,6 +29,7 @@ import { generateToken, hashToken } from "#lib/crypto";
 import { badRequest, conflict, forbidden, notFound } from "#lib/errors";
 import { generateId } from "#lib/ids";
 import { isValidTimeZone } from "#lib/time";
+import { log } from "#telemetry/log";
 
 function slugify(value: string) {
   return (
@@ -73,7 +74,6 @@ async function createWorkspace(
   const workspace: Workspace = {
     id: generateId(),
     name: input.name,
-    // Ids mix cases; slugs, which go in URLs, don't.
     slug: `${slugify(input.name)}-${generateId().slice(-6).toLowerCase()}`,
     timezone,
     entropyDays: 30,
@@ -146,14 +146,12 @@ export async function createWorkspaceForUser(
   });
 }
 
-// Claimed on sign-in with the same verified email (magic link, or a provider reporting a verified address).
 export async function claimMemberships(ctx: AppContext, user: SignedInUser) {
   if (!user.emailVerified) {
     return 0;
   }
   const pending = await listPendingInvites(ctx.db, { email: user.email });
   const memberships = await listMemberships(ctx.db, { userId: user.id });
-  // One member per user and workspace: of several invites to one workspace, the first wins.
   const joined = new Set(memberships.map((m) => m.member.workspaceId));
   const ids: string[] = [];
   for (const m of pending) {
@@ -163,7 +161,6 @@ export async function claimMemberships(ctx: AppContext, user: SignedInUser) {
     }
   }
   await setMembersUser(ctx.db, { ids, userId: user.id });
-  // A provider's photo (Google, GitHub) is a starting picture wherever they have none yet.
   if (user.image) {
     await fillMemberAvatars(ctx.db, {
       ids: [...memberships.map((m) => m.member.id), ...ids],
@@ -328,13 +325,7 @@ export async function authenticate(ctx: AppContext, token: string) {
   if (!row) {
     return null;
   }
-  // Fire-and-forget bookkeeping; never block a request on it.
-  void updateTokenById(ctx.db, {
-    id: row.tokenId,
-    set: { lastUsedAt: ctx.now() },
-  }).catch(() => {
-    // Best effort: a missed lastUsedAt update is harmless.
-  });
+  void recordTokenUse(ctx, row.tokenId);
   return { member: row.member, scopes: row.scopes.filter(isApiScope) };
 }
 
@@ -370,4 +361,12 @@ export async function revokeToken(
     id: tokenId,
     set: { revokedAt: ctx.now() },
   });
+}
+
+async function recordTokenUse(ctx: AppContext, id: string) {
+  try {
+    await updateTokenById(ctx.db, { id, set: { lastUsedAt: ctx.now() } });
+  } catch (error) {
+    log.warn("members: couldn't record token use", { error });
+  }
 }

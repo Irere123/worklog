@@ -1,10 +1,10 @@
 import { useSyncExternalStore } from "react";
 
+import { store } from "./storage";
+
 const KEY = "worklog.sidebar";
 const NARROW = "(max-width: 860px)";
 const listeners = new Set<() => void>();
-// Storage only seeds the first read: a write it refuses (blocked, or over quota) must still
-// take effect for this visit.
 let folded: boolean | undefined;
 
 /** Whether the sidebar is folded to a rail of icons; remembered per browser. */
@@ -14,15 +14,7 @@ export function useSidebarFolded(): boolean {
 
 export function setSidebarFolded(next: boolean) {
   folded = next;
-  try {
-    if (next) {
-      localStorage.setItem(KEY, "folded");
-    } else {
-      localStorage.removeItem(KEY);
-    }
-  } catch {
-    // Blocked storage only costs remembering it next visit.
-  }
+  store(KEY, next ? "folded" : null);
   for (const listener of listeners) {
     listener();
   }

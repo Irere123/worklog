@@ -10,7 +10,6 @@ import { DEPLOY } from "./links";
 import { useReducedMotion } from "./script";
 import { focus, page, type } from "./styles";
 
-// Short enough to hold one line on a phone: the cell keeps the height of one line, never two.
 const ENDINGS = [
   "that writes itself.",
   "for people and agents.",
@@ -44,7 +43,6 @@ export function Hero() {
         <h1 {...stylex.props(type.display, styles.title)}>
           Your team’s logbook
           <span {...stylex.props(styles.endings)}>
-            {/* Every ending is laid out in one cell, so the line keeps the width of the longest. */}
             {ENDINGS.map((ending, at) => (
               <span
                 key={ending}
@@ -137,14 +135,11 @@ const styles = stylex.create({
   badgeArrow: {
     color: color.fgFaint,
   },
-  // The front page's headline stands a size above the other pages' titles.
   title: {
     display: "flex",
     flexDirection: "column",
     alignItems: "center",
     maxWidth: 720,
-    // A phone scales the line with the screen, so the longest ending, which can't wrap, still fits
-    // a 360px screen.
     fontSize: {
       default: 54,
       "@media (max-width: 768px)": 46,
@@ -159,7 +154,6 @@ const styles = stylex.create({
   endings: {
     display: "grid",
     width: "100%",
-    // As grey as large type can go and still read: 3:1 against the page.
     color: "oklch(0.22 0.01 80 / 0.52)",
     whiteSpace: "nowrap",
   },
@@ -209,8 +203,6 @@ const styles = stylex.create({
     gap: space.xxl,
     width: "100%",
   },
-  // On a phone the two buttons stack, full width: side by side they fit or wrap depending on
-  // which font has arrived, and the page would jump when Inter swaps in.
   actions: {
     display: "flex",
     flexDirection: {
@@ -228,7 +220,6 @@ const styles = stylex.create({
       "@media (max-width: 768px)": 384,
     },
   },
-  // Full width when the pair stacks on a phone.
   action: {
     width: {
       default: "auto",

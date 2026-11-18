@@ -35,7 +35,6 @@ export async function findInstallState(
   return row;
 }
 
-// Deleting is the read, so a state works once even when two callbacks race.
 export async function deleteInstallState(
   db: DbOrTx,
   params: {

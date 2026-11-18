@@ -46,20 +46,10 @@ export type ReportStep = (step: Omit<TurnStep, "at">) => void;
 
 type Owner = { workspaceId: string; ownerId: string };
 
-/**
- * Longer than a routine takes: a run that died without clearing its mark stops counting as work
- * after this, as the scheduler's own lease does.
- */
 const RUN_STALE_MS = 15 * 60_000;
 
-// A step's input is shown as a few words ("Searched activity for “blocked”"); long text isn't.
 const STEP_TEXT_CHARS = 200;
 
-/**
- * Snapshots for one owner go out one at a time, in order. A change that arrives while one waits to
- * start rides on it: that read hasn't begun, so it will see the change. Parallel tool calls and a
- * turn ending as a routine starts cost one read, not one each.
- */
 const queued = new Map<string, Promise<void>>();
 const sending = new Map<string, Promise<void>>();
 
@@ -107,8 +97,6 @@ export async function assistantPresence(
         : []
     ),
   ];
-  // The inbox thread's briefs and pings already reach people as notifications; done is for
-  // answers to what they asked.
   const done = unseen.flatMap((c) =>
     !c.inbox && c.repliedAt !== null
       ? [{ conversationId: c.id, title: c.title, at: c.repliedAt }]
@@ -164,7 +152,6 @@ export async function turnPresence(
   };
   void tell();
   const step: ReportStep = (taken) => {
-    // What a teammate's turn is doing stays theirs: the owner sees only that it runs.
     if (conversation.mode === "owner") {
       void record(taken);
     }
@@ -211,7 +198,6 @@ export function reportingSteps(tools: ToolSet, report: ReportStep): ToolSet {
   );
 }
 
-// Even with nothing to wait for, the await lets the caller mark this queued before it starts.
 async function sendAfter(
   before: Promise<void> | undefined,
   ctx: AppContext,
@@ -240,7 +226,6 @@ async function announce(ctx: AppContext, { workspaceId, ownerId }: Owner) {
   }
 }
 
-// In the owner's own conversation they are the asker; only a teammate's needs the agent looked up.
 async function ownerOf(ctx: AppContext, conversation: ConversationRow) {
   if (conversation.mode === "owner") {
     return conversation.askerId;

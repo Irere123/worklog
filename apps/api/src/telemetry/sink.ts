@@ -17,13 +17,8 @@ export type TelemetrySettings = {
 
 const FLUSH_MS = 2000;
 const BATCH_ROWS = 500;
-// What waits while Tinybird is unreachable. Past it the oldest rows go: telemetry must never be
-// what takes the process down.
 const MAX_QUEUED = 20_000;
-// A connection that hangs would otherwise hold every flush after it, and shutdown with them.
 const SEND_TIMEOUT_MS = 10_000;
-// After a failed send, the timer and a full batch wait this long before trying again, doubling
-// up to the cap, unless Tinybird said how long with Retry-After.
 const BACKOFF_MS = 2000;
 const MAX_BACKOFF_MS = 60_000;
 
@@ -44,8 +39,6 @@ const queues: Record<Datasource, string[]> = {
   logs: [],
   metrics: [],
 };
-// Counted since the process started, and sampled as metrics: rows that never reached Tinybird
-// must show up as missing, not pass for a quiet hour.
 const counts = { dropped: 0, quarantined: 0, failedSends: 0 };
 let timer: ReturnType<typeof setInterval> | null = null;
 let running: Promise<void> | null = null;
@@ -138,8 +131,6 @@ export async function flush(): Promise<void> {
   await queued;
 }
 
-// The timer's and a full batch's flush, which wait out a backoff instead of hammering Tinybird
-// while it's down.
 function flushSoon() {
   if (running !== null || Date.now() < pausedUntil) {
     return;
@@ -169,7 +160,6 @@ async function sendAll() {
       const batch = queue.splice(0, BATCH_ROWS);
       const outcome = await send(datasource, batch);
       if (outcome.retry) {
-        // Back to the front, to go with the next flush once the backoff is over.
         queue.unshift(...batch);
         counts.failedSends += 1;
         failures += 1;
@@ -216,7 +206,6 @@ async function send(datasource: Datasource, rows: string[]): Promise<Outcome> {
     if (res.status === 429 || res.status >= 500) {
       return { retry: true, retryAfterMs: retryAfterMs(res) };
     }
-    // Rows it refuses (a bad token, a schema mismatch) would be refused again: drop them.
     counts.dropped += rows.length;
     return { retry: false };
   } catch (error) {
@@ -225,8 +214,6 @@ async function send(datasource: Datasource, rows: string[]): Promise<Outcome> {
   }
 }
 
-// Accepted isn't stored: rows that don't fit the datasource's schema go to its quarantine, and
-// only the answer says so.
 function noteQuarantined(datasource: Datasource, body: string) {
   let quarantined = 0;
   try {
@@ -254,7 +241,6 @@ function retryAfterMs(res: Response) {
     : null;
 }
 
-// Through the console, never `log`: a log about failing to ship logs would queue another.
 function warn(message: string) {
   const now = Date.now();
   if (now - lastWarning < 60_000) {

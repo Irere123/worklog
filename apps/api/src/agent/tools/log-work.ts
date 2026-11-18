@@ -7,8 +7,6 @@ import { LOG_KINDS, logWork } from "#work/log";
 import { safe } from "./scope";
 import type { Scope } from "./scope";
 
-// Work logs are attributed to the owner: it is their work, told to their assistant. One the team
-// will see runs only once the review finds the owner told it; a private one is theirs alone.
 export function logWorkTool(scope: Scope) {
   const { ctx, owner } = scope;
   return tool({

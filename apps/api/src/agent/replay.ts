@@ -14,7 +14,6 @@ import { memoryPage } from "./memory";
 import { TIMEOUTS } from "./models";
 import { readTools } from "./tools";
 
-/** The messages before the rated question that a replay carries; enough to know what was meant. */
 const REPLAY_HISTORY = 40;
 
 /**

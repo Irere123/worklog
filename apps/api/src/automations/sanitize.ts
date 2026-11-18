@@ -1,5 +1,3 @@
-// Model-written text from untrusted inputs is an exfiltration channel (EchoLeak pattern: image or link URLs carrying secrets).
-// Drop images, keep a link only if its exact URL appeared in the source data (or is ours), escape raw HTML.
 export function sanitizeMarkdown(
   markdown: string,
   allowedUrls: Iterable<string>,

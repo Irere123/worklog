@@ -15,16 +15,12 @@ import * as appSchema from "./schema";
 export const schema = { ...appSchema, ...authSchema };
 export type Db = NodePgDatabase<typeof schema> & { $client: Pool };
 export type Tx = Parameters<Parameters<Db["transaction"]>[0]>[0];
-// What query functions take, so the same query runs alone or inside `transact`.
 export type DbOrTx = Db | Tx;
 
 const migrationsFolder = fileURLToPath(
   new URL("../../drizzle", import.meta.url)
 );
 
-// node-postgres, not Bun's native SQL driver: with Drizzle 0.45 it stores jsonb values as JSON
-// *strings* (oven-sh/bun#28819) — reads look fine, but `data->>'repo'` is null in SQL.
-// test/postgres.test.ts guards this.
 export async function openDb(
   url: string,
   poolSize = 10
@@ -45,10 +41,7 @@ export async function openDb(
   };
 }
 
-// A connection can drop (a server restart); unhandled, that error crashes the process.
 function logError(error: Error) {
-  // A connection's socket keeps the trace of the request that opened it; its error isn't that
-  // request's.
   outsideTrace(() => {
     log.error("db: connection error", { error });
   });

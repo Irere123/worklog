@@ -19,8 +19,6 @@ export type AttentionState = NonNullable<Query<"/v1/attention">["state"]>;
 
 const FEED_PAGE = 50;
 
-// Keys are arrays rooted at the resource name, so the live stream can invalidate a whole family
-// (every card list, whatever its filter) with one prefix.
 export const q = {
   authConfig: () =>
     queryOptions({
@@ -76,7 +74,6 @@ export const q = {
           })
         ),
     }),
-  // Under "now" so the live stream refreshes it with each person's; an object can't be a handle.
   teamNow: (days = 7) =>
     queryOptions({
       queryKey: ["now", { team: true }, days],
@@ -163,7 +160,6 @@ export const q = {
         await unwrap(api.GET("/v1/activities", { params: { query: filter } })),
     }),
 
-  // Under "activities" so the live stream refreshes it with the feed.
   activityCounts: (since: string) =>
     queryOptions({
       queryKey: ["activities", "counts", since],
@@ -181,7 +177,6 @@ export const q = {
           api.GET("/v1/attention", { params: { query: { state } } })
         ),
     }),
-  // Under "attention" so every write that refreshes the inbox refreshes this item too.
   attentionItem: (id: string) =>
     queryOptions({
       queryKey: ["attention", "item", id],
@@ -228,12 +223,7 @@ export const q = {
     queryOptions({
       queryKey: ["presence"],
       queryFn: async () => await unwrap(api.GET("/v1/assistant/presence")),
-      // Every change arrives whole on the event stream, which replays what a dropped connection
-      // missed. A read on focus now and then catches the little that changes with no event: a
-      // routine whose worker died, a snoozed request waking.
       staleTime: 5 * 60_000,
-      // A read and an event, or events from two server processes, can land out of order: the
-      // later snapshot stays, whichever arrived last.
       structuralSharing: (before: unknown, after: unknown) =>
         asOf(before) > asOf(after) ? before : replaceEqualDeep(before, after),
     }),

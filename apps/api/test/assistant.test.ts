@@ -27,7 +27,6 @@ const testUsage = {
   outputTokens: { total: 10, text: 10, reasoning: undefined },
 };
 
-// What the automatic review answers.
 function verdict(allow: boolean, reason: string) {
   return { text: JSON.stringify({ allow, reason }) };
 }
@@ -146,7 +145,6 @@ describe("assistant", () => {
       { token: owner.token, body: { message: "Anything else?" } }
     );
     expect(second.body.reply).toBe("Nothing else is in progress.");
-    // Turn 2 replays turn 1 verbatim (system prompt, tool call and result included) — never edited.
     expect(prompts[2].prompt.slice(0, prompts[1].prompt.length)).toEqual(
       prompts[1].prompt.map((m: any) => m)
     );
@@ -162,7 +160,6 @@ describe("assistant", () => {
       "user",
       "assistant",
     ]);
-    // Each reply carries the work that led to it, not the tools' full results.
     expect(thread.messages.map((m: any) => m.steps)).toEqual([
       [],
       [
@@ -477,7 +474,6 @@ describe("turns", () => {
     const thread = (
       await env.call("GET", `/v1/conversations/${id}`, { token: owner.token })
     ).body;
-    // What each person typed, as typed: the time and open loops went to the model, not the record.
     expect(thread.messages.map((m: any) => m.text)).toEqual([
       "Check the payments thread",
       "First answer",
@@ -903,8 +899,9 @@ describe("turns", () => {
       token: owner.token,
     });
     expect(stop.body).toEqual({ stopped: true });
-    while (!(await reader.read()).done) {
-      // Drains the stream until the stopped turn has ended it.
+    let drained = await reader.read();
+    while (!drained.done) {
+      drained = await reader.read();
     }
     let thread: any;
     for (let i = 0; i < 50; i += 1) {
@@ -996,8 +993,9 @@ describe("turns", () => {
     await env.call("POST", `/v1/conversations/${id}/stop`, {
       token: owner.token,
     });
-    while (!(await reader.read()).done) {
-      // Drains the stream until the stopped turn has ended it.
+    let drained = await reader.read();
+    while (!drained.done) {
+      drained = await reader.read();
     }
     let thread: any;
     for (let i = 0; i < 50; i += 1) {
@@ -1138,7 +1136,6 @@ describe("turns", () => {
     ]);
     env.ctx.models = { main: model, fast: model };
     const warnings: string[] = [];
-    // A log line is its message and then its fields.
     // oxlint-disable-next-line landmines-testing/no-test-doubles -- captures the log line under test instead of printing it
     const warn = spyOn(console, "warn").mockImplementation(
       (...parts: unknown[]) => {
@@ -1295,7 +1292,6 @@ describe("automatic review", () => {
       ).body.stage;
     expect(await stage()).toBe("active");
 
-    // Emma's own tap runs exactly what was proposed, with no model in between.
     const request = (
       await env.call("GET", "/v1/attention", { token: owner.token })
     ).body.find((i: any) => i.kind === "assistant.approval");
@@ -1303,7 +1299,6 @@ describe("automatic review", () => {
       `Your assistant wants to move #${card.number} to done`
     );
     expect(request.actions.map((a: any) => a.id)).toEqual(["allow", "deny"]);
-    // The conversation shows the move as waiting on that request, not as done.
     const thread = (
       await env.call(
         "GET",
@@ -1314,7 +1309,6 @@ describe("automatic review", () => {
     expect(thread.messages.at(-1).steps).toEqual([
       expect.objectContaining({ tool: "move_card", approvalId: request.id }),
     ]);
-    // The conversation can ask where that one request stands; nobody else can see it.
     const held = await env.call("GET", `/v1/attention/${request.id}`, {
       token: owner.token,
     });
@@ -1330,7 +1324,6 @@ describe("automatic review", () => {
       (await env.call("GET", "/v1/attention/metrics", { token: owner.token }))
         .status
     ).toBe(200);
-    // Sam can't approve it, and neither can the assistant.
     expect(
       (
         await env.call("POST", `/v1/attention/${request.id}/actions/allow`, {
@@ -1421,7 +1414,6 @@ describe("automatic review", () => {
     expect(JSON.stringify(prompts[2].prompt.at(-1))).toContain(
       "The check didn't answer"
     );
-    // Only the move was checked: the private log ran without asking anyone.
     const checks = prompts.filter((p) =>
       String(p.prompt[0].content).startsWith("You check an action")
     );
@@ -1471,7 +1463,6 @@ describe("routines the assistant suggests", () => {
     expect(request.title).toBe(
       'Your assistant wants to set up a routine "Friday reviews" (weekly at 16:00)'
     );
-    // The conversation offers the same Allow inline, as for a held write.
     const thread = (
       await env.call(
         "GET",
@@ -1586,7 +1577,6 @@ describe("tools", () => {
 describe("assistant step limit", () => {
   test("a turn cut off mid-tool-call says so, and the transcript records it", async () => {
     const owner = await env.workspace();
-    // Never stops calling tools
     const { model } = scriptedModel([{ tool: "team_directory", input: {} }]);
     env.ctx.models = { main: model, fast: model };
     const res = await env.call("POST", "/v1/conversations", {
@@ -1636,7 +1626,6 @@ describe("prompts", () => {
   });
 });
 
-// What the owner's tabs were told about their assistant.
 async function ownerEvents(owner: {
   member: { id: string };
   workspace: { id: string };
@@ -1650,7 +1639,6 @@ async function ownerEvents(owner: {
   return rows.filter((e) => e.type === "assistant.updated").map((e) => e.data);
 }
 
-// Announcing doesn't hold up a turn, so a snapshot lands a moment after what it reports.
 async function toldWhen(
   owner: Parameters<typeof ownerEvents>[0],
   matches: (presence: any) => boolean
@@ -1708,14 +1696,12 @@ describe("presence", () => {
         {
           kind: "reply",
           conversationId: id,
-          // Named from what was asked once the first turn is stored.
           title: null,
           step: { tool: "search_activity", input: { query: "blocked" } },
         },
       ],
     });
 
-    // Each change arrives whole, so an open tab never reads presence again.
     expect(
       await toldWhen(
         owner,
@@ -1851,7 +1837,6 @@ describe("presence", () => {
     turn.answering = false;
     await answer;
 
-    // Sam's answer is Sam's to see, not the owner's news.
     const later = (
       await env.call("GET", "/v1/assistant/presence", { token: owner.token })
     ).body;
@@ -1866,7 +1851,6 @@ describe("presence", () => {
 
   test("names the routine that runs next, and isn't working once a run is over", async () => {
     const owner = await env.workspace();
-    // The default routines run through the day: left on, which one is next depends on the clock.
     const defaults = await env.call("GET", "/v1/automations", {
       token: owner.token,
     });

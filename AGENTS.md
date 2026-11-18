@@ -4,26 +4,17 @@ Rules for AI agents and humans working on Worklog. `CLAUDE.md` imports this file
 
 Worklog is an API-first work-visibility server with a web app (`apps/web`) on top. Connectors turn GitHub, Gitea, Slack, Discord and webhook events into one activity stream, which feeds a board, an attention queue, briefs and a personal assistant for each member. Background: [README.md](README.md) and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
-## Comments: no narration
+## No comments
 
-This is the rule agents break most. Follow it at all costs.
+This is the rule agents break most. Lint enforces it ([landmines](https://github.com/interfere-inc/landmines) `no-comments`).
 
-A comment says **why**: a constraint, trade-off or gotcha the code can't show. It never says **what** the code does.
+Code carries its meaning in names and structure; the reason for a change goes in the commit and the PR. The only comments allowed:
 
-- Don't restate the code: `// loop over the events`.
-- Don't describe your change: `// now handles edits`, `// fixed`. That goes in the commit.
-- Don't address the reader (`// as requested`), and don't leave commented-out code.
-- If code needs a what-comment, rename or extract instead.
+- functional directives, with a reason on every suppression: `// oxlint-disable-next-line <rule> -- <reason>`, `@ts-expect-error`;
+- a single-line `// WARNING:` for a dangerous footgun that keeps recurring;
+- TSDoc on exported public API.
 
-Keep existing why-comments, and update them when you change the code they explain.
-
-```ts
-// Bad: Validate the kind with a regex
-// Good: Published in the OpenAPI spec, which can't carry regex flags.
-kind: z.string().regex(/^[a-z][a-z0-9_]*(?:\.[a-z0-9_]+)+$/),
-```
-
-Lint enforces own-line comments, no `TODO`/`FIXME`, and a reason on every suppression: `// oxlint-disable-next-line <rule> -- <reason>`. The same rules apply to commit messages and PR descriptions.
+If code seems to need a comment, rename or extract instead. The same rules apply to commit messages and PR descriptions: say why, never narrate.
 
 ## Commands
 
@@ -153,7 +144,7 @@ Read [docs/DESIGN.md](docs/DESIGN.md) before building a screen: it covers who Wo
 
 ## Code style
 
-oxfmt and oxlint with [Ultracite](https://www.ultracite.ai)'s presets enforce the style. Our departures are in `oxlint.config.ts`, each with its reason.
+oxfmt and oxlint enforce the style: [Ultracite](https://www.ultracite.ai)'s presets and every [landmines](https://github.com/interfere-inc/landmines) rule. Our departures are in `oxlint.config.ts`.
 
 - **`type`, not `interface`,** because shapes flow into jsonb columns.
 - **Top-level functions are declarations.** Exports go first, helpers below.

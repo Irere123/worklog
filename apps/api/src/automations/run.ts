@@ -25,11 +25,6 @@ import { jitterFor, nextRun } from "./schedule";
 
 const FAILURE_ALERT_AT = 3;
 const FAILURE_DISABLE_AT = 10;
-/**
- * How long a queued run has before its automation comes due again, if its job is gone. A worker
- * that died mid-run holds its job, and the person's queue, until Graphile frees stale locks (four
- * hours); the claim keeps that job from running the automation again if it had finished.
- */
 const LEASE_MS = 15 * 60_000;
 
 /**
@@ -107,7 +102,6 @@ export async function runAutomation(
     member,
     await getWorkspaceById(ctx.db, { id: member.workspaceId })
   );
-  // Upkeep runs every half hour for everyone; marking it would cost two writes a run for no news.
   const shown = showsAtWork(automation);
   if (shown) {
     await updateAutomationById(ctx.db, {
@@ -142,7 +136,6 @@ export async function runAutomation(
           },
         }
       : automation.state;
-  // A check never sleeps past the next follow-up, so it comes back when it was asked for.
   const wake =
     automation.kind === "check"
       ? await findNextFollowUpAt(ctx.db, {
@@ -170,8 +163,6 @@ export async function runAutomation(
         ...(shown ? { runningSince: null } : {}),
         failureCount,
         state,
-        // Only to turn it off: written back as loaded, it would undo someone turning it off
-        // while it ran.
         ...(failureCount >= FAILURE_DISABLE_AT ? { enabled: false } : {}),
         ...(opts.manual === true ? {} : { claimedAt: null }),
         nextRunAt,

@@ -23,7 +23,6 @@ let stop: (() => Promise<void>) | null = null;
 
 beforeAll(async () => {
   env = await testEnv();
-  // Registered before the app answers anything: Hono builds its router on the first request.
   env.app.get("/v1/test/boom", () => {
     throw new Error("kaboom for emma@example.com");
   });
@@ -42,11 +41,9 @@ afterEach(async () => {
 
 type Row = Record<string, any>;
 
-// Tinybird's Events API as the exporter sees it: gzipped NDJSON, one datasource per request.
 function tinybird(
   opts: {
     sampleRate?: number;
-    // How Tinybird answers each request, in turn; it accepts once these run out.
     answers?: (() => Promise<number | Response>)[];
   } = {}
 ) {
@@ -133,7 +130,6 @@ describe("telemetry", () => {
       "member.id": member.id,
     });
 
-    // Queries inside a transaction count toward the request too.
     const setup = sent.rows.spans.find((s) => s.name === "POST /v1/setup");
     const tx = sent.rows.spans.find(
       (s) => s.name === "db.transaction" && s.parent_id === setup?.span_id
@@ -202,7 +198,6 @@ describe("telemetry", () => {
       throw conflict("That name is taken");
     }).catch(() => null);
     await flush();
-    // Sampled out and not a fault, so nothing about it is kept.
     expect(sent.rows.spans.some((s) => s.name === "test: refused")).toBe(false);
 
     const kept = tinybird();
@@ -232,7 +227,6 @@ describe("telemetry", () => {
       const weight = (name: string) =>
         sent.rows.spans.find((s) => s.name === name)?.weight;
       expect(weight("test: sampled")).toBe(4);
-      // Every failed trace is kept, so each stands for one.
       expect(weight("test: broken")).toBe(1);
     } finally {
       random.mockRestore();

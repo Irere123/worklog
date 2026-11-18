@@ -16,8 +16,6 @@ import { ErrorNote } from "#ui/feedback";
 import { Field, Select, Switch } from "#ui/field";
 import { color, radius, space, text } from "#ui/tokens.stylex";
 
-// What the OAuth server signs onto the pages it sends people to; going back to /authorize starts
-// the request afresh, so these are dropped.
 const SIGNING = ["sig", "exp", "ba_iat", "ba_pl", "ba_param"];
 
 /**
@@ -25,7 +23,6 @@ const SIGNING = ["sig", "exp", "ba_iat", "ba_pl", "ba_param"];
  * authorization request, now with a session; anyone else signs in first and lands back here.
  */
 export function ConnectSignIn() {
-  // Read raw: the router would turn numbers in the signed query into numbers.
   const query = useMemo(() => location.search.slice(1), []);
   const approval = useApproval(query);
   const signedOut = needsSignIn(approval.error);
@@ -117,7 +114,6 @@ function ApprovalForm({
   query,
   approval,
 }: {
-  /** The signed query the OAuth server sent, passed back with the decision. */
   query: string;
   approval: Schemas["AgentApproval"];
 }) {
@@ -244,7 +240,6 @@ function ApprovalForm({
   );
 }
 
-/** Who is asking, and whether its domain stands behind the name it gave. */
 function ClientCard({
   client,
 }: {
@@ -277,10 +272,6 @@ function ClientCard({
   );
 }
 
-/**
- * Who is approving, read the way the OAuth server will: by the browser's session alone. A 401
- * means nobody is signed in here, even if the app holds an API key.
- */
 function useApproval(query: string) {
   const clientId = new URLSearchParams(query).get("client_id") ?? "";
   return useQuery({
@@ -316,8 +307,6 @@ function isGrant(scope: string): scope is Grant {
   return GRANTS.some((g) => g.scope === scope);
 }
 
-// Better Auth's own endpoints, which sit outside the API client's typed routes. Both answer with
-// where the browser goes next.
 async function authPost(path: string, body: unknown) {
   const res = await fetch(path, {
     method: "POST",

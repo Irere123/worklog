@@ -22,8 +22,6 @@ const dev = (i: number) => ({ login: `dev-${i}`, id: 1000 + i });
 const at = (minute: number) =>
   new Date(Date.now() - (60 - minute) * 60_000).toISOString();
 
-// This connection's jobs not yet finished: waiting, running, or retrying after a failure. Other
-// tests leave jobs due later (a retry, a rate-limited sync), so it can't wait for all of them.
 async function unfinished(connectionId: string) {
   const result = await env.ctx.db.execute<{ n: number }>(sql`
     select count(*)::int as n
@@ -70,8 +68,6 @@ describe("under load", () => {
       expect(res.status).toBe(200);
     };
 
-    // Every repo: a review request, a burst of pushes, the review that resolves the request,
-    // and a duplicate of one push under a new delivery id. Repos interleave, as a busy org does.
     for (let step = 0; step < PUSHES + 2; step += 1) {
       for (let r = 0; r < REPOS; r += 1) {
         const repository = {

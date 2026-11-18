@@ -31,13 +31,11 @@ import { notFound } from "#lib/errors";
 
 export type AttentionItem = typeof attentionItems.$inferSelect;
 
-// Lists carry the card's number: it's what a client links and fetches by, and the id alone isn't.
 const withCardNumber = {
   ...getTableColumns(attentionItems),
   cardNumber: cards.number,
 };
 
-// `onlyIfNew` and `replace` mean what they do on `AttentionInput` in attention/service.ts.
 export async function upsertAttention(
   db: DbOrTx,
   params: {
@@ -68,7 +66,6 @@ export async function upsertAttention(
             count: sql`${attentionItems.count} + 1`,
             state: "open",
             resolvedAt: null,
-            // Something new happened: the proactive check should look at it again.
             consideredAt: null,
             disposition: null,
             reason: null,
@@ -90,7 +87,6 @@ function rankSql() {
 
 const byPriority = sql`case ${attentionItems.priority} when 'high' then 0 when 'normal' then 1 else 2 end`;
 
-// A snoozed item counts as open again once its snooze has passed.
 function openOrWoken(now: Date) {
   return or(
     eq(attentionItems.state, "open"),
@@ -219,7 +215,6 @@ export async function getAttentionById(
   return row;
 }
 
-// `memberId` is optional for the proactive check, whose ids come from that member's own items.
 export async function updateAttentionById(
   db: DbOrTx,
   params: {
@@ -256,8 +251,6 @@ export async function updateAttentionById(
   return row;
 }
 
-// The kinds of item a member acted on since then, pushed or not: in Worklog, or by closing it at
-// its source (reviewing the PR on GitHub marks the request done).
 export async function listActedKinds(
   db: DbOrTx,
   params: { memberId: string; since: Date }
@@ -280,7 +273,6 @@ export async function listActedKinds(
   return rows.map((r) => r.kind);
 }
 
-// When the next of a member's follow-ups wakes, if one is still waiting.
 export async function findNextFollowUpAt(
   db: DbOrTx,
   params: { memberId: string; now: Date }
@@ -301,7 +293,6 @@ export async function findNextFollowUpAt(
   return row?.at ?? undefined;
 }
 
-// Follow-ups still waiting for the time their member asked for, soonest first.
 export async function listPendingFollowUps(
   db: DbOrTx,
   params: { memberId: string; now: Date }
@@ -362,7 +353,6 @@ export async function listDigestableAttention(
     .orderBy(byPriority, desc(attentionItems.updatedAt));
 }
 
-// A digested item counts as considered, so the proactive check doesn't push it again.
 export async function setAttentionDigested(
   db: DbOrTx,
   params: { ids: string[]; at: Date }
@@ -415,9 +405,6 @@ export async function findAttentionByDedupeKey(
   return row;
 }
 
-// Without `memberId`, closes the open item for everyone who has it.
-// With `before`, only items raised by something that happened before then: a late resolve leaves
-// a newer request open.
 export async function setOpenAttentionDone(
   db: DbOrTx,
   params: {
@@ -449,8 +436,6 @@ export async function setOpenAttentionDone(
     );
 }
 
-// Keeps the latest source time, whichever order resolves arrive in.
-// Whatever the items' state: the text of something edited or deleted at its source mustn't linger.
 export async function updateAttentionText(
   db: DbOrTx,
   params: { workspaceId: string; dedupeKey: string; body: string | null }
@@ -496,7 +481,6 @@ export async function upsertAttentionResolution(
     });
 }
 
-// The member's own resolution or one for everyone, whichever is later.
 export async function findAttentionResolvedThrough(
   db: DbOrTx,
   params: { workspaceId: string; memberId: string; dedupeKey: string }
@@ -607,8 +591,6 @@ export async function countFeedbackBySignal(
     .groupBy(attentionFeedback.signal);
 }
 
-// An item is as visible as the activity that raised it. One that no activity raised, such as a
-// teammate's note to the owner, stays private.
 export async function listTeamVisibleAttentionIds(
   db: DbOrTx,
   params: { ids: string[] }

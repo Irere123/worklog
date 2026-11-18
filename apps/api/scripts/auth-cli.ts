@@ -1,4 +1,3 @@
-// Side-effect-free: the CLI only needs the config to know which tables to generate, so the pool never connects.
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 

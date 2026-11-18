@@ -79,8 +79,6 @@ export function webOrigins(config: Config): string[] {
   ];
 }
 
-// Agents can't be Better Auth users, and keeping tenancy in our members table avoids coupling
-// workspaces to the organization plugin's lifecycle.
 export function createAuth(
   db: Parameters<typeof drizzleAdapter>[0],
   config: Config,
@@ -125,7 +123,6 @@ export function createAuth(
       ...(discord ? { discord } : {}),
       ...(slack ? { slack } : {}),
     },
-    // Signing in with GitHub after an email link (same verified address) lands on the same person.
     account: {
       accountLinking: {
         enabled: true,
@@ -135,13 +132,9 @@ export function createAuth(
     session: {
       cookieCache: { enabled: true, maxAge: 60 },
       additionalFields: {
-        // Set by the approval page through /update-session, which also refreshes the cookie
-        // cache the OAuth endpoints read the session from.
         agentWorkspaceId: { type: "string", required: false },
       },
     },
-    // The OAuth provider issues its own tokens; the JWT plugin's session-to-JWT route would be a
-    // second, unscoped way to mint one.
     disabledPaths: ["/token"],
     databaseHooks: {
       session: {
@@ -152,7 +145,6 @@ export function createAuth(
     },
     plugins: [
       magicLink({
-        // Not awaited: response timing must not reveal whether the address exists.
         sendMagicLink: ({ email, url }) => {
           void sendSignInLink(mailer, { email, url, home: config.PUBLIC_URL });
         },
@@ -165,7 +157,6 @@ export function createAuth(
 
 export type Auth = ReturnType<typeof createAuth>;
 
-/** Worklog as an OAuth server for coding agents: the sign-in and approval behind its MCP endpoint. */
 function agentAuthorization(
   config: Config,
   hooks: Parameters<typeof createAuth>[3]
@@ -177,9 +168,6 @@ function agentAuthorization(
       consentPage: new URL("/connect", webAppUrl(config)).toString(),
       resource: mcpResource(config),
       scopes: ["openid", "profile", ...AGENT_TOKEN_SCOPES],
-      // Clients from before Client ID Metadata Documents (older Cursor, Claude Code, VS Code)
-      // register themselves. The person still approves each one, and a self-registered name
-      // is shown as unverified.
       allowDynamicClientRegistration: true,
       allowUnauthenticatedClientRegistration: true,
       clientRegistrationDefaultApplicationType: "infer",
@@ -192,9 +180,6 @@ function agentAuthorization(
       postLogin: {
         page: new URL("/connect", webAppUrl(config)).toString(),
         shouldRedirect: () => false,
-        // Consent is kept per workspace, so approving an agent in one doesn't let it into
-        // another. For a person in several who hasn't picked yet this is empty, and the
-        // approval page asks.
         consentReferenceId: async ({ user, session }) =>
           await hooks?.agentWorkspace?.(
             user.id,

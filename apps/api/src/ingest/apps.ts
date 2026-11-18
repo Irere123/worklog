@@ -14,9 +14,6 @@ import { badRequest, conflict, forbidden } from "#lib/errors";
 
 const CACHE_MS = 30_000;
 
-// Every delivery on an app endpoint needs the app's secret: a short cache spares a read and a
-// decrypt each time. Saving through this module clears it; another process sees a change within
-// CACHE_MS.
 const cache = new Map<string, { app: AppView | null; until: number }>();
 
 /** The instance's app for a provider, created from the environment on first use. Null if neither. */
@@ -30,7 +27,6 @@ export async function loadApp(
     return hit.app;
   }
   const app = await readApp(ctx, provider);
-  // No app isn't cached: one registered by another process must work at once.
   if (app) {
     cache.set(provider, { app, until: Date.now() + CACHE_MS });
   } else {
@@ -75,8 +71,6 @@ const sameApp = (a: Omit<AppView, "provider">, b: AppView) =>
   a.name === b.name &&
   JSON.stringify(a.credentials) === JSON.stringify(b.credentials);
 
-// An app that came from the environment follows it: an operator rotating a secret there expects
-// it to take effect. One registered through the API is the database's.
 async function fromEnvIfChanged(
   ctx: AppContext,
   row: ConnectorAppRow,
@@ -156,7 +150,6 @@ export async function listApps(ctx: AppContext) {
   const missing = providers.filter(
     (c) => !rows.some((r) => r.provider === c.id)
   );
-  // Seeds the ones the environment describes but the database doesn't have yet.
   for (const connector of missing) {
     await loadApp(ctx, connector.id);
   }

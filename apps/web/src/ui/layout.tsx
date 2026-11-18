@@ -103,8 +103,6 @@ const styles = stylex.create({
     position: "sticky",
     top: 0,
     zIndex: 5,
-    // Pages are fixed-height columns: a header whose actions wrap on a phone must grow, not be
-    // squeezed under the scrolling content beside it.
     flexShrink: 0,
     display: "flex",
     flexDirection: "column",
@@ -140,8 +138,6 @@ const styles = stylex.create({
     color: color.fg,
     whiteSpace: "nowrap",
   },
-  // Facts about the page (a count, a budget, a board's description), never a tagline: it would
-  // say the same thing on every visit.
   subtitle: {
     display: { default: null, "@media (max-width: 640px)": "none" },
     fontSize: text.label,

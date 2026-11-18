@@ -68,7 +68,6 @@ export function InboxScene({ play, paused, still }: SceneProps) {
       await a.wait(500);
       set({ toast: true });
       await a.wait(900);
-      // The pointer steps off the button so the next item reads unobstructed.
       if (done) {
         set({ cursor: { x: done.x + 40, y: done.y + 150 } });
       }
@@ -457,7 +456,6 @@ const styles = stylex.create({
     transitionProperty: "opacity, transform",
     transitionDuration: "320ms",
     transitionTimingFunction: "cubic-bezier(0.25, 0.8, 0.25, 1)",
-    // The next item waits for the last to leave, so the two are never drawn over each other.
     transitionDelay: "160ms",
   },
   pageGone: {

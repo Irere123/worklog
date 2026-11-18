@@ -11,7 +11,6 @@ import { z } from "zod";
 
 const SecretsSchema = z.record(z.string(), z.string());
 
-// Format `wl_<43 chars>`; only the SHA-256 is stored.
 export function generateToken(): string {
   return `wl_${randomBytes(32).toString("base64url")}`;
 }
@@ -49,7 +48,6 @@ export class SecretBox {
   private readonly keys: Map<string, Buffer>;
 
   constructor(rawKey: string | undefined, previous: string[] = []) {
-    // Development fallback only; loadConfig() refuses to start production without a key.
     this.key = rawKey
       ? decodeKey(rawKey, "WORKLOG_SECRET_KEY")
       : createHash("sha256").update("worklog-insecure-dev-key").digest();

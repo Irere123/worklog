@@ -14,21 +14,15 @@ export type SpanKind = "server" | "client" | "consumer" | "internal";
 /** A W3C trace context: where a span continues a trace another process started. */
 export type TraceParent = { traceId: string; spanId: string };
 
-// Spans finished before their trace's local root wait here, so a whole trace is kept or dropped
-// together: an error or a slow root keeps every span of it, whatever the sample rate.
 type Trace = {
   sampled: boolean;
   failed: boolean;
   keep: boolean | null;
-  // How many traces each kept span stands for, so counts and rates can be estimated from what
-  // was kept: one for a trace kept for its error or slowness (all of those are), 1/rate for one
-  // kept by sampling.
   weight: number;
   held: Record<string, unknown>[];
   dropped: number;
 };
 
-// A runaway trace (a replay touching thousands of rows) can't hold memory without bound.
 const MAX_HELD = 2000;
 
 const active = new AsyncLocalStorage<Span>();
@@ -42,8 +36,6 @@ export class Span {
   readonly attrs: Attrs;
   status: "ok" | "error" = "ok";
   error: ErrorInfo | null = null;
-  // Queries run in this span and the spans under it: their count and time spot N+1s and slow
-  // writes without a span per query. A child adds its totals to its parent's as it ends.
   dbQueries = 0;
   dbMs = 0;
 
@@ -151,8 +143,6 @@ export class Span {
       }
       return;
     }
-    // Finished after its root, like a stream that outlives the request that started it. Its
-    // trace may have been dropped by then, so it can arrive without its parents.
     if (trace.keep || this.status === "error") {
       emit("spans", {
         ...row,

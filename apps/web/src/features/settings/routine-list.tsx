@@ -167,7 +167,6 @@ function Where({ state }: { state: RoutineState }) {
   ) : null;
 }
 
-// The switch answers at once and steps back if the server refuses; a run says how it went.
 function useRoutineActions() {
   const client = useQueryClient();
   const key = q.automations().queryKey;

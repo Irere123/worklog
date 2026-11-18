@@ -27,11 +27,9 @@ const STALE: Record<EventType, QueryKey[]> = {
   "message.created": [["conversations"]],
   "automation.ran": [["automations"]],
   "notification.sent": [],
-  // Carries the whole snapshot, so nothing is read again.
   "assistant.updated": [],
 };
 
-// A webhook burst lands as dozens of events in a second; one refetch per family covers them all.
 const SETTLE_MS = 250;
 
 export type LiveStatus = "connecting" | "live" | "offline";
@@ -95,7 +93,6 @@ function isSentNews(value: unknown): value is SentNews {
 
 const STATES = new Set<unknown>(["working", "waiting", "done", "idle"]);
 
-/** The assistant's presence as the server sends it on every change: whole, never a diff. */
 function isPresence(value: unknown): value is Presence {
   return (
     typeof value === "object" &&
@@ -199,7 +196,6 @@ function subscribe(
   for (const [type, stale] of Object.entries(STALE)) {
     source.addEventListener(type, onEvent(stale));
   }
-  // Only items that are new to this tab: the cached inbox already holds anything seen before.
   source.addEventListener("attention.updated", (event) => {
     const data = payloadOf(event);
     const news = isAttentionNews(data) ? data : null;
@@ -210,13 +206,11 @@ function subscribe(
       notify.attention(news);
     }
   });
-  // Out-of-order snapshots are settled by the query itself, which keeps the newest.
   source.addEventListener("assistant.updated", (event) => {
     const data = payloadOf(event);
     if (isPresence(data)) {
       client.setQueryData(q.presence().queryKey, data);
     } else {
-      // Replayed from before snapshots travelled with the event.
       onEvent([["presence"]])();
     }
   });

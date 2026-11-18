@@ -10,9 +10,6 @@ import type { Scope } from "./scope";
 
 const MAX_STEPS = 8;
 
-// The main conversation stays small: a helper with a fresh context does the searching, and only
-// its report comes back. It's handed the same read-only tools as the conversation it works for, so
-// it can't find anything that conversation couldn't, and can't change anything.
 export function lookIntoTool(scope: Scope, lookups: ToolSet) {
   const { ctx, owner } = scope;
   return tool({

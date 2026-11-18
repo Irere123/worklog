@@ -1,6 +1,3 @@
-// Checks the colour tokens against WCAG 2 contrast, in light and dark. Every text pair needs 4.5:1,
-// faint metadata included: times, counts and captions are read too. Run after changing
-// src/ui/tokens.stylex.ts: bun run contrast
 import { readFileSync } from "node:fs";
 
 const source = readFileSync(
@@ -39,7 +36,6 @@ const PAIRS: [string, string, number][] = [
   ["goldFg", "goldSubtle", 4.5],
 ];
 
-// OKLCH → linear sRGB (Björn Ottosson's matrices), clamped to the gamut.
 function linear(value: string) {
   const [l = 0, c = 0, h = 0] = (value.match(/[\d.]+/gu) ?? []).map(Number);
   const a = c * Math.cos((h * Math.PI) / 180);

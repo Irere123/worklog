@@ -18,19 +18,12 @@ import type { MemoryKind, Visibility } from "#db/schema";
 
 export type MemoryRow = typeof memories.$inferSelect;
 
-// word_similarity is 1 for a word that appears as written and about 0.33 for a one-letter typo in a
-// short word ("pazta" against "pasta"); unrelated words score 0. It matches; strict_word_similarity,
-// which respects word boundaries, ranks, so "pazta" puts pasta above payment though both match.
 const TYPO_TOLERANCE = 0.3;
 const MAX_TERMS = 8;
-// A nightly digest replaces the one before, so a digest's history grows by a line a day.
 const MAX_LINEAGE = 200;
 
 const searchable = sql`${memories.content} || ' ' || array_to_string(${memories.aliases}, ' ')`;
 
-// Visibility is enforced here, in the query, never by prompt: teammates only ever get `team` rows.
-// `q` matches word by word, so "who owns payments" finds "Owns the payment service" and a
-// misspelling still finds its memory. A member's memories are few, so it scans them without an index.
 export async function listMemories(
   db: DbOrTx,
   params: {
@@ -86,7 +79,6 @@ export async function listMemories(
     .limit(params.limit ?? 100);
 }
 
-// The active entries of one kind and visibility (and day, for journals) that a new one replaces.
 export async function listActiveMemoryIds(
   db: DbOrTx,
   params: {
@@ -131,7 +123,6 @@ export async function findDigest(
   return row;
 }
 
-// Lines forgotten since then with nothing to replace them; a replaced line's successor is active.
 export async function listForgottenSince(
   db: DbOrTx,
   params: {
@@ -158,7 +149,6 @@ export async function listForgottenSince(
     .limit(params.limit);
 }
 
-// Exactly one visibility, so tidying team memory never reads private lines.
 export async function listReconcilable(
   db: DbOrTx,
   params: { memberId: string; visibility: Visibility; now: Date }
@@ -183,8 +173,6 @@ export async function insertMemory(db: DbOrTx, row: MemoryRow) {
   await db.insert(memories).values(row);
 }
 
-// Scoped to the member, so ids from another member's memory match nothing. Only active lines
-// change, so a line keeps pointing at whatever replaced it first.
 export async function setMemoriesSuperseded(
   db: DbOrTx,
   params: { memberId: string; ids: string[]; supersededBy?: string; now: Date }
@@ -230,8 +218,6 @@ export async function setMemoriesConfirmed(
     .returning();
 }
 
-// A line's history both ways: the lines it replaced, transitively, and the lines that replaced it,
-// up to the one in use now. `union` rather than `union all` stops at a line already seen.
 export async function listMemoryLineage(
   db: DbOrTx,
   params: { memberId: string; id: string }

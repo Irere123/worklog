@@ -62,7 +62,6 @@ export const WebhookSettings = z.object({
       encoding: z.enum(["hex", "base64"]).optional(),
     }),
     z.object({ type: z.literal("token"), header: z.string() }),
-    // https://www.standardwebhooks.com
     z.object({
       type: z.literal("standard-webhooks"),
       toleranceSeconds: z.number().int().min(30).max(3600).optional(),
@@ -150,7 +149,6 @@ function matches(
   return (w.exists ?? []).every((path) => !isMissing(readPath(payload, path)));
 }
 
-// Signed content is `${id}.${timestamp}.${body}`, HMAC-SHA256 with the `whsec_` key, base64.
 export function verifyStandardWebhook(
   secret: string,
   headers: Headers,
@@ -190,7 +188,6 @@ function pick(
   return src?.path ? scalarText(readPath(payload, src.path)) : undefined;
 }
 
-// The reason it's refused, or null when it checks out.
 function verify(s: Settings, secret: string, req: InboundRequest) {
   if (s.verify.type === "hmac-sha256") {
     const got = req.headers.get(s.verify.header) ?? "";
@@ -222,7 +219,6 @@ function verify(s: Settings, secret: string, req: InboundRequest) {
     : "unsigned webhooks are disabled for this connection";
 }
 
-// Rules carry no ids, so actors resolve by handle.
 const byHandle = (handle: string | null): ExternalActor | null =>
   handle ? { id: `handle:${handle.toLowerCase()}`, handle } : null;
 

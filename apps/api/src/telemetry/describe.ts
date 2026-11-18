@@ -9,8 +9,6 @@ export type ErrorInfo = {
   code: string;
   /** The first frame of our own code, as `function file`: where to start looking. */
   frame: string;
-  // What occurrences of one problem share: the message's first line, minus what a provider
-  // echoed back, which differs every time.
   key: string;
 };
 
@@ -18,27 +16,19 @@ const MAX_MESSAGE = 1000;
 const MAX_STACK = 4000;
 const MAX_QUERY = 500;
 
-// Telemetry leaves for a third party, so what an error says about a person or a credential is
-// masked first: constraint violations quote the values they reject, and provider errors can echo
-// a request.
 const MASKS: [RegExp, string][] = [
-  // The top-level domain is letters, so `graphile-worker@0.18.0` in a stack's paths stays.
   [/[\w.+-]+@[\w-]+(?:\.[\w-]+)*\.[a-z]{2,}\b/giu, "[email]"],
   [/\bwl_[\w-]+/gu, "[token]"],
   [/\bxox[a-z]-[\w-]+/giu, "[token]"],
   [/\bgh[opsu]_\w+/gu, "[token]"],
   [/\bgithub_pat_\w+/gu, "[token]"],
   [/\b(?<scheme>bearer|basic)\s+[\w.~+/=-]+/giu, "$<scheme> [redacted]"],
-  // Only with `=` or `:`, so Postgres's "duplicate key value violates…" reads as it was.
   [
     /(?<name>[\w-]*(?:token|key|secret|password))(?<sep>\s*[=:]\s*)[^\s&,;"']+/giu,
     "$<name>$<sep>[redacted]",
   ],
 ];
 
-// The AI SDK's errors about a model's output quote that output (`Text: …`, `Value: …`), and a
-// tool's input errors quote the input: a conversation, or someone's private log. These say only
-// what went wrong.
 const AI_ERRORS_WITHOUT_CONTENT = new Set([
   "AI_APICallError",
   "AI_RetryError",
@@ -93,7 +83,6 @@ export function isExpected(error: unknown) {
   if (typeof status === "number" && status >= 400 && status < 500) {
     return true;
   }
-  // Class 23 is integrity constraint violations: the conflict `violates()` turns into a 409.
   return codeOf(error).startsWith("23");
 }
 
@@ -111,8 +100,6 @@ export function fingerprint(where: string, error: ErrorInfo | null) {
 
 function messageOf(error: Error) {
   const query: unknown = Reflect.get(error, "query");
-  // Drizzle's DrizzleQueryError: its message lists the query's parameters, which are the data
-  // itself. The SQL alone says which query; its cause says why.
   if (
     typeof query === "string" &&
     Array.isArray(Reflect.get(error, "params"))
@@ -140,8 +127,6 @@ function causesOf(error: Error, depth = 0): string[] {
   ];
 }
 
-// A ProviderError ends with up to 200 characters of what the provider answered, which differs
-// between occurrences of the same refusal.
 function keyOf(error: Error, own: string) {
   const [firstLine = ""] = own.split("\n");
   if (error.name === "ProviderError") {
@@ -150,8 +135,6 @@ function keyOf(error: Error, own: string) {
   return firstLine;
 }
 
-// Drizzle wraps the driver's error, so Postgres's SQLSTATE is on a cause. A ProviderError's
-// `kind` (revoked, rate_limited) is its code, and an AI SDK call error's `statusCode`.
 function codeOf(error: Error, depth = 0): string {
   for (const key of ["code", "kind", "statusCode"]) {
     const value: unknown = Reflect.get(error, key);
@@ -172,10 +155,7 @@ function framesOf(stack: string) {
 }
 
 const UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/giu;
-// KSUIDs, Slack and GitHub ids, commit SHAs: a run of letters and digits with both in it.
 const MIXED_ID = /\b(?=[\w-]*\d)(?=[\w-]*[A-Za-z])[\w-]{8,}\b/gu;
-// A quoted snake_case name is a constraint, table or column: it tells problems apart. Anything
-// else quoted is a value, which differs between occurrences.
 const QUOTED = /"(?<inner>[^"]*)"|'[^']*'/gu;
 const IDENTIFIER = /^[a-z][a-z0-9]*(?:_[a-z0-9]+)+$/u;
 
@@ -189,12 +169,9 @@ function normalize(text: string) {
     .replaceAll(/\d+/gu, "<n>");
 }
 
-// Bun writes an awaited caller as `at async fn (…)` and a constructor as `at new X (…)`; for an
-// error thrown inside a library those are the only frames of ours.
 const OWN_FRAME =
   /^\s*at (?:async |new )?(?:(?<fn>[^\s(]+) \()?[^()]*\/src\/(?<file>[^:()]+)/u;
 
-// Line numbers move with every edit, so the frame is its function and file only.
 function ownFrame(stack: string) {
   for (const line of stack.split("\n")) {
     const match = line.includes("node_modules") ? null : OWN_FRAME.exec(line);

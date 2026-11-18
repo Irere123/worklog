@@ -4,8 +4,6 @@ import { escapeHtml } from "#automations/sanitize";
 
 import { palette } from "./layout";
 
-// Raw HTML and images in a brief are shown as text: a model wrote it, and an email must not
-// carry markup or remote images nobody chose.
 const markdown = new Marked({
   renderer: {
     html: ({ text }) => escapeHtml(text),
@@ -16,7 +14,6 @@ const markdown = new Marked({
 const text = `margin:0 0 16px;color:${palette.fg};font-size:15px;line-height:24px`;
 const mono = `font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:13px`;
 
-// Mail clients drop <style> blocks unevenly, so each tag carries its style inline.
 const STYLES: Record<string, string> = {
   p: text,
   h1: `margin:24px 0 8px;color:${palette.fg};font-size:17px;font-weight:600;line-height:24px`,

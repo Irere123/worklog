@@ -66,8 +66,6 @@ export function PromptDialog({
   );
 }
 
-// The dialog unmounts its contents when it closes, so keeping the draft here starts every opening
-// from `initial` without an effect to reset it.
 function PromptForm({
   id,
   label,

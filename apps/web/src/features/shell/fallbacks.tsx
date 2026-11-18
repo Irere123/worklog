@@ -20,7 +20,15 @@ import { ApiError } from "#api/client";
 import { Button, styles as button } from "#ui/button";
 import { Kbd } from "#ui/chip";
 import { Logo } from "#ui/logo";
-import { color, font, leading, radius, space, text } from "#ui/tokens.stylex";
+import {
+  color,
+  font,
+  leading,
+  radius,
+  space,
+  text,
+  weight,
+} from "#ui/tokens.stylex";
 
 import newsreaderUrl from "@fontsource-variable/newsreader/opsz.css?url";
 
@@ -49,7 +57,6 @@ export function RouteError({ error, reset }: ErrorComponentProps) {
       </Fallback>
     );
   }
-  // The API words its 4xx refusals for people; anything else is a stack trace's first line.
   const said =
     error instanceof ApiError && error.status < 500 ? error.message : null;
   return (
@@ -105,7 +112,6 @@ export function NotFound() {
   );
 }
 
-/** Back where there's history to go back to, and home either way; `primary` marks the first. */
 function WayOut({ primary = false }: { primary?: boolean }) {
   const router = useRouter();
   const canGoBack = useCanGoBack();
@@ -123,7 +129,6 @@ function WayOut({ primary = false }: { primary?: boolean }) {
           Go back
         </Button>
       )}
-      {/* Signed in, the front page sends you on to Home. */}
       <Link
         to={inShell ? "/home" : "/"}
         {...stylex.props(
@@ -150,7 +155,6 @@ function Fallback({
   icon: ReactNode;
   title: string;
   children: ReactNode;
-  /** The address or the error, in its own words, for anyone reporting it. */
   detail?: string;
   actions: ReactNode;
   hint?: ReactNode;
@@ -186,7 +190,6 @@ function Fallback({
   }
   return (
     <main {...stylex.props(styles.alone)}>
-      {/* React hoists it into the head; the app never loads the public pages' serif otherwise. */}
       <link rel="stylesheet" href={newsreaderUrl} precedence="default" />
       <a href="/" {...stylex.props(styles.brand)}>
         <Logo size={22} />
@@ -205,7 +208,6 @@ const styles = stylex.create({
     justifyContent: "center",
     overflowY: "auto",
     paddingInline: { default: space.x3, "@media (max-width: 640px)": space.lg },
-    // A little above the middle, where the eye starts on a tall panel.
     paddingBottom: "8dvh",
   },
   alone: {
@@ -272,8 +274,7 @@ const styles = stylex.create({
     fontFamily: font.display,
     fontSize: 34,
     lineHeight: "40px",
-    // design-allow: the public pages' serif headline weight, between Newsreader's light and regular
-    fontWeight: 360,
+    fontWeight: weight.display,
     fontOpticalSizing: "none",
     fontVariationSettings: "'opsz' 18",
     letterSpacing: "-0.025em",

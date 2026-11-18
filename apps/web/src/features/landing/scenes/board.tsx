@@ -493,7 +493,6 @@ const styles = stylex.create({
     transform: `translate(${x}px, ${y}px)`,
     transition: `transform ${travel}ms cubic-bezier(0.45, 0, 0.1, 1), filter 220ms ease, rotate 220ms ease, scale 220ms ease`,
   }),
-  // Held, it lifts, tilts a little with the hand and casts a deeper shadow; it settles flat on drop.
   flyerHeld: {
     filter: "drop-shadow(0 12px 18px oklch(0.2 0.02 60 / 0.18))",
     rotate: "2deg",

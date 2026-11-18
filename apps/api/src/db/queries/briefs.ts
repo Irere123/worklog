@@ -7,7 +7,6 @@ import { notFound } from "#lib/errors";
 
 export type BriefRow = typeof briefs.$inferSelect;
 
-// One brief per member, period and start: generating it again replaces it.
 export async function upsertBrief(db: DbOrTx, row: BriefRow) {
   const rows = await db
     .insert(briefs)

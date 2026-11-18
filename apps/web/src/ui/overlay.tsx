@@ -21,10 +21,7 @@ import {
   text,
 } from "./tokens.stylex";
 
-// Base UI's 5px default lets a menu opened by the window's edge sit flush against it.
 const EDGE = 8;
-
-/* Tooltip ---------------------------------------------------------------- */
 
 export const TooltipProvider = BaseTooltip.Provider;
 
@@ -61,8 +58,6 @@ export function Tooltip({
   );
 }
 
-/* Menu ------------------------------------------------------------------- */
-
 /**
  * A menu of actions. With `search`, it opens with a filter field on top, for lists that grow
  * with the team (people, boards) where scanning stops working.
@@ -85,7 +80,6 @@ export function Menu({
   width?: number;
   search?: string;
   empty?: ReactNode;
-  // A trigger that moves while the menu is open (a chip added beside it) would drag the menu along.
   anchor?: RefObject<Element | null>;
   onSearchChange?: (query: string) => void;
 }) {
@@ -272,8 +266,6 @@ export function MenuSeparator() {
   return <BaseMenu.Separator {...stylex.props(styles.separator)} />;
 }
 
-/* Popover ---------------------------------------------------------------- */
-
 export function Popover({
   trigger,
   children,
@@ -339,8 +331,6 @@ export function Popover({
 function textOf(children: ReactNode) {
   return typeof children === "string" ? children : undefined;
 }
-
-/* Dialog ----------------------------------------------------------------- */
 
 export function Dialog({
   open,
@@ -410,7 +400,6 @@ const styles = stylex.create({
     borderRadius: radius.md,
   },
   menuScroll: { padding: space.xs, overflowY: "auto" },
-  // The list scrolls under a fixed filter field, so the field never scrolls out of reach.
   searchable: { minWidth: 240, overflow: "hidden" },
   search: {
     display: "flex",
@@ -432,7 +421,6 @@ const styles = stylex.create({
     backgroundColor: "transparent",
     outline: "none",
     color: color.fg,
-    // Under 16px, iOS zooms the page to focus the field.
     fontSize: { default: text.label, [media.touch]: 16 },
     "::placeholder": { color: color.fgFaint },
   },
@@ -660,7 +648,6 @@ export const surface = stylex.create({
     boxShadow: shadow.float,
     outline: "none",
     transitionProperty: "opacity, transform",
-    // Leaving is quicker than arriving: once dismissed, the popup shouldn't hold the eye.
     transitionDuration: {
       default: motion.base,
       ":is([data-ending-style])": motion.fast,
@@ -682,7 +669,6 @@ export const surface = stylex.create({
     display: "flex",
     alignItems: "center",
     gap: space.md,
-    // A finger needs the taller row; a pointer gets the denser list.
     height: { default: 30, [media.touch]: 40 },
     paddingInline: space.md,
     borderRadius: radius.xs,

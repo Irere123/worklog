@@ -22,7 +22,6 @@ export async function listDeliveryTargets(
     .where(eq(deliveryTargets.memberId, params.memberId));
 }
 
-// Of `ids`, only the member's own enabled targets.
 export async function listEnabledTargets(
   db: DbOrTx,
   params: { memberId: string; ids: string[] }

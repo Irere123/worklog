@@ -17,7 +17,6 @@ export async function insertEvent(
   return returned(rows, "event");
 }
 
-// In the order given, so `seq` follows the order they were published in.
 export async function insertEvents(
   db: DbOrTx,
   rows: Pick<
@@ -32,7 +31,6 @@ export async function insertEvents(
   return inserted.toSorted((a, b) => a.seq - b.seq);
 }
 
-// Workspace-wide events plus the ones addressed to this member.
 export async function listEventsAfter(
   db: DbOrTx,
   params: {
@@ -60,8 +58,6 @@ export async function deleteEventsBefore(db: DbOrTx, params: { before: Date }) {
   await db.delete(events).where(lt(events.createdAt, params.before));
 }
 
-// Every workspace's, for fanning out what other processes published: what's new, and the seqs
-// known to be missing (inserts that hadn't committed when later ones were read).
 export async function listAllEventsAfter(
   db: DbOrTx,
   params: { afterSeq: number; alsoSeqs: number[]; limit: number }

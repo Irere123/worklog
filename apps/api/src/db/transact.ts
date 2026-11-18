@@ -34,8 +34,6 @@ export async function transact<T>(
         return await fn({ ...ctx, db, bus });
       })
   );
-  // Committed, whatever happens to its events: throwing now would tell the caller the write failed,
-  // and a retry would find it done. A client that misses the event catches up on its next read.
   try {
     await bus.release();
   } catch (error) {

@@ -2,7 +2,6 @@ import newsreaderLatinUrl from "@fontsource-variable/newsreader/files/newsreader
 
 import newsreaderUrl from "@fontsource-variable/newsreader/opsz.css?url";
 
-// The public pages' headline serif. The app itself never loads it, so it's fetched here, first.
 export const DISPLAY_FONT = [
   {
     rel: "preload",

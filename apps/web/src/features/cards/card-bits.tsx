@@ -28,6 +28,7 @@ import {
   shadow,
   space,
   text,
+  weight,
 } from "#ui/tokens.stylex";
 
 export type Card = Schemas["Card"];
@@ -239,7 +240,6 @@ function TileMeta({
     <div {...stylex.props(styles.meta, closed && styles.stampedMeta)}>
       {creator && <Avatar person={creator} size={16} labelled />}
       <span title="Added">{ago(card.createdAt)}</span>
-      {/* Untouched since it was added, the second time would only repeat the first. */}
       {ago(card.lastActiveAt) !== ago(card.createdAt) && (
         <>
           <span {...stylex.props(styles.sep)} />
@@ -308,7 +308,6 @@ export function stageLabel(stage: Card["stage"]) {
   }[stage];
 }
 
-/** The last quarter of a card's drift window, counted down so it can't be missed. */
 function DriftBubble({ at }: { at: string }) {
   const now = useHourlyNow();
   const days = Math.max(0, Math.ceil((Date.parse(at) - now) / DAY));
@@ -328,8 +327,6 @@ function DriftBubble({ at }: { at: string }) {
   );
 }
 
-// A board can stay open for days, so the countdown refreshes on its own rather than only when
-// the card happens to re-render.
 function useHourlyNow() {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
@@ -350,7 +347,6 @@ function Stamp({ card }: { card: Card }) {
   const done = card.stage === "done";
   const at = done ? card.closedAt : card.postponedAt;
   const system = !done && card.autoPostponed;
-  // Pressed only when it has just happened: a column of stamps landing on every page load is noise.
   const [fresh, setFresh] = useState(
     () => at !== null && Date.now() - Date.parse(at) < FRESH_MS
   );
@@ -379,7 +375,6 @@ function Stamp({ card }: { card: Card }) {
 
 const FRESH_MS = 15_000;
 
-// Overshoots below its size before settling, the way a rubber stamp squashes into paper.
 const press = stylex.keyframes({
   "0%": { opacity: 0, transform: "scale(1.8)" },
   "55%": { opacity: 1, transform: "scale(0.92)" },
@@ -431,8 +426,6 @@ const styles = stylex.create({
   closed: {
     opacity: { default: 0.62, ":hover": { default: null, [media.hover]: 0.9 } },
   },
-  // The stamp is taller than the footer it sits beside; on a card with no tags it would reach up
-  // over the title, so the footer grows to hold it.
   stampedMeta: { minHeight: 40 },
   top: { display: "flex", alignItems: "center", gap: space.sm, minWidth: 0 },
   tag: {
@@ -547,8 +540,7 @@ const styles = stylex.create({
   },
   bubbleNumber: {
     fontSize: 16,
-    // design-allow: the drift countdown is a printed badge, heavier than any interface text
-    fontWeight: 700,
+    fontWeight: weight.badge,
     fontVariantNumeric: "tabular-nums",
   },
   stamp: {
@@ -582,8 +574,7 @@ const styles = stylex.create({
   },
   stampWord: {
     fontSize: 11,
-    // design-allow: a rubber stamp, like Fizzy's, reads as ink rather than interface
-    fontWeight: 800,
+    fontWeight: weight.stamp,
     textTransform: "uppercase",
     letterSpacing: "0.08em",
   },

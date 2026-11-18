@@ -44,7 +44,6 @@ export async function setStatus(
   status: "active" | "suspended" | "revoked",
   reason: string
 ) {
-  // An admin's pause outlasts the provider saying it's fine again.
   if (
     conn.status === status ||
     (status === "active" && conn.status === "paused")
@@ -57,15 +56,12 @@ export async function setStatus(
       set: {
         status,
         statusReason: status === "active" ? null : reason,
-        // An app install's tokens came from the install and die with it; a re-install brings new
-        // ones. A hand-configured connection keeps its secrets so an admin can fix them.
         ...(status === "revoked" && conn.externalId
           ? { secrets: tx.secrets.seal({}) }
           : {}),
       },
     });
     await tellInstaller(tx, conn, `${conn.name} ${VERB[status]}: ${reason}`);
-    // What happened while it was away comes in from the provider's API.
     if (status === "active") {
       await queueSync(tx, conn);
     }

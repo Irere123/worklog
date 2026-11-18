@@ -5,7 +5,6 @@ import { gitlabHooks, hostOf, listGitlabProjects } from "./gitlab/api";
 import { normalizeGitlab, parseGitlab } from "./gitlab/events";
 import { gitlabSync, normalizeGitlabPage } from "./gitlab/sync";
 
-// Stored as it came, so a replay reads everything it said; read through `parseGitlab`.
 function parse(rawBody: string): object | null {
   try {
     const value: unknown = JSON.parse(rawBody);
@@ -15,7 +14,6 @@ function parse(rawBody: string): object | null {
   }
 }
 
-// The project id survives renames and moves between groups.
 function partitionOf(payload: object) {
   const p = parseGitlab(payload);
   return p.project?.id === undefined
@@ -87,7 +85,6 @@ export const gitlabConnector: Connector = {
     return {
       type: "event",
       eventType: kind ?? req.headers.get("x-gitlab-event") ?? "unknown",
-      // A retry keeps the Idempotency-Key (GitLab 17+); older servers send one UUID per event.
       deliveryId:
         req.headers.get("idempotency-key") ??
         req.headers.get("x-gitlab-event-uuid") ??

@@ -73,7 +73,6 @@ export function Logo({
   );
 }
 
-// The crayon's purple edge is a fraction of a pixel in an icon, where it only muddies the outline.
 const RIM_FROM = 32;
 
 const settle = stylex.keyframes({
@@ -100,7 +99,6 @@ const styles = stylex.create({
     animationFillMode: "backwards",
     "@media (prefers-reduced-motion: reduce)": { animationName: "none" },
   },
-  // pathLength={1} makes the dash the thread's whole length, so the offset reads as progress.
   write: {
     strokeDasharray: "1",
     animationName: write,

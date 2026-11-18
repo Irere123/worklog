@@ -1,7 +1,3 @@
-// Takes the pictures under the front page's tour: each chapter's finished frame, cut to the
-// thumbnails' 16:10. The public pages are always light, so the pictures are too. They are pictures, unlike the tour itself, so re-take them after
-// changing a scene. With `bun run dev` serving the page, in apps/web: bun run thumbs [url]
-// The first run needs a browser: bunx playwright install chromium
 import { chromium } from "playwright";
 
 const url = process.argv[2] ?? "http://localhost:3000/";
@@ -11,7 +7,6 @@ const WIDTH = 320;
 const HEIGHT = 200;
 
 const browser = await chromium.launch();
-// Reduced motion shows every scene's last frame at once, and hides the tour's Pause button.
 const context = await browser.newContext({
   viewport: { width: 1440, height: 900 },
   reducedMotion: "reduce",

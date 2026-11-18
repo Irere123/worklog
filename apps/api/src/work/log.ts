@@ -32,7 +32,6 @@ export async function logWork(
   author: Member,
   input: LogInput
 ) {
-  // 0 means no card, like a missing number.
   const cardNumber = input.cardNumber ?? 0;
   const card =
     cardNumber === 0
@@ -55,7 +54,6 @@ export async function logWork(
     data: { via: input.via ?? "text", structured: false },
   });
   if (!activity) {
-    // Only events with an externalId can be duplicates, and log entries have none.
     throw new Error("A log entry was not recorded");
   }
   const enrichment =
@@ -76,7 +74,6 @@ function firstLine(text: string) {
   return line.length > 100 ? `${line.slice(0, 97)}…` : line;
 }
 
-/** Structuring is best-effort: the entry is already recorded as typed. */
 async function enrich(
   ctx: AppContext,
   author: Member,

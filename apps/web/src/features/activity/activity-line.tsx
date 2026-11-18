@@ -106,7 +106,6 @@ export function lookOf(activity: Activity): Look {
   const size = 14;
   if (activity.agentState || kind.startsWith("agent.")) {
     const state = activity.agentState ?? "working";
-    // Still: the feed is history, and only the run's badge elsewhere moves while it's live.
     return {
       icon: <Ghost mood={runMood(state)} size={size + 2} still tinted />,
       tone: STATE[state]?.tone ?? "blue",
@@ -169,7 +168,6 @@ const STATE: Record<string, { label: string; tone: Tone }> = {
   failed: { label: "Couldn’t finish", tone: "red" },
 };
 
-// What happened to a card when the event says nothing more than the card's own title.
 const CARD_VERBS: Record<string, string> = {
   "card.created": "Added this card",
   "card.closed": "Marked it done",
@@ -178,7 +176,6 @@ const CARD_VERBS: Record<string, string> = {
   "card.gilded": "Gave it a golden ticket",
 };
 
-// Adding a card, moving it and assigning it a minute apart is one thing someone did, not three.
 const RUN_MS = 60 * 60 * 1000;
 
 /** Whether two events, newer first, read as one line: same person, same card, close together. */
@@ -207,7 +204,6 @@ export function foldRuns(activities: Activity[]) {
   return rows;
 }
 
-/** A run's steps in the order they happened, so it reads as a sentence: added, moved, assigned. */
 function stepsOf(activity: Activity, earlier: Activity[]) {
   return [...earlier.toReversed(), activity]
     .map(bodyOrVerb)
@@ -240,13 +236,11 @@ export function ActivityLine({
   const { byId } = useMembers();
   const actor = activity.actorId ? byId.get(activity.actorId) : undefined;
   const look = lookOf(activity);
-  // Inside a card the card's own title is noise; the body says what happened to it.
   const cardBody =
     hideCard && /^#\d+\s/u.test(activity.title)
       ? stepsOf(activity, earlier)
       : null;
   const aboutCard = cardBody !== null && cardBody !== "";
-  // Something that happened seconds ago arrived live: it glows once, so it's seen without a jump.
   const [fresh, setFresh] = useState(
     () => Date.now() - Date.parse(activity.occurredAt) < FRESH_MS
   );
@@ -319,7 +313,6 @@ function ActivityBody({
   compact: boolean;
 }) {
   const steps = stepsOf(activity, earlier);
-  // A note logged by hand often has the same text as title and body: say it once.
   if (steps === "" || steps === activity.title) {
     return null;
   }
@@ -373,8 +366,6 @@ function ActivityMeta({ activity }: { activity: Activity }) {
     ? byId.get(activity.onBehalfOfId)
     : undefined;
   const state = activity.agentState ? STATE[activity.agentState] : undefined;
-  // Most of the feed happens in Worklog itself or comes from agents through its API (their avatar
-  // already says so); naming that on every line is noise.
   const external = !IN_APP.has(activity.source);
   const isPrivate = activity.visibility === "private";
   if (!external && !behalf && activity.count <= 1 && !isPrivate && !state) {
@@ -390,7 +381,6 @@ function ActivityMeta({ activity }: { activity: Activity }) {
           <LockIcon size={10} /> Private
         </span>
       )}
-      {/* The line's ghost already shows the state; the badge only puts it in words. */}
       {state && <Badge tone={state.tone}>{state.label}</Badge>}
     </div>
   );

@@ -35,7 +35,6 @@ export type ActivityFilters = {
   limit?: number;
 };
 
-// Undefined when the source's `externalId` was already recorded: re-delivered events are no-ops.
 export async function insertActivity(db: DbOrTx, row: ActivityRow) {
   const [created] = await db
     .insert(activities)
@@ -117,7 +116,6 @@ export async function updateActivityById(
   return returned(rows, "activity");
 }
 
-// The entries memory cites, visible the same way as in `listActivities`; one deleted since is missing.
 export async function listActivitiesByIds(
   db: DbOrTx,
   params: { workspaceId: string; ids: string[]; privateFor: string[] }
@@ -142,7 +140,6 @@ export async function listActivitiesByIds(
     );
 }
 
-// Team-visible activity plus private entries authored by anyone in `privateFor` (the viewer and their personal agent in owner mode).
 export async function listActivities(
   db: DbOrTx,
   params: { workspaceId: string; privateFor: string[] } & ActivityFilters
@@ -366,8 +363,6 @@ export async function countActivitiesByActorHour(
     .groupBy(activities.actorId, hour);
 }
 
-// A run is one thread of an agent's work; an update with no thread is a run of its own, as its
-// question is filed under its id.
 const runThread = sql<string>`coalesce(${activities.threadKey}, ${activities.id})`;
 
 function runColumns() {
@@ -377,8 +372,6 @@ function runColumns() {
     title: activities.title,
     at: activities.occurredAt,
     cardNumber: cards.number,
-    // The inbox item its question raised: once its person has settled it, the agent is no longer
-    // waiting, even before it says so.
     asked: attentionItems.state,
   };
 }
@@ -472,7 +465,6 @@ export async function deleteActivityByExternalId(
   return deleted.length;
 }
 
-// A merged activity (count > 1) stands for several events, so one event's edit doesn't rewrite it.
 export async function updateUnmergedActivity(
   db: DbOrTx,
   params: {
@@ -497,8 +489,6 @@ export async function updateUnmergedActivity(
   return updated.length;
 }
 
-// Replay rebuilds these from the stored deliveries of one lane, received in the window. Their
-// ingested_events entries go with them.
 export async function deleteLaneActivities(
   db: DbOrTx,
   params: { connectionId: string; lane: number; since?: Date; until: Date }
@@ -526,7 +516,6 @@ export async function deleteLaneActivities(
   return deleted.length;
 }
 
-// Linking an identity re-attributes everything it already did.
 export async function updateActivitiesActor(
   db: DbOrTx,
   params: { actorIdentityId: string; actorId: string | null }

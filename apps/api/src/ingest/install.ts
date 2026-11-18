@@ -105,10 +105,6 @@ async function installable(ctx: AppContext, provider: string) {
   return { spec, app };
 }
 
-/**
- * Where the admin's browser goes once the provider is done with it. Only the web app's own
- * origins: anything else would make this server an open redirect.
- */
 function returnOrigin(ctx: AppContext, returnTo: unknown) {
   if (typeof returnTo !== "string") {
     return null;
@@ -146,8 +142,6 @@ export async function completeInstall(
   provider: string,
   query: Record<string, string>
 ) {
-  // Checked first and used up last: a link survives this server or the provider failing
-  // halfway, and still works only once.
   const { spec, app } = await installable(ctx, provider);
   const token = { provider, purpose: "install" as const, token: query.state };
   await peekState(ctx, token);
@@ -183,7 +177,6 @@ export async function connectInstallation(
   const { provider, workspaceId, memberId, installed } = params;
   try {
     return await transact(ctx, async (tx) => {
-      // GitHub gives a reinstall a new installation id; the account finds what it replaces.
       const byId = await findConnectionByExternalId(tx.db, {
         provider,
         externalId: installed.externalId,
@@ -204,7 +197,6 @@ export async function connectInstallation(
             `That ${provider} account is already connected to another workspace on this server`
           );
         }
-        // Uninstalled there: the installation is free, and the old connection keeps its history.
         await updateConnectionById(tx.db, {
           id: found.id,
           set: { externalId: null },
@@ -215,13 +207,9 @@ export async function connectInstallation(
         ? await updateConnectionById(tx.db, {
             id: found.id,
             set: {
-              // The admin may have renamed it; a renamed account says so by webhook.
               externalId: installed.externalId,
-              // An admin's pause outlasts a reinstall, as it does the provider's unsuspend.
               status: found.status === "paused" ? "paused" : "active",
               statusReason: null,
-              // The admin's choices stay; what the provider just said about itself replaces
-              // what it said before.
               settings: { ...found.settings, ...installed.settings },
               secrets: tx.secrets.seal({
                 ...tx.secrets.open(found.secrets),

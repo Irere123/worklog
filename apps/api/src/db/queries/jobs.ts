@@ -14,7 +14,6 @@ export type NewJob = {
   delayMs: number | null;
 };
 
-// Graphile Worker's own SQL API, so a job added inside a transaction commits with it.
 export async function addJob(db: DbOrTx, job: NewJob) {
   await db.execute(sql`select ${addJobCall(job)}`);
 }
@@ -39,7 +38,6 @@ function runAt(job: NewJob) {
     : sql`now() + make_interval(secs => ${job.delayMs / 1000})`;
 }
 
-// Jobs that could run now: not running, due, with attempts left.
 export async function countRunnableJobs(db: DbOrTx) {
   const result = await db.execute<{ n: number }>(
     sql`select count(*)::int as n from graphile_worker._private_jobs

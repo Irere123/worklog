@@ -38,7 +38,6 @@ export async function answerAttention(
       `"${tool}" isn't something an assistant can be allowed to do`
     );
   }
-  // Only the member's own assistant acts on their approval.
   if (agent?.ownerId !== member.id) {
     throw forbidden();
   }

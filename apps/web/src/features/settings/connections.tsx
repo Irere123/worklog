@@ -48,7 +48,6 @@ const STATUS: Record<
   revoked: { label: "Disconnected", tone: "red", status: "failed" },
 };
 
-// Settings that hold several values; the rest are single strings.
 const LISTS = new Set([
   "repos",
   "bots",
@@ -177,7 +176,6 @@ export function Connections() {
   );
 }
 
-/** The tool's own mark in a calm tile, the same mark its activity carries in the feed. */
 function ProviderMark({ provider }: { provider: string }) {
   return (
     <span {...stylex.props(styles.mark)}>

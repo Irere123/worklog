@@ -61,7 +61,6 @@ async function linkByEmail(
   }
 }
 
-// What events already said wins: the directory only fills gaps.
 function filled(
   identity: {
     displayName: string | null;
@@ -79,10 +78,6 @@ function filled(
   };
 }
 
-/**
- * The account belongs to one of the workspace's connections for the provider (two Slack teams are
- * two connections), and identities don't say which: ask each until one knows it.
- */
 async function lookUp(
   ctx: AppContext,
   connector: Connector,

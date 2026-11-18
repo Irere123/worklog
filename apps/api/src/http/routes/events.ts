@@ -90,7 +90,6 @@ export const eventRoutes = router().openapi(
       while (!stream.aborted) {
         while (queue.length > 0) {
           for (const e of queue.splice(0)) {
-            // Skip what the replay already sent.
             if (after === undefined || e.seq > cursor) {
               await stream.writeSSE(frame(e));
             }

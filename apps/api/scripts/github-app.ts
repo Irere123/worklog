@@ -5,11 +5,6 @@ import { parseArgs } from "node:util";
 import { escapeHtml } from "#automations/sanitize";
 import { convertManifest, githubManifest } from "#connectors/github/app";
 
-// Creates the GitHub App for a deployed server, from the operator's machine: one app serves every
-// workspace on the server, so on one hosting several teams it belongs in the environment, not in
-// any one workspace's settings. GitHub hands the credentials back once; they go to a file, not
-// the terminal, so they don't sit in scrollback.
-
 const { values } = parseArgs({
   options: {
     url: { type: "string" },
@@ -21,8 +16,6 @@ const { values } = parseArgs({
   },
 });
 
-// Bun reads apps/api/.env, whose PUBLIC_URL is this machine's: an app pointed there would get
-// no webhooks once deployed, so the address is asked for, never assumed.
 const url = values.url?.replace(/\/+$/u, "");
 if (!url || !URL.canParse(url) || isLocal(url)) {
   console.error(
@@ -51,8 +44,6 @@ async function finish(code: string) {
     GITHUB_CLIENT_ID: app.credentials.clientId,
     GITHUB_CLIENT_SECRET: app.credentials.clientSecret,
     GITHUB_APP_WEBHOOK_SECRET: app.credentials.webhookSecret,
-    // One line: Railway's variables and .env files both keep it whole, and the server turns
-    // the \n back into line breaks.
     GITHUB_APP_PRIVATE_KEY: app.credentials.privateKey
       .trim()
       .replaceAll("\n", "\\n"),
@@ -131,7 +122,6 @@ for await (const line of console) {
   process.exit(0);
 }
 
-/** A server only this machine can reach: GitHub couldn't deliver its webhooks there. */
 function isLocal(address: string) {
   const { hostname } = new URL(address);
   return (

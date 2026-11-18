@@ -187,7 +187,6 @@ export type CardInput = {
   externalUrl?: string | null;
 };
 
-// `silent` skips the activity write when the ingested event is itself the record.
 export type EffectOpts = { silent?: boolean };
 
 export async function createCard(
@@ -369,7 +368,6 @@ export async function updateCard(
         workspaceId: actor.workspaceId,
         id: boardId,
       });
-      // Columns are per board: moving boards sends the card back to triage there.
       Object.assign(set, {
         boardId,
         columnId: null,
@@ -753,7 +751,6 @@ const dueDay = new Intl.DateTimeFormat("en-GB", {
   timeZone: "UTC",
 });
 
-/** The edit as the log line says it: what a person would write, not the fields that changed. */
 function describeEdit(patch: Parameters<typeof updateCard>[3]) {
   const said: string[] = [];
   if (patch.title !== undefined) {

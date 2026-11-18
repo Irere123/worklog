@@ -105,7 +105,6 @@ function Row({
 }) {
   return (
     <div {...stylex.props(styles.viewport)}>
-      {/* The list twice, so the loop's seam lands on an identical frame. */}
       <ul {...stylex.props(styles.track, reverse && styles.reverse)}>
         {[...items, ...items].map((item, at) => (
           <li
@@ -125,7 +124,6 @@ function Row({
 
 const slide = stylex.keyframes({
   from: { transform: "translateX(0)" },
-  // Half the doubled list plus half a gap, so the seam lands exactly on the copy.
   to: { transform: `translateX(calc(-50% - ${space.lg} / 2))` },
 });
 
@@ -142,8 +140,6 @@ const styles = stylex.create({
     flexDirection: "column",
     gap: space.lg,
   },
-  // Held still, the ticker would hide most of its tiles past the edge, so the row scrolls by hand
-  // instead: one copy of the list, no fade, swipeable on a phone.
   viewport: {
     overflowX: {
       default: "hidden",
@@ -167,7 +163,6 @@ const styles = stylex.create({
     margin: 0,
     padding: 0,
     listStyle: "none",
-    // Paused rather than removed, the reversed row would hold its end frame, half a list along.
     animationName: {
       default: slide,
       [STILL]: "none",
@@ -210,8 +205,6 @@ const styles = stylex.create({
       [STILL]: "none",
     },
   },
-  // Every name sits the same step under its mark, however its line below wraps. The box is a
-  // fixed 24px, so a mark drawn larger to match its neighbours' weight doesn't push its name down.
   mark: {
     display: "flex",
     alignItems: "center",

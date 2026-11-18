@@ -24,9 +24,6 @@ import { workSnapshotTool } from "./tools/work-snapshot";
 
 export type { Scope } from "./tools/scope";
 
-// One file per tool, each a function of the conversation's scope. The keys here are the names the
-// model sees. Write tools exist only in owner mode, except one for teammates: leaving a note for
-// the owner. Privacy is enforced by what the tools query, not by the prompt.
 export function assistantTools(scope: Scope): ToolSet {
   const lookups = readTools(scope);
   const read = { ...lookups, look_into: lookIntoTool(scope, lookups) };
@@ -49,7 +46,6 @@ export function assistantTools(scope: Scope): ToolSet {
   };
 }
 
-// What a routine can use too: lookups only, scoped like a conversation in the same mode.
 export function readTools(scope: Scope) {
   return {
     team_directory: teamDirectoryTool(scope),

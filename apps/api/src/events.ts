@@ -20,10 +20,7 @@ type Publish = {
   data: Record<string, unknown>;
 };
 
-// How often other processes' events are read: the most a realtime update waits for, roughly.
 const POLL_MS = 250;
-// Events from concurrent inserts can commit out of seq order, a moment apart: a seq skipped over
-// is looked for again for this long, then taken for a rolled-back insert's gap.
 const MISSING_MS = 60_000;
 const BATCH = 1000;
 
@@ -89,8 +86,6 @@ export class EventBus {
     });
   }
 
-  // A relay read can see the rows before the insert returns their seqs: it waits for the local
-  // inserts in flight when it ran, which then have marked their rows sent.
   private async local(write: () => Promise<void>) {
     const run = write();
     this.hub.inflight.add(run);
@@ -114,7 +109,6 @@ export class EventBus {
     return this.held !== null;
   }
 
-  // One insert for everything the transaction published.
   async release() {
     const held = this.held?.splice(0) ?? [];
     if (held.length === 0) {
@@ -166,7 +160,6 @@ export class EventBus {
     this.hub.floor = await findLatestEventSeq(this.db);
     this.hub.cursor = this.hub.floor;
     this.hub.relaying = true;
-    // The read under way, which stopping waits for: a tick that finds one leaves it be.
     let reading = Promise.resolve();
     const timer = setInterval(() => {
       if (this.hub.reading) {
@@ -185,7 +178,6 @@ export class EventBus {
     };
   }
 
-  // One read at a time; a tick that finds one under way asks for one more after it.
   private async catchUp() {
     if (this.hub.reading) {
       this.hub.again = true;
@@ -199,7 +191,6 @@ export class EventBus {
       } while (this.hub.again);
       this.hub.failing = false;
     } catch (error) {
-      // Once per outage, not four times a second.
       if (!this.hub.failing) {
         log.error("bus: relay failed", { error });
       }
@@ -217,7 +208,6 @@ export class EventBus {
         alsoSeqs: [...hub.missing.keys()],
         limit: BATCH,
       });
-      // Only those in flight now can be in what was read; later ones don't hold it up.
       await Promise.allSettled(hub.inflight);
       for (const event of rows) {
         hub.missing.delete(event.seq);
@@ -231,7 +221,6 @@ export class EventBus {
         }
         hub.cursor = Math.max(hub.cursor, event.seq);
       }
-      // A seq still missing may yet be read back: what this process sent of it must stay known.
       for (const seq of hub.sent) {
         if (seq <= hub.cursor && !hub.missing.has(seq)) {
           hub.sent.delete(seq);

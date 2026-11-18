@@ -35,7 +35,6 @@ export function Ghost({
   label?: string;
 }) {
   const id = `ghost-${useId().replaceAll(/[^a-zA-Z0-9]/gu, "")}`;
-  // Shading and the hem's underside are sub-pixel at icon sizes: they'd cost paint for nothing.
   const detailed = size >= 28;
   const halt = still && styles.halt;
   return (
@@ -115,20 +114,12 @@ export function Ghost({
   );
 }
 
-// A bell: a round head on sides that flare a little toward the hem, as cloth falls.
 const BODY =
   "M7.4 11.6a8.6 8.6 0 0 1 17.2 0c0 4.6.3 8 1 11.2v.8H6.4v-.8c.7-3.2 1-6.6 1-11.2Z";
 
-// The hem is a row of lobes, each its own shape that stretches and gathers a beat behind the one
-// beside it, so the cloth ripples without morphing a path (which Safari can't animate). Sliding
-// a strip under a clip did that too, but the clip cut lobes off flat at both sides. Each lobe
-// hangs from a little inside the body, so a gathered one never opens a gap at the seam.
 const HEM_TOP = 22.6;
-// Where the body's bottom edge is: a lobe's shading starts there, not overlapping the body's own.
 const SEAM = 23.6;
 
-// Four lobes across the body; at icon sizes four turn into a fringe, so a small ghost has three
-// deeper ones.
 const HEM = {
   large: lobes({
     width: 4.8,
@@ -162,8 +153,6 @@ function lobes({
   });
 }
 
-// The wave's period in each mood, a whole fraction of the body's own loop so the two stay in step:
-// half the float, half the lean, half the hop, half the pencil's line. An error lets it hang.
 const WAVES: Record<Mood, number | null> = {
   idle: 1.6,
   listening: 1.1,
@@ -174,7 +163,6 @@ const WAVES: Record<Mood, number | null> = {
   error: null,
 };
 
-// How far each lobe's swing runs ahead of the one to its left, as a share of the wave.
 const LAG = 0.3;
 
 function Hem({
@@ -186,7 +174,6 @@ function Hem({
   mood: Mood;
   detailed: boolean;
   still: boolean;
-  /** The shading's fill, on a ghost big enough to show it; with it comes the hem's underside. */
   shade?: string;
 }) {
   const halt = still && styles.halt;
@@ -216,8 +203,6 @@ function Hem({
   );
 }
 
-// Eyes are sized for the drawing they're in: a hero ghost has the reference's small, set-apart
-// eyes, and an icon-sized one gets bigger ones that still read at 14px.
 const EYE = {
   large: { left: 13, right: 19, y: 12.4, rx: 1.15, ry: 1.6, line: 1.3 },
   small: { left: 12.6, right: 19.4, y: 12.6, rx: 1.5, ry: 2.05, line: 1.7 },
@@ -279,7 +264,6 @@ function Eyes({
   );
 }
 
-/** What floats beside it: the curl while it thinks, glints when it's done, a drop when it fails. */
 function Props({ mood, still }: { mood: Mood; still: boolean }) {
   const halt = still && styles.halt;
   if (mood === "thinking") {
@@ -319,7 +303,6 @@ function Props({ mood, still }: { mood: Mood; still: boolean }) {
   return null;
 }
 
-/** A pencil that writes a line out under the ghost, then lifts and starts the next. */
 function Pencil({ still }: { still: boolean }) {
   const halt = still && styles.halt;
   return (
@@ -346,13 +329,11 @@ const float = stylex.keyframes({
   "50%": { transform: "translateY(-1.2px)" },
 });
 
-// The shadow shrinks and fades as the ghost rises, so the float reads as height, not a wobble.
 const shadowFloat = stylex.keyframes({
   "0%, 100%": { transform: "scaleX(1)", opacity: 1 },
   "50%": { transform: "scaleX(0.8)", opacity: 0.55 },
 });
 
-// A lobe draws out, swings, gathers and swings back, so its tip rolls the way cloth does.
 const ripple = stylex.keyframes({
   "0%, 100%": { transform: "scaleY(1.12) skewX(0deg)" },
   "25%": { transform: "scaleY(0.92) skewX(-7deg)" },
@@ -360,14 +341,12 @@ const ripple = stylex.keyframes({
   "75%": { transform: "scaleY(0.92) skewX(7deg)" },
 });
 
-// The hem follows the float a beat late: drawn out while the ghost rises, gathered as it sinks.
 const drag = stylex.keyframes({
   "0%, 50%, 100%": { transform: "scaleY(1)" },
   "30%": { transform: "scaleY(1.12)" },
   "80%": { transform: "scaleY(0.9)" },
 });
 
-// The hop's follow-through: gathered in the crouch, trailing on the way up, bunched on landing.
 const hopDrag = stylex.keyframes({
   "0%, 58%, 100%": { transform: "scaleY(1)" },
   "62%": { transform: "scaleY(0.85)" },
@@ -376,7 +355,6 @@ const hopDrag = stylex.keyframes({
   "85%": { transform: "scaleY(1.08)" },
 });
 
-// The lean's follow-through: the hem swings past the body and back a beat after it.
 const swing = stylex.keyframes({
   "0%, 50%, 100%": { transform: "skewX(0deg)" },
   "25%": { transform: "skewX(5deg)" },
@@ -388,20 +366,17 @@ const blink = stylex.keyframes({
   "95%": { transform: "scaleY(0.1)" },
 });
 
-// Now and then it looks one way, then the other, as anyone waiting at a desk does.
 const glance = stylex.keyframes({
   "0%, 40%, 60%, 84%, 100%": { transform: "translateX(0)" },
   "44%, 56%": { transform: "translateX(-0.7px)" },
   "64%, 80%": { transform: "translateX(0.7px)" },
 });
 
-// Head still, hem swung out: leaning in to hear you.
 const lean = stylex.keyframes({
   "0%, 100%": { transform: "rotate(-6deg) scale(1.03)" },
   "50%": { transform: "rotate(-3deg) scale(1.03)" },
 });
 
-// A hop and settle, like someone looking up from their desk to catch your eye.
 const hop = stylex.keyframes({
   "0%, 55%, 100%": { transform: "translateY(0) scale(1)" },
   "60%": { transform: "translateY(0) scale(1.06, 0.94)" },
@@ -415,7 +390,6 @@ const spin = stylex.keyframes({
   to: { transform: "rotate(360deg)" },
 });
 
-// Drawn in from the centre, then erased from it, so the spiral seems to wind and unwind.
 const draw = stylex.keyframes({
   "0%": { strokeDashoffset: 1 },
   "50%": { strokeDashoffset: 0 },
@@ -460,14 +434,12 @@ const scribble = stylex.keyframes({
   "86%, 100%": { strokeDashoffset: 0, opacity: 0 },
 });
 
-// The pencil keeps pace with the line's end, then goes back to start the next.
 const jot = stylex.keyframes({
   "0%": { transform: "translateX(-7.5px)" },
   "72%, 86%": { transform: "translateX(0)" },
   "100%": { transform: "translateX(-7.5px)" },
 });
 
-// Up and down with each stroke of the line.
 const nib = stylex.keyframes({
   "0%, 100%": { transform: "translateY(0)" },
   "50%": { transform: "translateY(-0.8px)" },
@@ -483,25 +455,17 @@ const styles = stylex.create({
     animationTimingFunction: motion.inOut,
     animationIterationCount: "infinite",
   },
-  // Rotations and scales turn about the part itself, not the corner of the drawing.
   part: { transformBox: "fill-box", transformOrigin: "50% 100%" },
-  // The figure turns about fixed points in the drawing (here the hem's foot) rather than its own
-  // box, which the moving hem resizes every frame and would set the pivot drifting.
   figure: { transformBox: "view-box", transformOrigin: "16px 25px" },
   ink: { fill: "currentColor" },
-  // The hem's underside, a shade darker in either theme, so the cloth has a thickness.
   underside: { fill: color.fold },
   sheen: { stopColor: color.sheen },
   shade: { stopColor: color.shade },
-  // Charcoal rather than the page's full ink, as soft cloth reads; set on the whole figure so
-  // the body and hem don't show a seam where they overlap.
   body: {
     opacity: 0.9,
     transitionProperty: "opacity",
     transitionDuration: motion.slow,
   },
-  // Faded as a whole rather than path by path, where the body and hem overlap and would show a
-  // darker seam; 0.58 lands on fgFaint against the page in both themes.
   faded: { opacity: 0.58 },
   stroke: {
     fill: "none",
@@ -516,7 +480,6 @@ const styles = stylex.create({
     transformBox: "fill-box",
     transformOrigin: "center",
   },
-  // Drawn out and gathered from where it hangs, so the seam with the body never moves.
   trail: {
     transformBox: "view-box",
     transformOrigin: "16px 22.6px",
@@ -621,7 +584,6 @@ const styles = stylex.create({
     animationTimingFunction: "linear",
     animationIterationCount: "infinite",
   },
-  // Three strokes in the line's 1.3s, so the nib bobs once a stroke.
   nib: {
     animationName: { default: nib, [REDUCED]: "none" },
     animationDuration: "433ms",
@@ -630,7 +592,6 @@ const styles = stylex.create({
   },
 });
 
-// One float for every mood that floats, so changing mood never makes it jump.
 const floating = {
   animationName: { default: float, [REDUCED]: "none" },
   animationDuration: "3.2s",
@@ -643,7 +604,6 @@ const floats = stylex.create({
   writing: floating,
   waiting: floating,
   done: floating,
-  // It sets down: nothing to float about.
   error: { transform: "translateY(1.2px)" },
 });
 
@@ -665,7 +625,6 @@ const shadows = stylex.create({
 const bodies = stylex.create({
   idle: {},
   listening: {
-    // The crown of the head, so it stays put while the hem swings out.
     transformOrigin: "16px 3px",
     transform: { default: null, [REDUCED]: "rotate(-5deg)" },
     animationName: { default: lean, [REDUCED]: "none" },
@@ -697,7 +656,6 @@ const dragging = {
   animationDuration: "3.2s",
 } as const;
 
-// The hem's follow-through takes the body's own loop and length, so it lands with it.
 const trails = stylex.create({
   idle: dragging,
   listening: {
@@ -715,8 +673,6 @@ const trails = stylex.create({
   error: {},
 });
 
-// Where it looks: at you while listening or waiting, up and away while thinking, down at the
-// pencil while writing, down and in when something's gone wrong.
 const looks = stylex.create({
   idle: {},
   listening: { transform: "translateX(-0.5px) scale(1.2)" },

@@ -8,7 +8,6 @@ import { AI, OPEN, PRIVACY, START } from "./questions";
 import type { Question } from "./questions";
 import { focus, links, page } from "./styles";
 
-// The five a team asks first; the rest wait on the FAQ page.
 const FIRST: Question[] = [START[1], OPEN[1], AI[0], AI[2], PRIVACY[0]].filter(
   (each) => each !== undefined
 );
@@ -88,7 +87,6 @@ const styles = stylex.create({
     transitionProperty: "color",
     transitionDuration: motion.fast,
     borderRadius: radius.xs,
-    // Safari draws its own disclosure triangle unless the marker is hidden this way.
     "::-webkit-details-marker": {
       display: "none",
     },
@@ -99,7 +97,6 @@ const styles = stylex.create({
     transitionProperty: "transform",
     transitionDuration: motion.base,
     transitionTimingFunction: motion.out,
-    // The plus turns into a cross when the answer is open: the same strokes, rotated.
     transform: {
       default: "none",
       ":is([open] > summary > *)": "rotate(45deg)",

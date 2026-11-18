@@ -1,5 +1,3 @@
-// The design rules a reviewer kept catching by eye, checked on every lint run so agents and
-// people building without a designer in the room hold the same line. docs/DESIGN.md says why.
 import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 
@@ -47,9 +45,6 @@ for (const file of walk(root)) {
   for (const rule of RULES) {
     for (const match of source.matchAll(rule.pattern)) {
       const line = source.slice(0, match.index).split("\n").length;
-      if (allowed(source, line)) {
-        continue;
-      }
       failures.push(
         `${path.relative(process.cwd(), file)}:${line}  ${rule.name}: ${rule.why}`
       );
@@ -65,12 +60,6 @@ if (failures.length > 0) {
   process.exit(1);
 }
 console.log("Design rules hold.");
-
-/** A deliberate exception names itself on the line above: `// design-allow: <reason>`. */
-function allowed(source: string, line: number) {
-  const above = source.split("\n")[line - 2] ?? "";
-  return /\/\/ design-allow: \S/u.test(above);
-}
 
 function* walk(dir: string): Generator<string> {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {

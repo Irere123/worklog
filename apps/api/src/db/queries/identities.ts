@@ -23,7 +23,6 @@ export async function insertIdentity(
   }
 }
 
-// For ingestion, where two deliveries can see a new account at once: the loser gets undefined.
 export async function insertIdentityIfNew(
   db: DbOrTx,
   row: typeof identities.$inferInsert
@@ -36,7 +35,6 @@ export async function insertIdentityIfNew(
   return created;
 }
 
-// Several new accounts in one statement; the ones another delivery created first are left out.
 export async function insertIdentitiesIfNew(
   db: DbOrTx,
   rows: (typeof identities.$inferInsert)[]
@@ -97,13 +95,11 @@ export async function listIdentitiesByHandles(
         sql`${identities.externalId} not like 'handle:%'`
       )
     )
-    // An account new enough that its sightings aren't counted yet still ranks by when it was.
     .orderBy(
       sql`coalesce(${identities.lastSeenAt}, ${identities.firstSeenAt}, ${identities.createdAt}) desc`
     );
 }
 
-// `handle` matches the last-seen login case-insensitively; pass it lowercase.
 export async function findIdentityByExternalIdOrHandle(
   db: DbOrTx,
   params: {
@@ -189,7 +185,6 @@ export async function updateIdentityById(
   return row;
 }
 
-// Only when something about the account changed; the sighting count goes through the tally.
 export async function updateIdentityDetails(
   db: DbOrTx,
   params: {
@@ -214,7 +209,6 @@ export async function updateIdentityDetails(
     .where(eq(identities.id, params.id));
 }
 
-// One statement for a batch of sightings (ingest/tally.ts).
 export async function updateIdentitySightings(
   db: DbOrTx,
   rows: { id: string; n: number; first: Date; last: Date }[]

@@ -47,7 +47,6 @@ export async function updateMemberById(
   return returned(rows, "member");
 }
 
-// Fills only an empty picture, so one the person chose, or an earlier account's, stays.
 export async function fillMemberAvatars(
   db: DbOrTx,
   params: { ids: string[]; avatarUrl: string }
@@ -82,7 +81,6 @@ export async function listMembers(
     .orderBy(members.createdAt);
 }
 
-// `workspaceId` is optional for jobs, which hold an id that came from a row in a known workspace.
 export async function findMemberById(
   db: DbOrTx,
   params: { id: string; workspaceId?: string }
@@ -101,7 +99,6 @@ export async function findMemberById(
   return row;
 }
 
-// Handles are stored lowercase; pass them without the `@`.
 export async function listMembersByHandles(
   db: DbOrTx,
   params: { workspaceId: string; handles: string[] }
@@ -136,7 +133,6 @@ export async function findMemberByIdOrHandle(
   return row;
 }
 
-// `root` comes from slugify, so it can't carry LIKE wildcards.
 export async function listHandlesLike(
   db: DbOrTx,
   params: { workspaceId: string; root: string }
@@ -184,7 +180,6 @@ export async function listMemberships(db: DbOrTx, params: { userId: string }) {
     .orderBy(asc(members.createdAt));
 }
 
-// A member with an email but no user is an invite, waiting for a sign-in with that address.
 export async function listPendingInvites(
   db: DbOrTx,
   params: { email: string }
@@ -215,8 +210,6 @@ export async function setMembersUser(
     .where(inArray(members.id, params.ids));
 }
 
-// Explicit links first, then sign-in accounts, so signing in with GitHub is enough to be attributed.
-// Pass every id the event carries (e.g. GitHub's numeric id and login).
 export async function findMemberByIdentity(
   db: DbOrTx,
   params: {
@@ -277,7 +270,6 @@ export async function findMemberBySignIn(
   return row?.member;
 }
 
-// Who hears about a connection nobody is recorded as having installed.
 export async function findWorkspaceOwner(
   db: DbOrTx,
   params: { workspaceId: string }
@@ -298,7 +290,6 @@ export async function findWorkspaceOwner(
   return row;
 }
 
-// Active people whose email is `email`, compared case-insensitively.
 export async function listHumansByEmail(
   db: DbOrTx,
   params: { workspaceId: string; email: string }
@@ -317,7 +308,6 @@ export async function listHumansByEmail(
     .limit(2);
 }
 
-// Who signed in with each of these provider accounts, for resolving a delivery's people at once.
 export async function listMembersBySignIn(
   db: DbOrTx,
   params: { workspaceId: string; provider: string; accountIds: string[] }

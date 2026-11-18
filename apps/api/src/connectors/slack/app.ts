@@ -50,7 +50,6 @@ const Access = z.object({
 
 const Auth = z.object({ url: z.string().optional() });
 
-// Interactions carry the installation they came from, worked out in `receive`.
 const Routed = z.object({ install: z.string().nullish() });
 
 const Lifecycle = z.object({
@@ -101,7 +100,6 @@ export const slackApp: AppSpec = {
     const routed = Routed.safeParse(received.payload);
     return routed.success ? (routed.data.install ?? null) : null;
   },
-  // `app_uninstalled` and `tokens_revoked` arrive in no set order; either one ends it.
   lifecycle(eventType, payload) {
     if (eventType !== "app_uninstalled" && eventType !== "tokens_revoked") {
       return null;
@@ -126,8 +124,6 @@ export const slackApp: AppSpec = {
       redirect_uri: callbackUrl,
       state,
     }).toString()}`,
-  // The code is exchanged with the app's secret, so the team it returns is the one the admin
-  // approved on Slack's own page.
   async completeInstall(ctx, app, query, callbackUrl) {
     if (!query.code) {
       throw badRequest(

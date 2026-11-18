@@ -152,13 +152,11 @@ describe("GitHub", () => {
     await env.call("DELETE", `/v1/cards/${card.number}/closure`, {
       token: owner.token,
     });
-    // The same close, read back by a sync under another delivery id.
     await send("issues", closedByBot, { delivery: "bot-close-again" });
     [card] = (await env.call("GET", "/v1/cards", { token: owner.token })).body;
     expect(card.stage).not.toBe("done");
   });
 
-  // Closed by a bot under one bot policy, reopened by hand, then read again under the other.
   const stageAfterReread = async (first: string, then: string) => {
     const { owner, board, conn, send } = await github();
     const policy = async (bots: string) =>
@@ -217,7 +215,6 @@ describe("GitHub", () => {
       body: { archived: true },
     });
     expect(archived.status).toBe(200);
-    // What else the connection holds can still change.
     const renamed = await env.call("PATCH", `/v1/connections/${conn.id}`, {
       token: owner.token,
       body: { name: "Acme code" },
@@ -452,7 +449,6 @@ describe("Slack", () => {
         token: owner.token,
       })
     ).body;
-    // C0RANDOM isn't an opted-in channel
     expect(msgs).toHaveLength(1);
     const samItems = (
       await env.call("GET", "/v1/attention", { token: sam.token })

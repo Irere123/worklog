@@ -20,7 +20,6 @@ export async function listConnectorApps(db: DbOrTx) {
   return await db.select().from(connectorApps);
 }
 
-// Undefined when the provider already has an app: credentials are replaced only on purpose.
 export async function insertConnectorApp(
   db: DbOrTx,
   row: typeof connectorApps.$inferInsert
@@ -53,7 +52,6 @@ export async function updateConnectorApp(
   return row;
 }
 
-// Only if nobody changed them since they were read; false otherwise.
 export async function updateConnectorAppCredentialsIfUnchanged(
   db: DbOrTx,
   params: { provider: string; from: string; to: string }
@@ -88,7 +86,6 @@ export async function updateConnectorAppTally(db: DbOrTx, params: AppTally) {
       lastUnroutedAt: sql`greatest(${connectorApps.lastUnroutedAt}, ${params.lastUnroutedAt}::timestamptz)`,
       rejections: sql`${connectorApps.rejections} + ${params.rejections}`,
       lastRejectedAt: sql`greatest(${connectorApps.lastRejectedAt}, ${params.lastRejectedAt}::timestamptz)`,
-      // The reason that goes with the latest time, whichever process flushes first.
       lastRejection: sql`case
         when ${params.lastRejectedAt}::timestamptz is not null
           and (${connectorApps.lastRejectedAt} is null or ${params.lastRejectedAt}::timestamptz >= ${connectorApps.lastRejectedAt})

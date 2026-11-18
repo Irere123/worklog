@@ -9,8 +9,6 @@ export type Schemas = components["schemas"];
 const KEY = "worklog.apiKey";
 const WORKSPACE = "worklog.workspace";
 
-// Browsers sign in with a session cookie; an API key from setup or settings is the fallback for
-// servers without email, and for testing as an agent.
 export const auth = {
   key: () => localStorage.getItem(KEY),
   setKey(key: string | null) {
@@ -87,8 +85,6 @@ export async function unwrap<T>(call: Promise<Result<T>>): Promise<T> {
   );
 }
 
-// The API's validation message is written for developers ("✖ Invalid email → at email"); a
-// person reads the first problem, named by its field: "Email: Invalid email address".
 function readable(issue: { path?: (string | number)[]; message?: string }) {
   const field = issue.path?.findLast((part) => typeof part === "string");
   if (!issue.message) {
@@ -126,7 +122,6 @@ export async function unwrapEarly<T>(
   );
 }
 
-// openapi-fetch leaves data unset only for an empty body (a 204), which the API never sends.
 function succeeded<T>(result: Result<T>): result is Result<T> & { data: T } {
   return result.error === undefined && result.response.ok;
 }

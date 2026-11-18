@@ -56,7 +56,6 @@ export type AttentionInput = {
   wakeAt?: Date | null;
 };
 
-/** Further out than this belongs on the board, not in someone's queue. */
 const FOLLOW_UP_MAX_DAYS = 90;
 
 /**
@@ -91,14 +90,9 @@ export async function scheduleFollowUp(
   });
 }
 
-/** How many high-priority items one sender may raise for one person per day; the rest become normal. */
 const SENDER_HIGH_QUOTA = { human: 2, agent: 1 } as const;
 export const AGENT_QUESTION = "agent.needs_you";
-// A coding agent's question to its own person blocks the work they gave it, so it stays urgent
-// however many it asked today; what bounds a looping agent is how many it has waiting at once.
-// The person's push budget still decides when they hear.
 export const AGENT_QUESTIONS_WAITING = 3;
-/** An urgent item pulls that person's attention check forward to now + this, merging bursts. */
 const URGENT_DEBOUNCE_MS = 3 * 60_000;
 
 export async function raiseAttention(
@@ -218,7 +212,6 @@ export async function updateAttention(
         patch.state === "snoozed" ? (patch.snoozedUntil ?? null) : null,
       resolvedAt: resolved ? ctx.now() : null,
       ...(patch.state === "done" ? { actedAt: ctx.now() } : {}),
-      // Snoozing asks for it back later: when it wakes, the check decides afresh whether to push it.
       ...(patch.state === "snoozed"
         ? { consideredAt: null, disposition: null, reason: null }
         : {}),
@@ -293,8 +286,6 @@ export async function recordNotification(
     ...input,
     createdAt: ctx.now(),
   });
-  // An open tab is one more place the message lands, so it gets only what was actually sent:
-  // the ping budget has already been applied.
   await ctx.bus.publish({
     workspaceId: input.workspaceId,
     audienceId: input.memberId,
@@ -308,7 +299,6 @@ export async function recordNotification(
   });
 }
 
-// The items a team-visible message may mention.
 export async function teamVisibleAttention(
   ctx: AppContext,
   items: AttentionItem[]
@@ -351,7 +341,6 @@ export async function giveFeedback(
   return { kind: item.kind, muted: muted.has(item.kind) };
 }
 
-/** The last this many pings of one kind all dismissed, none acted on, say the same as "not useful". */
 const DISMISSED_TO_MUTE = 3;
 
 /**
@@ -455,7 +444,6 @@ export function assertAction(item: AttentionItem, actionId: string) {
   }
 }
 
-// How many of the assistant's requests wait for an OK is part of its presence.
 async function waitingChanged(
   ctx: AppContext,
   item: Pick<AttentionItem, "kind" | "workspaceId" | "memberId">

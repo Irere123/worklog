@@ -6,7 +6,6 @@ import { useMe } from "#features/auth/session";
 
 type Me = NonNullable<ReturnType<typeof useMe>>;
 
-// The stack is a handful of cards kept within reach, not a second board.
 export const MAX_PINS = 12;
 
 /**

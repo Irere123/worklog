@@ -7,7 +7,6 @@ const listeners = new Set<() => void>();
 
 const schemeOf = (theme: Theme) => (theme === "system" ? "light dark" : theme);
 
-// Runs before first paint so a dark-mode reader never sees a white flash.
 export const THEME_SCRIPT = `try{var t=localStorage.getItem("${KEY}");document.documentElement.style.colorScheme=t==="light"||t==="dark"?t:"light dark"}catch(e){}`;
 
 function read(): Theme {
@@ -17,7 +16,6 @@ function read(): Theme {
 
 export function setTheme(theme: Theme) {
   localStorage.setItem(KEY, theme);
-  // Every colour changes at once; buttons fading on their own would read as lag, not a switch.
   const still = document.createElement("style");
   still.textContent = "*,*::before,*::after{transition:none!important}";
   document.head.append(still);

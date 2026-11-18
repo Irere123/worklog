@@ -4,14 +4,10 @@ import type { Mood } from "./ghost";
 import type { Product } from "./product-mark";
 import { motion } from "./tokens.stylex";
 
-// Keyed by the provider squashed to letters, since "Runs on" is typed by hand: "Claude Code",
-// "claude-code" and "claude_code" are one tool. Anything else (blank is stored as "custom")
-// falls back to the prompt.
 const TOOLS: Record<string, Product> = {
   claudecode: "claude",
   claude: "claude",
   cursor: "cursor",
-  // Codex wears its maker's mark, as Claude Code does.
   codex: "openai",
   openaicodex: "openai",
   copilot: "copilot",
@@ -60,7 +56,6 @@ export function PromptMark({
   );
 }
 
-/** A shell waiting on its next line: the cursor blinks, and runs ahead while it works. */
 function Prompt({ busy, still }: { busy: boolean; still: boolean }) {
   const halt = still && styles.halt;
   return (
@@ -77,32 +72,27 @@ function Prompt({ busy, still }: { busy: boolean; still: boolean }) {
   );
 }
 
-// A terminal cursor is on or off, never in between.
 const caret = stylex.keyframes({
   "0%, 49%": { opacity: 1 },
   "50%, 100%": { opacity: 0 },
 });
 
-// Typing: the line grows from where the prompt ends, then clears for the next.
 const type = stylex.keyframes({
   "0%": { transform: "scaleX(0.15)" },
   "70%, 85%": { transform: "scaleX(1)" },
   "100%": { transform: "scaleX(0.15)" },
 });
 
-// The prompt nudges forward with each command it runs.
 const run = stylex.keyframes({
   "0%, 60%, 100%": { transform: "translateX(0)" },
   "30%": { transform: "translateX(1.2px)" },
 });
 
-// Leaning in to hear you, and settling back a little each beat.
 const lean = stylex.keyframes({
   "0%, 100%": { transform: "rotate(-7deg)" },
   "50%": { transform: "rotate(-4deg)" },
 });
 
-// A hop and settle, like someone looking up from their desk to catch your eye.
 const hop = stylex.keyframes({
   "0%, 55%, 100%": { transform: "translateY(0) scale(1)" },
   "60%": { transform: "translateY(0) scale(1.06, 0.94)" },
@@ -137,10 +127,8 @@ const styles = stylex.create({
     transitionProperty: "opacity, filter",
     transitionDuration: motion.slow,
   },
-  // A failed run loses its strength as well as its footing, so it reads as stopped at a glance.
   failed: { opacity: 0.6 },
   halt: { animationName: "none" },
-  // Hops and leans pivot on the mark's foot, fixed in the drawing, not on a box that moves.
   whole: {
     transformBox: "view-box",
     transformOrigin: "12px 21px",
@@ -196,7 +184,6 @@ const moods = stylex.create({
     animationTimingFunction: motion.out,
     animationIterationCount: 1,
   },
-  // It sets down where the shake ends, a little lower, the way the ghost does.
   error: {
     transform: "translateY(0.8px)",
     animationName: { default: shake, [REDUCED]: "none" },

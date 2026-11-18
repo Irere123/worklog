@@ -12,7 +12,6 @@ import { color, font, leading, radius, space, text } from "#ui/tokens.stylex";
 
 import { CardRun, STAGE_TONE, stageLabel, useMembers } from "./card-bits";
 
-// Long enough that a pointer passing over a reply doesn't flash cards; short enough to feel asked.
 const OPEN_MS = 450;
 const CLOSE_MS = 160;
 

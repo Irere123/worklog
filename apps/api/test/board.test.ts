@@ -275,10 +275,8 @@ describe("drift nudges", () => {
         assigneeIds: [owner.member.id],
       },
     });
-    // Assigning yourself is activity too; wait out 6 of the 7 days.
     env.ctx.now = () => new Date(Date.now() + 6 * DAY_MS);
     expect(await nudgeDrifting(env.ctx)).toBe(1);
-    // Once per quiet spell
     expect(await nudgeDrifting(env.ctx)).toBe(0);
 
     const item = (
@@ -329,7 +327,6 @@ describe("the team at a glance", () => {
       token: ana.token,
       body: { text: "Paired on the importer", visibility: "team" },
     });
-    // Times are kept to the millisecond: two logs inside one would tie for latest.
     await Bun.sleep(2);
     await env.call("POST", "/v1/logs", {
       token: ana.token,
@@ -350,7 +347,6 @@ describe("the team at a glance", () => {
     });
     expect(anaForOwner.latest.title).not.toContain("Interviewing");
 
-    // An agent's state comes from its latest update that carried one, not its latest line.
     const agent = (
       await env.call("POST", "/v1/members", {
         token: owner.token,
@@ -426,7 +422,6 @@ describe("the team at a glance", () => {
     expect(seenByOwner.reduce((a, b) => a + b, 0)).toBe(3);
     expect((await rhythmFor(ana.token))[13]).toBe(2);
 
-    // A person's own page reads a quarter, the same way.
     const page = await env.call("GET", `/v1/members/${ana.member.handle}/now`, {
       token: owner.token,
     });

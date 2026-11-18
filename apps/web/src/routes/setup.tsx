@@ -30,15 +30,10 @@ export const Route = createFileRoute("/setup")({
 
 const zone = () => Intl.DateTimeFormat().resolvedOptions().timeZone;
 
-/**
- * Two doors: a signed-in person with no workspace creates one, and a brand-new server is set
- * up from scratch, which returns the owner's first API key.
- */
 function Setup() {
   const session = useQuery({ ...q.session(), retry: false });
   const config = useQuery(q.authConfig());
   const signedIn = Boolean(session.data?.user);
-  // A hosted Worklog lets anyone start a workspace; a team's own server may be invite-only.
   const signupOpen = config.data?.signupOpen !== false;
   const inWorkspace = (session.data?.memberships.length ?? 0) > 0;
   const [token, setToken] = useState<string | null>(null);
@@ -66,7 +61,6 @@ function Setup() {
             body: {
               workspaceName: value.workspaceName,
               name: value.name,
-              // Optional: an empty field means "no email", not an address to check.
               email: value.email.trim() || undefined,
               timezone: zone(),
             },
@@ -123,7 +117,6 @@ function Setup() {
   if (inWorkspace) {
     return <Navigate to="/home" />;
   }
-  // Ask before the form: filling it in only to hear "setup is closed" wastes the visit.
   if (!signedIn && config.data?.setupOpen === false && signupOpen) {
     return (
       <AuthFrame

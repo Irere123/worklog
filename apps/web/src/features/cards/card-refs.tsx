@@ -9,7 +9,6 @@ import { color, font, radius, shadow, space, text } from "#ui/tokens.stylex";
 import { stageLabel } from "./card-bits";
 import type { Card } from "./card-bits";
 
-// "#" then a number or a word, at the end of what's typed: the reference being written.
 const TRIGGER = /(?:^|\s)#(?<query>[\p{L}\p{N}]*)$/u;
 const SHOWN = 6;
 
@@ -47,7 +46,6 @@ export function useCardRefs({
     setIndex(0);
   };
 
-  /** Returns true when the key was the picker's, so the textarea's own handler can skip it. */
   const onKeyDown = (event: KeyboardEvent) => {
     if (matches.length === 0) {
       return false;
@@ -65,7 +63,6 @@ export function useCardRefs({
       return true;
     }
     if (event.key === "Escape") {
-      // Closes the list, not the panel or the editor around it.
       event.preventDefault();
       event.stopPropagation();
       setDismissed(value);
@@ -81,7 +78,6 @@ export function useCardRefs({
           <li key={card.id}>
             <button
               type="button"
-              // Keeps focus in the textarea, so typing carries on after a click.
               onMouseDown={(event) => event.preventDefault()}
               onClick={() => pick(card)}
               {...stylex.props(styles.option, i === active && styles.active)}
@@ -109,7 +105,6 @@ function match(cards: Card[], query: string, exclude?: number) {
     return candidates.slice(0, SHOWN);
   }
   if (/^\d+$/u.test(term)) {
-    // "#1" means card 1 before 14, 15 and 18: Enter should insert what was typed.
     return candidates
       .filter((c) => String(c.number).startsWith(term))
       .toSorted((a, b) => a.number - b.number)

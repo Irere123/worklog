@@ -16,7 +16,6 @@ import { loadApp } from "./apps";
 import { applyChange } from "./lifecycle";
 import { store } from "./pipeline";
 
-// Any fixed numbers work, as long as every Worklog process uses the same ones.
 const LOCK_BASE = 4_243_961_000;
 const WAIT_FOR_LOCK_MS = 30_000;
 const WAIT_FOR_APP_MS = 60_000;
@@ -25,11 +24,11 @@ const MAX_BACKOFF_MS = 60_000;
 const WATCH_LOCK_MS = 15_000;
 
 async function pause(ms: number, signal: AbortSignal) {
-  try {
-    await sleep(ms, undefined, { signal });
-  } catch {
-    // Aborted: stopping.
-  }
+  await sleep(ms, undefined, { signal }).catch((error: unknown) => {
+    if (!signal.aborted) {
+      throw error;
+    }
+  });
 }
 
 /** What a stream hands over goes where a webhook would: the inbox, or the connection itself. */
@@ -64,10 +63,6 @@ export async function acceptStreamed(
   ctx.tally.received(conn.id, ctx.now());
 }
 
-/**
- * One run of the socket. The lock dies with its connection, and then another process may open a
- * second socket: this one stops when it can't see its lock any more. True when that happened.
- */
 async function runWatched(
   ctx: AppContext,
   provider: string,
@@ -160,7 +155,6 @@ async function holdOpen(
           await pause(REFUSED_MS, signal);
           continue;
         }
-        // A connection that lasted resets the backoff; one that keeps failing waits longer.
         backoff =
           Date.now() - started > MAX_BACKOFF_MS
             ? 1000

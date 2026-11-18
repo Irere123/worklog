@@ -40,7 +40,6 @@ export async function tryHoldLock(
         await client.query("select pg_advisory_unlock($1)", [key]);
         client.release();
       } catch {
-        // The connection dropped, and the lock with it.
         client.release(true);
       }
     },

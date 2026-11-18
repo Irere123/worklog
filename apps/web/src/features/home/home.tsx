@@ -61,12 +61,7 @@ export function Home() {
   );
 }
 
-/**
- * The day in a sentence, written from the record rather than by a model: what's waiting on you,
- * and what the team got done since yesterday morning.
- */
 function DaySummary() {
-  // Held in state so the query key is stable, and moved on at midnight for a page left open.
   const [since, setSince] = useState(startOfYesterday);
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -199,7 +194,6 @@ function Ask({ meId }: { meId: string }) {
         onSend={(question) => {
           void navigate({ to: "/assistant", search: { ask: question } });
         }}
-        // The assistant's code loads while the question is typed, so sending opens it at once.
         onStartTyping={() => {
           void router.preloadRoute({ to: "/assistant" });
         }}
@@ -214,7 +208,6 @@ function NeedsYou() {
   const list = items.data ?? [];
   return (
     <Section
-      // The inbox badge carries the count; a second number here would make it louder, not clearer.
       title="Needs you"
       aside={
         <Link to="/inbox" {...stylex.props(styles.more)}>
@@ -262,10 +255,6 @@ function NeedsYou() {
   );
 }
 
-/**
- * The one place that gathers a person's cards from every board: what they're moving, then what's
- * waiting for them to triage. Both lists arrive before either shows, so triage doesn't pop in under it.
- */
 function YourCards() {
   const lists = useQueries({
     queries: [
@@ -342,7 +331,6 @@ function TeamNow({ selfId }: { selfId: string }) {
   const people = list.filter((m) => m.kind === "human" && m.id !== selfId);
   const team = useQuery(q.teamNow(3));
   const byMember = new Map(team.data?.map((row) => [row.memberId, row]));
-  // Agents are teammates too; the ones mid-run or waiting on someone are part of "right now".
   const agents = list.filter((m) => {
     const state = byMember.get(m.id)?.agent?.state;
     return m.kind === "agent" && (state === "working" || state === "needs_you");
@@ -421,7 +409,6 @@ function TeamNow({ selfId }: { selfId: string }) {
 
 const styles = stylex.create({
   scroll: { flexGrow: 1, overflowY: "auto" },
-  // One column, as on Things' Today: the page reads top to bottom in the order it matters.
   page: {
     display: "flex",
     flexDirection: "column",
@@ -452,8 +439,6 @@ const styles = stylex.create({
     marginTop: space.md,
     fontSize: text.titleSm,
     lineHeight: leading.titleSm,
-    // Balance halves the second sentence on a phone and leaves a gap beside it; pretty only
-    // keeps a last word from hanging alone.
     textWrap: "pretty",
   },
   summaryNow: { color: color.fg },
@@ -486,8 +471,6 @@ const styles = stylex.create({
     fontSize: text.label,
     color: color.fgMuted,
   },
-  // Rows sit on the page rather than in a box; the hover fill bleeds past the text so titles
-  // line up with the section heading above them.
   list: {
     display: "flex",
     flexDirection: "column",
@@ -529,7 +512,6 @@ const styles = stylex.create({
     color: color.fg,
     overflow: "hidden",
     textOverflow: "ellipsis",
-    // A phone fits a few words per line; cutting there hides what the row is about.
     whiteSpace: { default: "nowrap", "@media (max-width: 640px)": "normal" },
   },
   meta: {

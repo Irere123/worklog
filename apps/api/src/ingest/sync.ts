@@ -22,13 +22,10 @@ import { store } from "./pipeline";
 import { queueSync, syncQueue } from "./sync-queue";
 import { viewOf } from "./view";
 
-/** Where listing what to sync (an installation's repos) records how it went. */
 const LISTING = "*";
 
-// The same page read twice is one delivery: the inbox drops the second.
 const digest = (payload: unknown) => shortHash(JSON.stringify(payload));
 
-/** Pages one job reads before handing over, so a long backfill doesn't hold a worker. */
 const PAGES_PER_RUN = 10;
 
 async function syncable(ctx: AppContext, connectionId: string) {
@@ -94,7 +91,6 @@ async function enqueueStream(
       queue: syncQueue(connectionId),
       key: `sync:${connectionId}:${stream}`,
       maxAttempts: 5,
-      // Workers drain what's already stored before reading more history.
       priority: 10,
       runAt,
     }
@@ -199,7 +195,6 @@ export async function reconcileAll(ctx: AppContext) {
     if (connector?.sync) {
       await queueSync(ctx, conn);
     }
-    // A forge disables a hook that keeps failing; this turns it back on.
     if (connector?.hooks) {
       await queueHooks(ctx, conn);
     }

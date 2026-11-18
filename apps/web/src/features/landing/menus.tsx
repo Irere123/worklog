@@ -84,7 +84,6 @@ export function NavMenu({
   );
 }
 
-// The panel is dark on the light page, as resurf's is: it reads as something laid over it.
 const PANEL = "oklch(0.25 0.004 80)";
 const ROW_HOVER = "oklch(0.3 0.004 80)";
 
@@ -116,7 +115,6 @@ const styles = stylex.create({
     maxWidth: "calc(100vw - 32px)",
     overflow: "hidden",
     borderRadius: 16,
-    // Seen through the 1px gaps between tiles, it rules them apart without a border on each.
     backgroundColor: "oklch(0.33 0.004 80)",
     boxShadow:
       "0 0 0 1px oklch(1 0 0 / 0.1), 0 1px 2px oklch(0 0 0 / 0.05), 0 4px 8px -2px oklch(0 0 0 / 0.05), 0 12px 24px -4px oklch(0 0 0 / 0.06), 0 24px 48px -8px oklch(0 0 0 / 0.07)",

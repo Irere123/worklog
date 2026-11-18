@@ -24,7 +24,6 @@ export function Closing() {
   );
 }
 
-// Full paths, so the footer works the same from every public page.
 const COLUMNS = [
   {
     title: "Product",
@@ -116,8 +115,6 @@ const styles = stylex.create({
   action: {
     marginTop: 40,
   },
-  // The hero's row of facts again: one line on a wide screen, a stack on a phone, so no dot is
-  // ever left at a line's end.
   fine: {
     marginTop: space.xxl,
   },

@@ -7,7 +7,6 @@ import { createHash } from "node:crypto";
  */
 export const LANES = 16;
 
-// A hash of the partition: stable across processes and releases, which a lane must be.
 export function laneOf(partition: string): number {
   if (!partition) {
     return 0;

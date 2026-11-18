@@ -64,14 +64,9 @@ import { assistantTools } from "./tools";
 const MAX_STEPS = 10;
 const OUT_OF_STEPS =
   "I ran out of steps before finishing — could you narrow the question?";
-/** Coming back after this long, the list of what's open has likely moved on since the last glance. */
 const RETURNING_AFTER_MS = 2 * 60 * 60_000;
-// Inside the provider's shortest cache lifetime (five minutes), a turn should read its history from
-// the cache; one that doesn't had its prefix changed under it.
 const CACHE_WARM_MS = 4 * 60_000;
-// Outlasts the longest turn, so it only frees a conversation whose turn's process died.
 const TURN_LEASE_MS = TIMEOUTS.chat.totalMs + 30_000;
-// Longer than a lease, so the one waiting behind a turn whose process died still gets its turn.
 const TURN_WAIT_MS = TURN_LEASE_MS + 30_000;
 const TURN_POLL_MS = 250;
 const STOP_POLL_MS = 500;
@@ -122,11 +117,6 @@ async function openConversation(
   throw badRequest("Say which conversation or agent this is for");
 }
 
-/**
- * One turn at a time in a conversation, in the order messages came: a message sent while the
- * assistant is still answering waits in line, then reads what came before it, rather than being
- * answered beside it by a model that never saw it. Returns what gives the conversation back.
- */
 async function takeTurn(ctx: AppContext, conversation: ConversationRow) {
   const conversationId = conversation.id;
   const token = `${ctx.now().getTime()}:${generateId()}`;
@@ -160,12 +150,6 @@ async function takeTurn(ctx: AppContext, conversation: ConversationRow) {
   }
 }
 
-/**
- * The turn this request holds: `signal` aborts it when someone asks it to stop (the owner, or a
- * message sent with `interrupt`), whichever process that request reached; `step` records what it's
- * doing for the owner's view of their assistant; and `release` gives the conversation back and
- * stops watching.
- */
 async function heldTurn(
   ctx: AppContext,
   conversation: ConversationRow,
@@ -198,7 +182,6 @@ async function heldTurn(
   };
 }
 
-/** Shorter than the provider's shortest cache lifetime, so a warmed prompt is still there. */
 const WARM_GAP_MS = 4 * 60_000;
 
 /**
@@ -259,7 +242,6 @@ async function prepareTurn(
   channel: Channel = "api",
   onStep?: ReportStep
 ) {
-  // Read once the turn is ours: the turn before may have moved it on, or compaction its recap.
   const conversation =
     (await findConversationById(ctx.db, {
       id: opened.id,
@@ -282,8 +264,6 @@ async function prepareTurn(
 
   const voice = await findVoice(ctx.db, { memberId: owner.id });
   const history = await loadHistory(ctx, conversation);
-  // A new conversation, or one picked up again after a while, opens with what's in flight, the way
-  // a person would glance at their list. It travels in the message, so the cached prefix stays put.
   const quietFor = ctx.now().getTime() - conversation.updatedAt.getTime();
   const returning = history.length === 0 || quietFor > RETURNING_AFTER_MS;
   const tz = timezoneOf(asker, ws);
@@ -335,13 +315,6 @@ function reported(tools: ToolSet, onStep?: ReportStep) {
   return onStep === undefined ? tools : reportingSteps(tools, onStep);
 }
 
-/**
- * The memory page a turn's instructions carry, and notes on what changed since. The page stays as
- * the conversation's first turn took it until its next summary, so the prompt's start is the same
- * on every call; what memory learns meanwhile, in this conversation or another, reaches the model
- * as notes in its newest message, each change once. Coming back after a while, when the provider's
- * cache has lapsed anyway, the page is taken afresh. Returns what to record with the turn.
- */
 async function memoryForTurn(
   ctx: AppContext,
   owner: Member,
@@ -375,8 +348,6 @@ function turnUsage(usage: LanguageModelUsage) {
   };
 }
 
-// The prompt cache is what keeps replaying history cheap, so a miss where a hit was due is a bug
-// to look into (the instructions changed mid-conversation, or the provider moved), not noise.
 function noteCacheMiss(
   conversationId: string,
   warm: boolean,
@@ -391,7 +362,6 @@ function noteCacheMiss(
   }
 }
 
-// Attention items and follow-ups are the owner's own, so a teammate's conversation only sees the cards.
 async function openLoops(
   ctx: AppContext,
   owner: Member,
@@ -454,27 +424,20 @@ async function offlineReply(
 ) {
   const person = (await namedTeammate(ctx, owner, question)) ?? owner;
   const snapshot = await workSnapshot(ctx, person, {
-    // Someone else's snapshot is the team's view of them, whoever's assistant is asking.
     includePrivate: person.id === owner.id && conversation.mode === "owner",
   });
   return `AI isn't configured on this server yet (set OPENROUTER_API_KEY), so here is ${person.name}'s current snapshot:\n\n${renderSnapshot(snapshot)}`;
 }
 
-/** Without a model, the one thing to read from "What is Jean working on?" is who it's about. */
 async function namedTeammate(ctx: AppContext, owner: Member, question: string) {
   const text = question.toLowerCase();
   const everyone = await listMembers(ctx.db, {
     workspaceId: owner.workspaceId,
   });
-  return (
-    everyone
-      .filter((m) => m.id !== owner.id)
-      // People before agents: "Jean" means Jean, not "Jean Miller's assistant".
-      .toSorted(
-        (a, b) => Number(a.kind === "agent") - Number(b.kind === "agent")
-      )
-      .find((m) => namesOf(m).some((name) => mentions(text, name)))
-  );
+  return everyone
+    .filter((m) => m.id !== owner.id)
+    .toSorted((a, b) => Number(a.kind === "agent") - Number(b.kind === "agent"))
+    .find((m) => namesOf(m).some((name) => mentions(text, name)));
 }
 
 function namesOf(member: Member) {
@@ -494,7 +457,6 @@ function mentions(text: string, name: string) {
   );
 }
 
-// Step limit hit mid-tool-call: record it so the transcript matches what the user saw.
 function closing(finishReason: string, text: string) {
   const cutOff = finishReason === "tool-calls";
   return {
@@ -566,7 +528,6 @@ export async function ask(
   }
 }
 
-// Checked once the turn is ours, so a resend that arrives mid-answer waits for that answer.
 async function sentBefore(
   ctx: AppContext,
   conversation: ConversationRow,
@@ -577,7 +538,6 @@ async function sentBefore(
     : await answeredBefore(ctx, conversation, input.clientId);
 }
 
-// A reply that's already written, in the same stream format as a live one.
 function writtenReply(headers: Record<string, string>, reply: string) {
   return createUIMessageStreamResponse({
     headers,
@@ -592,7 +552,6 @@ function writtenReply(headers: Record<string, string>, reply: string) {
   });
 }
 
-// Stored history is the source of truth: clients send only their new message.
 export async function askStream(
   ctx: AppContext,
   asker: Member,
@@ -645,11 +604,7 @@ export async function askStream(
   }
 
   try {
-    // What the person already read stays in the record when they stop the reply.
     let written = "";
-    // What the stream sent last. Words after nothing or after a tool open a new stretch of
-    // writing: presence says so once, and the record starts a new paragraph rather than running
-    // two sentences together.
     let last: "nothing" | "text" | "tool" = "nothing";
     const result = streamText({
       model: ctx.models.main,
@@ -689,7 +644,6 @@ export async function askStream(
         log.error("assistant: turn failed", { error });
       },
     });
-    // Finish (and persist) the turn even if the phone drops the connection mid-answer.
     void releaseWhenSettled(result.consumeStream(), release);
     return createUIMessageStreamResponse({
       headers,
@@ -702,11 +656,6 @@ export async function askStream(
   }
 }
 
-/**
- * Gives the conversation back once the stream has settled, after onEnd stored the turn, however it
- * ended. An error part doesn't end the stream, so letting go there would let the next turn in
- * before this one is written.
- */
 async function releaseWhenSettled(
   settled: PromiseLike<void>,
   release: () => Promise<void>

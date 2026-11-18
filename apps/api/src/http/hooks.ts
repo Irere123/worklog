@@ -7,10 +7,8 @@ import { receiveForApp } from "#ingest/routing";
 
 type HookEnv = { Variables: { ctx: AppContext } };
 
-// Not bearer-authenticated: the provider's signature over the raw body authenticates the request.
 export function hookRoutes() {
   const app = new Hono<HookEnv>();
-  // Before the per-connection routes, which would read "apps" as a connection id.
   app.post("/hooks/apps/:provider", async (c) => await handleApp(c));
   app.post("/hooks/apps/:provider/:channel", async (c) => await handleApp(c));
   app.post("/hooks/:id", async (c) => await handle(c));
@@ -55,15 +53,8 @@ async function handle(
   return Response.json(result.body, { status: result.status });
 }
 
-// GitHub's own cap on a webhook payload.
 const MAX_BODY = 25 * 1024 * 1024;
 
-/**
- * The body as text, or null past the cap. Read before the signature is checked, so it bounds what
- * an unauthenticated caller can make the server buffer, whatever Content-Length claims. Read
- * straight from the stream: Hono's `bodyLimit` rebuilds the request around a new stream, and Bun
- * (1.3) sometimes fails to read a rebuilt one, about one webhook in two hundred under load.
- */
 async function boundedBody(req: Request): Promise<string | null> {
   const declared = Number(req.headers.get("content-length") ?? 0);
   if (declared > MAX_BODY || !req.body) {

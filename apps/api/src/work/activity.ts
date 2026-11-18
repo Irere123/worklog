@@ -53,9 +53,6 @@ function clamp(n: number) {
   return Math.max(0, Math.min(1, n));
 }
 
-// Null when the event was already recorded; `merged: true` when folded into an existing activity.
-// The card's entropy clock resets in the same transaction: a retry after a failed reset would find
-// the activity already recorded and never reset it.
 export async function recordActivity(
   ctx: AppContext,
   input: ActivityInput
@@ -155,7 +152,6 @@ async function mergeInto(
       importance: clamp(
         Math.max(existing.importance, input.importance ?? 0.5) + 0.05
       ),
-      // The burst spans its events, whichever order they arrive in.
       occurredAt:
         occurredAt < existing.occurredAt ? occurredAt : existing.occurredAt,
       updatedAt:

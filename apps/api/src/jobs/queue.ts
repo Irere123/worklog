@@ -6,8 +6,6 @@ import { addJob, unlockStaleJobs } from "#db/queries/jobs";
 import type { NewJob } from "#db/queries/jobs";
 import { log } from "#telemetry/log";
 
-// Graphile Worker's messages vary with the job, so they go in a field; the error it hands over
-// is what groups them into issues. A task's own failure is logged by the task wrapper.
 export const logger = new Logger((scope) => (level, message, meta) => {
   if (meta?.failure === true) {
     return;
@@ -72,7 +70,6 @@ export function newJob(
   };
 }
 
-/** Nothing Worklog runs as a job takes this long: one still locked lost its worker. */
 const ABANDONED_MS = 60 * 60_000;
 
 /**

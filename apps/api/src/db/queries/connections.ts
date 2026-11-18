@@ -21,7 +21,6 @@ export async function listConnections(
     .where(eq(connections.workspaceId, params.workspaceId));
 }
 
-// Active connections of these providers in every workspace, for the daily catch-up sync.
 export async function listActiveConnectionsByProvider(
   db: DbOrTx,
   params: { providers: string[] }
@@ -40,7 +39,6 @@ export async function listActiveConnectionsByProvider(
     );
 }
 
-// Active connections that last received something before `before`.
 export async function listQuietConnections(
   db: DbOrTx,
   params: { before: Date }
@@ -62,7 +60,6 @@ export async function listConnectionSecrets(db: DbOrTx) {
     .from(connections);
 }
 
-// Only if nobody changed them since they were read; false otherwise.
 export async function updateConnectionSecretsIfUnchanged(
   db: DbOrTx,
   params: { id: string; from: string; to: string }
@@ -77,7 +74,6 @@ export async function updateConnectionSecretsIfUnchanged(
   return rows.length > 0;
 }
 
-// Every connection installed through a provider's app that isn't revoked yet, in every workspace.
 export async function listInstalledConnections(
   db: DbOrTx,
   params: { provider: string }
@@ -94,13 +90,11 @@ export async function listInstalledConnections(
     );
 }
 
-// Every workspace's connections, for jobs that sweep them all.
 export async function listAllConnectionIds(db: DbOrTx) {
   const rows = await db.select({ id: connections.id }).from(connections);
   return rows.map((r) => r.id);
 }
 
-// `workspaceId` is optional for webhooks and jobs, which only know the connection id.
 /**
  * Taken first by a transaction that writes rows referring to the connection: deleting it then
  * waits for the transaction to finish instead of deadlocking with it.
@@ -171,7 +165,6 @@ export async function updateConnectionById(
   return returned(rows, "connection");
 }
 
-// Where an app's webhook for this installation goes.
 export async function findConnectionByExternalId(
   db: DbOrTx,
   params: { provider: string; externalId: string }
@@ -188,7 +181,6 @@ export async function findConnectionByExternalId(
   return row;
 }
 
-// Oldest first, so the order is stable when a workspace has several.
 export async function listActiveConnections(
   db: DbOrTx,
   params: { workspaceId: string; provider: string }
@@ -206,7 +198,6 @@ export async function listActiveConnections(
     .orderBy(asc(connections.createdAt));
 }
 
-// The workspace's revoked installation of the same account: reinstalling gets it back.
 export async function findRevokedConnection(
   db: DbOrTx,
   params: { workspaceId: string; provider: string; account: string }
@@ -235,8 +226,6 @@ export type ConnectionTally = {
   lastRejection: string | null;
 };
 
-// One statement for a batch of counters (ingest/tally.ts). Rows for deleted connections match
-// nothing.
 export async function updateConnectionTallies(
   db: DbOrTx,
   rows: ConnectionTally[]

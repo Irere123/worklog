@@ -29,7 +29,6 @@ import { resolveMember } from "#work/members";
 
 const ws = (c: Context<Env>) => c.get("member").workspaceId;
 
-// Card state changes are sub-resources (POST sets, DELETE undoes), like Fizzy's API.
 function cardAction(opts: {
   method: "post" | "delete";
   path: string;

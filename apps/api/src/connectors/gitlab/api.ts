@@ -31,7 +31,6 @@ export const projectsOf = (conn: ConnectionView) =>
     ? conn.settings.repos.filter((r): r is string => typeof r === "string")
     : [];
 
-// A project's path is its id in the API, URL-encoded: group/sub/project → group%2Fsub%2Fproject.
 export const projectPath = (path: string) =>
   `/projects/${encodeURIComponent(path)}`;
 
@@ -66,7 +65,6 @@ const Hook = z.object({
   alert_status: z.string().nullish(),
 });
 
-// Only what the mapping turns into work; confidential issues and internal notes stay in GitLab.
 const config = (hook: { url: string; secret: string }) => ({
   url: hook.url,
   token: hook.secret,
@@ -101,7 +99,6 @@ async function ensureOne(
       });
       return { target: project, state: "created" };
     }
-    // GitLab turns off a hook whose deliveries keep failing; saving it again turns it back on.
     if (ours.alert_status && ours.alert_status !== "executable") {
       await gitlabRequest(ctx, conn, "repair hook", `${hooks}/${ours.id}`, {
         method: "PUT",

@@ -33,7 +33,6 @@ const WEEKDAYS: Record<string, number> = {
 
 export const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
-// The API reads a missing list as every day, so the app does too.
 const EVERY_DAY = [0, 1, 2, 3, 4, 5, 6];
 
 const formatters = new Map<string, Intl.DateTimeFormat>();

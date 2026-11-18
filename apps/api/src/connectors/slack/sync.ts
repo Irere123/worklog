@@ -12,7 +12,6 @@ import { botTokenOf, slackApi } from "./api";
 
 const MAX_PAGES = 20;
 
-// Slack sends "" for a missing name or cursor.
 const nonEmpty = (s: string | undefined) => (s === "" ? undefined : s);
 
 const Channels = z.object({
@@ -85,11 +84,9 @@ export async function slackAccount(
       botTokenOf(conn.secrets),
       "users.info",
       { user: userId },
-      // Someone from another organization in a shared channel isn't in this directory.
       { soft: ["user_not_found", "user_not_visible"] }
     )
   );
-  // Slack answered without a user: nothing to learn, and asking again won't change that.
   if (!body.success) {
     return null;
   }
@@ -123,20 +120,13 @@ const Info = z.object({
 });
 
 const Cursor = z.object({
-  /** Messages after this ts are new on the next run. */
   oldest: z.string().optional(),
-  /** Paging within the current run. */
   page: z.string().optional(),
   newest: z.string().optional(),
   private: z.boolean().optional(),
-  /**
-   * Threads seen with replies, by their first message's ts. A thread started before `oldest`
-   * isn't in the history any more, so its new replies are only found by asking for it.
-   */
   threads: z.array(z.string()).optional(),
 });
 
-/** Threads remembered per channel, the most recently started kept. */
 const THREADS_KEPT = 200;
 
 const tsOf = (d: Date) => (d.getTime() / 1000).toFixed(6);
@@ -145,12 +135,9 @@ const later = (a: string | undefined, b: string) =>
 
 const channelOf = (stream: string) => stream.slice("channel:".length);
 
-/** Threads read per page of history, so one page of busy threads can't spend the rate limit. */
 const THREADS_PER_PAGE = 20;
-/** Remembered threads re-read per run, newest first. */
 const OLDER_THREADS_PER_RUN = 50;
 
-// Replies after `oldest` in these threads, their first messages left out.
 async function threadReplies(
   ctx: AppContext,
   token: string,
@@ -173,7 +160,6 @@ async function threadReplies(
   return replies;
 }
 
-// Threads on this page with a reply after `oldest`.
 function repliedSince(messages: z.infer<typeof Message>[], oldest: string) {
   return messages
     .filter(
@@ -222,7 +208,6 @@ export const slackHistory: SyncSpec = {
       .filter((m) => (m.reply_count ?? 0) > 0)
       .map((m) => m.ts);
     const seen = new Set(body.messages.map((m) => m.ts));
-    // On a run's last page, the remembered threads this run didn't come across.
     const older = more
       ? []
       : (cursor.threads ?? [])

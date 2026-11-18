@@ -41,6 +41,7 @@ import {
   notFound,
 } from "#lib/errors";
 import { generateId } from "#lib/ids";
+import { log } from "#telemetry/log";
 
 import { recordActivity } from "./activity";
 import {
@@ -51,11 +52,6 @@ import {
 import { canActFor, createMember } from "./members";
 import type { SignedInUser } from "./members";
 
-/**
- * Coding tools by the domains that publish their client metadata and the names they register
- * under. A metadata document's domain is proof; a self-registered name is only a claim, which the
- * person sees marked as such before approving it.
- */
 const TOOLS = [
   {
     provider: "claude-code",
@@ -191,8 +187,6 @@ export type AgentGrant = {
   scopes: ApiScope[];
 };
 
-// "Last used" is for a person deciding whether an agent still matters, so minutes are plenty, and
-// an agent calling all day doesn't write on every call.
 const TOUCH_EVERY_MS = 5 * 60 * 1000;
 
 /** Claims Worklog reads from a verified MCP access token. */
@@ -254,7 +248,6 @@ export async function agentForToken(
   if (agent) {
     return { ...base, agent };
   }
-  // Its first two calls raced, and the other one made the agent.
   const winner = await findAgentConnection(ctx.db, {
     workspaceId,
     ownerId: owner.id,
@@ -274,9 +267,7 @@ function touch(ctx: AppContext, connection: AgentConnection) {
   ) {
     return;
   }
-  void touchAgentConnection(ctx.db, { id: connection.id, now }).catch(() => {
-    // Best effort: a missed lastUsedAt is harmless.
-  });
+  void recordAgentUse(ctx, connection.id, now);
 }
 
 function text(claim: unknown) {
@@ -288,8 +279,6 @@ function grantedScopes(scope: unknown): ApiScope[] {
   return AGENT_SCOPES.filter((s) => granted.has(s));
 }
 
-// A disconnected agent comes back only through a new approval: disconnecting revoked its refresh
-// tokens and consent, so a token issued after it can only be a fresh one.
 async function revived(ctx: AppContext, agent: Member, iat: unknown) {
   if (agent.deactivatedAt === null) {
     return agent;
@@ -355,7 +344,6 @@ async function makeAgent(
       createdAt: tx.now(),
     });
     if (!inserted) {
-      // Throwing rolls back the agent this call made, keeping the other call's.
       throw new RacedError();
     }
     return agent;
@@ -518,7 +506,6 @@ export async function checkIn(
   if (waitMs <= 0) {
     return await read();
   }
-  // Listening starts before the first read, so an answer landing between the two isn't missed.
   const watch = watchQuestions(ctx, grant);
   try {
     const deadline = ctx.now().getTime() + waitMs;
@@ -544,11 +531,6 @@ function unanswered({ item, replies }: Asked) {
   );
 }
 
-/**
- * Wakes on what could answer a question: its inbox item changing, or a comment on its card by
- * someone other than the agent. Until the question is known, any of its person's questions or any
- * comment counts, and the reread sorts it out.
- */
 function watchQuestions(ctx: AppContext, { agent, owner }: AgentGrant) {
   let target: AttentionItem | undefined;
   let pending = false;
@@ -597,7 +579,6 @@ function watchQuestions(ctx: AppContext, { agent, owner }: AgentGrant) {
           ),
         });
       } catch (error) {
-        // Woken by news or cancelled by the client: either way, the caller reads again.
         if (!(error instanceof Error && error.name === "AbortError")) {
           throw error;
         }
@@ -710,4 +691,12 @@ async function cardReplies(
       on: "card" as const,
     };
   });
+}
+
+async function recordAgentUse(ctx: AppContext, id: string, now: Date) {
+  try {
+    await touchAgentConnection(ctx.db, { id, now });
+  } catch (error) {
+    log.warn("agents: couldn't record last use", { error });
+  }
 }

@@ -149,7 +149,6 @@ describe("Gitea and Forgejo backfill", () => {
       "Released acme/api v2.0.0",
     ]);
 
-    // History lands in the lane its webhooks use: the repo's id.
     const deliveries = (
       await env.call("GET", `/v1/connections/${conn.id}/deliveries`, {
         token: owner.token,
@@ -159,7 +158,6 @@ describe("Gitea and Forgejo backfill", () => {
       new Set(["77"])
     );
 
-    // The same comment arriving as a webhook later is already there.
     const raw = JSON.stringify({
       action: "created",
       repository: { id: 77, full_name: "acme/api" },
@@ -330,7 +328,6 @@ describe("Gitea and Forgejo backfill", () => {
     });
     expect(hook.events).toContain("pull_request_review_approved");
 
-    // The secret it made is the one deliveries are checked with.
     const raw = JSON.stringify({
       action: "opened",
       repository: { id: 77, full_name: "acme/api" },
@@ -354,7 +351,6 @@ describe("Gitea and Forgejo backfill", () => {
     });
     expect(res.status).toBe(200);
 
-    // A hook the forge disabled after failures is turned back on.
     existing = [
       {
         id: 7,

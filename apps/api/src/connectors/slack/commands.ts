@@ -80,8 +80,6 @@ export async function interactSlack(
 ): Promise<Interacted> {
   const interaction = Interaction.parse(payload);
   if (interaction.kind === "mention") {
-    // Answering takes longer than Slack's 3 s, so it's a job. Slack retries a slow ack with the
-    // same event id, and `once` keeps the retry from answering twice.
     const { event, eventId } = interaction;
     return {
       body: { ok: true },
@@ -141,8 +139,6 @@ export async function followUpSlack(
     if (!e.channel || !e.user) {
       return;
     }
-    // Seen only by whoever asked: the answer can hold their private logs, items and brief, and a
-    // channel is a team place.
     await slackApi(
       ctx,
       botTokenOf(conn.secrets),
@@ -153,7 +149,6 @@ export async function followUpSlack(
           channel: e.channel,
           user: e.user,
           text: toSlack(reply),
-          // In the thread it was asked in; Slack doesn't show one in a thread that isn't there.
           ...(e.thread_ts ? { thread_ts: e.thread_ts } : {}),
         },
       }
@@ -172,7 +167,6 @@ export async function followUpSlack(
   });
 }
 
-// The person asked and is waiting: a failure gets an answer that says so.
 async function answer(
   ctx: AppContext,
   conn: ConnectionView,

@@ -44,8 +44,6 @@ export async function insertCard(db: DbOrTx, row: CardRow) {
   }
 }
 
-// The workspace row is the counter. Take a number outside `transact`: inside, the row stays locked
-// until commit, so every other card created in the workspace waits. A failed card leaves a gap.
 export async function nextCardNumber(
   db: DbOrTx,
   params: { workspaceId: string }
@@ -84,7 +82,6 @@ export async function updateCardById(
   await db.update(cards).set(params.set).where(eq(cards.id, params.id));
 }
 
-// Never backwards: activity read back from history is older than what the card has seen since.
 export async function setCardActiveAt(
   db: DbOrTx,
   params: { id: string; at: Date }
@@ -123,9 +120,7 @@ export async function listCardRows(
   }
   const words = params.q?.trim().split(/\s+/u).filter(Boolean) ?? [];
   if (words.length) {
-    // "14" or "#14" is how people name a card, so a number finds that card as well as text.
     const number = /^#?(?<n>\d{1,9})$/u.exec(params.q?.trim() ?? "")?.groups?.n;
-    // Every word, in any order: people and agents describe a task in their own words, not its title's.
     const text = and(
       ...words.map((word) =>
         or(
@@ -174,8 +169,6 @@ export async function listCardRows(
     .limit(params.limit ?? 200);
 }
 
-// Ecto's preload: one query per relation for a page of cards, never one per card. Sequential, not
-// Promise.all: inside `transact` they share one connection, which can't run two queries at once.
 export async function listCardRelations(
   db: DbOrTx,
   params: {
@@ -275,7 +268,6 @@ export async function deleteWatcher(
     );
 }
 
-// False when the member was already assigned.
 export async function insertAssignee(
   db: DbOrTx,
   params: { cardId: string; memberId: string }
@@ -302,7 +294,6 @@ export async function deleteAssignee(
     );
 }
 
-// Several statements: run it inside `transact`. `names` are already trimmed, lowercase and unique.
 export async function setCardTags(
   db: DbOrTx,
   params: { workspaceId: string; cardId: string; names: string[] }
@@ -320,14 +311,12 @@ export async function setCardTags(
     .select()
     .from(tags)
     .where(and(eq(tags.workspaceId, workspaceId), inArray(tags.name, names)));
-  // A concurrent call for the same card may have inserted the same pairs.
   await db
     .insert(cardTags)
     .values(rows.map((t) => ({ cardId, tagId: t.id })))
     .onConflictDoNothing();
 }
 
-// Active cards three quarters of the way to drifting, once per human assignee.
 export async function listDriftingAssignments(
   db: DbOrTx,
   params: { now: Date }
@@ -372,8 +361,6 @@ export async function findCardByExternalKey(
   return card;
 }
 
-// Cards an event points at. An activity links to the first id, so exact external-key matches come
-// before matches by number.
 export async function listCardIdsByRefs(
   db: DbOrTx,
   params: { workspaceId: string; externalKeys: string[]; numbers: number[] }
@@ -402,7 +389,6 @@ export async function listCardIdsByRefs(
   return rows.toSorted((a, b) => byKey(a) - byKey(b)).map((r) => r.id);
 }
 
-// Active cards past their board's (or the workspace's) entropy period.
 export async function listStaleCards(db: DbOrTx, params: { now: Date }) {
   return await db
     .select({ workspaceId: cards.workspaceId, number: cards.number })
@@ -468,7 +454,6 @@ export async function listCurrentCards(
     );
 }
 
-// ILIKE reads % and _ as wildcards; a search means them literally.
 function contains(word: string) {
   return `%${word.replaceAll(/[\\%_]/gu, "\\$&")}%`;
 }

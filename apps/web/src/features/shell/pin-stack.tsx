@@ -20,14 +20,12 @@ import {
   text,
 } from "#ui/tokens.stylex";
 
-// Sonner's stack, sized for a sidebar: rows are one line tall, so no heights need measuring.
 const ROW = 36;
 const GAP = 6;
 const PEEK = 7;
 const LAYERS = 3;
 const LEAVE_MS = 200;
 
-// When the stack first appeared: rows there from the start sit still, only new pins slide in.
 let shownSince = Number.POSITIVE_INFINITY;
 
 /**
@@ -76,7 +74,6 @@ export function PinStack() {
         }
       }}
       onFocus={(e) => {
-        // Keyboard focus only: a tap focuses too, and would open the pile and the card at once.
         if (e.target.matches(":focus-visible")) {
           setExpanded(true);
         }
@@ -97,7 +94,6 @@ export function PinStack() {
       }}
       {...stylex.props(styles.dock, styles.height(ROW + PEEK * (layers - 1)))}
     >
-      {/* Keeps the pointer "inside" while it crosses the gaps between fanned-out rows. */}
       {expanded && (
         <div
           aria-hidden
@@ -142,7 +138,6 @@ function PinRow({
   onExpand: () => void;
   onUnpin: () => void;
 }) {
-  // Mounts below its place and slides up on the next frame, like a toast arriving.
   const [mounted, setMounted] = useState(() => Date.now() - shownSince < 1000);
   const [leaving, setLeaving] = useState(false);
   useEffect(() => {
@@ -173,7 +168,6 @@ function PinRow({
         search={(prev: Record<string, unknown>) => ({ ...prev, card: number })}
         tabIndex={front || expanded ? 0 : -1}
         onClick={(e) => {
-          // On a touch screen there's no hover: the first tap opens the pile, the next picks a card.
           if (!expanded) {
             e.preventDefault();
             onExpand();
@@ -202,7 +196,6 @@ function PinRow({
   );
 }
 
-/** Where a row sits: fanned out into a list, or tucked into the pile with the back rows peeking. */
 function placement({
   index,
   expanded,
@@ -222,7 +215,6 @@ function placement({
   return { y: -PEEK * depth, scale: 1 - 0.05 * depth };
 }
 
-/** The pile's top row carries the pin and the count; every other row shows its stage. */
 function RowFace({
   number,
   card,
@@ -252,8 +244,6 @@ function RowFace({
 }
 
 const styles = stylex.create({
-  // The pile keeps its collapsed height in the sidebar; fanned out, it rises over the nav above
-  // it, the way Sonner's toasts rise over the page.
   dock: {
     position: "relative",
     marginTop: space.lg,
@@ -276,7 +266,6 @@ const styles = stylex.create({
     borderStyle: "solid",
     borderColor: color.line,
     boxShadow: shadow.card,
-    // Scaling from the top keeps the sliver that peeks out above the front row the same height.
     transformOrigin: "center top",
     transitionProperty: {
       default: "transform, opacity",
@@ -310,7 +299,6 @@ const styles = stylex.create({
     outline: { default: "none", ":focus-visible": `2px solid ${color.focus}` },
     outlineOffset: -2,
   },
-  // Behind the front row only a sliver shows; text there would be clipped noise.
   muted: { opacity: 0 },
   pin: { flexShrink: 0, color: color.accentFg },
   stage: {

@@ -17,7 +17,6 @@ beforeEach(() => {
 
 const mailbox = () => (env.ctx.mailer as ConsoleMailer).sent;
 
-// Sign-in links and invites are sent without awaiting, so a test waits for the one it reads.
 async function mailTo(address: string, sentAfter = 0) {
   for (let tries = 0; tries < 100; tries += 1) {
     const mail = mailbox()
@@ -205,9 +204,7 @@ describe("signing in", () => {
       });
       await env.drain();
     };
-    // Pushed before signing in with GitHub: nobody's yet.
     await push(1);
-    // What Better Auth stores after "Sign in with GitHub": the numeric GitHub user id.
     await env.ctx.db.insert(account).values({
       id: "acc_test_github",
       accountId: "4242",

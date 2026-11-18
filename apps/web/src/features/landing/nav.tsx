@@ -22,15 +22,12 @@ import { NavMenu } from "./menus";
 import type { NavItem } from "./menus";
 import { cta, focus } from "./styles";
 
-// Full paths, so the bar works the same from the pricing page as from the front page.
 const LINKS = [
   { href: "/#features", label: "Features" },
   { href: "/pricing", label: "Pricing" },
   { href: "/changelog", label: "Changelog" },
 ];
 
-// Each tile's glyph in a colour of its own, as resurf's are: on the dark panel they're how the eye
-// tells six tiles apart before reading them.
 const RESOURCES: NavItem[] = [
   {
     title: "Self-hosting",
@@ -70,7 +67,6 @@ const RESOURCES: NavItem[] = [
   },
 ];
 
-// Past the hero's own buttons, the bar's button takes over as the way in, so it darkens to match.
 const PAST_HERO = 460;
 
 /**
@@ -84,10 +80,7 @@ export function Nav({ setupOpen }: { setupOpen: boolean }) {
     null
   );
 
-  // Leaving one link for the next clears and then sets the highlight; the clear waits a tick so
-  // the move between neighbours slides instead of fading out and back in.
   const clear = useRef<ReturnType<typeof setTimeout>>(undefined);
-  // An open menu keeps the highlight on its trigger, as the pressed state of the button.
   const held = useRef(false);
   function point(event: MouseEvent<HTMLElement>) {
     clearTimeout(clear.current);
@@ -126,8 +119,6 @@ export function Nav({ setupOpen }: { setupOpen: boolean }) {
     return () => window.removeEventListener("keydown", close);
   }, [open]);
 
-  // Getting started is signing in: a new person names their workspace next. A fresh server
-  // starts by setting up its first workspace instead.
   const to = setupOpen ? "/setup" : "/login";
 
   return (
@@ -256,8 +247,6 @@ const styles = stylex.create({
       [NARROW]: space.xl,
     },
   },
-  // Two layers under the bar, taller than it: a blur that fades out halfway down, and the page's
-  // own colour thinning to nothing, so scrolled content dims and softens before it reaches the bar.
   blur: {
     position: "absolute",
     insetInline: 0,
@@ -284,8 +273,6 @@ const styles = stylex.create({
     alignItems: "center",
     gap: space.md,
     justifySelf: "start",
-    // A 22px mark is too small to tap; the padding gives it a 40px target and the margin takes the
-    // padding back, so the mark stays where it was.
     padding: 9,
     margin: -9,
     color: color.fg,
@@ -307,8 +294,6 @@ const styles = stylex.create({
     padding: 0,
     listStyle: "none",
   },
-  // One shape that slides to whichever link the pointer is over, rather than each link lighting
-  // its own: the eye follows a single object along the bar.
   highlight: {
     position: "absolute",
     top: 0,
@@ -341,7 +326,6 @@ const styles = stylex.create({
     height: 28,
     paddingInline: space.lg,
     borderRadius: radius.full,
-    // A menu's trigger is a button, which brings a grey fill of its own.
     backgroundColor: "transparent",
     color: {
       default: "oklch(0.22 0.01 80 / 0.7)",

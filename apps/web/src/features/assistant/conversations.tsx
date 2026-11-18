@@ -45,7 +45,6 @@ import type { Glance } from "./presence";
 import { useSuggestions } from "./suggestions";
 import { WaitingOnYou } from "./waiting";
 
-// Past this many, the list gets a filter: scrolling stops being the quick way to find one.
 const FILTER_FROM = 8;
 
 export function Conversations({ children }: { children: ReactNode }) {
@@ -151,16 +150,11 @@ export function Conversations({ children }: { children: ReactNode }) {
   );
 }
 
-/**
- * A new conversation starts at the composer, as in any assistant people already use: what's
- * written here opens the conversation and is sent as its first message.
- */
 /** What a conversation is called in lists and its header. */
 export function titleOf(
   c: { title: string | null; inbox: boolean; mode: "owner" | "teammate" },
   owner?: string
 ) {
-  // The thread briefs and pings arrive in; "Inbox" would name the page of attention items.
   if (c.inbox) {
     return "From your assistant";
   }
@@ -187,7 +181,6 @@ export function NewChat({ ask }: { ask?: string }) {
   const started = useRef(false);
   const me = useMe();
   const { agent: mine, mood, glance } = usePresence();
-  // While you type (or dictate) it's listening; that's the one thing presence can't know.
   const [drafting, setDrafting] = useState(false);
   const conversations = useQuery(q.conversations());
   const open = useMutation({
@@ -198,7 +191,6 @@ export function NewChat({ ask }: { ask?: string }) {
       return { reply, question };
     },
     onSuccess: ({ reply, question }) => {
-      // Listed under the question straight away; the server names it once the first turn is in.
       client.setQueryData(q.conversations().queryKey, (cached) => [
         { ...reply.conversation, title: reply.conversation.title ?? question },
         ...(cached ?? []).filter((c) => c.id !== reply.conversation.id),
@@ -227,7 +219,6 @@ export function NewChat({ ask }: { ask?: string }) {
   const asking = open.variables ?? (open.isError ? undefined : ask);
 
   if (asking && !open.isError) {
-    // The question shows the moment it's asked, as the thread will; the conversation opens under it.
     return (
       <>
         <PageHeader title={asking} />
@@ -251,7 +242,6 @@ export function NewChat({ ask }: { ask?: string }) {
               ? `What can I find for you, ${firstName}?`
               : "What can I find for you?"}
           </h1>
-          {/* Someone new learns what it is; after that, the line says what it's doing. */}
           {conversations.data?.length === 0 || !glance ? (
             <p {...stylex.props(styles.emptyText)}>
               Your assistant reads the team’s activity and your board, remembers
@@ -290,7 +280,6 @@ export function NewChat({ ask }: { ask?: string }) {
   );
 }
 
-/** What the assistant is doing, linked to where it's doing it when that's a conversation. */
 function StatusLine({ glance }: { glance: Glance }) {
   return (
     <p aria-live="polite" {...stylex.props(styles.emptyText)}>
@@ -309,8 +298,6 @@ function StatusLine({ glance }: { glance: Glance }) {
   );
 }
 
-// Where a row's time goes: the assistant's face while it's answering there, a dot for an answer
-// not yet read, otherwise how long ago it moved.
 function ItemStatus({
   conversation,
   mood,
@@ -343,7 +330,6 @@ function ItemStatus({
   );
 }
 
-/** On a phone the list beside the thread is hidden, so a new chat lists the latest ones. */
 function RecentConversations() {
   const list = useQuery({ ...q.conversations(), select: notBeingDeleted });
   const items = list.data?.slice(0, 8) ?? [];
@@ -379,7 +365,6 @@ export function ConversationView({ id, ask }: { id: string; ask?: string }) {
   const conversation = useQuery(q.conversation(id));
   const navigate = useNavigate();
   const { byId } = useMembers();
-  // The URL drops the question straight away, so a reload can't send it twice; keep it here.
   // oxlint-disable-next-line react/hook-use-state -- only the first value is wanted; there is nothing to set
   const [question] = useState(ask);
 
@@ -405,8 +390,6 @@ export function ConversationView({ id, ask }: { id: string; ask?: string }) {
     );
   }
   if (conversation.isError) {
-    // Gone is not broken: a deleted conversation, or one that was never yours (403), gets a way
-    // on instead of a Try again that can't work.
     const gone =
       conversation.error instanceof ApiError &&
       (conversation.error.status === 404 || conversation.error.status === 403);
@@ -481,17 +464,13 @@ export function ConversationView({ id, ask }: { id: string; ask?: string }) {
   );
 }
 
-// How long a deleted conversation can still be brought back.
 const UNDO_MS = 5000;
 const pendingDeletes = new Map<string, ReturnType<typeof setTimeout>>();
 
-// The server keeps a deleted conversation until its Undo window ends, so a refetch meanwhile
-// (focus, a live message) must not bring it back into the list.
 function notBeingDeleted<T extends { id: string }>(list: T[]) {
   return list.filter((c) => !pendingDeletes.has(c.id));
 }
 
-// A tab closed during the undo window still deletes: the request outlives the page.
 if (typeof window !== "undefined") {
   window.addEventListener("pagehide", () => {
     for (const [id, timer] of pendingDeletes) {
@@ -520,17 +499,12 @@ async function deleteFor(id: string, restore: () => void) {
   }
 }
 
-/**
- * Deleting goes at once from the list and the page, with Undo for a few seconds instead of a
- * confirm dialog; only then is it deleted for good.
- */
 function ConversationMenu({ id, title }: { id: string; title: string | null }) {
   const client = useQueryClient();
   const navigate = useNavigate();
   const { byId } = useMembers();
   const copy = async () => {
     try {
-      // Fetched fresh: a reply that just finished streaming isn't in the cached copy yet.
       const detail = await client.query({
         ...q.conversation(id),
         staleTime: 0,
@@ -615,10 +589,6 @@ function asMarkdown(
   return `${[`# ${detail.title ?? "Conversation"}`, ...turns].join("\n\n")}\n`;
 }
 
-/**
- * A conversation's name, renamed where it's read: click it (or its pencil), type, and Enter
- * saves; Escape keeps the old one. The list updates at once.
- */
 function EditableTitle({
   conversationId,
   title,
@@ -814,7 +784,6 @@ const styles = stylex.create({
   },
   group: { display: "flex", flexDirection: "column", gap: 1 },
   filter: { paddingInline: space.sm, paddingTop: space.sm },
-  // The list sits beside the thread on wide screens; on a phone the thread needs a way back to it.
   back: {
     display: { default: "none", "@media (max-width: 860px)": "grid" },
     placeItems: "center",
@@ -854,7 +823,6 @@ const styles = stylex.create({
     gap: space.xs,
     flexShrink: 0,
     fontSize: text.caption,
-    // The open conversation's fill is a step darker, so its time steps up to stay readable.
     color: {
       default: color.fgFaint,
       ":is([data-status=active] > *)": color.fgMuted,
@@ -894,7 +862,6 @@ const styles = stylex.create({
     display: "flex",
     flexDirection: "column",
     alignItems: "center",
-    // "safe": once what waits on you fills the page it scrolls from the top instead of clipping it.
     justifyContent: {
       default: "safe center",
       "@media (max-width: 640px)": "flex-start",
@@ -910,7 +877,6 @@ const styles = stylex.create({
     gap: space.xl,
     width: "100%",
     maxWidth: 680,
-    // Sits a little above centre, where the eye lands on an empty page.
     marginBottom: { default: "10vh", "@media (max-width: 640px)": 0 },
   },
   emptyHead: {
@@ -954,7 +920,6 @@ const styles = stylex.create({
     paddingInline: space.sm,
     listStyle: "none",
   },
-  // A long suggestion wraps on a phone, so the chip grows with it instead of clipping.
   starter: {
     minHeight: 30,
     paddingBlock: space.xs,

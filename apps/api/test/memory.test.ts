@@ -3,7 +3,6 @@ import { expect, test } from "bun:test";
 import { DAY_MS, scriptedModel, testEnv } from "./harness";
 import type { TestEnv } from "./harness";
 
-// Kigali is UTC+2 all year, the harness's default workspace time zone.
 const TUESDAY = new Date("2026-10-27T10:00:00Z");
 const WEDNESDAY = new Date("2026-10-28T10:00:00Z");
 const SUNDAY = new Date("2026-11-01T10:00:00Z");
@@ -22,8 +21,6 @@ async function memories(env: TestEnv, token: string, query = "") {
   return (await env.call("GET", `/v1/memories${query}`, { token })).body;
 }
 
-// What a one-shot call asked, as written: its transcript is JSON, which stringifying the prompt
-// would escape again.
 function asked(call: any): string {
   return call.prompt
     .at(-1)
@@ -31,7 +28,6 @@ function asked(call: any): string {
     .join("");
 }
 
-// A line as a memory pass's model writes it, citing the ids it was shown.
 function learnedLine(content: string, confirmed: boolean, evidence: string[]) {
   return {
     content,
@@ -50,7 +46,6 @@ function rememberFact(content: string, isPrivate: boolean) {
   };
 }
 
-// About 22k tokens a turn, so three turns cross the compaction budget.
 function big(label: string) {
   return `${label} ${"x".repeat(90_000)}`;
 }
@@ -93,7 +88,6 @@ test("a long conversation folds its older turns into a recap once it goes quiet,
     });
   }
   await env.drain();
-  // Still mid-conversation: nothing is folded while a reply might be on its way.
   expect(prompts).toHaveLength(3);
   await env.drain({ later: workspace.id });
   await env.call("POST", `/v1/conversations/${id}/messages`, {
@@ -417,7 +411,6 @@ test("private work never reaches team-visible memory or teammates", async () => 
   expect(shared.content).not.toContain("Salary");
   expect(mine.content).toContain("Salary negotiation call");
 
-  // A teammate asking the assistant only ever sees the team journal.
   const { model, prompts } = scriptedModel([
     { tool: "recall", input: {} },
     { text: "ok" },
@@ -524,7 +517,6 @@ test("once a conversation goes quiet the assistant learns from what its owner sa
   expect(await memories(env, owner.token, "?q=french")).toHaveLength(0);
 
   await env.drain({ later: owner.workspace.id });
-  // Sam's conversation went quiet too, and taught nothing: only one pass reached the model.
   expect(prompts).toHaveLength(2);
   const pass = asked(prompts[1]);
   expect(pass).toContain(
@@ -578,7 +570,6 @@ test("a conversation keeps its memory page until its next summary; what's learne
   }
 
   const [first, second, third] = prompts.map((p) => p.prompt);
-  // The start of the prompt never moved, so every turn could read the last from the cache.
   expect(second[0].content).toBe(first[0].content);
   expect(third[0].content).toBe(first[0].content);
   expect(first[0].content).not.toContain("Moved to the platform team");
@@ -721,7 +712,6 @@ test("an owner's rating of a reply is learned from; a teammate's is kept but tea
     ).body.messages.find((m: any) => m.role === "assistant");
   const myReply = await replyIn(owner.token, mine.id);
   const theirReply = await replyIn(sam.token, theirs.id);
-  // The owner's question settles first, and teaches nothing; Sam's teaches the owner's nothing.
   await env.drain({ later: owner.workspace.id });
   expect(prompts).toHaveLength(3);
 
@@ -774,7 +764,6 @@ test("an owner's rating of a reply is learned from; a teammate's is kept but tea
     content: "Wants the answer first, then detail",
     visibility: "private",
   });
-  // Learned once: settling again doesn't read the same rating twice.
   await env.drain({ later: owner.workspace.id });
   expect(prompts).toHaveLength(4);
 
@@ -801,8 +790,6 @@ test("the pass after a conversation can only forget lines it was shown", async (
       body: { content: "Oldest fact: owns the billing cron", kind: "fact" },
     })
   ).body;
-  // Newer facts push the oldest off the page the pass reads. Times are kept to the millisecond,
-  // and writes this fast would otherwise tie, leaving which is newest to chance.
   for (let i = 0; i < 60; i += 1) {
     await Bun.sleep(2);
     await env.call("POST", "/v1/memories", {
@@ -849,7 +836,6 @@ test("a conversation far past its budget is compacted at once, without waiting f
       body: { message: `huge-turn ${"x".repeat(600_000)}` },
     })
   ).body.conversation;
-  // The last turn is always kept whole, so there's something to fold once a second one follows.
   await env.call("POST", `/v1/conversations/${id}/messages`, {
     token,
     body: { message: "Short follow-up" },
@@ -949,7 +935,6 @@ test("a rated reply can be asked again with today's prompts, and the replay chan
     before: "A very long rambling answer",
     note: "Too long",
   });
-  // Lookups only: it could ask to move a card, and the tool wasn't there.
   const tools = now.prompts[0].tools.map((t: any) => t.name);
   expect(tools).not.toContain("move_card");
   expect(JSON.stringify(now.prompts[0].prompt)).not.toContain("And billing?");
@@ -1016,7 +1001,6 @@ test("each line cites what it was learned from, and inferences stay out of the d
   expect(asked(writer.prompts[1])).toContain(`"id":"${said.id}"`);
 
   const [fact] = await memories(env, owner.token, "?kind=fact");
-  // The team pass was never shown the message, and nobody can cite an id that doesn't exist.
   expect(fact).toMatchObject({
     content: "Owns the retry queue",
     visibility: "team",

@@ -62,7 +62,6 @@ export async function runRoutine(
     conversationId: `routine:${automation.id}`,
     said: automation.instructions ?? "",
   };
-  // The last result was written from everything, so the team version doesn't see it.
   const last = everything
     ? `Last result: ${JSON.stringify(automation.state.lastResult ?? null)}\n\n`
     : "";
@@ -81,7 +80,6 @@ export async function runRoutine(
     stopWhen: [isStepCount(MAX_STEPS), hasToolCall("send_message")],
     timeout: TIMEOUTS.background,
   });
-  // What the routine looked up: the only links its message may carry.
   const sources = result.steps.flatMap((s) =>
     s.toolResults.map((r) => r.output)
   );

@@ -4,7 +4,6 @@ import { call } from "#connectors/http";
 import type { ConnectionView, HookResult, HooksSpec } from "#connectors/types";
 import type { AppContext } from "#context";
 
-// What the shared GitHub mapping understands, in Gitea's names for hook events.
 const EVENTS = [
   "push",
   "issues",
@@ -58,7 +57,6 @@ async function request(
   return body;
 }
 
-// `active` defaults to false on Gitea: a hook created without it never fires.
 const config = (hook: { url: string; secret: string }) => ({
   type: "gitea",
   active: true,
@@ -86,7 +84,6 @@ async function ensureOne(
       return { target: repo, state: "created" };
     }
     if (ours.active === false) {
-      // Disabled after failing deliveries, or by hand: turned back on, with the current secret.
       await request(
         ctx,
         conn,

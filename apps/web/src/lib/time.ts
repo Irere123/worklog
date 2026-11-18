@@ -42,7 +42,6 @@ export function agoPhrase(iso: string, now = Date.now()) {
   if (short === "now") {
     return "just now";
   }
-  // Past a week `ago` gives a date, and "2 Nov ago" isn't English.
   return Date.parse(iso) < now - 7 * DAY ? `on ${short}` : `${short} ago`;
 }
 
@@ -50,7 +49,6 @@ export function agoPhrase(iso: string, now = Date.now()) {
 export function fromNow(iso: string, now = Date.now()) {
   const ms = Date.parse(iso) - now;
   const abs = Math.abs(ms);
-  // The past truncates like `ago`, so a card's "5 hours ago" and its history's "4h" agree.
   const count = ms < 0 ? Math.trunc : Math.round;
   if (abs < HOUR) {
     return relative.format(count(ms / MINUTE), "minute");
@@ -120,7 +118,6 @@ const ZONED = {
   weekday: { weekday: "long" },
   day: { weekday: "short" },
   date: { day: "numeric", month: "short" },
-  // en-CA writes 2026-11-16, which parses back as that calendar day.
   key: { year: "numeric", month: "2-digit", day: "2-digit" },
 } satisfies Record<string, Intl.DateTimeFormatOptions>;
 
@@ -134,7 +131,6 @@ function zoned(kind: keyof typeof ZONED, timeZone: string | undefined) {
     try {
       f = new Intl.DateTimeFormat(locale, { ...ZONED[kind], timeZone });
     } catch {
-      // A zone the browser doesn't know falls back to its own rather than breaking the page.
       f = new Intl.DateTimeFormat(locale, ZONED[kind]);
     }
     zonedCache.set(id, f);

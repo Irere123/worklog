@@ -4,9 +4,6 @@ import { createContext } from "#context";
 import { listUnhelpfulRatings } from "#db/queries/conversations";
 import { findMemberById } from "#db/queries/members";
 
-// After changing a prompt, the constitution or the model: asks the replies people marked unhelpful
-// again and prints each old answer beside the new one. Nothing is stored or sent.
-// Usage: bun run ratings:replay <workspace id> [how many, default 20]
 const [workspaceId, limit = "20"] = process.argv.slice(2);
 if (!workspaceId) {
   console.error("Usage: bun run ratings:replay <workspace id> [how many]");

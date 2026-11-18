@@ -25,7 +25,6 @@ export async function listActiveTokens(
     .orderBy(desc(apiTokens.createdAt));
 }
 
-// Revoked and expired tokens, and tokens of deactivated members, don't match.
 export async function findTokenByHash(
   db: DbOrTx,
   params: { tokenHash: string; now: Date }

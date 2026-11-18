@@ -89,7 +89,6 @@ type Source = {
   people: People;
 };
 
-/** What an event may do besides becoming activity. */
 type Effects = {
   raise: boolean;
   onlyIfNew: boolean;
@@ -104,7 +103,6 @@ const NOBODY: Who = { resolved: null, member: null, isBot: false };
 type Loaded = { connector: Connector; view: ConnectionView; namespace: string };
 
 const BATCH = 25;
-/** A drain hands over after this long, so one busy lane doesn't hold a worker indefinitely. */
 const BUDGET_MS = 20_000;
 const MAX_ATTEMPTS = 5;
 const STUCK_RETRY_MS = 30_000;
@@ -134,7 +132,6 @@ export async function drainLane(
     const fresh = batch.filter((d) => !tried.has(d.id));
     if (fresh.length === 0) {
       await scheduleNextRetry(ctx, connectionId, lane);
-      // Tried and still pending: its failure couldn't even be recorded. Look again later.
       if (batch.some((d) => d.status === "pending")) {
         await enqueueDrain(
           ctx,
@@ -153,7 +150,6 @@ export async function drainLane(
         tried.add(delivery.id);
       }
       clean = (await attemptTogether(ctx, loaded, lane, run)) && clean;
-      // After each page of history, look again if a live event arrived meanwhile.
       if (
         run[0]?.via === "sync" &&
         (await findLiveWaiting(ctx.db, { connectionId, lane })) !== undefined
@@ -162,10 +158,6 @@ export async function drainLane(
         break;
       }
     }
-    // All of a short batch done, none of it a retry: the lane was empty when listed, and whatever
-    // arrived since queued a job of its own (this one is running, so the key starts another).
-    // Listing again would cost a query for nothing, on every drain of a quiet lane. The lane's
-    // retries are booked all the same: this drain may have run on the job that was holding them.
     if (
       clean &&
       !cutIn &&
@@ -182,8 +174,6 @@ export async function drainLane(
   }
 }
 
-// A lane's failures share one retry job, which runs at the earliest of them; whatever wasn't due
-// yet gets the job again, at its own time.
 async function scheduleNextRetry(
   ctx: AppContext,
   connectionId: string,
@@ -195,8 +185,6 @@ async function scheduleNextRetry(
   }
 }
 
-// New live deliveries go together. A page of history goes alone, so live events can cut in after
-// it, and so does a retry, so a delivery that keeps failing doesn't take others down each time.
 function runsOf(deliveries: InboundEvent[]) {
   const runs: InboundEvent[][] = [];
   let together: InboundEvent[] = [];
@@ -217,11 +205,6 @@ function runsOf(deliveries: InboundEvent[]) {
   return runs;
 }
 
-/**
- * Deliveries that arrived together, in one transaction with one lookup of everyone they name: a
- * busy lane pays for one commit, not one per delivery. When any of them fails, all of it rolls
- * back and each is tried on its own, so only the one that failed waits for a retry.
- */
 async function attemptTogether(
   ctx: AppContext,
   loaded: Loaded,
@@ -271,8 +254,6 @@ async function attemptTogether(
     );
     return true;
   } catch (error) {
-    // Each one's own attempt records its own error; the people are already resolved. Said here
-    // too, since what failed together (a deadlock with another lane) may succeed alone.
     log.warn("ingest: deliveries failed together; trying each alone", {
       error,
       connectionId: loaded.view.id,
@@ -312,7 +293,6 @@ async function attempt(
   }
 }
 
-// 10 s, 20 s, 40 s, 80 s, with jitter so a burst of failures doesn't retry in lockstep.
 function backoff(attempts: number) {
   const base = 10_000 * 2 ** Math.max(0, attempts - 1);
   return Math.round(base * (0.75 + Math.random() * 0.5));
@@ -340,8 +320,6 @@ export async function processInbound(
   if (!loaded) {
     return;
   }
-  // Done is done: a second job for the same delivery (one queued before lanes, a race) does
-  // nothing. Only a replay processes it again.
   if (
     opts.replay !== true &&
     (inbound.status === "processed" || inbound.status === "ignored")
@@ -366,7 +344,6 @@ export async function processInbound(
       ctx,
       async (tx) => {
         await lockConnectionForWrites(tx.db, { id: loaded.view.id });
-        // Another processor may have taken it meanwhile; a replay processes it again on purpose.
         if (mode !== "replay") {
           const waiting = await lockWaitingDeliveries(tx.db, {
             ids: [inbound.id],
@@ -396,8 +373,6 @@ export async function processInbound(
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     if (mode === "replay") {
-      // Its effects already happened, so it isn't retried live, and it stays done: the next
-      // replay, once the connector is fixed, rebuilds its activity.
       await updateInboundAttempt(ctx.db, {
         id: inbound.id,
         set: { error: `replay failed: ${message}` },
@@ -423,8 +398,6 @@ function normalizeDelivery({ connector, view }: Loaded, inbound: InboundEvent) {
     },
     view
   );
-  // Two such connections in a workspace can name different events alike. Threads are names
-  // their owners give conversations, and two naming one alike mean the same one.
   return connector.perConnection === true
     ? {
         ...normalized,
@@ -436,7 +409,6 @@ function normalizeDelivery({ connector, view }: Loaded, inbound: InboundEvent) {
     : normalized;
 }
 
-/** A delivery's events, in the caller's transaction, and the status that says what came of them. */
 async function ingestDelivery(
   tx: AppContext,
   loaded: Loaded,
@@ -473,16 +445,10 @@ async function ingestDelivery(
   return { status, outcome };
 }
 
-/** Hidden events and signals still did something (a nudge, a board change), even with no activity. */
 function actsOnPeople(event: WorklogEvent) {
   return event.hidden === true || (event.signals ?? []).length > 0;
 }
 
-/**
- * Claimed in the ledger first: a retry, a redelivery or a sync of an event already ingested
- * changes nothing, even when it was merged into a burst. Its writes join the delivery's
- * transaction, so one event failing rolls back the whole delivery, which is retried whole.
- */
 async function ingestEvent(
   ctx: AppContext,
   source: Source,
@@ -510,7 +476,6 @@ async function ingestEvent(
     externalId: event.id,
   };
   await transact(ctx, async (tx) => {
-    // The claim names the activity it is about to write, so a new event costs one ledger write.
     const planned = event.hidden === true ? null : generateId();
     const claimed = await insertIngestedEventIfNew(tx.db, {
       ...key,
@@ -542,12 +507,9 @@ async function ingestEvent(
         importance: verdict.importance,
       });
       if (!activityId) {
-        // Recorded before the ledger existed, and still found by its external id. Without a
-        // claim pointing nowhere, a replay that deletes it can rebuild it.
         await deleteIngestedEvent(tx.db, key);
         return;
       }
-      // Merged into a burst: the claim points at the burst instead.
       if (activityId !== planned) {
         await setIngestedActivity(tx.db, { ...key, activityId });
       }
@@ -563,10 +525,6 @@ async function ingestEvent(
   });
 }
 
-/**
- * What a dropped event says about the state of things still holds: a bot closing a PR resolves the
- * review requests on it and closes its card. Nothing is recorded and nobody is pinged.
- */
 async function applyState(
   ctx: AppContext,
   source: Source,
@@ -578,9 +536,6 @@ async function applyState(
   if (resolves.length === 0 && board.length === 0) {
     return;
   }
-  // Once: read again (a sync page, a redelivery), it mustn't close a card someone has reopened
-  // since, whether it was dropped or kept the first time (the bot policy may have changed). Under
-  // a key of its own, so a replay that keeps the event after all can still record it.
   const key = {
     workspaceId: source.conn.workspaceId,
     source: source.conn.provider,
@@ -625,10 +580,6 @@ function changesState(e: BoardEffect) {
   return e.type === "close_card" || e.type === "reopen_card";
 }
 
-/**
- * The event, less the closes and reopens that already ran when it was dropped: kept now (the bot
- * policy changed), it mustn't close a card again that someone has reopened since.
- */
 async function withoutAppliedState(
   ctx: AppContext,
   source: Source,
@@ -671,7 +622,6 @@ function scopeOf(source: Source): BoardScope {
   };
 }
 
-/** Effects run before card refs so the activity can link to the card they create. */
 async function linkCard(
   ctx: AppContext,
   scope: BoardScope,
@@ -816,7 +766,6 @@ async function applyRevision(
     source: source.conn.provider,
     externalId: event.id,
   };
-  // A mention raised from it shows what it said.
   const mention = {
     workspaceId: source.conn.workspaceId,
     dedupeKey: `mention:${event.id}`,
@@ -842,7 +791,6 @@ async function applyRevision(
     const burst = entry?.activityId
       ? await findActivityById(ctx.db, { id: entry.activityId })
       : undefined;
-    // As with a deletion, the burst can't say which line was this one's.
     if (burst && burst.count > 1) {
       await forgetMergedText(ctx, burst);
       outcome.dropped.push({
@@ -864,7 +812,6 @@ async function applyRevision(
     const activity = entry?.activityId
       ? await findActivityById(tx.db, { id: entry.activityId })
       : undefined;
-    // A burst stands for the other messages too: it loses this one's text, not its existence.
     if (activity && activity.count > 1) {
       await forgetMergedText(tx, activity);
       return "deleted at the source (removed from the burst it was merged into)";
@@ -881,8 +828,6 @@ async function applyRevision(
   outcome.dropped.push({ id: event.id, reason });
 }
 
-// A burst's body holds every merged message's text and can't say which line was whose, so a
-// deleted message takes the body with it: what was deleted must not linger.
 async function forgetMergedText(
   ctx: AppContext,
   activity: { id: string; body: string | null }
@@ -940,9 +885,6 @@ export async function replayLane(
   if (!loaded) {
     return { reprocessed: 0, failed: 0, rebuiltFrom: 0 };
   }
-  // Up to now, not to when the replay was asked for: a drain that ran in between may have merged
-  // later deliveries into bursts this deletes, and the lane's queue keeps live work from running
-  // while this does.
   const window = { ...params, until: ctx.now() };
   const ids = await listInboundEventIds(ctx.db, window);
   const removed = await deleteLaneActivities(ctx.db, window);
@@ -951,8 +893,6 @@ export async function replayLane(
     try {
       await processInbound(ctx, id, { replay: true, loaded });
     } catch (error) {
-      // Marked failed with its error; the rest of the lane is still rebuilt. Not retried: a
-      // retry would run live, and its effects already happened.
       failed += 1;
       log.error("ingest: replay of a delivery failed", {
         error,

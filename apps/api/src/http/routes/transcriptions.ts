@@ -54,7 +54,6 @@ export const transcriptionRoutes = router().openapi(
 );
 
 function audioType(header: string | undefined): AudioType {
-  // "audio/webm;codecs=opus" is what a browser's recorder says; the codec rides along.
   const type = header?.split(";")[0]?.trim().toLowerCase() ?? "";
   if (!(type in AUDIO_FORMATS)) {
     throw badRequest(
@@ -65,7 +64,6 @@ function audioType(header: string | undefined): AudioType {
   return type as AudioType;
 }
 
-// Read off the stream with a running count, so a body that lies about its length is still cut off.
 async function boundedBytes(req: Request) {
   if (Number(req.headers.get("content-length") ?? 0) > MAX_AUDIO_BYTES) {
     throw tooLong();

@@ -10,8 +10,6 @@ import { color, leading, radius, space, text } from "#ui/tokens.stylex";
 import { AllowDeny, useAnswerApproval } from "./approvals";
 
 const APPROVAL = "assistant.approval";
-// The review writes "Your assistant wants to move #9 to Investigating"; on the assistant's own
-// page the line starts at the verb.
 const ASKING = /^Your assistant wants to /u;
 
 /**

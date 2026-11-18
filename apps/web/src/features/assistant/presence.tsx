@@ -159,7 +159,6 @@ function doing(work: Working, people: Map<string, Member>) {
   }
 }
 
-// A custom routine is named by its owner, so it reads as its name.
 const ROUTINE_WORDS: Record<RoutineKind, string | null> = {
   "brief.daily": "Writing your daily brief",
   "brief.weekly": "Writing your weekly brief",
@@ -169,7 +168,6 @@ const ROUTINE_WORDS: Record<RoutineKind, string | null> = {
   custom: null,
 };
 
-/** The step the server records once the reply's text starts to flow (agent/loop.ts). */
 const WRITING_STEP = "writing";
 
 /**

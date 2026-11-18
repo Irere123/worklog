@@ -4,7 +4,6 @@ import { readMigrationFiles } from "drizzle-orm/migrator";
 import type { MigrationMeta } from "drizzle-orm/migrator";
 import type { Pool, PoolClient } from "pg";
 
-// Any fixed number works, as long as every Worklog process uses the same one.
 const MIGRATION_LOCK = 4_243_960_211;
 
 const CONCURRENT_INDEX =
@@ -35,14 +34,10 @@ export async function migrate(pool: Pool, migrationsFolder: string) {
       }
     }
   } finally {
-    // Closing the connection releases the session lock, even after a failed migration.
     client.release(true);
   }
 }
 
-// Polls rather than waiting inside pg_advisory_lock: a session blocked in that call holds a
-// snapshot, and CREATE INDEX CONCURRENTLY in the session that has the lock waits for every older
-// snapshot to end, so the two would deadlock.
 async function lock(client: PoolClient) {
   for (;;) {
     const { rows } = await client.query<{ locked: boolean }>(
@@ -84,8 +79,6 @@ async function apply(client: PoolClient, migration: MigrationMeta) {
   }
 }
 
-// A failed build leaves an invalid index behind; a build that finished before the migration was
-// recorded leaves a valid one. Rebuild the first, keep the second.
 async function buildIndex(client: PoolClient, statement: string) {
   const name = CONCURRENT_INDEX.exec(statement)?.groups?.name ?? "";
   const { rows } = await client.query<{ valid: boolean }>(

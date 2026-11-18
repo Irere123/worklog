@@ -29,8 +29,6 @@ const VERIFY: { value: Verify; label: string; header: string }[] = [
   },
 ];
 
-// A working starting point: one rule that turns a "deploy" event into activity. People edit it to
-// match their tool's payload; the docs list every field a rule can use.
 const STARTER = `[
   {
     "when": { "eventType": "deploy" },

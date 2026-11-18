@@ -46,7 +46,6 @@ export function isValidTimeZone(tz: string): boolean {
   }
 }
 
-// weekday: 0 = Sunday.
 export function localParts(date: Date, timeZone: string): LocalParts {
   const parts: Record<string, string> = {};
   for (const p of formatter(timeZone).formatToParts(date)) {
@@ -80,7 +79,6 @@ export function zonedToUtc(
 ): Date {
   const target = Date.UTC(year, month - 1, day, hour, minute);
   let guess = target;
-  // Two passes converge across DST transitions.
   for (let i = 0; i < 2; i += 1) {
     const p = localParts(new Date(guess), timeZone);
     const asUtc = Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute);
@@ -114,7 +112,6 @@ export function startOfLocalDay(
   );
 }
 
-// The start of a local calendar date given as YYYY-MM-DD, or undefined if it isn't one.
 export function startOfLocalDate(
   day: string,
   timeZone: string,
@@ -143,7 +140,6 @@ export function startOfLocalDate(
       );
 }
 
-// A local date and time given as YYYY-MM-DDTHH:MM, or undefined if it isn't one.
 export function startOfLocalMinute(
   value: string,
   timeZone: string
@@ -165,14 +161,11 @@ export function startOfLocalMinute(
   return zonedToUtc(p.year, p.month, p.day, hour, minute, timeZone);
 }
 
-// Formatted YYYY-MM-DD.
 export function localDate(date: Date, timeZone: string): string {
   const p = localParts(date, timeZone);
   return `${p.year}-${String(p.month).padStart(2, "0")}-${String(p.day).padStart(2, "0")}`;
 }
 
-// The last local day an expiry covers: it is stored as the next day's midnight, which belongs to
-// the day after.
 export function lastLocalDate(expiresAt: Date, timeZone: string): string {
   return localDate(new Date(expiresAt.getTime() - 1), timeZone);
 }
@@ -194,7 +187,6 @@ export function isWithinHours(
 export const HOUR_MS = 60 * 60 * 1000;
 export const DAY_MS = 24 * HOUR_MS;
 
-// A member's clock is their own, or the workspace's until they set one.
 export function timezoneOf(
   member: { timezone: string | null },
   workspace: { timezone: string }

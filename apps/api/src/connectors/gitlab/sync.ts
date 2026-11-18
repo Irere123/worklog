@@ -12,7 +12,6 @@ import { gitlabRequest, projectPath, projectsOf } from "./api";
 import { gitlabTime, normalizeGitlab } from "./events";
 import type { GitlabInput } from "./events";
 
-// A run re-reads a little of what the last one saw; the ledger drops the overlap.
 const OVERLAP_MS = 5 * 60_000;
 const PER_PAGE = 100;
 const DAY_MS = 86_400_000;
@@ -95,7 +94,6 @@ const Cursor = z.object({
       started: z.string(),
       stage: z.enum(STAGES),
       page: z.number(),
-      /** The partition webhooks use (`project.id`), so history and live events share a lane. */
       projectId: z.number().optional(),
       webUrl: z.string().optional(),
       defaultBranch: z.string().optional(),
@@ -123,17 +121,10 @@ const PATHS: Record<Stage, (since: string, page: number) => string> = {
   issues: (since, page) =>
     `/issues?scope=all&updated_after=${encodeURIComponent(since)}&order_by=updated_at&sort=asc&per_page=${PER_PAGE}&page=${page}`,
   releases: (_since, page) => `/releases?per_page=${PER_PAGE}&page=${page}`,
-  // `after` is a date and exclusive: from the day before, and the page drops what's older.
   pushes: (since, page) =>
     `/events?action=pushed&after=${new Date(Date.parse(since) - DAY_MS).toISOString().slice(0, 10)}&sort=asc&per_page=${PER_PAGE}&page=${page}`,
 };
 
-/**
- * History and catch-up through GitLab's API with the connection's token: each project's merge
- * requests, issues, releases and pushes since the last run, rebuilt as the webhooks GitLab would
- * have sent so they get the webhooks' ids. Comments arrive through webhooks only: GitLab lists
- * them per merge request or issue, which would cost a request for each.
- */
 async function readProject(
   ctx: AppContext,
   conn: ConnectionView,
@@ -174,7 +165,6 @@ async function readProject(
       items,
     },
   };
-  // Releases come newest first with no `since`: one page covers any reasonable window.
   if (items.length === PER_PAGE && run.stage !== "releases") {
     return {
       page,
@@ -329,8 +319,6 @@ function releaseDelivery(raw: unknown): Delivery[] {
   ];
 }
 
-// The events API keeps a push's head commit, its title and how many commits it carried: enough
-// for the push the webhook announced, under the same id.
 function pushDelivery(raw: unknown): Delivery[] {
   const parsed = PushEvent.safeParse(raw);
   if (!parsed.success) {
@@ -404,7 +392,6 @@ export function normalizeGitlabPage(
       events.length === 0
         ? `nothing new in ${project.path_with_namespace} ${stage}`
         : undefined,
-    // History before the window isn't noise; what the rules turned into nothing is.
     skipped: normalized.filter((e) => e.length === 0).length,
   };
 }

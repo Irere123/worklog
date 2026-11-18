@@ -4,7 +4,6 @@ import { insertVoice } from "#db/queries/voices";
 import type { VoiceRow } from "#db/queries/voices";
 import { generateId } from "#lib/ids";
 
-// It rides along in every conversation, so it stays about a page.
 export const MAX_VOICE_CHARS = 4000;
 
 /**

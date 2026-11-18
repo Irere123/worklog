@@ -1,7 +1,3 @@
-// The demo team the seed script creates, so the landing page shows the same people, agents and
-// cards someone meets after `bun run seed`. Agents' ids are the seed's own, because an agent's
-// face and colour are drawn from its id: Atlas looks here as it does in the app.
-
 export const ada = {
   id: "ada",
   name: "Ada Chen",

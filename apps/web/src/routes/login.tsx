@@ -10,6 +10,7 @@ import { q } from "#api/queries";
 import { AuthFrame, authStyles } from "#features/auth/frame";
 import { requestMagicLink, socialSignIn } from "#features/auth/session";
 import { DISPLAY_FONT } from "#features/landing/head";
+import { store } from "#lib/storage";
 import { Button } from "#ui/button";
 import { Badge } from "#ui/chip";
 import { ErrorNote } from "#ui/feedback";
@@ -165,7 +166,6 @@ function Login() {
                 </Link>
               </>
             )}
-            {/* Keys are for agents and scripts; outside development, people sign in as themselves. */}
             {import.meta.env.DEV && (
               <button
                 type="button"
@@ -247,7 +247,6 @@ function Login() {
   );
 }
 
-// The API also signs people in with Slack, but the web app offers only these two for now.
 function isShown(provider: string): provider is Provider {
   return provider in PROVIDERS;
 }
@@ -263,11 +262,7 @@ function readLastUsed() {
 }
 
 function rememberLastUsed(method: Provider | "email") {
-  try {
-    localStorage.setItem(LAST_USED, method);
-  } catch {
-    // Private windows may refuse storage; the hint is a nicety.
-  }
+  store(LAST_USED, method);
 }
 
 function ApiKeyForm({ next }: { next: string }) {

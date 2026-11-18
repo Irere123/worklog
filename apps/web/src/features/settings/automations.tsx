@@ -726,7 +726,6 @@ const styles = stylex.create({
       ":hover": { default: null, [media.hover]: color.uiHover },
     },
   },
-  // A tint, not a solid fill: five days on in a row is the usual answer and shouldn't shout.
   dayOn: {
     color: color.accentFg,
     boxShadow: `inset 0 0 0 1px color-mix(in oklch, ${color.accent} 40%, transparent)`,

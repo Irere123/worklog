@@ -7,7 +7,6 @@ import { color, font, radius, space, text } from "#ui/tokens.stylex";
 import { page, type } from "./styles";
 import { ada } from "./team";
 
-// Broken at its own flags and fields, so a narrow terminal never has to split a word.
 const COMMAND = `curl $WORKLOG/v1/logs \\
   -H "authorization: Bearer $KEY" \\
   -d '{"kind":"decision",
@@ -130,7 +129,6 @@ const styles = stylex.create({
       "@media (max-width: 640px)": 0,
     },
   },
-  // Dark, as a terminal is; it runs off the panel's foot.
   terminal: {
     marginBottom: -24,
     overflow: "hidden",
@@ -167,7 +165,6 @@ const styles = stylex.create({
   code: {
     margin: 0,
     paddingTop: space.xl,
-    // Room under the reply for the line it writes, which lands over this empty foot.
     paddingBottom: 128,
     paddingInline: {
       default: space.xxl,
@@ -175,8 +172,6 @@ const styles = stylex.create({
     },
     overflowX: "hidden",
     fontFamily: font.mono,
-    // The longest line is 36 characters; scaled with the screen, it still fits whole at 320px
-    // instead of leaving its trailing backslash on a line of its own.
     fontSize: {
       default: 13,
       "@media (max-width: 640px)": "clamp(9px, 2.9vw, 10px)",
@@ -200,7 +195,6 @@ const styles = stylex.create({
   },
   line: {
     position: "absolute",
-    // Straddles the terminal's edge, half over the panel, so it reads as arriving from outside.
     right: {
       default: -110,
       "@media (max-width: 1100px)": -40,

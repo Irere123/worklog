@@ -28,8 +28,6 @@ function requiredScope(method: string, path: string): ApiScope {
   return "write";
 }
 
-// The OAuth server that issues an agent's token sees only the browser's session cookie, so
-// approving one reads as that same person even when the web app also holds an API key.
 const SESSION_ONLY = new Set(["GET /v1/agent-approval"]);
 
 async function identify(
@@ -79,7 +77,6 @@ async function identify(
   return { member: chosen?.member ?? null, user };
 }
 
-// Better Auth reads any bearer token as a session, which would hide the cookie behind the key.
 function withoutKey(headers: Headers) {
   const rest = new Headers(headers);
   rest.delete("authorization");
@@ -95,7 +92,6 @@ function apiKeyOf(c: Context<Env>): string | undefined {
   if (bearer !== undefined && bearer.startsWith("wl_")) {
     return bearer;
   }
-  // EventSource can't send headers, so the stream alone accepts ?token=.
   if (c.req.path === "/v1/events") {
     return c.req.query("token");
   }

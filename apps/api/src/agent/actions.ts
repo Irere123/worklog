@@ -121,7 +121,6 @@ export const ACTIONS = {
         id: i.id,
         memberId: owner.id,
       });
-      // Approving its own proposal would make the check meaningless.
       if (item.kind === APPROVAL_KIND) {
         throw badRequest(
           `Only ${owner.name} can answer their assistant's own requests for approval`
@@ -205,7 +204,6 @@ export function isAction(name: string): name is ActionName {
   return Object.hasOwn(ACTIONS, name);
 }
 
-// Loosely typed on purpose: `input` was validated against the action's own schema just before.
 export async function runAction(
   ctx: AppContext,
   agent: Member,
@@ -231,7 +229,6 @@ export function describeAction(name: ActionName, input: unknown) {
   return (action.describe as (i: unknown) => string)(parsed);
 }
 
-// `to` is "maybe", "not_now" or "done", or else the name of a column.
 async function moveCard(
   ctx: AppContext,
   agent: Member,

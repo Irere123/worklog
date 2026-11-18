@@ -54,7 +54,6 @@ export function mcpRoutes(ctx: AppContext) {
         }
         throw error;
       }
-      // Built per request around the caller: tools and instructions differ by agent and grant.
       const handler = createMcpHandler(() => agentServer(ctx, grant), {
         onerror: (error) => {
           log.warn("mcp: request failed", { error });
@@ -66,11 +65,9 @@ export function mcpRoutes(ctx: AppContext) {
   );
 
   app.post("/mcp", async (c) => await serve(c.req.raw));
-  // Stateless: there is no session stream to open or end.
   app.on(["GET", "DELETE"], "/mcp", (c) =>
     c.json({ error: { code: "method_not_allowed", message: "POST only" } }, 405)
   );
-  // OAuth discovery documents (RFC 9728, RFC 8414) live at the root, outside /api/auth.
   app.get(
     "/.well-known/*",
     async (c) => await c.get("ctx").auth.handler(c.req.raw)
@@ -78,7 +75,6 @@ export function mcpRoutes(ctx: AppContext) {
   return app;
 }
 
-// A 401 carries the challenge, so the client signs in again instead of giving up.
 function refusal(error: ApiError, metadata: string) {
   const headers = new Headers();
   if (error.status === 401) {
