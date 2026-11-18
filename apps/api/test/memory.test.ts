@@ -1,8 +1,6 @@
 import { expect, test } from "bun:test";
 
-import { DAY_MS } from "#lib/time";
-
-import { scriptedModel, testEnv } from "./harness";
+import { DAY_MS, scriptedModel, testEnv } from "./harness";
 import type { TestEnv } from "./harness";
 
 // Kigali is UTC+2 all year, the harness's default workspace time zone.

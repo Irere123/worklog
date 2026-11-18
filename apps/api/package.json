@@ -5,6 +5,7 @@
   "type": "module",
   "imports": {
     "#db": "./src/db/index.ts",
+    "#test/*": "./test/*.ts",
     "#*": "./src/*.ts"
   },
   "scripts": {

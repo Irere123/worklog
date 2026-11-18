@@ -5,9 +5,8 @@ import { setTimeout as sleep } from "node:timers/promises";
 import { sql } from "drizzle-orm";
 
 import { startStreams } from "#ingest/streams";
-
-import { routedFetch, testEnv } from "./harness";
-import type { TestEnv } from "./harness";
+import { routedFetch, testEnv } from "#test/harness";
+import type { TestEnv } from "#test/harness";
 
 let env: TestEnv;
 const identified: { token: string; intents: number }[] = [];

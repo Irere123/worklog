@@ -21,12 +21,16 @@ export default defineConfig({
   // pass without proving anything.
   jsPlugins: [
     { name: "landmines-testing", specifier: "@interfere/landmines/testing" },
+    {
+      name: "landmines-structure",
+      specifier: "@interfere/landmines/structure",
+    },
   ],
   overrides: [
     {
       // Tests read untyped JSON responses and assert on their shape; a wrong
       // shape fails the assertion, which is the check that matters here.
-      files: ["**/test/**"],
+      files: ["**/test/**", "**/*.test.ts"],
       rules: {
         "typescript/no-explicit-any": "off",
         "typescript/no-non-null-assertion": "off",
@@ -59,7 +63,7 @@ export default defineConfig({
       },
     },
     {
-      files: ["apps/api/src/db/**"],
+      files: ["apps/api/src/db/**", "apps/api/src/**/*.test.ts"],
       rules: { "no-restricted-imports": "off" },
     },
     {
@@ -132,7 +136,7 @@ export default defineConfig({
         allow: {
           "apps/api/test/assistant.test.ts": 15,
           "apps/api/test/board.test.ts": 1,
-          "apps/api/test/discord-gateway.test.ts": 3,
+          "apps/api/src/ingest/discord-gateway.test.ts": 3,
           "apps/api/test/mcp.test.ts": 2,
           "apps/api/test/memory.test.ts": 1,
           "apps/api/test/pipeline.test.ts": 1,
@@ -145,7 +149,7 @@ export default defineConfig({
       "error",
       {
         allow: {
-          "apps/api/test/discord-gateway.test.ts": 2,
+          "apps/api/src/ingest/discord-gateway.test.ts": 2,
           "apps/api/test/order.test.ts": 1,
           "apps/api/test/pipeline.test.ts": 1,
           "apps/api/test/scale.test.ts": 1,
@@ -155,5 +159,8 @@ export default defineConfig({
     "landmines-testing/no-test-doubles": "error",
     "landmines-testing/no-unsignaled-poll": "error",
     "landmines-testing/strict-msw": "error",
+    "landmines-structure/colocated-tests": "error",
+    "landmines-structure/package-exports": "error",
+    "landmines-structure/test-file-names": "error",
   },
 });

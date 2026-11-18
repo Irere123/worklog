@@ -6,8 +6,7 @@ import path from "node:path";
 import { Pool } from "pg";
 
 import { migrate } from "#db/migrate";
-
-import { freshDatabase } from "./harness";
+import { freshDatabase } from "#test/harness";
 
 const pools: Pool[] = [];
 

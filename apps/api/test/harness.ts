@@ -9,6 +9,9 @@ import type { AppContext } from "#context";
 import { runJobsOnce } from "#jobs/tasks";
 import { ConsoleMailer } from "#lib/mailer";
 
+export { hmacHex } from "#lib/crypto";
+export { DAY_MS } from "#lib/time";
+
 // One database for the whole run (bun runs every test file in one process), recreated at the start
 // so rows from an earlier run can't make a test pass. Isolation comes from each test creating its
 // own workspace.

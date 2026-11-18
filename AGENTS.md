@@ -70,7 +70,7 @@ apps/api/src/
   events.ts      the event bus
   context.ts     AppContext, built once per process
   config.ts      the only reader of environment variables
-apps/api/test/   harness.ts plus one file per area
+apps/api/test/   harness.ts plus one file per area, for tests through the HTTP API
 
 apps/web/src/
   routes/        TanStack file routes, thin: validate search params, render a feature
@@ -146,6 +146,8 @@ Read [docs/DESIGN.md](docs/DESIGN.md) before building a screen: it covers who Wo
 ## Tests
 
 - Test through the HTTP API with `testEnv()`. Each test creates its own workspace.
+- A test that imports a module to test it sits beside that module in `src/` (`src/db/migrate.test.ts`) and imports the harness as `#test/harness`. A test that goes through the API stays in `apps/api/test/` and takes helpers such as `hmacHex` from the harness. Lint (`colocated-tests`) checks which is which.
+- No retries, raised timeouts or fixed sleeps: await the event instead. The sleeps and timeouts already in place are counted per file in `oxlint.config.ts`; lower a count when you remove one.
 - Use `scriptedModel()` for AI, `fetchStub()` for HTTP, and `env.drain()` after a webhook.
 - To fix a failing test, fix the code, not the assertion.
 

@@ -3,9 +3,7 @@ import { randomInt } from "node:crypto";
 
 import { sql } from "drizzle-orm";
 
-import { hmacHex } from "#lib/crypto";
-
-import { routedFetch, scriptedModel, testEnv } from "./harness";
+import { hmacHex, routedFetch, scriptedModel, testEnv } from "./harness";
 import type { TestEnv } from "./harness";
 
 let env: TestEnv;

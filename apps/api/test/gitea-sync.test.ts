@@ -1,8 +1,6 @@
 import { beforeAll, beforeEach, describe, expect, test } from "bun:test";
 
-import { hmacHex } from "#lib/crypto";
-
-import { routedFetch, testEnv } from "./harness";
+import { hmacHex, routedFetch, testEnv } from "./harness";
 import type { TestEnv } from "./harness";
 
 let env: TestEnv;
