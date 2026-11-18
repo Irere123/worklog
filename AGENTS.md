@@ -28,6 +28,7 @@ bun run test           # files in parallel and random order; each worker recreat
 bun run typecheck
 bun run lint           # `bun run lint:fix` applies safe fixes
 bun run format         # `bun run format:check` only checks
+bun run secrets        # secretlint over every tracked file; pre-commit checks staged ones
 
 cd apps/api
 bun run test test/board.test.ts   # one file
@@ -102,6 +103,7 @@ apps/web/src/
 - **The assistant never writes its own instructions.** No tool may change `constitution.md` or the owner's voice.
 - **Helpers:** throw `notFound`, `forbidden`, `badRequest` or `conflict` from `lib/errors.ts`; use `returned()` for rows a write must return and `generateId(prefix)` for ids.
 - **Never hand-edit** `drizzle/**` or `db/auth-schema.ts`. A custom migration's SQL is the one exception.
+- **No credentials in the repo, not even throwaway ones.** A database in CI or a local container trusts connections on localhost, a secret a run needs is generated then (`openssl rand -hex 32`), and examples use placeholders (`<token>`). secretlint (`.secretlintrc.json`) checks staged files on commit and every tracked file in CI.
 
 ## Web app
 

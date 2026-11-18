@@ -19,10 +19,10 @@ Work is scattered across GitHub, Slack, Discord and calls, and agents now do a g
 
 ## Quick start
 
-You need [Bun](https://bun.sh) and [Postgres](https://www.postgresql.org). The default `DATABASE_URL` is `postgres://postgres:postgres@localhost:5432/worklog`, which this container matches:
+You need [Bun](https://bun.sh) and [Postgres](https://www.postgresql.org). The default `DATABASE_URL` is `postgres://postgres:postgres@localhost:5432/worklog`, which this container matches; it trusts local connections, so it listens on 127.0.0.1 only:
 
 ```bash
-docker run -d --name worklog-db -p 5432:5432 -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=worklog postgres:18
+docker run -d --name worklog-db -p 127.0.0.1:5432:5432 -e POSTGRES_HOST_AUTH_METHOD=trust -e POSTGRES_DB=worklog postgres:18
 ```
 
 Then:

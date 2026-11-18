@@ -12,6 +12,8 @@ pre-commit:
     - name: format
       run: bun --bun oxfmt --no-error-on-unmatched-pattern {staged_files}
       stage_fixed: true
+    - name: secrets
+      run: bun --bun secretlint {staged_files}
 
 commit-msg:
   jobs:
