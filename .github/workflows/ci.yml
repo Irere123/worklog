@@ -5,6 +5,7 @@ on:
     branches: [main]
     tags: ["v*"]
   pull_request:
+  merge_group:
 
 # A newer push to the same branch makes an older run moot; main's runs all finish, since each
 # one publishes an image.
@@ -16,24 +17,15 @@ permissions:
   contents: read
 
 jobs:
-  check:
-    name: Format, lint, typecheck, test & build
+  lint:
+    name: Format & lint
     runs-on: ubuntu-latest
-    timeout-minutes: 15
-    services:
-      postgres:
-        image: postgres:18
-        env:
-          POSTGRES_PASSWORD: postgres
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v5
         with:
-          # The whole history, so commitlint can read every commit in a PR.
           fetch-depth: 0
+          filter: blob:none
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version-file: package.json
@@ -44,8 +36,52 @@ jobs:
           bun --bun commitlint --verbose --from ${{ github.event.pull_request.base.sha }} --to ${{ github.event.pull_request.head.sha }}
       - run: bun run format:check
       - run: bun run lint
+
+  typecheck:
+    name: Typecheck
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          filter: blob:none
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
+      - run: bun install --frozen-lockfile
       - run: bun run typecheck
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Postgres starts while the rest sets up
+        run: >-
+          docker run -d --name postgres -p 5432:5432 -e POSTGRES_PASSWORD=postgres postgres:18 -c fsync=off -c synchronous_commit=off -c full_page_writes=off
+      - uses: actions/checkout@v5
+        with:
+          filter: blob:none
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
+      - run: bun install --frozen-lockfile
+      - name: Postgres is ready
+        run: timeout 60 sh -c 'until docker exec postgres pg_isready -U postgres -q; do sleep 0.2; done'
       - run: bun run test
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          filter: blob:none
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
+      - run: bun install --frozen-lockfile
       - name: Colours meet contrast targets
         run: bun run --filter @worklog/web contrast
       - name: Web app builds
@@ -180,7 +216,7 @@ jobs:
 
   publish:
     name: Publish ${{ matrix.image }} image
-    needs: [check, images]
+    needs: [lint, typecheck, test, build, images]
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
     timeout-minutes: 20
