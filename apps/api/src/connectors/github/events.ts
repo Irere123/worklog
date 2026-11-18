@@ -11,7 +11,7 @@ const optional = <T extends z.ZodType>(schema: T) =>
   schema.optional().catch(undefined);
 const listOf = <T extends z.ZodType>(item: T) =>
   z.array(z.unknown()).transform((items) =>
-    items.flatMap((i): z.infer<T>[] => {
+    items.flatMap((i) => {
       const parsed = item.safeParse(i);
       return parsed.success ? [parsed.data] : [];
     })
@@ -105,7 +105,7 @@ const PayloadSchema = z
   })
   .catch({});
 
-export function parsePayload(payload: unknown): Payload {
+export function parsePayload(payload: unknown) {
   return PayloadSchema.parse(payload);
 }
 
@@ -120,24 +120,25 @@ const WL_REF = /\bWL-(?<number>\d+)\b/giu;
 const MENTION = /(?:^|[^\w`/])@(?<login>[a-z0-9](?:[a-z0-9-]{0,38}))/giu;
 const MERGE_COMMIT = /^Merge (?:pull request|branch) |\(#\d+\)\s*$/u;
 
-export const actorFor = (u: User): ExternalActor => ({
-  id:
-    u.id === undefined || u.id === null
-      ? `handle:${u.login.toLowerCase()}`
-      : String(u.id),
-  handle: u.login,
-  name: u.name ?? null,
-  bot: u.type === "Bot" || /\[bot\]$/iu.test(u.login),
-  avatarUrl: u.avatar_url ?? null,
-});
+export const actorFor = (u: User) =>
+  ({
+    id:
+      u.id === undefined || u.id === null
+        ? `handle:${u.login.toLowerCase()}`
+        : String(u.id),
+    handle: u.login,
+    name: u.name ?? null,
+    bot: u.type === "Bot" || /\[bot\]$/iu.test(u.login),
+    avatarUrl: u.avatar_url ?? null,
+  }) satisfies ExternalActor;
 
-const actorOf = (u?: User | null): ExternalActor | null =>
-  u ? actorFor(u) : null;
+const actorOf = (u?: User | null) => (u ? actorFor(u) : null);
 
-const byLogin = (login: string): ExternalActor => ({
-  id: `handle:${login.toLowerCase()}`,
-  handle: login,
-});
+const byLogin = (login: string) =>
+  ({
+    id: `handle:${login.toLowerCase()}`,
+    handle: login,
+  }) satisfies ExternalActor;
 
 const captures = (
   text: string | null | undefined,
@@ -153,11 +154,14 @@ const mentionsIn = (text: string | null | undefined, exclude?: string) =>
     ),
   ]
     .filter((l) => l !== exclude?.toLowerCase())
-    .map((l): Signal => ({
-      type: "mentioned",
-      who: byLogin(l),
-      excerpt: (text ?? "").slice(0, 280),
-    }));
+    .map(
+      (l) =>
+        ({
+          type: "mentioned",
+          who: byLogin(l),
+          excerpt: (text ?? "").slice(0, 280),
+        }) satisfies Signal
+    );
 
 const wlRefs = (...texts: (string | null | undefined)[]) => [
   ...new Set(texts.flatMap((t) => captures(t, WL_REF, "number").map(Number))),
@@ -167,10 +171,11 @@ const closesKeys = (ns: string, repo: string, body?: string | null) =>
 
 const firstLine = (message: string) => message.split("\n", 1)[0] ?? "";
 
-const ignore = (reason: string): Normalized => ({
-  events: [],
-  ignored: reason,
-});
+const ignore = (reason: string) =>
+  ({
+    events: [],
+    ignored: reason,
+  }) satisfies Normalized;
 
 type Delivery = {
   ns: string;
@@ -232,7 +237,7 @@ export function normalizeGithubLike(
   payload: unknown,
   receivedAt: Date,
   settings: { repos?: unknown }
-): Normalized {
+) {
   const p = parsePayload(payload);
   const repo = p.repository?.full_name;
   if (!repo) {
@@ -265,7 +270,7 @@ export function normalizeGithubLike(
   });
 }
 
-function onPush({ ns, repo, p, actor, at, event }: Delivery): Normalized {
+function onPush({ ns, repo, p, actor, at, event }: Delivery) {
   if (p.deleted === true) {
     return ignore("branch deleted");
   }
@@ -321,10 +326,10 @@ function onPush({ ns, repo, p, actor, at, event }: Delivery): Normalized {
         importance: isDefault ? 0.4 : 0.3,
       }),
     ],
-  };
+  } satisfies Normalized;
 }
 
-function onPullRequest(d: Delivery): Normalized {
+function onPullRequest(d: Delivery) {
   const { ns, repo, p, ref, key } = d;
   const pr = p.pull_request;
   if (!pr) {
@@ -355,7 +360,7 @@ function onPrOpened(
   { p, at, stamp, ref, key, event }: Delivery,
   pr: Issue,
   common: Common
-): Normalized {
+) {
   if (pr.draft === true) {
     return ignore("draft pull request");
   }
@@ -377,22 +382,25 @@ function onPrOpened(
         title: `${reopened ? "Reopened" : "Opened"} PR ${ref(pr.number)}: ${pr.title}`,
         body: pr.body?.slice(0, 600) ?? null,
         signals: [
-          ...(pr.requested_reviewers ?? []).map((u): Signal => ({
-            type: "review_requested",
-            who: actorFor(u),
-          })),
+          ...(pr.requested_reviewers ?? []).map(
+            (u) =>
+              ({
+                type: "review_requested",
+                who: actorFor(u),
+              }) satisfies Signal
+          ),
           ...mentionsIn(pr.body, p.sender?.login),
         ],
       }),
     ],
-  };
+  } satisfies Normalized;
 }
 
 function onPrClosed(
   { at, ref, key, event }: Delivery,
   pr: Issue,
   common: Common
-): Normalized {
+) {
   const merged = pr.merged === true;
   return {
     events: [
@@ -405,14 +413,14 @@ function onPrClosed(
         signals: [{ type: "resolve", what: "review_requested" }],
       }),
     ],
-  };
+  } satisfies Normalized;
 }
 
 function onReviewRequested(
   { p, at, stamp, ref, key, event }: Delivery,
   pr: Issue,
   common: Common
-): Normalized {
+) {
   const reviewer = p.requested_reviewer;
   if (!reviewer) {
     return ignore("review requested from a team");
@@ -428,14 +436,14 @@ function onReviewRequested(
         signals: [{ type: "review_requested", who: actorFor(reviewer) }],
       }),
     ],
-  };
+  } satisfies Normalized;
 }
 
 function onReviewRequestRemoved(
   { p, at, stamp, ref, key, event }: Delivery,
   pr: Issue,
   common: Common
-): Normalized {
+) {
   const reviewer = p.requested_reviewer;
   if (!reviewer) {
     return ignore("team review request removed");
@@ -458,14 +466,14 @@ function onReviewRequestRemoved(
         ],
       }),
     ],
-  };
+  } satisfies Normalized;
 }
 
 function onPrAssigned(
   { p, at, stamp, ref, key, event }: Delivery,
   pr: Issue,
   common: Common
-): Normalized {
+) {
   const { assignee } = p;
   if (!assignee) {
     return ignore("no assignee");
@@ -482,10 +490,10 @@ function onPrAssigned(
         signals: [{ type: "assigned", who: actorFor(assignee) }],
       }),
     ],
-  };
+  } satisfies Normalized;
 }
 
-function onReview({ ns, p, actor, at, ref, key, event }: Delivery): Normalized {
+function onReview({ ns, p, actor, at, ref, key, event }: Delivery) {
   const { review, pull_request: pr } = p;
   if (p.action !== "submitted" || !review || !pr) {
     return ignore(`pull_request_review.${p.action}`);
@@ -527,19 +535,10 @@ function onReview({ ns, p, actor, at, ref, key, event }: Delivery): Normalized {
         signals,
       }),
     ],
-  };
+  } satisfies Normalized;
 }
 
-function onComment({
-  ns,
-  eventType,
-  p,
-  actor,
-  at,
-  ref,
-  key,
-  event,
-}: Delivery): Normalized {
+function onComment({ ns, eventType, p, actor, at, ref, key, event }: Delivery) {
   const { comment } = p;
   if (p.action !== "created" || !comment) {
     return ignore(`${eventType}.${p.action}`);
@@ -581,10 +580,10 @@ function onComment({
         signals: mentionsIn(comment.body, p.sender?.login),
       }),
     ],
-  };
+  } satisfies Normalized;
 }
 
-function onIssue(d: Delivery): Normalized {
+function onIssue(d: Delivery) {
   const { p, ref, key } = d;
   const { issue } = p;
   if (!issue) {
@@ -612,7 +611,7 @@ function onIssueOpened(
   { p, at, ref, key, event }: Delivery,
   issue: Issue,
   common: Common
-): Normalized {
+) {
   return {
     events: [
       event({
@@ -634,14 +633,14 @@ function onIssueOpened(
         signals: mentionsIn(issue.body, p.sender?.login),
       }),
     ],
-  };
+  } satisfies Normalized;
 }
 
 function onIssueClosed(
   { at, stamp, ref, key, event }: Delivery,
   issue: Issue,
   common: Common
-): Normalized {
+) {
   return {
     events: [
       event({
@@ -654,14 +653,14 @@ function onIssueClosed(
         signals: [{ type: "resolve", what: "assigned" }],
       }),
     ],
-  };
+  } satisfies Normalized;
 }
 
 function onIssueReopened(
   { at, stamp, ref, key, event }: Delivery,
   issue: Issue,
   common: Common
-): Normalized {
+) {
   return {
     events: [
       event({
@@ -673,14 +672,14 @@ function onIssueReopened(
         board: [{ type: "reopen_card", externalKey: key(issue.number) }],
       }),
     ],
-  };
+  } satisfies Normalized;
 }
 
 function onIssueAssigned(
   { p, at, stamp, ref, key, event }: Delivery,
   issue: Issue,
   common: Common
-): Normalized {
+) {
   const { assignee } = p;
   if (!assignee) {
     return ignore("no assignee");
@@ -699,10 +698,10 @@ function onIssueAssigned(
         signals: [{ type: "assigned", who }],
       }),
     ],
-  };
+  } satisfies Normalized;
 }
 
-function onRelease({ ns, repo, p, at, event }: Delivery): Normalized {
+function onRelease({ ns, repo, p, at, event }: Delivery) {
   const r = p.release;
   if (p.action !== "published" || !r || r.draft === true) {
     return ignore(`release.${p.action}`);
@@ -721,5 +720,5 @@ function onRelease({ ns, repo, p, at, event }: Delivery): Normalized {
         importance: prerelease ? 0.6 : undefined,
       }),
     ],
-  };
+  } satisfies Normalized;
 }

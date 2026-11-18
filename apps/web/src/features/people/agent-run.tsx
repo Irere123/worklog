@@ -28,8 +28,9 @@ const MOODS: Record<string, Mood> = {
 };
 
 /** How an agent's ghost looks for where its run stands; anything unknown is idle. */
-export function runMood(state: string | null | undefined): Mood {
-  return MOODS[state ?? ""] ?? "idle";
+export function runMood(state: string | null | undefined) {
+  const mood: Mood = MOODS[state ?? ""] ?? "idle";
+  return mood;
 }
 
 /** A run that's working or waiting on someone; a finished or failed one is history. */
@@ -65,14 +66,12 @@ export function RunBadge({
  * How an agent's face looks for its run, and whether it moves. A run that went quiet is shown as
  * idle and still, the same as the line that says it has stalled.
  */
-export function runFace(run: Run | null | undefined): {
-  mood: Mood;
-  live: boolean;
-} {
-  if (!run || isStale(run)) {
-    return { mood: "idle", live: false };
-  }
-  return { mood: runMood(run.state), live: inPlay(run.state) };
+export function runFace(run: Run | null | undefined) {
+  const face: { mood: Mood; live: boolean } =
+    !run || isStale(run)
+      ? { mood: "idle", live: false }
+      : { mood: runMood(run.state), live: inPlay(run.state) };
+  return face;
 }
 
 const STALE_MS = 2 * 3_600_000;

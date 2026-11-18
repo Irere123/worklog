@@ -220,7 +220,7 @@ async function execute(
   member: Member,
   tz: string,
   manual: boolean
-): Promise<RunOutcome> {
+) {
   switch (automation.kind) {
     case "brief.daily":
     case "brief.weekly": {

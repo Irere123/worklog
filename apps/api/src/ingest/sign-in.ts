@@ -22,7 +22,7 @@ export function withAppSignIn(
   config: Config,
   apps: ConnectorAppRow[],
   secrets: SecretBox
-): Config {
+) {
   const filled: Config = { ...config };
   for (const app of apps) {
     const keys = SIGN_IN.get(app.provider);

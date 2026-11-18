@@ -119,7 +119,7 @@ export type GitlabPayload = z.infer<typeof PayloadSchema>;
 export type GitlabInput = z.input<typeof PayloadSchema>;
 export type GitlabUser = z.infer<typeof UserSchema>;
 
-export function parseGitlab(payload: unknown): GitlabPayload {
+export function parseGitlab(payload: unknown) {
   const parsed = PayloadSchema.safeParse(payload);
   return parsed.success ? parsed.data : PayloadSchema.parse({});
 }
@@ -134,18 +134,21 @@ const GROUP_MENTIONS = new Set(["all", "here", "channel"]);
 const MERGE_COMMIT = /^Merge branch '.+' into '.+'|See merge request \S+!\d+/u;
 const BOT = /^(?:project|group)_\d+_bot|[-_]bot$/iu;
 
-export const actorFor = (u: GitlabUser): ExternalActor => ({
-  id: u.id === undefined ? `handle:${u.username.toLowerCase()}` : String(u.id),
-  handle: u.username,
-  name: u.name ?? null,
-  bot: BOT.test(u.username),
-  avatarUrl: u.avatar_url ?? null,
-});
+export const actorFor = (u: GitlabUser) =>
+  ({
+    id:
+      u.id === undefined ? `handle:${u.username.toLowerCase()}` : String(u.id),
+    handle: u.username,
+    name: u.name ?? null,
+    bot: BOT.test(u.username),
+    avatarUrl: u.avatar_url ?? null,
+  }) satisfies ExternalActor;
 
-const byLogin = (login: string): ExternalActor => ({
-  id: `handle:${login.toLowerCase()}`,
-  handle: login,
-});
+const byLogin = (login: string) =>
+  ({
+    id: `handle:${login.toLowerCase()}`,
+    handle: login,
+  }) satisfies ExternalActor;
 
 const captures = (
   text: string | null | undefined,
@@ -161,11 +164,14 @@ const mentionsIn = (text: string | null | undefined, exclude?: string) =>
     ),
   ]
     .filter((l) => l !== exclude?.toLowerCase() && !GROUP_MENTIONS.has(l))
-    .map((l): Signal => ({
-      type: "mentioned",
-      who: byLogin(l),
-      excerpt: (text ?? "").slice(0, 280),
-    }));
+    .map(
+      (l) =>
+        ({
+          type: "mentioned",
+          who: byLogin(l),
+          excerpt: (text ?? "").slice(0, 280),
+        }) satisfies Signal
+    );
 
 const wlRefs = (...texts: (string | null | undefined)[]) => [
   ...new Set(texts.flatMap((t) => captures(t, WL_REF, "number").map(Number))),
@@ -173,10 +179,11 @@ const wlRefs = (...texts: (string | null | undefined)[]) => [
 
 const firstLine = (message: string) => message.split("\n", 1)[0] ?? "";
 
-const ignore = (reason: string): Normalized => ({
-  events: [],
-  ignored: reason,
-});
+const ignore = (reason: string) =>
+  ({
+    events: [],
+    ignored: reason,
+  }) satisfies Normalized;
 
 export function gitlabTime(value: string | undefined) {
   const iso = value?.replace(" UTC", "Z").replace(" ", "T") ?? "";
@@ -219,7 +226,7 @@ export function normalizeGitlab(
   payload: unknown,
   receivedAt: Date,
   settings: { repos?: unknown }
-): Normalized {
+) {
   const p = parseGitlab(payload);
   const path = p.project?.path_with_namespace;
   if (!path) {
@@ -266,7 +273,7 @@ function actorOfPayload(p: GitlabPayload) {
     : null;
 }
 
-function onPush({ ns, path, p, actor, at, event }: Delivery): Normalized {
+function onPush({ ns, path, p, actor, at, event }: Delivery) {
   const gitRef = p.ref ?? "";
   if (!gitRef.startsWith("refs/heads/")) {
     return ignore("not a branch");
@@ -320,7 +327,7 @@ function onPush({ ns, path, p, actor, at, event }: Delivery): Normalized {
         importance: isDefault ? 0.4 : 0.3,
       }),
     ],
-  };
+  } satisfies Normalized;
 }
 
 const added = (change?: z.infer<typeof ChangeSchema>) => {
@@ -333,7 +340,7 @@ const removed = (change?: z.infer<typeof ChangeSchema>) =>
     change ? { previous: change.current, current: change.previous } : undefined
   );
 
-function onMergeRequest(d: Delivery): Normalized {
+function onMergeRequest(d: Delivery) {
   const { p, actor, at, stamp, mrRef, mrKey, issueKey, event } = d;
   const mr = p.object_attributes;
   if (mr?.iid === undefined || !mr.title) {
@@ -357,10 +364,10 @@ function onMergeRequest(d: Delivery): Normalized {
       numbers: wlRefs(title, mr.description),
     },
   };
-  const opened = (id: string, verb: string, when?: string): Normalized =>
+  const opened = (id: string, verb: string, when?: string) =>
     draft
       ? ignore("draft merge request")
-      : {
+      : ({
           events: [
             event({
               ...common,
@@ -370,15 +377,18 @@ function onMergeRequest(d: Delivery): Normalized {
               title: `${verb} MR ${mrRef(iid)}: ${title}`,
               body: mr.description?.slice(0, 600) ?? null,
               signals: [
-                ...(p.reviewers ?? []).map((u): Signal => ({
-                  type: "review_requested",
-                  who: actorFor(u),
-                })),
+                ...(p.reviewers ?? []).map(
+                  (u) =>
+                    ({
+                      type: "review_requested",
+                      who: actorFor(u),
+                    }) satisfies Signal
+                ),
                 ...mentionsIn(mr.description, actor?.handle ?? undefined),
               ],
             }),
           ],
-        };
+        } satisfies Normalized);
   switch (mr.action ?? "") {
     case "open": {
       return opened(`mr:${mrKey(iid)}:opened`, "Opened", mr.created_at);
@@ -404,7 +414,7 @@ function onMergeRequest(d: Delivery): Normalized {
             signals: [{ type: "resolve", what: "review_requested" }],
           }),
         ],
-      };
+      } satisfies Normalized;
     }
     case "approval":
     case "approved": {
@@ -424,7 +434,7 @@ function onApproval(
   iid: number,
   title: string,
   common: MrCommon
-): Normalized {
+) {
   if (!actor) {
     return ignore("approval without an approver");
   }
@@ -453,7 +463,7 @@ function onApproval(
         signals,
       }),
     ],
-  };
+  } satisfies Normalized;
 }
 
 type MrCommon = {
@@ -470,7 +480,7 @@ function onMergeRequestUpdate(
   common: MrCommon,
   opened: (id: string, verb: string, when?: string) => Normalized,
   draft: boolean
-): Normalized {
+) {
   const { changes } = p;
   const updated = p.object_attributes?.updated_at;
   if (changes?.draft?.previous === true && !draft) {
@@ -513,7 +523,7 @@ function onMergeRequestUpdate(
     ),
   ];
   return events.length
-    ? { events }
+    ? ({ events } satisfies Normalized)
     : ignore("merge_request.update (not a work signal)");
 }
 
@@ -537,7 +547,7 @@ function onNote({
   mrKey,
   issueKey,
   event,
-}: Delivery): Normalized {
+}: Delivery) {
   const note = p.object_attributes;
   if (!note?.note || note.id === undefined) {
     return ignore("note without a comment");
@@ -583,7 +593,7 @@ function onNote({
         signals: mentionsIn(note.note, actor?.handle ?? undefined),
       }),
     ],
-  };
+  } satisfies Normalized;
 }
 
 type IssueCommon = {
@@ -598,7 +608,7 @@ function onIssueAssigned(
   iid: number,
   title: string,
   common: IssueCommon
-): Normalized {
+) {
   const updated = p.object_attributes?.updated_at;
   const events = added(p.changes?.assignees).map((u) => {
     const who = actorFor(u);
@@ -614,11 +624,11 @@ function onIssueAssigned(
     });
   });
   return events.length
-    ? { events }
+    ? ({ events } satisfies Normalized)
     : ignore(`issue.update on ${title} (not a work signal)`);
 }
 
-function onIssue(d: Delivery): Normalized {
+function onIssue(d: Delivery) {
   const { p, actor, at, stamp, issueRef, issueKey, event } = d;
   const issue = p.object_attributes;
   if (issue?.iid === undefined || !issue.title) {
@@ -663,7 +673,7 @@ function onIssue(d: Delivery): Normalized {
             signals: mentionsIn(issue.description, actor?.handle ?? undefined),
           }),
         ],
-      };
+      } satisfies Normalized;
     }
     case "close": {
       const when = issue.closed_at ?? issue.updated_at;
@@ -679,7 +689,7 @@ function onIssue(d: Delivery): Normalized {
             signals: [{ type: "resolve", what: "assigned" }],
           }),
         ],
-      };
+      } satisfies Normalized;
     }
     case "reopen": {
       return {
@@ -693,7 +703,7 @@ function onIssue(d: Delivery): Normalized {
             board: [{ type: "reopen_card", externalKey: key }],
           }),
         ],
-      };
+      } satisfies Normalized;
     }
     case "update": {
       return onIssueAssigned(d, iid, title, common);
@@ -704,7 +714,7 @@ function onIssue(d: Delivery): Normalized {
   }
 }
 
-function onRelease({ ns, path, p, at, event }: Delivery): Normalized {
+function onRelease({ ns, path, p, at, event }: Delivery) {
   if (p.action !== "create" || !p.tag) {
     return ignore(`release.${p.action}`);
   }
@@ -720,5 +730,5 @@ function onRelease({ ns, path, p, at, event }: Delivery): Normalized {
         thread: `${ns}:${path}:releases`,
       }),
     ],
-  };
+  } satisfies Normalized;
 }

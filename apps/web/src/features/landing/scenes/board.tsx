@@ -214,7 +214,7 @@ export function BoardScene({ play, paused, still }: SceneProps) {
   );
 }
 
-function box(root: HTMLElement | null, name: string): Box | null {
+function box(root: HTMLElement | null, name: string) {
   const target = root?.querySelector<HTMLElement>(`[data-target="${name}"]`);
   if (!(root && target && target.offsetParent)) {
     return null;

@@ -33,31 +33,37 @@ const history: [string, object][] = [
       pull_request: pr("2026-10-26T13:00:00Z"),
     },
   ],
-  ...[1, 2, 3, 4].map((i): [string, object] => [
-    "push",
-    {
-      ref: "refs/heads/idempotent",
-      after: `sha-${i}`,
-      sender: emma,
-      commits: [{ id: `c${i}`, message: `step ${i}` }],
-      head_commit: { timestamp: `2026-10-26T13:1${i}:00Z` },
-    },
-  ]),
-  ...[1, 2].map((i): [string, object] => [
-    "issue_comment",
-    {
-      action: "created",
-      sender: sam,
-      issue: { ...pr("2026-10-26T13:30:00Z"), pull_request: {} },
-      comment: {
-        id: 7000 + i,
-        body: `nit ${i}`,
-        html_url: "c",
-        user: sam,
-        created_at: `2026-10-26T13:3${i}:00Z`,
-      },
-    },
-  ]),
+  ...[1, 2, 3, 4].map(
+    (i) =>
+      [
+        "push",
+        {
+          ref: "refs/heads/idempotent",
+          after: `sha-${i}`,
+          sender: emma,
+          commits: [{ id: `c${i}`, message: `step ${i}` }],
+          head_commit: { timestamp: `2026-10-26T13:1${i}:00Z` },
+        },
+      ] satisfies [string, object]
+  ),
+  ...[1, 2].map(
+    (i) =>
+      [
+        "issue_comment",
+        {
+          action: "created",
+          sender: sam,
+          issue: { ...pr("2026-10-26T13:30:00Z"), pull_request: {} },
+          comment: {
+            id: 7000 + i,
+            body: `nit ${i}`,
+            html_url: "c",
+            user: sam,
+            created_at: `2026-10-26T13:3${i}:00Z`,
+          },
+        },
+      ] satisfies [string, object]
+  ),
   [
     "pull_request_review",
     {

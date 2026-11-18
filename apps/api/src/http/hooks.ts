@@ -55,7 +55,7 @@ async function handle(
 
 const MAX_BODY = 25 * 1024 * 1024;
 
-async function boundedBody(req: Request): Promise<string | null> {
+async function boundedBody(req: Request) {
   const declared = Number(req.headers.get("content-length") ?? 0);
   if (declared > MAX_BODY || !req.body) {
     return declared > MAX_BODY ? null : "";

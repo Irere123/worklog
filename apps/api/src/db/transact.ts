@@ -18,7 +18,7 @@ export async function transact<T>(
   ctx: AppContext,
   fn: (tx: AppContext) => Promise<T>,
   opts: { durable?: boolean } = {}
-): Promise<T> {
+) {
   if (ctx.bus.holding) {
     return await fn(ctx);
   }

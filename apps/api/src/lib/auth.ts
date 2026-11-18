@@ -16,7 +16,7 @@ import type { Mailer } from "./mailer";
 
 export type SocialProvider = "github" | "discord" | "slack";
 
-export function enabledSocialProviders(config: Config): SocialProvider[] {
+export function enabledSocialProviders(config: Config) {
   const out: SocialProvider[] = [];
   if (config.GITHUB_CLIENT_ID && config.GITHUB_CLIENT_SECRET) {
     out.push("github");
@@ -70,7 +70,7 @@ export const AGENT_TOKEN_SCOPES = [...AGENT_SCOPES, "offline_access"];
 /** The access-token claim naming the workspace an agent was approved into. */
 export const WORKSPACE_CLAIM = "worklog_workspace";
 
-export function webOrigins(config: Config): string[] {
+export function webOrigins(config: Config) {
   return [
     config.PUBLIC_URL,
     ...(config.WEB_ORIGINS?.split(",")

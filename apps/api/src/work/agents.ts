@@ -207,10 +207,7 @@ const reconnect = (message: string) =>
  * the person approved it into, working for them, labelled with its tool. A second install of the
  * same tool (another laptop registers a new client) joins the agent it already has.
  */
-export async function agentForToken(
-  ctx: AppContext,
-  claims: AgentClaims
-): Promise<AgentGrant> {
+export async function agentForToken(ctx: AppContext, claims: AgentClaims) {
   const userId = text(claims.sub);
   const clientId = text(claims.azp) ?? text(claims.client_id);
   const workspaceId = text(claims.worklog_workspace);
@@ -274,7 +271,7 @@ function text(claim: unknown) {
   return typeof claim === "string" ? claim : undefined;
 }
 
-function grantedScopes(scope: unknown): ApiScope[] {
+function grantedScopes(scope: unknown) {
   const granted = new Set(typeof scope === "string" ? scope.split(" ") : []);
   return AGENT_SCOPES.filter((s) => granted.has(s));
 }
@@ -490,7 +487,7 @@ export async function checkIn(
   grant: AgentGrant,
   thread: string,
   opts: { waitMs?: number; signal?: AbortSignal } = {}
-): Promise<Asked | null> {
+) {
   const read = async () => {
     const item = await findAttentionByDedupeKey(ctx.db, {
       memberId: grant.owner.id,

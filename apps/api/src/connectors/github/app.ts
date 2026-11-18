@@ -111,7 +111,7 @@ export function authFor(
   conn: ConnectionView,
   app: AppView | null,
   installationId: string | null
-): GithubAuth | null {
+) {
   if (installationId && app) {
     return {
       api: apiUrl(app.credentials),

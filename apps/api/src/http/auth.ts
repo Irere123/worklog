@@ -13,9 +13,9 @@ import type { Env } from "./router";
 const deny = (c: Context, status: 401 | 403, code: string, message: string) =>
   c.json({ error: { code, message } }, status);
 
-function requiredScope(method: string, path: string): ApiScope {
+function requiredScope(method: string, path: string) {
   if (method === "GET" || method === "HEAD") {
-    return "read";
+    return "read" satisfies ApiScope;
   }
   if (
     method === "POST" &&
@@ -23,18 +23,16 @@ function requiredScope(method: string, path: string): ApiScope {
       path === "/v1/logs" ||
       /^\/v1\/connections\/[^/]+\/events$/u.test(path))
   ) {
-    return "ingest";
+    return "ingest" satisfies ApiScope;
   }
-  return "write";
+  return "write" satisfies ApiScope;
 }
 
 const SESSION_ONLY = new Set(["GET /v1/agent-approval"]);
 
-async function identify(
-  ctx: AppContext,
-  c: Context<Env>,
-  route: string
-): Promise<Response | { member: Member | null; user: SignedInUser | null }> {
+type Identity = { member: Member | null; user: SignedInUser | null };
+
+async function identify(ctx: AppContext, c: Context<Env>, route: string) {
   const key = apiKeyOf(c);
   if (key && !SESSION_ONLY.has(route)) {
     const found = await authenticate(ctx, key);
@@ -53,7 +51,7 @@ async function identify(
         `This API key needs the "${needed}" scope`
       );
     }
-    return { member: found.member, user: null };
+    return { member: found.member, user: null } satisfies Identity;
   }
 
   const session = await ctx.auth.api.getSession({
@@ -74,7 +72,7 @@ async function identify(
   if (wanted && !chosen) {
     return deny(c, 403, "forbidden", "You're not a member of that workspace");
   }
-  return { member: chosen?.member ?? null, user };
+  return { member: chosen?.member ?? null, user } satisfies Identity;
 }
 
 function withoutKey(headers: Headers) {
@@ -83,7 +81,7 @@ function withoutKey(headers: Headers) {
   return rest;
 }
 
-function apiKeyOf(c: Context<Env>): string | undefined {
+function apiKeyOf(c: Context<Env>) {
   const header = c.req.header("authorization");
   const bearer =
     header !== undefined && header.toLowerCase().startsWith("bearer ")
@@ -92,10 +90,7 @@ function apiKeyOf(c: Context<Env>): string | undefined {
   if (bearer !== undefined && bearer.startsWith("wl_")) {
     return bearer;
   }
-  if (c.req.path === "/v1/events") {
-    return c.req.query("token");
-  }
-  return undefined;
+  return c.req.path === "/v1/events" ? c.req.query("token") : undefined;
 }
 
 const IDENTITY_ONLY = new Set([
@@ -116,10 +111,7 @@ export function authMiddleware(ctx: AppContext) {
   });
 }
 
-async function admit(
-  ctx: AppContext,
-  c: Context<Env>
-): Promise<Response | null> {
+async function admit(ctx: AppContext, c: Context<Env>) {
   const route = `${c.req.method} ${c.req.path}`;
   if (PUBLIC.has(route)) {
     return null;

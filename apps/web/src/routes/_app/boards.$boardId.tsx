@@ -60,8 +60,11 @@ export const Route = createFileRoute("/_app/boards/$boardId")({
       staleTime: "static",
     });
   },
-  validateSearch: (search: Record<string, unknown>): { view?: "list" } =>
-    search.view === "list" ? { view: "list" } : {},
+  validateSearch: (search: Record<string, unknown>) => {
+    const result: { view?: "list" } =
+      search.view === "list" ? { view: "list" } : {};
+    return result;
+  },
   head: ({ loaderData }) => ({
     meta: [{ title: `${loaderData?.name ?? "Board"} · Worklog` }],
   }),

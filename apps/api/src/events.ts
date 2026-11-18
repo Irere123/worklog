@@ -70,7 +70,7 @@ export class EventBus {
     this.held = held;
   }
 
-  async publish(input: Publish): Promise<void> {
+  async publish(input: Publish) {
     if (this.held) {
       this.held.push(input);
       return;
@@ -101,11 +101,11 @@ export class EventBus {
    * event would get its `seq` before commit and could become visible after a higher `seq` that a
    * client has already resumed past.
    */
-  hold(): EventBus {
+  hold() {
     return new EventBus(this.db, this.hub, []);
   }
 
-  get holding(): boolean {
+  get holding() {
     return this.held !== null;
   }
 
@@ -143,7 +143,7 @@ export class EventBus {
     }
   }
 
-  subscribe(listener: Listener): () => void {
+  subscribe(listener: Listener) {
     this.hub.listeners.add(listener);
     return () => {
       this.hub.listeners.delete(listener);
@@ -156,7 +156,7 @@ export class EventBus {
    * one at a time, so a NOTIFY on every insert would make every write that publishes wait its turn.
    * Returns the function that stops it.
    */
-  async listen(opts: { everyMs?: number } = {}): Promise<() => Promise<void>> {
+  async listen(opts: { everyMs?: number } = {}) {
     this.hub.floor = await findLatestEventSeq(this.db);
     this.hub.cursor = this.hub.floor;
     this.hub.relaying = true;
@@ -242,7 +242,7 @@ export class EventBus {
     memberId: string,
     afterSeq: number,
     limit = 500
-  ): Promise<StoredEvent[]> {
+  ) {
     return await listEventsAfter(this.db, {
       workspaceId,
       memberId,
@@ -260,7 +260,7 @@ export function canSee(
   event: StoredEvent,
   workspaceId: string,
   memberId: string
-): boolean {
+) {
   return (
     event.workspaceId === workspaceId &&
     (event.audienceId === null || event.audienceId === memberId)

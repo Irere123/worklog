@@ -173,7 +173,7 @@ export async function connectInstallation(
     memberId: string;
     installed: Installed;
   }
-): Promise<ConnectionRow> {
+) {
   const { provider, workspaceId, memberId, installed } = params;
   try {
     return await transact(ctx, async (tx) => {

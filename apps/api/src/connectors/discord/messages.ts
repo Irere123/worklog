@@ -73,7 +73,7 @@ function revision(
   m: Message,
   settings: Record<string, unknown>,
   receivedAt: Date
-): WorklogEvent | null {
+) {
   const id = `discord:${m.channel_id}:${m.id}`;
   if (eventType === "MESSAGE_DELETE") {
     return {
@@ -83,7 +83,7 @@ function revision(
       occurredAt: receivedAt,
       actor: null,
       title: "deleted",
-    };
+    } satisfies WorklogEvent;
   }
   if (
     eventType === "MESSAGE_UPDATE" &&
@@ -99,20 +99,23 @@ function revision(
       actor: null,
       title: `Posted in #${channelName(settings, m.channel_id)}: ${text.slice(0, 90)}`,
       body: text.slice(0, 1000),
-    };
+    } satisfies WorklogEvent;
   }
   return null;
 }
 
-function mentionsOf(m: Message, authorId: string, text: string): Signal[] {
+function mentionsOf(m: Message, authorId: string, text: string) {
   return (m.mentions ?? [])
     .filter((u) => u.id !== authorId && u.bot !== true)
-    .map((u) => ({
-      type: "mentioned",
-      who: { id: u.id, handle: u.username, name: u.global_name ?? null },
-      excerpt: text.slice(0, 280),
-      priority: "normal",
-    }));
+    .map(
+      (u) =>
+        ({
+          type: "mentioned",
+          who: { id: u.id, handle: u.username, name: u.global_name ?? null },
+          excerpt: text.slice(0, 280),
+          priority: "normal",
+        }) satisfies Signal
+    );
 }
 
 /**
@@ -125,24 +128,36 @@ export function normalizeDiscordMessage(
   payload: unknown,
   settings: Record<string, unknown>,
   receivedAt: Date
-): Normalized {
+) {
   const parsed = DiscordMessage.safeParse(payload);
   if (!parsed.success) {
-    return { events: [], ignored: "malformed Discord message" };
+    return {
+      events: [],
+      ignored: "malformed Discord message",
+    } satisfies Normalized;
   }
   const m = parsed.data;
   if (!m.guild_id) {
-    return { events: [], ignored: "direct messages are never ingested" };
+    return {
+      events: [],
+      ignored: "direct messages are never ingested",
+    } satisfies Normalized;
   }
   if (eventType !== "MESSAGE_CREATE") {
     const edit = revision(eventType, m, settings, receivedAt);
     return edit
-      ? { events: [edit] }
-      : { events: [], ignored: `${eventType} without content` };
+      ? ({ events: [edit] } satisfies Normalized)
+      : ({
+          events: [],
+          ignored: `${eventType} without content`,
+        } satisfies Normalized);
   }
   const { author } = m;
   if (!author || author.bot === true || m.webhook_id) {
-    return { events: [], ignored: "bot or webhook message" };
+    return {
+      events: [],
+      ignored: "bot or webhook message",
+    } satisfies Normalized;
   }
   const name = channelName(settings, m.channel_id);
   const text = plain(m, settings);
@@ -181,9 +196,9 @@ export function normalizeDiscordMessage(
         ignored: optedIn
           ? "too short to be a work update"
           : "channel not opted in",
-      };
+      } satisfies Normalized;
     }
-    return { events: [{ ...base, hidden: true }] };
+    return { events: [{ ...base, hidden: true }] } satisfies Normalized;
   }
   if (replyTo) {
     return {
@@ -199,7 +214,7 @@ export function normalizeDiscordMessage(
           },
         },
       ],
-    };
+    } satisfies Normalized;
   }
-  return { events: [{ ...base, importance: 0.3 }] };
+  return { events: [{ ...base, importance: 0.3 }] } satisfies Normalized;
 }

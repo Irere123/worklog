@@ -260,7 +260,7 @@ export async function readRepo(
   fullName: string,
   raw: Record<string, unknown>,
   window: { since: Date }
-): Promise<SyncRead> {
+) {
   const cursor = Cursor.parse(raw);
   const run = cursor.run ?? {
     since: cursor.next ?? window.since.toISOString(),
@@ -303,7 +303,7 @@ export async function readRepo(
       page,
       cursor: { ...cursor, run: { ...known, after: pageInfo.endCursor } },
       done: false,
-    };
+    } satisfies SyncRead;
   }
   const nextStage = STAGES[STAGES.indexOf(run.stage) + 1];
   return {
@@ -313,7 +313,7 @@ export async function readRepo(
       run: { ...known, stage: nextStage ?? "pushes", after: null, offset: 0 },
     },
     done: false,
-  };
+  } satisfies SyncRead;
 }
 
 const Activity = z.array(
@@ -351,7 +351,7 @@ async function readPushes(
   auth: GithubAuth,
   fullName: string,
   run: Run
-): Promise<SyncRead> {
+) {
   const get = async (what: string, path: string) => {
     const res = await githubCall(ctx, auth, what, path);
     const body: unknown = await res.json();
@@ -395,12 +395,12 @@ async function readPushes(
       page,
       cursor: { run: { ...run, offset: offset + PUSHES_PER_PAGE } },
       done: false,
-    };
+    } satisfies SyncRead;
   }
   const next = new Date(
     new Date(run.started).getTime() - OVERLAP_MS
   ).toISOString();
-  return { page, cursor: { next }, done: true };
+  return { page, cursor: { next }, done: true } satisfies SyncRead;
 }
 
 async function commitsOf(
@@ -455,14 +455,14 @@ export async function installationRepos(ctx: AppContext, auth: GithubAuth) {
   return names;
 }
 
-const userOf = (a: GqlActor): User | null =>
+const userOf = (a: GqlActor) =>
   a
-    ? {
+    ? ({
         login: a.login,
         id: a.databaseId ?? null,
         type: a.__typename === "Bot" ? "Bot" : "User",
         name: a.name ?? undefined,
-      }
+      } satisfies User)
     : null;
 
 const closerOf = (items: z.infer<typeof Closer>) =>
@@ -538,10 +538,7 @@ function pullDeliveries(node: z.infer<typeof PullNode>) {
   return out;
 }
 
-function lineCommentDeliveries(
-  comments: z.infer<typeof Comment>[],
-  pr: Issue
-): { type: string; payload: Payload }[] {
+function lineCommentDeliveries(comments: z.infer<typeof Comment>[], pr: Issue) {
   return comments.flatMap((c) => {
     const user = userOf(c.author);
     return user
@@ -559,7 +556,7 @@ function lineCommentDeliveries(
               },
               pull_request: pr,
               sender: user,
-            },
+            } satisfies Payload,
           },
         ]
       : [];
@@ -601,10 +598,7 @@ function issueDeliveries(node: z.infer<typeof IssueNode>) {
   return out;
 }
 
-function commentDeliveries(
-  comments: z.infer<typeof Comment>[],
-  issue: Issue
-): { type: string; payload: Payload }[] {
+function commentDeliveries(comments: z.infer<typeof Comment>[], issue: Issue) {
   return comments.flatMap((c) => {
     const user = userOf(c.author);
     return user
@@ -622,7 +616,7 @@ function commentDeliveries(
               },
               issue,
               sender: user,
-            },
+            } satisfies Payload,
           },
         ]
       : [];
@@ -669,7 +663,7 @@ function awaitingReview(
   ns: string,
   repo: string,
   node: z.infer<typeof PullNode>
-): WorklogEvent[] {
+) {
   if (node.closedAt || node.isDraft === true) {
     return [];
   }
@@ -699,7 +693,7 @@ function awaitingReview(
         url: node.url,
         hidden: true,
         signals: [{ type: "review_requested", who }],
-      },
+      } satisfies WorklogEvent,
     ];
   });
 }
@@ -710,10 +704,10 @@ export function normalizeSyncPage(
   payload: unknown,
   receivedAt: Date,
   settings: Record<string, unknown>
-): Normalized {
+) {
   const page = SyncPayload.safeParse(payload);
   if (!page.success) {
-    return { events: [], ignored: "malformed sync page" };
+    return { events: [], ignored: "malformed sync page" } satisfies Normalized;
   }
   const { repo, since, stage, nodes } = page.data;
   const deliveries: { type: string; payload: Payload }[] = [];
@@ -763,7 +757,7 @@ export function normalizeSyncPage(
         ? `nothing new in ${repo.full_name} ${stage}`
         : undefined,
     skipped: normalized.filter((e) => e.length === 0).length,
-  };
+  } satisfies Normalized;
 }
 
 export function reposOf(conn: ConnectionView) {

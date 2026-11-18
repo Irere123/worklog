@@ -348,7 +348,7 @@ export function useDictation({
   };
 }
 
-function recognizerClass(): RecognizerClass | null {
+function recognizerClass() {
   const found: unknown =
     Reflect.get(globalThis, "SpeechRecognition") ??
     Reflect.get(globalThis, "webkitSpeechRecognition");

@@ -8,7 +8,7 @@ const listeners = new Set<() => void>();
 let folded: boolean | undefined;
 
 /** Whether the sidebar is folded to a rail of icons; remembered per browser. */
-export function useSidebarFolded(): boolean {
+export function useSidebarFolded() {
   return useSyncExternalStore(subscribe, readFolded, () => false);
 }
 
@@ -21,7 +21,7 @@ export function setSidebarFolded(next: boolean) {
 }
 
 /** Below this width the sidebar is a drawer over the page, never a rail. */
-export function useNarrow(): boolean {
+export function useNarrow() {
   return useSyncExternalStore(
     (listener) => {
       const query = matchMedia(NARROW);

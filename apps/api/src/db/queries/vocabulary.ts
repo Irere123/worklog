@@ -13,7 +13,7 @@ export type Vocabulary = { terms: string[]; cards: string[] };
 export async function listVocabulary(
   db: DbOrTx,
   params: { workspaceId: string; maxTerms: number; maxCards: number }
-): Promise<Vocabulary> {
+) {
   const id = params.workspaceId;
   const result = await db.execute<{ kind: "term" | "card"; text: string }>(sql`
     (select 'term' as kind, term as text from (

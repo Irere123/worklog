@@ -111,7 +111,7 @@ function isPresence(value: unknown): value is Presence {
   );
 }
 
-function payloadOf(event: Event): unknown {
+function payloadOf(event: Event) {
   if (!(event instanceof MessageEvent) || typeof event.data !== "string") {
     return null;
   }

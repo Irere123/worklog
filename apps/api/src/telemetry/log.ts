@@ -99,7 +99,7 @@ function print(
   }
 }
 
-function field(value: unknown): string | number | boolean {
+function field(value: unknown) {
   if (typeof value === "number" || typeof value === "boolean") {
     return value;
   }

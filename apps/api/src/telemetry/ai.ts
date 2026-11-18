@@ -23,7 +23,7 @@ export function traceModelCalls() {
   registerTelemetry(integration());
 }
 
-function integration(): Telemetry {
+function integration() {
   return {
     onStart: (event) => {
       open(
@@ -114,7 +114,7 @@ function integration(): Telemetry {
       span?.fail(event.error);
       span?.end();
     },
-  };
+  } satisfies Telemetry;
 }
 
 function open(spans: Map<string, Span>, id: string, span: Span) {

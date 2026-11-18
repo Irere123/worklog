@@ -111,7 +111,7 @@ export async function markConversationSeen(
 export async function loadHistory(
   ctx: AppContext,
   conversation: ConversationRow
-): Promise<ModelMessage[]> {
+) {
   const rows = await listMessagesAfter(ctx.db, {
     conversationId: conversation.id,
     afterSeq: conversation.recapThroughSeq,
@@ -398,7 +398,7 @@ function leads(index: number, m: ModelMessage) {
   return index === 0 && m.role === "user";
 }
 
-function displayText(m: ModelMessage): string | null {
+function displayText(m: ModelMessage) {
   if (m.role === "tool") {
     return null;
   }

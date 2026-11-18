@@ -294,10 +294,10 @@ describe("automations", () => {
     });
     await env.call("POST", `/v1/automations/${morning.id}/run`, { token });
 
-    const posted = (url: string): string =>
+    const posted = (url: string) =>
       (env.ctx.fetch as any).calls.find((c: any) => c.url === url).body
         .markdown;
-    const mailed = (to: string): string =>
+    const mailed = (to: string) =>
       (env.ctx.mailer as ConsoleMailer).sent.find((m) => m.to === to)!.text;
     for (const full of [
       posted("https://ntfy.test/emma"),

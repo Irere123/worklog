@@ -17,7 +17,7 @@ export type Person = {
 /** Everyone a delivery's events name, by account id. */
 export type People = Map<string, Person>;
 
-function fill(first: ExternalActor, then: ExternalActor): ExternalActor {
+function fill(first: ExternalActor, then: ExternalActor) {
   return {
     id: first.id,
     handle: first.handle ?? then.handle,
@@ -86,7 +86,7 @@ export async function resolvePeople(
   workspaceId: string,
   namespace: string,
   events: WorklogEvent[]
-): Promise<People> {
+) {
   const resolved = await resolveActors(ctx, workspaceId, namespace, [
     ...named(events).values(),
   ]);

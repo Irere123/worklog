@@ -56,7 +56,7 @@ function formatter(zone: string) {
 }
 
 /** Where a person's day stands right now, in their own time zone. Null without a valid zone. */
-export function clockOf(member: Member, now: Date): Clock | null {
+export function clockOf(member: Member, now: Date) {
   const zone = member.timezone;
   if (!zone) {
     return null;

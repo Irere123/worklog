@@ -7,7 +7,7 @@ export function nextRun(
   after: Date,
   settings: MemberSettings = {},
   jitterMs = 0
-): Date {
+) {
   if (schedule.type === "interval") {
     let next = new Date(after.getTime() + schedule.minutes * 60_000);
     if (schedule.activeHoursOnly === true && settings.activeHours) {
@@ -47,7 +47,7 @@ export function nextActive(
   date: Date,
   timeZone: string,
   settings: MemberSettings
-): Date {
+) {
   const hours = settings.activeHours;
   if (!hours) {
     return date;
@@ -85,13 +85,13 @@ export function isActiveNow(
   now: Date,
   timeZone: string,
   settings: MemberSettings
-): boolean {
+) {
   return nextActive(now, timeZone, settings).getTime() === now.getTime();
 }
 
 const UINT32 = 2 ** 32;
 
-export function jitterFor(id: string, maxMs = 120_000): number {
+export function jitterFor(id: string, maxMs = 120_000) {
   let h = 0;
   for (const ch of id) {
     h = (h * 31 + (ch.codePointAt(0) ?? 0)) % UINT32;

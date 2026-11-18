@@ -21,7 +21,7 @@ export const HH_MM = /^\d{1,2}:\d{2}$/;
 export function derived<I, S extends z.ZodType>(
   schema: S,
   from: (row: I) => z.input<S>
-): z.ZodPipe<z.ZodTransform<z.input<S>, I>, S> {
+) {
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- see above
   return z.preprocess(
     // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- rows only ever come from `respond`, typed by the return type above

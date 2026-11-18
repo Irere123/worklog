@@ -189,7 +189,7 @@ export async function createMember(
   ctx: AppContext,
   workspaceId: string,
   input: NewMember
-): Promise<Member> {
+) {
   if (input.timezone && !isValidTimeZone(input.timezone)) {
     throw badRequest(`Unknown time zone ${input.timezone}`);
   }
@@ -251,7 +251,7 @@ export async function resolveMember(
   ctx: AppContext,
   viewer: Member,
   ref: string
-): Promise<Member> {
+) {
   if (ref === "me") {
     return viewer;
   }

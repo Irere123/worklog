@@ -26,7 +26,7 @@ export class ConsoleMailer implements Mailer {
   }
 }
 
-function resendMailer(apiKey: string, from: string): Mailer {
+function resendMailer(apiKey: string, from: string) {
   return {
     kind: "resend",
     async send(email) {
@@ -49,20 +49,20 @@ function resendMailer(apiKey: string, from: string): Mailer {
         throw new Error(`Resend responded ${res.status}: ${await res.text()}`);
       }
     },
-  };
+  } satisfies Mailer;
 }
 
-function smtpMailer(url: string, from: string): Mailer {
+function smtpMailer(url: string, from: string) {
   return {
     kind: "smtp",
     async send(email) {
       const nodemailer = await import("nodemailer");
       await nodemailer.createTransport(url).sendMail({ from, ...email });
     },
-  };
+  } satisfies Mailer;
 }
 
-export function createMailer(config: Config): Mailer {
+export function createMailer(config: Config) {
   if (config.RESEND_API_KEY) {
     return resendMailer(config.RESEND_API_KEY, config.MAIL_FROM);
   }

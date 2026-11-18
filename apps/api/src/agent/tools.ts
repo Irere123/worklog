@@ -24,11 +24,14 @@ import { workSnapshotTool } from "./tools/work-snapshot";
 
 export type { Scope } from "./tools/scope";
 
-export function assistantTools(scope: Scope): ToolSet {
+export function assistantTools(scope: Scope) {
   const lookups = readTools(scope);
   const read = { ...lookups, look_into: lookIntoTool(scope, lookups) };
   if (scope.mode === "teammate") {
-    return { ...read, leave_note_for_owner: leaveNoteTool(scope) };
+    return {
+      ...read,
+      leave_note_for_owner: leaveNoteTool(scope),
+    } satisfies ToolSet;
   }
   return {
     ...read,
@@ -43,7 +46,7 @@ export function assistantTools(scope: Scope): ToolSet {
     create_card: createCardTool(scope),
     move_card: moveCardTool(scope),
     comment_on_card: commentOnCardTool(scope),
-  };
+  } satisfies ToolSet;
 }
 
 export function readTools(scope: Scope) {

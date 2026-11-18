@@ -7,7 +7,7 @@ import { createHash } from "node:crypto";
  */
 export const LANES = 16;
 
-export function laneOf(partition: string): number {
+export function laneOf(partition: string) {
   if (!partition) {
     return 0;
   }

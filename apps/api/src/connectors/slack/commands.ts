@@ -77,7 +77,7 @@ export async function interactSlack(
   ctx: AppContext,
   conn: ConnectionView,
   payload: unknown
-): Promise<Interacted> {
+) {
   const interaction = Interaction.parse(payload);
   if (interaction.kind === "mention") {
     const { event, eventId } = interaction;
@@ -87,7 +87,7 @@ export async function interactSlack(
         payload: { kind: "mention", event },
         once: eventId ?? `${event.channel}:${event.ts}`,
       },
-    };
+    } satisfies Interacted;
   }
   const { form } = interaction;
   const userId = form.user_id ?? "";
@@ -101,7 +101,7 @@ export async function interactSlack(
         response_type: "ephemeral",
         text: toSlack(await runSlackCommand(ctx, conn, author, userId, input)),
       },
-    };
+    } satisfies Interacted;
   }
   return {
     body: {
@@ -117,7 +117,7 @@ export async function interactSlack(
         responseUrl: form.response_url,
       },
     },
-  };
+  } satisfies Interacted;
 }
 
 export async function followUpSlack(

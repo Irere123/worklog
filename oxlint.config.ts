@@ -20,6 +20,7 @@ export default defineConfig({
       name: "landmines-structure",
       specifier: "@interfere/landmines/structure",
     },
+    { name: "landmines-types", specifier: "@interfere/landmines/types" },
   ],
   overrides: [
     {
@@ -127,5 +128,6 @@ export default defineConfig({
     "landmines-structure/colocated-tests": "error",
     "landmines-structure/package-exports": "error",
     "landmines-structure/test-file-names": "error",
+    "landmines-types/no-explicit-return-types": "error",
   },
 });

@@ -36,17 +36,23 @@ export async function receive(
   ctx: AppContext,
   connectionId: string,
   req: InboundRequest
-): Promise<Reply> {
+) {
   const conn = await findConnectionById(ctx.db, { id: connectionId });
   const connector = conn ? getConnector(conn.provider) : undefined;
   if (!conn || !connector) {
-    return { status: 404, body: { error: "unknown connection" } };
+    return {
+      status: 404,
+      body: { error: "unknown connection" },
+    } satisfies Reply;
   }
   const view = viewOf(ctx, conn);
   const received = await connector.receive(req, view);
   if (received.type === "reject") {
     ctx.tally.rejected(conn.id, req.receivedAt, received.error);
-    return { status: received.status, body: { error: received.error } };
+    return {
+      status: received.status,
+      body: { error: received.error },
+    } satisfies Reply;
   }
   return await accept(ctx, { connector, conn, view }, req, received, "webhook");
 }
@@ -58,10 +64,13 @@ export async function accept(
   req: InboundRequest,
   received: Exclude<Received, { type: "reject" }>,
   via: "webhook" | "app"
-): Promise<Reply> {
+) {
   const { connector, conn, view } = to;
   if (received.type === "respond") {
-    return { status: received.status ?? 200, body: received.body };
+    return {
+      status: received.status ?? 200,
+      body: received.body,
+    } satisfies Reply;
   }
   const answers =
     received.type === "interaction" &&
@@ -74,7 +83,7 @@ export async function accept(
         received.type === "interaction" && connector.unavailable
           ? connector.unavailable(message)
           : { ok: true, ignored: `connection is ${conn.status}` },
-    };
+    } satisfies Reply;
   }
   if (received.type === "interaction") {
     if (!connector.interact) {
@@ -93,7 +102,7 @@ export async function accept(
         once: answered.later.once,
       });
     }
-    return { status: 200, body: answered.body };
+    return { status: 200, body: answered.body } satisfies Reply;
   }
   const stored = await store(ctx, conn, {
     deliveryId: received.deliveryId,
@@ -104,9 +113,10 @@ export async function accept(
     partitionKey: received.partition ?? "",
   });
   ctx.tally.received(conn.id, req.receivedAt);
-  return stored
+  const reply: Reply = stored
     ? { status: 200, body: { ok: true } }
     : { status: 200, body: { ok: true, duplicate: true } };
+  return reply;
 }
 
 export async function receivePushed(
@@ -138,7 +148,7 @@ export async function store(
   ctx: AppContext,
   conn: Pick<ConnectionRow, "id" | "workspaceId">,
   delivery: Delivery
-): Promise<string | null> {
+) {
   const lane = laneOf(delivery.partitionKey);
   const row = await insertInboundEventWithJob(ctx.db, {
     row: {
@@ -173,22 +183,21 @@ function storable(payload: unknown) {
     : payload;
 }
 
-function withoutNul(value: unknown): unknown {
+function withoutNul(value: unknown) {
+  let cleaned: unknown = value;
   if (typeof value === "string") {
-    return value.replaceAll("\u0000", "");
-  }
-  if (Array.isArray(value)) {
-    return value.map(withoutNul);
-  }
-  if (typeof value === "object" && value !== null) {
-    return Object.fromEntries(
+    cleaned = value.replaceAll("\u0000", "");
+  } else if (Array.isArray(value)) {
+    cleaned = value.map(withoutNul);
+  } else if (typeof value === "object" && value !== null) {
+    cleaned = Object.fromEntries(
       Object.entries(value).map(([k, v]) => [
         k.replaceAll("\u0000", ""),
         withoutNul(v),
       ])
     );
   }
-  return value;
+  return cleaned;
 }
 
 /**

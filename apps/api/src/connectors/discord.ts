@@ -115,9 +115,9 @@ async function handleInteraction(
   ctx: AppContext,
   conn: ConnectionView,
   i: Interaction
-): Promise<Interacted> {
+) {
   if (i.type !== 2 || !i.data) {
-    return { body: UNSUPPORTED };
+    return { body: UNSUPPORTED } satisfies Interacted;
   }
   const userId = i.member?.user.id ?? i.user?.id ?? "";
   const options = i.data.options ?? [];
@@ -133,7 +133,7 @@ async function handleInteraction(
           flags: EPHEMERAL,
         },
       },
-    };
+    } satisfies Interacted;
   }
   const job = {
     name: i.data.name,
@@ -147,7 +147,7 @@ async function handleInteraction(
         type: 4,
         data: { content: clip(await answer(ctx, conn, job)), flags: EPHEMERAL },
       },
-    };
+    } satisfies Interacted;
   }
   return {
     body: { type: 5, data: { flags: EPHEMERAL } },
@@ -155,7 +155,7 @@ async function handleInteraction(
       payload: { ...job, applicationId: i.application_id, token: i.token },
       once: i.id,
     },
-  };
+  } satisfies Interacted;
 }
 
 const Job = z.object({

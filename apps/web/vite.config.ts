@@ -76,7 +76,7 @@ export default defineConfig({
   ],
 });
 
-function phosphorWeights(): Plugin {
+function phosphorWeights() {
   return {
     name: "worklog:phosphor-weights",
     enforce: "pre",
@@ -105,7 +105,7 @@ function phosphorWeights(): Plugin {
         };
       },
     },
-  };
+  } satisfies Plugin;
 }
 
 function splitEntries(code: string, start: number) {

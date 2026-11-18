@@ -49,12 +49,22 @@ function normalize(
   ns: string,
   input: { eventType: string; payload: unknown; receivedAt: Date },
   settings: Record<string, unknown>
-): Normalized {
+) {
   if (input.eventType === "sync.github") {
-    return normalizeSyncPage(ns, input.payload, input.receivedAt, settings);
+    return normalizeSyncPage(
+      ns,
+      input.payload,
+      input.receivedAt,
+      settings
+    ) satisfies Normalized;
   }
   if (input.eventType === "sync.gitea") {
-    return normalizeGiteaPage(ns, input.payload, input.receivedAt, settings);
+    return normalizeGiteaPage(
+      ns,
+      input.payload,
+      input.receivedAt,
+      settings
+    ) satisfies Normalized;
   }
   const review = ns.startsWith("gitea:")
     ? asGithubReview(input.eventType, input.payload)
@@ -67,7 +77,7 @@ function normalize(
       { ...review, repository },
       input.receivedAt,
       settings
-    );
+    ) satisfies Normalized;
   }
   return normalizeGithubLike(
     ns,
@@ -75,7 +85,7 @@ function normalize(
     input.payload,
     input.receivedAt,
     settings
-  );
+  ) satisfies Normalized;
 }
 
 const authOf = (
@@ -129,16 +139,16 @@ async function githubRepos(
   ctx: Parameters<SyncSpec["read"]>[0],
   conn: ConnectionView,
   app: AppView | null
-): Promise<Source[]> {
+) {
   const auth = authOf(ctx, conn, app);
   if (!auth || !conn.externalId) {
-    return reposOf(conn).map((name) => ({ id: name, name }));
+    return reposOf(conn).map((name) => ({ id: name, name }) satisfies Source);
   }
   const names = await installationRepos(ctx, auth);
-  return names.map((name) => ({ id: name, name }));
+  return names.map((name) => ({ id: name, name }) satisfies Source);
 }
 
-function parse(rawBody: string): object | null {
+function parse(rawBody: string) {
   try {
     const value: unknown = JSON.parse(rawBody);
     return typeof value === "object" && value !== null ? value : {};

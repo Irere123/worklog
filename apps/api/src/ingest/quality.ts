@@ -41,12 +41,12 @@ export function gate(
   event: WorklogEvent,
   isBot: boolean,
   settings: QualitySettings
-): Gate {
+) {
   if ((settings.ignoreKinds ?? []).includes(event.kind)) {
     return {
       keep: false,
       reason: `kind ${event.kind} is ignored for this connection`,
-    };
+    } satisfies Gate;
   }
   let importance = event.importance ?? BASE_IMPORTANCE[event.kind] ?? 0.4;
   if (isBot) {
@@ -55,17 +55,20 @@ export function gate(
       return {
         keep: false,
         reason: "bot activity is ignored for this connection",
-      };
+      } satisfies Gate;
     }
     if (policy === "quiet") {
       if (!BOT_KINDS_KEPT.has(event.kind)) {
         return {
           keep: false,
           reason: `bot ${event.kind} (only bot PRs, releases and deploys are kept)`,
-        };
+        } satisfies Gate;
       }
       importance *= 0.3;
     }
   }
-  return { keep: true, importance: Math.max(0, Math.min(1, importance)) };
+  return {
+    keep: true,
+    importance: Math.max(0, Math.min(1, importance)),
+  } satisfies Gate;
 }

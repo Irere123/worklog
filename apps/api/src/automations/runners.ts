@@ -122,14 +122,14 @@ export async function runBrief(
   automation: Automation,
   member: Member,
   manual: boolean
-): Promise<RunOutcome> {
+) {
   const period = automation.kind === "brief.weekly" ? "weekly" : "daily";
   const { _key, ...data } = await gatherBriefData(ctx, member, period);
   if (!manual && isEmptyWindow(data)) {
     return {
       status: "quiet",
       summary: "Nothing moved and nothing is waiting on you, so no brief",
-    };
+    } satisfies RunOutcome;
   }
   const brief = await saveBrief(
     ctx,
@@ -160,7 +160,7 @@ export async function runBrief(
         markdown: team.body,
         sources: team.data,
         kind: "brief",
-      };
+      } satisfies Message;
     }
   );
   const shown = await listOpenAttention(ctx.db, {
@@ -175,20 +175,23 @@ export async function runBrief(
   return {
     status: "delivered",
     summary: `${brief.title} → inbox + ${plural(delivered.length, "target")}${failed.length ? `, ${failed.length} failed` : ""}`,
-  };
+  } satisfies RunOutcome;
 }
 
 export async function runDigest(
   ctx: AppContext,
   automation: Automation,
   member: Member
-): Promise<RunOutcome> {
+) {
   const items = await listDigestableAttention(ctx.db, {
     memberId: member.id,
     now: ctx.now(),
   });
   if (!items.length) {
-    return { status: "skipped", summary: "Nothing new since the last batch" };
+    return {
+      status: "skipped",
+      summary: "Nothing new since the last batch",
+    } satisfies RunOutcome;
   }
   await send(ctx, automation, member, digest(items), async () => {
     const shared = await teamVisibleAttention(ctx, items);
@@ -198,10 +201,13 @@ export async function runDigest(
     ctx,
     items.map((i) => i.id)
   );
-  return { status: "delivered", summary: plural(items.length, "item") };
+  return {
+    status: "delivered",
+    summary: plural(items.length, "item"),
+  } satisfies RunOutcome;
 }
 
-function digest(shown: AttentionItem[]): Message {
+function digest(shown: AttentionItem[]) {
   return {
     subject: "Your Worklog digest",
     markdown: [
@@ -214,7 +220,7 @@ function digest(shown: AttentionItem[]): Message {
     sources: shown,
     kind: "digest",
     itemIds: shown.map((i) => i.id),
-  };
+  } satisfies Message;
 }
 
 function digestLine(a: AttentionItem) {
@@ -258,16 +264,19 @@ export async function runCheck(
   member: Member,
   tz: string,
   manual: boolean
-): Promise<RunOutcome> {
+) {
   if (!manual && !isActiveNow(ctx.now(), tz, member.settings)) {
-    return { status: "skipped", summary: "Outside active hours" };
+    return {
+      status: "skipped",
+      summary: "Outside active hours",
+    } satisfies RunOutcome;
   }
   const pending = await listUnconsideredAttention(ctx.db, {
     memberId: member.id,
     now: ctx.now(),
   });
   if (!pending.length) {
-    return { status: "skipped", summary: "Nothing new" };
+    return { status: "skipped", summary: "Nothing new" } satisfies RunOutcome;
   }
 
   const limits = { ...DEFAULT_LIMITS, ...member.settings.notify };
@@ -297,7 +306,7 @@ export async function runCheck(
       return {
         status: "quiet",
         summary: `Holding ${plural(candidates.length, "urgent item")} until the ${limits.minGapMinutes}-minute gap passes`,
-      };
+      } satisfies RunOutcome;
     }
     if (budget === "hold") {
       candidates = [];
@@ -321,12 +330,14 @@ export async function runCheck(
 
 type Limits = typeof DEFAULT_LIMITS;
 
+type Budget = "ok" | "spent" | "hold";
+
 function digestReason(
   item: AttentionItem,
   muted: Map<string, string>,
   limits: Limits,
   now: number
-): string | null {
+) {
   const why = muted.get(item.kind);
   if (why !== undefined) {
     return why;
@@ -349,22 +360,22 @@ async function pingBudget(
   tz: string,
   limits: Limits,
   now: number
-): Promise<"ok" | "spent" | "hold"> {
+) {
   const { pushesToday, lastPushAt } = await pushBudget(
     ctx,
     memberId,
     startOfLocalDay(ctx.now(), tz)
   );
   if (pushesToday >= limits.dailyPushCap) {
-    return "spent";
+    return "spent" satisfies Budget;
   }
   if (
     lastPushAt &&
     now - lastPushAt.getTime() < limits.minGapMinutes * 60_000
   ) {
-    return "hold";
+    return "hold" satisfies Budget;
   }
-  return "ok";
+  return "ok" satisfies Budget;
 }
 
 async function classify(
@@ -372,13 +383,16 @@ async function classify(
   automation: Automation,
   member: Member,
   candidates: AttentionItem[]
-): Promise<Decision[]> {
+) {
   if (!candidates.length || !ctx.models) {
-    return candidates.map((c) => ({
-      id: c.id,
-      disposition: "push",
-      reason: defaultReason(c),
-    }));
+    return candidates.map(
+      (c) =>
+        ({
+          id: c.id,
+          disposition: "push",
+          reason: defaultReason(c),
+        }) satisfies Decision
+    );
   }
   const memory = await renderMemory(ctx, member.id, {
     includePrivate: true,
@@ -412,7 +426,7 @@ async function classify(
       id: c.id,
       disposition: d && !d.push ? "digest" : "push",
       reason: plainReason(d?.reason) ?? defaultReason(c),
-    };
+    } satisfies Decision;
   });
 }
 
@@ -422,7 +436,7 @@ async function pushDecided(
   member: Member,
   pending: AttentionItem[],
   decisions: Decision[]
-): Promise<RunOutcome> {
+) {
   const rows = decisions
     .filter((d) => d.disposition === "push")
     .flatMap((d) => {
@@ -434,7 +448,7 @@ async function pushDecided(
     return {
       status: "quiet",
       summary: `Considered ${plural(decisions.length, "item")}; nothing worth interrupting for`,
-    };
+    } satisfies RunOutcome;
   }
   await send(ctx, automation, member, ping(rows), async () => {
     const visibleItems = await teamVisibleAttention(
@@ -450,10 +464,10 @@ async function pushDecided(
   return {
     status: "delivered",
     summary: `Pushed ${rows.length}, held ${decisions.length - rows.length} for the digest`,
-  };
+  } satisfies RunOutcome;
 }
 
-function ping(rows: { item: AttentionItem; reason: string }[]): Message {
+function ping(rows: { item: AttentionItem; reason: string }[]) {
   return {
     subject:
       rows.length === 1 && rows[0]
@@ -470,7 +484,7 @@ function ping(rows: { item: AttentionItem; reason: string }[]): Message {
     kind: "push",
     itemIds: rows.map((r) => r.item.id),
     reason: rows.map((r) => r.reason).join(" | "),
-  };
+  } satisfies Message;
 }
 
 function plainReason(reason?: string) {
@@ -512,17 +526,17 @@ export async function runCustom(
   ctx: AppContext,
   automation: Automation,
   member: Member
-): Promise<RunOutcome> {
+) {
   const { models } = ctx;
   if (!models) {
     return {
       status: "skipped",
       summary: "Custom automations need AI (OPENROUTER_API_KEY)",
-    };
+    } satisfies RunOutcome;
   }
   const own = await runRoutine(ctx, models, automation, member, "private");
   if (!own.message) {
-    return { status: "quiet", summary: own.summary };
+    return { status: "quiet", summary: own.summary } satisfies RunOutcome;
   }
   await send(
     ctx,
@@ -536,13 +550,18 @@ export async function runCustom(
         : null;
     }
   );
-  return { status: "delivered", summary: own.summary };
+  return { status: "delivered", summary: own.summary } satisfies RunOutcome;
 }
 
 function routineMessage(
   automation: Automation,
   markdown: string,
   sources: unknown
-): Message {
-  return { subject: automation.name, markdown, sources, kind: "custom" };
+) {
+  return {
+    subject: automation.name,
+    markdown,
+    sources,
+    kind: "custom",
+  } satisfies Message;
 }

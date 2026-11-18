@@ -210,7 +210,7 @@ async function attemptTogether(
   loaded: Loaded,
   lane: number,
   deliveries: InboundEvent[]
-): Promise<boolean> {
+) {
   const [first] = deliveries;
   if (!first || deliveries.length === 1) {
     return first ? await attempt(ctx, loaded, lane, first) : true;
@@ -274,7 +274,7 @@ async function attempt(
   lane: number,
   delivery: InboundEvent,
   people?: People
-): Promise<boolean> {
+) {
   const inboundEventId = delivery.id;
   try {
     await processInbound(ctx, delivery, { loaded, people });
@@ -598,9 +598,9 @@ async function withoutAppliedState(
     : event;
 }
 
-function effectsFor(ctx: AppContext, mode: Mode, event: WorklogEvent): Effects {
+function effectsFor(ctx: AppContext, mode: Mode, event: WorklogEvent) {
   if (mode !== "sync") {
-    return { raise: true, onlyIfNew: false, board: "all" };
+    return { raise: true, onlyIfNew: false, board: "all" } satisfies Effects;
   }
   const age = ctx.now().getTime() - event.occurredAt.getTime();
   const recent = age <= ctx.config.BACKFILL_NOTIFY_HOURS * HOUR_MS;
@@ -608,10 +608,10 @@ function effectsFor(ctx: AppContext, mode: Mode, event: WorklogEvent): Effects {
     raise: recent,
     onlyIfNew: true,
     board: recent ? "all" : "state",
-  };
+  } satisfies Effects;
 }
 
-function scopeOf(source: Source): BoardScope {
+function scopeOf(source: Source) {
   const { boardId } = source.conn.settings;
   return {
     workspaceId: source.conn.workspaceId,
@@ -619,7 +619,7 @@ function scopeOf(source: Source): BoardScope {
     boardId: typeof boardId === "string" ? boardId : undefined,
     source: source.conn.provider,
     people: source.people,
-  };
+  } satisfies BoardScope;
 }
 
 async function linkCard(
@@ -903,15 +903,16 @@ export async function replayLane(
   return { reprocessed: ids.length - failed, failed, rebuiltFrom: removed };
 }
 
-async function load(
-  ctx: AppContext,
-  connectionId: string
-): Promise<Loaded | null> {
+async function load(ctx: AppContext, connectionId: string) {
   const conn = await findConnectionById(ctx.db, { id: connectionId });
   const connector = conn ? getConnector(conn.provider) : undefined;
   if (!conn || !connector) {
     return null;
   }
   const view = viewOf(ctx, conn);
-  return { connector, view, namespace: connector.identityNamespace(view) };
+  return {
+    connector,
+    view,
+    namespace: connector.identityNamespace(view),
+  } satisfies Loaded;
 }

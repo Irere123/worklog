@@ -177,12 +177,12 @@ export class Span {
   }
 }
 
-export function activeSpan(): Span | undefined {
+export function activeSpan() {
   return active.getStore();
 }
 
 /** Runs `fn` with `span` as the active span, for work a library hands back to run. */
-export function runIn<T>(span: Span, fn: () => T): T {
+export function runIn<T>(span: Span, fn: () => T) {
   return active.run(span, fn);
 }
 
@@ -190,7 +190,7 @@ export function runIn<T>(span: Span, fn: () => T): T {
  * Runs `fn` outside any trace, for callbacks that fire long after whatever registered them: a
  * pool connection's error belongs to no request that happened to open it.
  */
-export function outsideTrace<T>(fn: () => T): T {
+export function outsideTrace<T>(fn: () => T) {
   return active.exit(fn);
 }
 
@@ -203,7 +203,7 @@ export async function traced<T>(
   attrs: Attrs,
   fn: (span: Span) => Promise<T>,
   opts: { kind?: SpanKind; parent?: Span | TraceParent | null } = {}
-): Promise<T> {
+) {
   const span = startSpan(name, attrs, opts);
   try {
     return await active.run(span, async () => await fn(span));
@@ -241,9 +241,7 @@ export function startSpan(
 const TRACEPARENT =
   /^00-(?<traceId>[0-9a-f]{32})-(?<spanId>[0-9a-f]{16})-[0-9a-f]{2}$/u;
 
-export function parseTraceparent(
-  header: string | undefined
-): TraceParent | null {
+export function parseTraceparent(header: string | undefined) {
   const groups = header ? TRACEPARENT.exec(header.trim())?.groups : undefined;
   const traceId = groups?.traceId;
   const spanId = groups?.spanId;

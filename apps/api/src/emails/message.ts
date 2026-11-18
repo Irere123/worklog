@@ -17,11 +17,11 @@ export async function message({
   element: ReactElement;
   text: string[];
   headers?: Record<string, string>;
-}): Promise<Omit<Email, "to">> {
+}) {
   return {
     subject,
     html: await render(element),
     text: text.join("\n"),
     headers,
-  };
+  } satisfies Omit<Email, "to">;
 }

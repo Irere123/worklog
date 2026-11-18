@@ -35,7 +35,7 @@ const TAG = new RegExp(
 );
 
 /** A brief's markdown as email HTML. Raw HTML is escaped, so every tag left is marked's own. */
-export function emailHtml(source: string): string {
+export function emailHtml(source: string) {
   const html = markdown.parse(source, { async: false });
   return html.replaceAll(
     TAG,

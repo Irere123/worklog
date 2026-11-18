@@ -126,7 +126,7 @@ let sequence = 0;
 
 type Outgoing = { path: string; headers: Record<string, string>; raw: string };
 
-function githubEvent(team: number): { event: string; payload: object } {
+function githubEvent(team: number) {
   sequence += 1;
   const repo = pick(REPOS);
   const repository = {
@@ -212,7 +212,7 @@ function githubEvent(team: number): { event: string; payload: object } {
   };
 }
 
-function githubRequest(team: number): Outgoing {
+function githubRequest(team: number) {
   const { event, payload } = githubEvent(team);
   const raw = JSON.stringify(payload);
   return {
@@ -223,12 +223,12 @@ function githubRequest(team: number): Outgoing {
       "x-hub-signature-256": `sha256=${hmacHex("bench", raw)}`,
     },
     raw,
-  };
+  } satisfies Outgoing;
 }
 
 const recentThreads: string[] = [];
 
-function slackRequest(team: number): Outgoing {
+function slackRequest(team: number) {
   sequence += 1;
   const user = (i: number) => slackId(team, i);
   const ts = `${Math.floor(Date.now() / 1000)}.${String(sequence % 1_000_000).padStart(6, "0")}`;
@@ -271,7 +271,7 @@ function slackRequest(team: number): Outgoing {
       "x-slack-signature": `v0=${hmacHex("bench", `v0:${at}:${raw}`)}`,
     },
     raw,
-  };
+  } satisfies Outgoing;
 }
 
 const apiPorts: number[] = [];
@@ -371,7 +371,7 @@ async function untilSignalled() {
   });
 }
 
-async function work(): Promise<never> {
+async function work() {
   const wctx = await createContext(
     loadConfig({ ...process.env, OPENROUTER_API_KEY: "" }),
     { models: null, fetch: standInFetch() }
@@ -383,7 +383,7 @@ async function work(): Promise<never> {
   process.exit(0);
 }
 
-async function serveApi(): Promise<never> {
+async function serveApi() {
   const actx = await createContext(
     loadConfig({ ...process.env, OPENROUTER_API_KEY: "" }),
     { models: null, fetch: standInFetch() }

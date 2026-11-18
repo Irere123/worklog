@@ -40,7 +40,7 @@ const DRIFT_ACTIONS = [
   { id: "done", label: "It's done" },
 ];
 
-export async function nudgeDrifting(ctx: AppContext): Promise<number> {
+export async function nudgeDrifting(ctx: AppContext) {
   const rows = await listDriftingAssignments(ctx.db, { now: ctx.now() });
   let raised = 0;
   for (const { card, days, memberId } of rows) {
@@ -64,7 +64,7 @@ export async function nudgeDrifting(ctx: AppContext): Promise<number> {
   return raised;
 }
 
-export async function sweepEntropy(ctx: AppContext): Promise<number> {
+export async function sweepEntropy(ctx: AppContext) {
   const stale = await listStaleCards(ctx.db, { now: ctx.now() });
   for (const card of stale) {
     await transition(ctx, null, card.workspaceId, card.number, {

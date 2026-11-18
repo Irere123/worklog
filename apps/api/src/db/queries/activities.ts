@@ -143,7 +143,7 @@ export async function listActivitiesByIds(
 export async function listActivities(
   db: DbOrTx,
   params: { workspaceId: string; privateFor: string[] } & ActivityFilters
-): Promise<(ActivityRow & { cardNumber: number | null })[]> {
+) {
   const { workspaceId, privateFor, ...filters } = params;
   const where: (SQL | undefined)[] = [
     eq(activities.workspaceId, workspaceId),

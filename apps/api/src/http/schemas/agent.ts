@@ -143,7 +143,7 @@ type Part = {
   output?: { type?: unknown; value?: unknown };
 };
 
-function partsOf(content: unknown): Part[] {
+function partsOf(content: unknown) {
   const inner =
     typeof content === "object" && content !== null && "content" in content
       ? content.content
@@ -157,17 +157,18 @@ function partsOf(content: unknown): Part[] {
 
 type Traced = Step & { callId?: string };
 
-function stepsOf(content: unknown): Traced[] {
-  return partsOf(content).flatMap((part): Traced[] => {
+function stepsOf(content: unknown) {
+  return partsOf(content).flatMap((part) => {
     if (
       part.type === "reasoning" &&
       typeof part.text === "string" &&
       part.text.trim()
     ) {
-      return [{ kind: "thought", text: part.text }];
+      const thought: Traced[] = [{ kind: "thought", text: part.text }];
+      return thought;
     }
     if (part.type === "tool-call" && typeof part.toolName === "string") {
-      return [
+      const call: Traced[] = [
         {
           kind: "tool",
           tool: part.toolName,
@@ -180,19 +181,22 @@ function stepsOf(content: unknown): Traced[] {
             typeof part.toolCallId === "string" ? part.toolCallId : undefined,
         },
       ];
+      return call;
     }
     return [];
   });
 }
 
-function foundIn(value: unknown): z.input<typeof Found>[] {
+function foundIn(value: unknown) {
   const items = Array.isArray(value) ? value : [value];
   return items.slice(0, FOUND_SHOWN).flatMap((item: unknown) => {
     if (typeof item !== "object" || item === null) {
       return [];
     }
-    const field = (key: string): unknown =>
-      Object.getOwnPropertyDescriptor(item, key)?.value;
+    const field = (key: string) => {
+      const v: unknown = Object.getOwnPropertyDescriptor(item, key)?.value;
+      return v;
+    };
     const title = field("title");
     if (typeof title !== "string") {
       return [];
@@ -210,7 +214,7 @@ function foundIn(value: unknown): z.input<typeof Found>[] {
         source: text("source"),
         url: text("url"),
       },
-    ];
+    ] satisfies z.input<typeof Found>[];
   });
 }
 

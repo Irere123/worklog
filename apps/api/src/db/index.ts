@@ -21,10 +21,7 @@ const migrationsFolder = fileURLToPath(
   new URL("../../drizzle", import.meta.url)
 );
 
-export async function openDb(
-  url: string,
-  poolSize = 10
-): Promise<{ db: Db; close: () => Promise<void> }> {
+export async function openDb(url: string, poolSize = 10) {
   const pool = new Pool({ connectionString: url, max: poolSize });
   instrumentPool(pool);
   pool.on("error", logError);

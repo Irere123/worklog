@@ -207,7 +207,7 @@ async function readBy(
   ctx: AppContext,
   member: Member,
   input: { kind: TargetKind; address: string }
-): Promise<Visibility> {
+) {
   if (input.kind === "email") {
     return member.email?.toLowerCase() === input.address.toLowerCase()
       ? "private"
@@ -227,10 +227,7 @@ async function readBy(
   return "team";
 }
 
-async function botToken(
-  ctx: AppContext,
-  connectionId: string | null
-): Promise<{ connectionId: string; token: string; own: boolean }> {
+async function botToken(ctx: AppContext, connectionId: string | null) {
   if (!connectionId) {
     throw new Error("No connection configured for this target");
   }
@@ -371,7 +368,7 @@ async function sendTo(ctx: AppContext, target: TargetRow, message: Outgoing) {
   }
 }
 
-export function toSlack(md: string): string {
+export function toSlack(md: string) {
   return md
     .replaceAll(/^#{1,6}\s+(?<text>.*)$/gmu, "*$<text>*")
     .replaceAll(/\*\*(?<text>.+?)\*\*/gu, "*$<text>*")

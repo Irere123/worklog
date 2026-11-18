@@ -51,7 +51,7 @@ function Mail() {
   );
 }
 
-function privacy(): Section[] {
+function privacy() {
   return [
     {
       title: "What this policy covers",
@@ -188,7 +188,7 @@ function privacy(): Section[] {
   ];
 }
 
-function terms(): Section[] {
+function terms() {
   return [
     {
       title: "These terms",

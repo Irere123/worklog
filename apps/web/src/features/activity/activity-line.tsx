@@ -101,7 +101,7 @@ export function SourceName({
 type Look = { icon: ReactNode; tone: Tone };
 
 /** The verb decides the icon; the source is a word beside it, so no brand marks are needed. */
-export function lookOf(activity: Activity): Look {
+export function lookOf(activity: Activity) {
   const { kind } = activity;
   const size = 14;
   if (activity.agentState || kind.startsWith("agent.")) {

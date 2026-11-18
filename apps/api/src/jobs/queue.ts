@@ -57,7 +57,7 @@ export function newJob(
   task: string,
   payload: Record<string, unknown>,
   opts: JobOptions = {}
-): NewJob {
+) {
   return {
     task,
     payload,
@@ -67,7 +67,7 @@ export function newJob(
     priority: opts.priority ?? 0,
     runAt: opts.runAt ?? null,
     delayMs: opts.delayMs ?? null,
-  };
+  } satisfies NewJob;
 }
 
 const ABANDONED_MS = 60 * 60_000;

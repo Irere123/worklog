@@ -53,41 +53,38 @@ function clamp(n: number) {
   return Math.max(0, Math.min(1, n));
 }
 
-export async function recordActivity(
-  ctx: AppContext,
-  input: ActivityInput
-): Promise<(ActivityRow & { merged?: boolean }) | null> {
-  return await transact(ctx, async (tx) => {
-    const occurredAt = input.occurredAt ?? tx.now();
-    if (input.coalesce) {
-      const merged = await mergeInto(tx, input, input.coalesce, occurredAt);
-      if (merged) {
-        return merged;
+export async function recordActivity(ctx: AppContext, input: ActivityInput) {
+  const recorded: (ActivityRow & { merged?: boolean }) | null = await transact(
+    ctx,
+    async (tx) => {
+      const occurredAt = input.occurredAt ?? tx.now();
+      if (input.coalesce) {
+        const merged = await mergeInto(tx, input, input.coalesce, occurredAt);
+        if (merged) {
+          return merged;
+        }
       }
+      const created = await insertActivity(
+        tx.db,
+        newActivity(input, occurredAt, tx.now())
+      );
+      if (!created) {
+        return null;
+      }
+      if (created.cardId) {
+        await setCardActiveAt(tx.db, {
+          id: created.cardId,
+          at: created.occurredAt,
+        });
+      }
+      await announce(tx, created, "activity.created");
+      return created;
     }
-    const created = await insertActivity(
-      tx.db,
-      newActivity(input, occurredAt, tx.now())
-    );
-    if (!created) {
-      return null;
-    }
-    if (created.cardId) {
-      await setCardActiveAt(tx.db, {
-        id: created.cardId,
-        at: created.occurredAt,
-      });
-    }
-    await announce(tx, created, "activity.created");
-    return created;
-  });
+  );
+  return recorded;
 }
 
-function newActivity(
-  input: ActivityInput,
-  occurredAt: Date,
-  now: Date
-): ActivityRow {
+function newActivity(input: ActivityInput, occurredAt: Date, now: Date) {
   return {
     id: input.id ?? generateId(),
     workspaceId: input.workspaceId,

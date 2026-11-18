@@ -5,7 +5,7 @@ import type { Config } from "#config";
 
 export type Models = { main: LanguageModel; fast: LanguageModel };
 
-export function createModels(config: Config): Models | null {
+export function createModels(config: Config) {
   if (!config.OPENROUTER_API_KEY) {
     return null;
   }

@@ -212,10 +212,7 @@ export async function deleteConnection(
   await deleteConnectionById(ctx.db, { id });
 }
 
-export function webhookUrls(
-  ctx: AppContext,
-  conn: ConnectionRow
-): Record<string, string> {
+export function webhookUrls(ctx: AppContext, conn: ConnectionRow) {
   const endpoints = getConnector(conn.provider)?.endpoints ?? {};
   return Object.fromEntries(
     Object.entries(endpoints).map(([name, suffix]) => [

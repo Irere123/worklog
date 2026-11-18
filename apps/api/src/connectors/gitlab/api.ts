@@ -41,7 +41,7 @@ export async function gitlabRequest(
   what: string,
   path: string,
   init: { method?: string; body?: unknown } = {}
-): Promise<unknown> {
+) {
   const res = await call(
     ctx,
     `GitLab ${what}`,
@@ -56,7 +56,8 @@ export async function gitlabRequest(
       body: init.body === undefined ? undefined : JSON.stringify(init.body),
     }
   );
-  return await res.json();
+  const body: unknown = await res.json();
+  return body;
 }
 
 const Hook = z.object({
@@ -85,7 +86,7 @@ async function ensureOne(
   conn: ConnectionView,
   project: string,
   hook: { url: string; secret: string }
-): Promise<HookResult> {
+) {
   const hooks = `${projectPath(project)}/hooks`;
   try {
     const existing = z
@@ -97,22 +98,22 @@ async function ensureOne(
         method: "POST",
         body: config(hook),
       });
-      return { target: project, state: "created" };
+      return { target: project, state: "created" } satisfies HookResult;
     }
     if (ours.alert_status && ours.alert_status !== "executable") {
       await gitlabRequest(ctx, conn, "repair hook", `${hooks}/${ours.id}`, {
         method: "PUT",
         body: config(hook),
       });
-      return { target: project, state: "repaired" };
+      return { target: project, state: "repaired" } satisfies HookResult;
     }
-    return { target: project, state: "ok" };
+    return { target: project, state: "ok" } satisfies HookResult;
   } catch (error) {
     return {
       target: project,
       state: "failed",
       error: error instanceof Error ? error.message : String(error),
-    };
+    } satisfies HookResult;
   }
 }
 
@@ -143,9 +144,11 @@ const MAX_PAGES = 10;
 export async function listGitlabProjects(
   ctx: AppContext,
   conn: ConnectionView
-): Promise<Source[]> {
+) {
   if (!conn.secrets.token) {
-    return projectsOf(conn).map((name) => ({ id: name, name }));
+    return projectsOf(conn).map(
+      (name) => ({ id: name, name }) satisfies Source
+    );
   }
   const sources: Source[] = [];
   for (let page = 1; page <= MAX_PAGES; page += 1) {

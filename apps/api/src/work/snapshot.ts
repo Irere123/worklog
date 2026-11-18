@@ -257,7 +257,7 @@ function daysBetween(from: string, to: string) {
   return Math.round((Date.parse(to) - Date.parse(from)) / DAY_MS);
 }
 
-export function renderSnapshot(s: WorkSnapshot): string {
+export function renderSnapshot(s: WorkSnapshot) {
   const lines = [
     `*${s.person.name}* (@${s.person.handle}${s.person.kind === "agent" ? ", agent" : ""})`,
   ];

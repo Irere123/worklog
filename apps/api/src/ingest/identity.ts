@@ -75,7 +75,7 @@ type Details = Pick<
   "memberId" | "externalHandle" | "displayName" | "isBot" | "avatarUrl"
 >;
 
-function changes(current: Identity, next: Details): Partial<Details> | null {
+function changes(current: Identity, next: Details) {
   const set: Partial<Details> = {};
   if (next.memberId !== current.memberId) {
     set.memberId = next.memberId;
@@ -127,7 +127,7 @@ export async function resolveActors(
   workspaceId: string,
   namespace: string,
   sightings: Sighting[]
-): Promise<Map<string, Resolved>> {
+) {
   const out = new Map<string, Resolved>();
   if (sightings.length === 0) {
     return out;
@@ -167,7 +167,7 @@ function trustsLogin(sighting: Pick<Sighting, "acted">, namespace: string) {
   return sighting.acted !== false || isBuiltInNamespace(namespace);
 }
 
-function told(sighting: Sighting, namespace: string): Sighting {
+function told(sighting: Sighting, namespace: string) {
   return trustsLogin(sighting, namespace)
     ? sighting
     : {
@@ -253,7 +253,7 @@ async function sighted(
   ctx: AppContext,
   { sighting, identity }: Known,
   memberId: string | null
-): Promise<Resolved> {
+) {
   const { actor, at, n } = sighting;
   const seen = sighting.acted !== false && actor.id === identity.externalId;
   const set = changes(identity, {
@@ -302,7 +302,7 @@ async function recordIdentities(
   workspaceId: string,
   namespace: string,
   sightings: Sighting[]
-): Promise<Known[]> {
+) {
   if (sightings.length === 0) {
     return [];
   }
@@ -381,7 +381,7 @@ async function matchIdentity(
   workspaceId: string,
   namespace: string,
   actor: ExternalActor
-): Promise<Identity | undefined> {
+) {
   const handle = actor.handle?.toLowerCase() ?? null;
   const candidates = await listIdentitiesByExternalIds(ctx.db, {
     workspaceId,
@@ -416,7 +416,7 @@ async function recordIdentity(
   namespace: string,
   actor: ExternalActor,
   seenAt: Date | null
-): Promise<Identity> {
+) {
   const created = await transact(ctx, async (tx) => {
     const row = await insertIdentityIfNew(tx.db, {
       id: generateId(),

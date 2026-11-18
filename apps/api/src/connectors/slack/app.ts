@@ -29,7 +29,7 @@ const Installation = z.object({
 });
 
 /** An org-wide install is one connection for the whole Enterprise Grid org. */
-export function installationOf(raw: unknown): string | null {
+export function installationOf(raw: unknown) {
   const parsed = Installation.safeParse(raw);
   if (!parsed.success) {
     return null;

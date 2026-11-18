@@ -8,7 +8,7 @@ import { DAY_MS } from "#lib/time";
 
 const BATCH = 1000;
 
-export function retainedSince(ctx: AppContext): Date | undefined {
+export function retainedSince(ctx: AppContext) {
   const days = ctx.config.INBOUND_RETENTION_DAYS;
   return days > 0 ? new Date(ctx.now().getTime() - days * DAY_MS) : undefined;
 }

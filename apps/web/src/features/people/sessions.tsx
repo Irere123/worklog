@@ -92,7 +92,7 @@ export function AgentSessions({ handle }: { handle: string }) {
   );
 }
 
-export function sessionsOf(activities: Activity[]): Session[] {
+export function sessionsOf(activities: Activity[]) {
   const byThread = new Map<string, Session>();
   for (const activity of activities) {
     if (!activity.agentState) {

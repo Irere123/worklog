@@ -39,7 +39,7 @@ export async function listEventsAfter(
     afterSeq: number;
     limit: number;
   }
-): Promise<StoredEvent[]> {
+) {
   return await db
     .select()
     .from(events)
@@ -61,7 +61,7 @@ export async function deleteEventsBefore(db: DbOrTx, params: { before: Date }) {
 export async function listAllEventsAfter(
   db: DbOrTx,
   params: { afterSeq: number; alsoSeqs: number[]; limit: number }
-): Promise<StoredEvent[]> {
+) {
   return await db
     .select()
     .from(events)

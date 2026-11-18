@@ -65,13 +65,14 @@ type ChatMessage = UIMessage<Meta>;
 
 const FOLLOW_PX = 120;
 
-function toUi(messages: Stored[]): ChatMessage[] {
-  return messages.map((m) => ({
+function toUi(messages: Stored[]) {
+  const ui: ChatMessage[] = messages.map((m) => ({
     id: m.id,
     role: m.role,
     parts: [{ type: "text", text: m.text }],
     metadata: { steps: storedSteps(m.steps), createdAt: m.createdAt },
   }));
+  return ui;
 }
 
 export function Chat({
@@ -1068,7 +1069,7 @@ function replyMood(
   latest: boolean,
   said: string,
   landed: boolean
-): Mood | undefined {
+) {
   if (streaming) {
     return said ? "writing" : "thinking";
   }

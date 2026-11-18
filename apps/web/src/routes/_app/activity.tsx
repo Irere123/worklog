@@ -34,10 +34,13 @@ const SOURCES = [
 
 export const Route = createFileRoute("/_app/activity")({
   head: () => ({ meta: [{ title: "Activity · Worklog" }] }),
-  validateSearch: (search: Record<string, unknown>): ActivitySearch => ({
-    actor: typeof search.actor === "string" ? search.actor : undefined,
-    source: typeof search.source === "string" ? search.source : undefined,
-  }),
+  validateSearch: (search: Record<string, unknown>) => {
+    const result: ActivitySearch = {
+      actor: typeof search.actor === "string" ? search.actor : undefined,
+      source: typeof search.source === "string" ? search.source : undefined,
+    };
+    return result;
+  },
   loaderDeps: ({ search }) => ({ actor: search.actor, source: search.source }),
   loader: ({ context, deps }) => preloadActivity(context.queryClient, deps),
   component: ActivityPage,

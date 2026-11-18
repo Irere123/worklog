@@ -105,7 +105,7 @@ export async function updateCardsByColumn(
 export async function listCardRows(
   db: DbOrTx,
   params: CardFilters & { workspaceId: string }
-): Promise<CardRow[]> {
+) {
   const where: (SQL | undefined)[] = [
     eq(cards.workspaceId, params.workspaceId),
   ];

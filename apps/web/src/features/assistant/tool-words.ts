@@ -36,7 +36,7 @@ const VERBS: Record<string, Words> = {
   leave_note_for_owner: { doing: "Leaving a note", did: "Left a note" },
 };
 
-function field(input: unknown, key: string): string | undefined {
+function field(input: unknown, key: string) {
   const value: unknown =
     typeof input === "object" && input !== null
       ? Object.getOwnPropertyDescriptor(input, key)?.value

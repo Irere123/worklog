@@ -73,7 +73,7 @@ export type Config = z.infer<typeof Env>;
 
 export function loadConfig(
   env: Record<string, string | undefined> = process.env
-): Config {
+) {
   const given = withPlatformDefaults(
     Object.fromEntries(Object.entries(env).filter(([, v]) => v !== ""))
   );

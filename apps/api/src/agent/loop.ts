@@ -77,10 +77,7 @@ function stoppedReply(written: string) {
   return kept ? `${kept}\n\n_${STOPPED}_` : STOPPED;
 }
 
-export async function resolveAgent(
-  ctx: AppContext,
-  target: Member
-): Promise<Member> {
+export async function resolveAgent(ctx: AppContext, target: Member) {
   if (target.kind === "agent") {
     if (!target.ownerId) {
       throw badRequest("That agent has no owner to speak for");
@@ -467,11 +464,7 @@ function closing(finishReason: string, text: string) {
   };
 }
 
-export async function ask(
-  ctx: AppContext,
-  asker: Member,
-  input: TurnInput
-): Promise<{ conversation: ConversationRow; reply: string }> {
+export async function ask(ctx: AppContext, asker: Member, input: TurnInput) {
   const opened = await openConversation(ctx, asker, input);
   if (input.interrupt === true) {
     await requestTurnStop(ctx.db, { id: opened.id, now: ctx.now() });
@@ -556,7 +549,7 @@ export async function askStream(
   ctx: AppContext,
   asker: Member,
   input: TurnInput
-): Promise<Response> {
+) {
   const opened = await openConversation(ctx, asker, input);
   const headers = { "x-worklog-conversation": opened.id };
   if (input.interrupt === true) {

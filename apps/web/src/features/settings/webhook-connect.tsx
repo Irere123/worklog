@@ -42,7 +42,7 @@ const STARTER = `[
   }
 ]`;
 
-function parseRules(source: string): { rules: unknown[] } | { error: string } {
+function parseRules(source: string) {
   try {
     const parsed: unknown = JSON.parse(source);
     return Array.isArray(parsed)

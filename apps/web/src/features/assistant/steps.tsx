@@ -77,8 +77,8 @@ type Found = Schemas["StepFound"];
 
 const FOUND_SHOWN = 8;
 
-export function storedSteps(steps: StoredStep[]): Step[] {
-  return steps.map((step) =>
+export function storedSteps(steps: StoredStep[]) {
+  const shown: Step[] = steps.map((step) =>
     step.kind === "thought"
       ? { kind: "thought", text: step.text, live: false }
       : {
@@ -91,6 +91,7 @@ export function storedSteps(steps: StoredStep[]): Step[] {
           found: step.found,
         }
   );
+  return shown;
 }
 
 type ToolPart = {
@@ -107,14 +108,16 @@ const STATUS: Record<string, "done" | "failed"> = {
   "output-error": "failed",
 };
 
-function foundIn(output: unknown): Found[] {
+function foundIn(output: unknown) {
   const items: unknown[] = Array.isArray(output) ? output : [output];
-  return items.slice(0, FOUND_SHOWN).flatMap((item): Found[] => {
+  const found: Found[] = items.slice(0, FOUND_SHOWN).flatMap((item) => {
     if (typeof item !== "object" || item === null) {
       return [];
     }
-    const read = (key: string): unknown =>
-      Object.getOwnPropertyDescriptor(item, key)?.value;
+    const read = (key: string) => {
+      const value: unknown = Object.getOwnPropertyDescriptor(item, key)?.value;
+      return value;
+    };
     const word = (key: string) => {
       const value = read(key);
       return typeof value === "string" ? value : null;
@@ -133,6 +136,7 @@ function foundIn(output: unknown): Found[] {
           },
         ];
   });
+  return found;
 }
 
 function heldFor(output: unknown) {
@@ -157,7 +161,7 @@ function heldFor(output: unknown) {
 }
 
 /** The steps in a reply as it streams: reasoning and tool calls, in the order they happened. */
-export function liveSteps(parts: UIMessage["parts"]): Step[] {
+export function liveSteps(parts: UIMessage["parts"]) {
   const steps: Step[] = [];
   for (const part of parts) {
     if (part.type === "reasoning") {
@@ -574,19 +578,22 @@ function reportOf(output: unknown) {
   return typeof report === "string" ? report : null;
 }
 
-function fieldsOf(input: unknown): [string, string][] {
+function fieldsOf(input: unknown) {
   if (typeof input !== "object" || input === null) {
     return [];
   }
-  return Object.entries(input).flatMap(([key, value]): [string, string][] => {
-    if (typeof value === "string" || typeof value === "number") {
-      return [[key, String(value)]];
+  const fields: [string, string][] = Object.entries(input).flatMap(
+    ([key, value]) => {
+      if (typeof value === "string" || typeof value === "number") {
+        return [[key, String(value)]];
+      }
+      if (typeof value === "boolean") {
+        return [[key, value ? "Yes" : "No"]];
+      }
+      return [];
     }
-    if (typeof value === "boolean") {
-      return [[key, value ? "Yes" : "No"]];
-    }
-    return [];
-  });
+  );
+  return fields;
 }
 
 function humanize(key: string) {

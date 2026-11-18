@@ -24,7 +24,7 @@ export const auth = {
   },
 };
 
-export function authHeaders(): Record<string, string> {
+export function authHeaders() {
   const headers: Record<string, string> = {};
   const key = auth.key();
   if (key) {
@@ -63,7 +63,7 @@ export class ApiError extends Error {
 type Result<T> = { data?: T; error?: unknown; response: Response };
 
 /** The body of a successful call, or an `ApiError` carrying the server's code and message. */
-export async function unwrap<T>(call: Promise<Result<T>>): Promise<T> {
+export async function unwrap<T>(call: Promise<Result<T>>) {
   const result = await call;
   if (succeeded(result)) {
     return result.data;
@@ -106,7 +106,7 @@ function readable(issue: { path?: (string | number)[]; message?: string }) {
 export async function unwrapEarly<T>(
   path: string,
   call: () => Promise<Result<T>>
-): Promise<T> {
+) {
   const early = await takeBootResponse(path);
   if (!early) {
     return await unwrap(call());

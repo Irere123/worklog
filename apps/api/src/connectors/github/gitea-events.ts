@@ -38,10 +38,7 @@ const Reviewed = z.object({
  * verdict, the author told, the reviewer's request resolved. Null for anything else, including
  * GitHub-style inline comments, which carry a `comment`.
  */
-export function asGithubReview(
-  eventType: string,
-  payload: unknown
-): Payload | null {
+export function asGithubReview(eventType: string, payload: unknown) {
   const state = VERDICTS.get(eventType);
   if (!state) {
     return null;
@@ -64,5 +61,5 @@ export function asGithubReview(
       user: sender,
       submitted_at: at,
     },
-  };
+  } satisfies Payload;
 }

@@ -103,7 +103,7 @@ function revisionOf(
   e: SlackEvent,
   settings: Record<string, unknown>,
   receivedAt: Date
-): WorklogEvent | null {
+) {
   if (e.subtype === "message_deleted" && e.channel && e.deleted_ts) {
     return {
       id: `slack:${e.channel}:${e.deleted_ts}`,
@@ -112,7 +112,7 @@ function revisionOf(
       occurredAt: receivedAt,
       actor: null,
       title: "deleted",
-    };
+    } satisfies WorklogEvent;
   }
   if (e.subtype === "message_changed" && e.channel && e.message) {
     const text = plain(e.message.text ?? "");
@@ -124,14 +124,12 @@ function revisionOf(
       actor: null,
       title: `Posted in #${channelNameOf(settings, e.channel)}: ${text.slice(0, 90)}`,
       body: text.slice(0, 1000),
-    };
+    } satisfies WorklogEvent;
   }
   return null;
 }
 
-function sourceOf(
-  e: SlackEvent
-): { user: string; channel: string } | { ignored: string } {
+function sourceOf(e: SlackEvent) {
   if (e.bot_id || !e.user) {
     return { ignored: "bot or system message" };
   }
@@ -153,7 +151,7 @@ function messageEvent(
   eventId: string,
   settings: Record<string, unknown>,
   receivedAt: Date
-): WorklogEvent {
+) {
   const { user, channel, channelName } = source;
   const text = plain(e.text ?? "");
   const signals: Signal[] = mentionedUserIds(e.text ?? "")
@@ -193,7 +191,7 @@ function messageEvent(
     signals,
     visibility: e.channel_type === "group" ? "private" : "team",
     data: { eventId },
-  };
+  } satisfies WorklogEvent;
 }
 
 export function normalizeSlackMessage(
@@ -201,17 +199,35 @@ export function normalizeSlackMessage(
   eventId: string,
   settings: Record<string, unknown>,
   receivedAt: Date
-): Normalized {
+) {
+  const normalized: Normalized = normalizeMessage(
+    e,
+    eventId,
+    settings,
+    receivedAt
+  );
+  return normalized;
+}
+
+function normalizeMessage(
+  e: SlackEvent,
+  eventId: string,
+  settings: Record<string, unknown>,
+  receivedAt: Date
+) {
   if (unchangedEdit(e)) {
-    return { events: [], ignored: "changed without its text changing" };
+    return {
+      events: [],
+      ignored: "changed without its text changing",
+    } satisfies Normalized;
   }
   const revision = revisionOf(e, settings, receivedAt);
   if (revision) {
-    return { events: [revision] };
+    return { events: [revision] } satisfies Normalized;
   }
   const source = sourceOf(e);
   if ("ignored" in source) {
-    return { events: [], ignored: source.ignored };
+    return { events: [], ignored: source.ignored } satisfies Normalized;
   }
   const channelName = channelNameOf(settings, source.channel);
   const base = messageEvent(
@@ -222,7 +238,7 @@ export function normalizeSlackMessage(
     receivedAt
   );
   if (addressedToBot(e.text ?? "", settings.botUserId)) {
-    return { events: [], ignored: "addressed to Worklog" };
+    return { events: [], ignored: "addressed to Worklog" } satisfies Normalized;
   }
   const optedIn =
     Array.isArray(settings.channels) &&
@@ -235,9 +251,9 @@ export function normalizeSlackMessage(
         ignored: optedIn
           ? "too short to be a work update"
           : "channel not opted in",
-      };
+      } satisfies Normalized;
     }
-    return { events: [{ ...base, hidden: true }] };
+    return { events: [{ ...base, hidden: true }] } satisfies Normalized;
   }
   if (e.thread_ts && e.thread_ts !== e.ts) {
     return {
@@ -253,9 +269,9 @@ export function normalizeSlackMessage(
           },
         },
       ],
-    };
+    } satisfies Normalized;
   }
-  return { events: [{ ...base, importance: 0.3 }] };
+  return { events: [{ ...base, importance: 0.3 }] } satisfies Normalized;
 }
 
 /** A page of `conversations.history`, as the sync stores it. */
@@ -291,10 +307,13 @@ export function normalizeHistory(
   payload: unknown,
   settings: Record<string, unknown>,
   receivedAt: Date
-): Normalized {
+) {
   const page = HistoryPage.safeParse(payload);
   if (!page.success) {
-    return { events: [], ignored: "malformed history page" };
+    return {
+      events: [],
+      ignored: "malformed history page",
+    } satisfies Normalized;
   }
   const { channel } = page.data;
   const events: WorklogEvent[] = [];
@@ -323,5 +342,5 @@ export function normalizeHistory(
     events,
     ignored: events.length === 0 ? "messages without work updates" : undefined,
     skipped,
-  };
+  } satisfies Normalized;
 }

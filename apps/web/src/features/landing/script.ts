@@ -132,7 +132,7 @@ export function pointAt(
   name: string,
   fx = 0.82,
   fy = 0.62
-): Point | null {
+) {
   const target = root?.querySelector<HTMLElement>(`[data-target="${name}"]`);
   if (!(root && target && target.offsetParent)) {
     return null;

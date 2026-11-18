@@ -111,11 +111,13 @@ const Reconciliation = z.object({
     .describe("Ids of unconfirmed lines that their evidence states outright"),
 });
 
+type Consolidated = { status: "quiet" | "skipped"; summary: string };
+
 export async function runConsolidate(
   ctx: AppContext,
   member: Member,
   tz: string
-): Promise<{ status: "quiet" | "skipped"; summary: string }> {
+) {
   const until = startOfLocalDay(ctx.now(), tz);
   const since = startOfLocalDay(ctx.now(), tz, -1);
   const day = localDate(new Date(since.getTime() + DAY_MS / 2), tz);
@@ -161,10 +163,16 @@ export async function runConsolidate(
     }
   }
   if (!parts.length) {
-    return { status: "skipped", summary: `No activity on ${day}` };
+    return {
+      status: "skipped",
+      summary: `No activity on ${day}`,
+    } satisfies Consolidated;
   }
   await rebuildDigests(ctx, member, day);
-  return { status: "quiet", summary: `${day}: ${parts.join("; ")}` };
+  return {
+    status: "quiet",
+    summary: `${day}: ${parts.join("; ")}`,
+  } satisfies Consolidated;
 }
 
 async function consolidatePart(
@@ -407,15 +415,17 @@ function evidenceLine(
 function citer(items: ActivityRow[], said: Said[]) {
   const activity = new Set(items.map((a) => a.id));
   const messages = new Map(said.map((m) => [m.id, m]));
-  return (ids: string[]): MemoryEvidence[] =>
-    [...new Set(ids)].flatMap((id): MemoryEvidence[] => {
+  return (ids: string[]) =>
+    [...new Set(ids)].flatMap((id) => {
       if (activity.has(id)) {
-        return [{ kind: "activity", id }];
+        const cited: MemoryEvidence[] = [{ kind: "activity", id }];
+        return cited;
       }
       const m = messages.get(id);
-      return m?.text
+      const quoted: MemoryEvidence[] = m?.text
         ? [{ kind: "said", at: m.createdAt.toISOString(), text: m.text }]
         : [];
+      return quoted;
     });
 }
 

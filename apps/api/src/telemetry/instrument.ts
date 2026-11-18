@@ -7,7 +7,7 @@ import type { Attrs, Span } from "./trace";
  * A fetch whose calls are spans: method, host and status. Never the path or query, which carry
  * secrets for some targets (a Slack incoming-webhook URL is its own credential).
  */
-export function tracedFetch(inner: typeof fetch): typeof fetch {
+export function tracedFetch(inner: typeof fetch) {
   const wrapped = async (input: string | URL | Request, init?: RequestInit) => {
     const url = new URL(input instanceof Request ? input.url : input);
     const method = (
@@ -72,7 +72,7 @@ function wrapQuery(target: Pool | PoolClient) {
 
 type Call = { span: Span; query: unknown; started: number; busy: Attrs };
 
-function poolBusy(pool: Pool): Attrs {
+function poolBusy(pool: Pool) {
   return {
     "db.pool.waiting": pool.waitingCount,
     "db.pool.idle": pool.idleCount,

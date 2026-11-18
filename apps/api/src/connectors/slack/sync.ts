@@ -29,10 +29,7 @@ const Channels = z.object({
 });
 
 /** Channels the bot can see, for choosing which ones count as work updates. */
-export async function slackChannels(
-  ctx: AppContext,
-  conn: ConnectionView
-): Promise<Source[]> {
+export async function slackChannels(ctx: AppContext, conn: ConnectionView) {
   const token = botTokenOf(conn.secrets);
   const sources: Source[] = [];
   let cursor: string | undefined;
@@ -77,7 +74,7 @@ export async function slackAccount(
   conn: ConnectionView,
   _app: unknown,
   userId: string
-): Promise<AccountDetails | null> {
+) {
   const body = UserInfo.safeParse(
     await slackApi(
       ctx,
@@ -97,7 +94,7 @@ export async function slackAccount(
     handle: nonEmpty(user.profile?.display_name) ?? nonEmpty(user.name) ?? null,
     bot: user.is_bot === true,
     avatarUrl: nonEmpty(user.profile?.image_72) ?? null,
-  };
+  } satisfies AccountDetails;
 }
 
 const Message = z.looseObject({

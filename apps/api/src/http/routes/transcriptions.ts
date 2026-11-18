@@ -53,7 +53,7 @@ export const transcriptionRoutes = router().openapi(
   }
 );
 
-function audioType(header: string | undefined): AudioType {
+function audioType(header: string | undefined) {
   const type = header?.split(";")[0]?.trim().toLowerCase() ?? "";
   if (!(type in AUDIO_FORMATS)) {
     throw badRequest(

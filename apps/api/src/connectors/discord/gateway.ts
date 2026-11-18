@@ -61,7 +61,7 @@ function deliveryOf(t: string, d: z.infer<typeof Dispatched>) {
   return `del:${d.id}`;
 }
 
-function itemOf(t: string, raw: unknown): Streamed | null {
+function itemOf(t: string, raw: unknown) {
   const d = Dispatched.safeParse(raw);
   if (!d.success || !d.data.guild_id) {
     return null;
@@ -74,7 +74,7 @@ function itemOf(t: string, raw: unknown): Streamed | null {
       eventType: t,
       payload: raw,
       partition: d.data.channel_id,
-    };
+    } satisfies Streamed;
   }
   if (t === "GUILD_DELETE" && d.data.unavailable !== true) {
     return {
@@ -85,7 +85,7 @@ function itemOf(t: string, raw: unknown): Streamed | null {
         status: "revoked",
         reason: "the bot was removed from the server",
       },
-    };
+    } satisfies Streamed;
   }
   return null;
 }

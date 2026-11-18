@@ -624,7 +624,7 @@ function RecentDeliveries({
   );
 }
 
-function stringList(value: unknown): string[] {
+function stringList(value: unknown) {
   return Array.isArray(value)
     ? value.filter((v): v is string => typeof v === "string")
     : [];

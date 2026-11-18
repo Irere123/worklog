@@ -21,7 +21,7 @@ export async function loadApp(
   ctx: AppContext,
   provider: string,
   opts: { fresh?: boolean } = {}
-): Promise<AppView | null> {
+) {
   const hit = cache.get(provider);
   if (hit && hit.until > Date.now() && opts.fresh !== true) {
     return hit.app;
@@ -276,7 +276,7 @@ export function forgetCachedApps() {
   cache.clear();
 }
 
-function viewOfApp(ctx: AppContext, row: ConnectorAppRow): AppView {
+function viewOfApp(ctx: AppContext, row: ConnectorAppRow) {
   return {
     provider: row.provider,
     appId: row.appId,

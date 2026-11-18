@@ -12,12 +12,12 @@ const FALLBACK = [
 /** What a suggestion shows, and the full question it sends. */
 export type Suggestion = { label: string; ask: string };
 
-const plain = (question: string): Suggestion => ({
+const plain = (question: string) => ({
   label: question,
   ask: question,
 });
 
-export function useSuggestions(): Suggestion[] {
+export function useSuggestions() {
   const open = useQuery(q.attention("open"));
   const mine = useQuery(q.cards({ assignee: "me", stage: "active" }));
   const picked: Suggestion[] = [];

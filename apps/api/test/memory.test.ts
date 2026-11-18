@@ -21,7 +21,7 @@ async function memories(env: TestEnv, token: string, query = "") {
   return (await env.call("GET", `/v1/memories${query}`, { token })).body;
 }
 
-function asked(call: any): string {
+function asked(call: any) {
   return call.prompt
     .at(-1)
     .content.map((part: any) => part.text ?? "")

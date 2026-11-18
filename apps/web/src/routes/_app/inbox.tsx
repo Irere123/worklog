@@ -12,12 +12,14 @@ const STATES: readonly AttentionState[] = [
 
 export const Route = createFileRoute("/_app/inbox")({
   head: () => ({ meta: [{ title: "Inbox · Worklog" }] }),
-  validateSearch: (
-    search: Record<string, unknown>
-  ): { state?: AttentionState; item?: string } => {
+  validateSearch: (search: Record<string, unknown>) => {
     const state = STATES.find((s) => s === search.state);
     const item = typeof search.item === "string" ? search.item : undefined;
-    return { ...(state ? { state } : {}), ...(item ? { item } : {}) };
+    const result: { state?: AttentionState; item?: string } = {
+      ...(state ? { state } : {}),
+      ...(item ? { item } : {}),
+    };
+    return result;
   },
   component: InboxPage,
 });

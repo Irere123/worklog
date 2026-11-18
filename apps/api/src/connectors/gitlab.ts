@@ -5,7 +5,7 @@ import { gitlabHooks, hostOf, listGitlabProjects } from "./gitlab/api";
 import { normalizeGitlab, parseGitlab } from "./gitlab/events";
 import { gitlabSync, normalizeGitlabPage } from "./gitlab/sync";
 
-function parse(rawBody: string): object | null {
+function parse(rawBody: string) {
   try {
     const value: unknown = JSON.parse(rawBody);
     return typeof value === "object" && value !== null ? value : {};

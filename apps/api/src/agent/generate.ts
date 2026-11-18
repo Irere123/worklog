@@ -14,7 +14,7 @@ type Call = {
 export async function structured<T>(
   models: Models,
   call: Call & { schema: z.ZodType<T> }
-): Promise<T> {
+) {
   const { output } = await generateText({
     model: models[call.model],
     instructions: join(call.instructions),

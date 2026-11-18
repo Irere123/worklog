@@ -20,7 +20,7 @@ export function needsDeferral(name: string) {
   return name === "ask" || name === "brief";
 }
 
-export function parseCommand(input: string): { name: string; rest: string } {
+export function parseCommand(input: string) {
   const trimmed = input.trim();
   const [first = "", ...rest] = trimmed.split(/\s+/u);
   const name = first.toLowerCase();
@@ -36,7 +36,7 @@ export async function runCommand(
   platform: "slack" | "discord",
   platformUserId: string,
   cmd: Command
-): Promise<string> {
+) {
   if (cmd.name === "help") {
     return HELP;
   }

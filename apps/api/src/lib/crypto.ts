@@ -11,24 +11,24 @@ import { z } from "zod";
 
 const SecretsSchema = z.record(z.string(), z.string());
 
-export function generateToken(): string {
+export function generateToken() {
   return `wl_${randomBytes(32).toString("base64url")}`;
 }
 
-export function hashToken(token: string): string {
+export function hashToken(token: string) {
   return createHash("sha256").update(token).digest("hex");
 }
 
 /** A short, stable digest: a delivery id for a body that carries none. */
-export function shortHash(value: string): string {
+export function shortHash(value: string) {
   return createHash("sha256").update(value).digest("hex").slice(0, 32);
 }
 
-export function hmacHex(secret: string, payload: string): string {
+export function hmacHex(secret: string, payload: string) {
   return createHmac("sha256", secret).update(payload).digest("hex");
 }
 
-export function safeEqual(a: string, b: string): boolean {
+export function safeEqual(a: string, b: string) {
   const ab = Buffer.from(a);
   const bb = Buffer.from(b);
   return ab.length === bb.length && timingSafeEqual(ab, bb);
@@ -59,7 +59,7 @@ export class SecretBox {
     }
   }
 
-  seal(value: Record<string, string>): string {
+  seal(value: Record<string, string>) {
     const iv = randomBytes(12);
     const cipher = createCipheriv("aes-256-gcm", this.key, iv);
     const data = Buffer.concat([
@@ -73,7 +73,7 @@ export class SecretBox {
     ].join(".");
   }
 
-  open(sealed: string): Record<string, string> {
+  open(sealed: string) {
     const parts = sealed.split(".");
     if (parts[0] === "v2" && parts.length === 5) {
       const key = this.keys.get(parts[1] ?? "");
@@ -96,12 +96,12 @@ export class SecretBox {
   }
 
   /** Sealed with an older key, or before key ids: re-seal it with the current one. */
-  stale(sealed: string): boolean {
+  stale(sealed: string) {
     return !sealed.startsWith(`v2.${this.kid}.`);
   }
 }
 
-function decrypt(key: Buffer, parts: string[]): Record<string, string> {
+function decrypt(key: Buffer, parts: string[]) {
   const [iv, tag, data] = parts.map((p) => Buffer.from(p, "base64url"));
   if (!iv || !tag || !data || parts.length !== 3) {
     throw new Error("Malformed sealed secret");

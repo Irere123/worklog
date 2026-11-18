@@ -441,7 +441,7 @@ function outcome(result: unknown) {
   return Object.keys(rest).length ? rest : "Done.";
 }
 
-async function reply(run: () => Promise<unknown>): Promise<CallToolResult> {
+async function reply(run: () => Promise<unknown>) {
   try {
     const value = await run();
     return {
@@ -451,19 +451,19 @@ async function reply(run: () => Promise<unknown>): Promise<CallToolResult> {
           text: typeof value === "string" ? value : JSON.stringify(value, lean),
         },
       ],
-    };
+    } satisfies CallToolResult;
   } catch (error) {
     if (error instanceof ApiError) {
       return {
         isError: true,
         content: [{ type: "text", text: error.message }],
-      };
+      } satisfies CallToolResult;
     }
     log.error("mcp: tool failed", { error });
     return {
       isError: true,
       content: [{ type: "text", text: "Something went wrong in Worklog." }],
-    };
+    } satisfies CallToolResult;
   }
 }
 

@@ -2,7 +2,7 @@ export function sanitizeMarkdown(
   markdown: string,
   allowedUrls: Iterable<string>,
   publicUrl?: string
-): string {
+) {
   const allowed = new Set([...allowedUrls].filter(Boolean));
   const ok = (url: string) =>
     allowed.has(url) || (publicUrl ? url.startsWith(publicUrl) : false);
@@ -23,7 +23,7 @@ export function sanitizeMarkdown(
     );
 }
 
-export function urlsIn(data: unknown): string[] {
+export function urlsIn(data: unknown) {
   const out: string[] = [];
   const walk = (v: unknown) => {
     if (typeof v === "string") {

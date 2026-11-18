@@ -100,7 +100,7 @@ async function warm(root: string, load: (file: string) => Promise<unknown>) {
   }
 }
 
-async function readServed(file: string): Promise<Served | null> {
+async function readServed(file: string) {
   const handle = Bun.file(file);
   const stat = await handle.stat().catch(() => null);
   if (stat?.isFile() !== true) {

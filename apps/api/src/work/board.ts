@@ -238,7 +238,7 @@ function newCardRow(
   number: number,
   actor: Member | null,
   input: CardInput
-): CardRow {
+) {
   const now = ctx.now();
   return {
     id: generateId(),
@@ -262,23 +262,19 @@ function newCardRow(
     closedById: null,
     createdAt: now,
     updatedAt: now,
-  };
+  } satisfies CardRow;
 }
 
 export async function listCards(
   ctx: AppContext,
   workspaceId: string,
   filters: CardFilters = {}
-): Promise<CardView[]> {
+) {
   const rows = await listCardRows(ctx.db, { ...filters, workspaceId });
   return await hydrate(ctx, workspaceId, rows);
 }
 
-async function hydrate(
-  ctx: AppContext,
-  workspaceId: string,
-  rows: CardRow[]
-): Promise<CardView[]> {
+async function hydrate(ctx: AppContext, workspaceId: string, rows: CardRow[]) {
   if (!rows.length) {
     return [];
   }
@@ -287,7 +283,7 @@ async function hydrate(
     cards: rows,
   });
   const now = ctx.now().getTime();
-  return rows.map((card) => {
+  const views: CardView[] = rows.map((card) => {
     const board = related.boards.find((b) => b.id === card.boardId);
     const days = board?.entropyDays ?? related.workspace?.entropyDays ?? 30;
     const autoPostponeAt = new Date(
@@ -312,6 +308,7 @@ async function hydrate(
           : null,
     };
   });
+  return views;
 }
 
 export async function getCard(

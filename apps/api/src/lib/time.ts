@@ -9,7 +9,7 @@ export type LocalParts = {
 
 const formatters = new Map<string, Intl.DateTimeFormat>();
 
-function formatter(timeZone: string): Intl.DateTimeFormat {
+function formatter(timeZone: string) {
   let f = formatters.get(timeZone);
   if (!f) {
     f = new Intl.DateTimeFormat("en-US", {
@@ -37,7 +37,7 @@ const WEEKDAYS: Record<string, number> = {
   Sat: 6,
 };
 
-export function isValidTimeZone(tz: string): boolean {
+export function isValidTimeZone(tz: string) {
   try {
     formatter(tz);
     return true;
@@ -46,7 +46,7 @@ export function isValidTimeZone(tz: string): boolean {
   }
 }
 
-export function localParts(date: Date, timeZone: string): LocalParts {
+export function localParts(date: Date, timeZone: string) {
   const parts: Record<string, string> = {};
   for (const p of formatter(timeZone).formatToParts(date)) {
     parts[p.type] = p.value;
@@ -61,7 +61,7 @@ export function localParts(date: Date, timeZone: string): LocalParts {
   };
 }
 
-function weekdayNumber(name: string | undefined): number {
+function weekdayNumber(name: string | undefined) {
   const weekday = name === undefined ? undefined : WEEKDAYS[name];
   if (weekday === undefined) {
     throw new Error(`Unexpected weekday "${name}" from Intl`);
@@ -76,7 +76,7 @@ export function zonedToUtc(
   hour: number,
   minute: number,
   timeZone: string
-): Date {
+) {
   const target = Date.UTC(year, month - 1, day, hour, minute);
   let guess = target;
   for (let i = 0; i < 2; i += 1) {
@@ -87,7 +87,7 @@ export function zonedToUtc(
   return new Date(guess);
 }
 
-export function parseHHMM(value: string): { hour: number; minute: number } {
+export function parseHHMM(value: string) {
   const m = /^(?<hour>\d{1,2}):(?<minute>\d{2})$/u.exec(value);
   if (!m?.groups) {
     throw new Error(`Invalid time "${value}", expected HH:MM`);
@@ -95,11 +95,7 @@ export function parseHHMM(value: string): { hour: number; minute: number } {
   return { hour: Number(m.groups.hour), minute: Number(m.groups.minute) };
 }
 
-export function startOfLocalDay(
-  date: Date,
-  timeZone: string,
-  offsetDays = 0
-): Date {
+export function startOfLocalDay(date: Date, timeZone: string, offsetDays = 0) {
   const p = localParts(date, timeZone);
   const base = new Date(Date.UTC(p.year, p.month - 1, p.day + offsetDays));
   return zonedToUtc(
@@ -116,19 +112,18 @@ export function startOfLocalDate(
   day: string,
   timeZone: string,
   offsetDays = 0
-): Date | undefined {
+) {
   const m = /^(?<y>\d{4})-(?<m>\d{2})-(?<d>\d{2})$/u.exec(day);
-  if (!m?.groups) {
-    return undefined;
-  }
-  const base = new Date(
-    Date.UTC(
-      Number(m.groups.y),
-      Number(m.groups.m) - 1,
-      Number(m.groups.d) + offsetDays
-    )
-  );
-  return Number.isNaN(base.getTime())
+  const base = m?.groups
+    ? new Date(
+        Date.UTC(
+          Number(m.groups.y),
+          Number(m.groups.m) - 1,
+          Number(m.groups.d) + offsetDays
+        )
+      )
+    : undefined;
+  return base === undefined || Number.isNaN(base.getTime())
     ? undefined
     : zonedToUtc(
         base.getUTCFullYear(),
@@ -140,33 +135,26 @@ export function startOfLocalDate(
       );
 }
 
-export function startOfLocalMinute(
-  value: string,
-  timeZone: string
-): Date | undefined {
+export function startOfLocalMinute(value: string, timeZone: string) {
   const m = /^(?<day>\d{4}-\d{2}-\d{2})[T ](?<time>\d{2}:\d{2})$/u.exec(
     value.trim()
   );
   const midnight = m?.groups?.day
     ? startOfLocalDate(m.groups.day, timeZone)
     : undefined;
-  if (!midnight || !m?.groups?.time) {
-    return undefined;
-  }
-  const { hour, minute } = parseHHMM(m.groups.time);
-  if (hour > 23 || minute > 59) {
-    return undefined;
-  }
-  const p = localParts(midnight, timeZone);
-  return zonedToUtc(p.year, p.month, p.day, hour, minute, timeZone);
+  const time = m?.groups?.time ? parseHHMM(m.groups.time) : undefined;
+  const p = midnight ? localParts(midnight, timeZone) : undefined;
+  return p && time && time.hour <= 23 && time.minute <= 59
+    ? zonedToUtc(p.year, p.month, p.day, time.hour, time.minute, timeZone)
+    : undefined;
 }
 
-export function localDate(date: Date, timeZone: string): string {
+export function localDate(date: Date, timeZone: string) {
   const p = localParts(date, timeZone);
   return `${p.year}-${String(p.month).padStart(2, "0")}-${String(p.day).padStart(2, "0")}`;
 }
 
-export function lastLocalDate(expiresAt: Date, timeZone: string): string {
+export function lastLocalDate(expiresAt: Date, timeZone: string) {
   return localDate(new Date(expiresAt.getTime() - 1), timeZone);
 }
 
@@ -174,7 +162,7 @@ export function isWithinHours(
   date: Date,
   timeZone: string,
   hours: { start: string; end: string }
-): boolean {
+) {
   const p = localParts(date, timeZone);
   const now = p.hour * 60 + p.minute;
   const s = parseHHMM(hours.start);

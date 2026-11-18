@@ -384,7 +384,7 @@ function random(seed: number) {
 
 type Node = Record<string, unknown> | unknown[];
 
-function containers(value: unknown, out: Node[] = []): Node[] {
+function containers(value: unknown, out: Node[] = []) {
   if (Array.isArray(value)) {
     out.push(value);
     for (const v of value) {

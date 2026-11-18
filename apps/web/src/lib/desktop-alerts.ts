@@ -12,7 +12,7 @@ const ICON = "/icon-192.png";
 const listeners = new Set<() => void>();
 let constructorFails = false;
 
-function read(): AlertState {
+function read() {
   if (!("Notification" in window) || constructorFails) {
     return "unsupported";
   }
@@ -25,8 +25,13 @@ function read(): AlertState {
     : "off";
 }
 
-export function useDesktopAlerts(): AlertState {
-  return useSyncExternalStore(subscribe, read, () => "unsupported");
+export function useDesktopAlerts() {
+  const state: AlertState = useSyncExternalStore(
+    subscribe,
+    read,
+    () => "unsupported"
+  );
+  return state;
 }
 
 /** Asks for permission and shows a first notification, so people see what they turned on. */

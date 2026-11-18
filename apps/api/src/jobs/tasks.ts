@@ -230,8 +230,8 @@ export async function runJobsOnce(ctx: AppContext) {
 
 const PayloadSchema = z.record(z.string(), z.unknown());
 
-function taskList(ctx: AppContext): TaskList {
-  return Object.fromEntries(
+function taskList(ctx: AppContext) {
+  const tasks: TaskList = Object.fromEntries(
     Object.entries(TASKS).map(([name, handle]) => [
       name,
       async (payload: unknown, helpers) => {
@@ -267,6 +267,7 @@ function taskList(ctx: AppContext): TaskList {
       },
     ])
   );
+  return tasks;
 }
 
 function workspaceOf(payload: unknown) {

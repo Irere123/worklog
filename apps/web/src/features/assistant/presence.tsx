@@ -79,7 +79,7 @@ export function describePresence(
   people: Map<string, Member>,
   timeZone?: string,
   now = new Date()
-): Glance {
+) {
   const [first, ...rest] = presence.working;
   if (first) {
     const more = rest.length > 0 ? ` · and ${rest.length} more` : "";
@@ -174,19 +174,22 @@ const WRITING_STEP = "writing";
  * How the assistant looks for what presence says: writing once its words flow, thinking while it
  * looks things up or runs a routine, waiting when it needs your OK, pleased with an unread answer.
  */
-export function moodOf(presence: Presence | undefined): Mood {
+export function moodOf(presence: Presence | undefined) {
   const state = presence?.state ?? "idle";
   const first = presence?.working[0];
   if (state === "working" && first) {
     return moodOfWork(first);
   }
-  return state === "working" ? "thinking" : state;
+  const mood: Mood = state === "working" ? "thinking" : state;
+  return mood;
 }
 
-function moodOfWork(work: Working): Mood {
-  return work.kind === "reply" && work.step?.tool === WRITING_STEP
-    ? "writing"
-    : "thinking";
+function moodOfWork(work: Working) {
+  const mood: Mood =
+    work.kind === "reply" && work.step?.tool === WRITING_STEP
+      ? "writing"
+      : "thinking";
+  return mood;
 }
 
 /**

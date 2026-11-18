@@ -148,6 +148,7 @@ oxfmt and oxlint enforce the style: [Ultracite](https://www.ultracite.ai)'s pres
 
 - **`type`, not `interface`,** because shapes flow into jsonb columns.
 - **Top-level functions are declarations.** Exports go first, helpers below.
+- **Return types are inferred.** Pin a contract at the return site with `satisfies T`, or with a typed local when callers need the wider type. Type predicates and `never` are the exceptions.
 - **Keys are ordered for the reader,** not sorted.
 - **Imports:** `#` aliases across folders, `./` within one, never `../`. Aliases resolve to files, so a folder's loader is a file of the same name beside it (`agent/tools.ts` for `agent/tools/`).
 - **Fix lint findings.** Suppress one line only, with a reason.

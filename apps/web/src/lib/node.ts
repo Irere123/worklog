@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
 /** React renders nothing for these, so a slot holding one gets no wrapper either. */
-export function isShown(node: ReactNode): boolean {
+export function isShown(node: ReactNode) {
   return node !== undefined && node !== null && node !== false && node !== "";
 }

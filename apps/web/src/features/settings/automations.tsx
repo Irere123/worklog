@@ -676,14 +676,22 @@ function isKind(value: string): value is Kind {
   return Object.hasOwn(KINDS, value);
 }
 
-function defaultSchedule(type: string): Schedule {
+function defaultSchedule(type: string) {
   if (type === "weekly") {
-    return { type: "weekly", weekday: 5, at: "16:00" };
+    return { type: "weekly", weekday: 5, at: "16:00" } satisfies Schedule;
   }
   if (type === "interval") {
-    return { type: "interval", minutes: 60, activeHoursOnly: true };
+    return {
+      type: "interval",
+      minutes: 60,
+      activeHoursOnly: true,
+    } satisfies Schedule;
   }
-  return { type: "daily", at: "08:00", weekdays: [1, 2, 3, 4, 5] };
+  return {
+    type: "daily",
+    at: "08:00",
+    weekdays: [1, 2, 3, 4, 5],
+  } satisfies Schedule;
 }
 
 function targetNoun(kind: Schemas["DeliveryTarget"]["kind"]) {

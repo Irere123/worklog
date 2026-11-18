@@ -24,7 +24,7 @@ export type AgentClient = {
 export async function findAgentClient(
   db: DbOrTx,
   params: { clientId: string }
-): Promise<AgentClient | undefined> {
+) {
   const [row] = await db
     .select({
       clientId: oauthClient.clientId,
@@ -36,16 +36,15 @@ export async function findAgentClient(
     })
     .from(oauthClient)
     .where(eq(oauthClient.clientId, params.clientId));
-  if (!row || row.disabled === true) {
-    return undefined;
-  }
-  return {
-    clientId: row.clientId,
-    name: row.name,
-    uri: row.uri,
-    softwareId: row.softwareId,
-    verified: row.discovery !== null,
-  };
+  return row && row.disabled !== true
+    ? {
+        clientId: row.clientId,
+        name: row.name,
+        uri: row.uri,
+        softwareId: row.softwareId,
+        verified: row.discovery !== null,
+      }
+    : undefined;
 }
 
 export async function findAgentConnection(

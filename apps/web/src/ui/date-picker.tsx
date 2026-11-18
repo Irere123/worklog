@@ -148,12 +148,12 @@ function Month({
   );
 }
 
-function quickPicks(): [string, string][] {
+function quickPicks() {
   const today = localDay();
   const weekday = parse(today).getDay();
   const monday = addDays(today, (8 - weekday) % 7 || 7);
   const tomorrow = addDays(today, 1);
-  return [
+  const picks: [string, string][] = [
     ["Today", today],
     ["Tomorrow", tomorrow],
     monday === tomorrow
@@ -161,6 +161,7 @@ function quickPicks(): [string, string][] {
       : ["Next Monday", monday],
     ["In two weeks", addDays(today, 14)],
   ];
+  return picks;
 }
 
 function parse(day: string) {

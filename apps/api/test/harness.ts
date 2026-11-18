@@ -176,9 +176,7 @@ type Routed = {
  * method and URL prefix, first match wins, and a plain value is sent as JSON. Anything unmatched
  * answers `{ ok: true }`. Every call is recorded in `calls`.
  */
-export function routedFetch(
-  routes: [string, (req: Routed) => unknown][]
-): typeof fetch & { calls: Routed[] } {
+export function routedFetch(routes: [string, (req: Routed) => unknown][]) {
   const calls: Routed[] = [];
   const fn = (async (input: string | URL | Request, init?: RequestInit) => {
     const raw =

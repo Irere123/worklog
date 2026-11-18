@@ -88,32 +88,29 @@ type Settings = z.infer<typeof WebhookSettings>;
 
 const isMissing = (v: unknown) => v === null || v === undefined;
 
-export function readPath(data: unknown, path: string): unknown {
+export function readPath(data: unknown, path: string) {
   let cur: unknown = data;
   for (const part of path.split(".")) {
-    if (typeof cur !== "object" || cur === null) {
-      return undefined;
-    }
-    cur = Reflect.get(cur, part);
+    cur =
+      typeof cur === "object" && cur !== null
+        ? Reflect.get(cur, part)
+        : undefined;
   }
   return cur;
 }
 
-function scalarText(v: unknown): string | undefined {
+function scalarText(v: unknown) {
   if (typeof v === "string") {
     return v;
   }
-  if (
-    typeof v === "number" ||
+  return typeof v === "number" ||
     typeof v === "boolean" ||
     typeof v === "bigint"
-  ) {
-    return String(v);
-  }
-  return undefined;
+    ? String(v)
+    : undefined;
 }
 
-export function renderTemplate(template: string, data: unknown): string {
+export function renderTemplate(template: string, data: unknown) {
   return template.replaceAll(
     /\{\{\s*(?<path>[\w.-]+)\s*\}\}/gu,
     (_, path: string) => {
@@ -219,7 +216,7 @@ function verify(s: Settings, secret: string, req: InboundRequest) {
     : "unsigned webhooks are disabled for this connection";
 }
 
-const byHandle = (handle: string | null): ExternalActor | null =>
+const byHandle = (handle: string | null) =>
   handle ? { id: `handle:${handle.toLowerCase()}`, handle } : null;
 
 export const webhookConnector: Connector = {

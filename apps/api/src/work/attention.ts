@@ -95,10 +95,7 @@ export const AGENT_QUESTION = "agent.needs_you";
 export const AGENT_QUESTIONS_WAITING = 3;
 const URGENT_DEBOUNCE_MS = 3 * 60_000;
 
-export async function raiseAttention(
-  ctx: AppContext,
-  input: AttentionInput
-): Promise<AttentionItem | null> {
+export async function raiseAttention(ctx: AppContext, input: AttentionInput) {
   const raised = await transact(ctx, async (tx) => {
     const now = tx.now();
     const priority = await applySenderQuota(tx, input);
@@ -158,10 +155,7 @@ export async function raiseAttention(
   return raised;
 }
 
-async function applySenderQuota(
-  ctx: AppContext,
-  input: AttentionInput
-): Promise<Priority> {
+async function applySenderQuota(ctx: AppContext, input: AttentionInput) {
   if (input.priority !== "high" || !input.fromId) {
     return input.priority;
   }
@@ -349,10 +343,7 @@ const DISMISSED_TO_MUTE = 3;
  * without acting on any). It only ever holds pings for the digest, never drops them, and one ping
  * marked useful or acted on undoes it.
  */
-export async function mutedKinds(
-  ctx: AppContext,
-  memberId: string
-): Promise<Map<string, string>> {
+export async function mutedKinds(ctx: AppContext, memberId: string) {
   const since = new Date(ctx.now().getTime() - 14 * DAY_MS);
   const [rows, pushed, acted] = await Promise.all([
     countFeedbackByKind(ctx.db, { memberId, since }),

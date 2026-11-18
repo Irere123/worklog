@@ -58,8 +58,11 @@ const STATUS: Record<string, Look> = {
   failed: { label: "Failed", tone: "red", status: "failed" },
 };
 
-export function statusOf(status: string): Look {
-  return STATUS[status] ?? { label: status, tone: "neutral", status: "idle" };
+export function statusOf(status: string) {
+  return (
+    STATUS[status] ??
+    ({ label: status, tone: "neutral", status: "idle" } satisfies Look)
+  );
 }
 
 /** Where a routine stands, for the right of its row: what needs someone comes before the clock. */
@@ -74,21 +77,21 @@ export function routineState(
   a: Automation,
   running: boolean,
   timeZone?: string
-): RoutineState {
+) {
   if (running) {
-    return { kind: "running" };
+    return { kind: "running" } satisfies RoutineState;
   }
   if (a.failureCount > 0) {
     return {
       kind: "failing",
       label: a.failureCount === 1 ? "Failed" : `Failed ${a.failureCount} times`,
-    };
+    } satisfies RoutineState;
   }
   if (!a.enabled) {
-    return { kind: "paused" };
+    return { kind: "paused" } satisfies RoutineState;
   }
   if (a.nextRunAt === null) {
-    return { kind: "unscheduled" };
+    return { kind: "unscheduled" } satisfies RoutineState;
   }
   return {
     kind: "next",
@@ -96,14 +99,14 @@ export function routineState(
       Date.parse(a.nextRunAt) <= Date.now()
         ? "Due now"
         : upcomingShort(a.nextRunAt, new Date(), timeZone),
-  };
+  } satisfies RoutineState;
 }
 
 /**
  * How it went last time, in a few words: enough to trust it ran. What it said is in the thread it
  * sent to, so the row doesn't repeat it.
  */
-export function routineLast(a: Automation): string | null {
+export function routineLast(a: Automation) {
   if (!a.lastResult || a.failureCount > 0) {
     return null;
   }

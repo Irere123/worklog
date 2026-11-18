@@ -94,11 +94,12 @@ const Page = z.object({
     .optional(),
 });
 
-const userOf = (u: z.infer<typeof GiteaUser>): User => ({
-  login: u.login,
-  id: u.id ?? null,
-  name: u.full_name === "" ? undefined : u.full_name,
-});
+const userOf = (u: z.infer<typeof GiteaUser>) =>
+  ({
+    login: u.login,
+    id: u.id ?? null,
+    name: u.full_name === "" ? undefined : u.full_name,
+  }) satisfies User;
 
 const REPO_STREAM = /^repo:(?<name>[^/\s]+\/[^/\s]+)$/u;
 
@@ -114,14 +115,15 @@ async function get(
   conn: ConnectionView,
   what: string,
   path: string
-): Promise<unknown> {
+) {
   const res = await call(ctx, `Gitea ${what}`, `${api(conn)}${path}`, {
     headers: {
       Accept: "application/json",
       Authorization: `token ${conn.secrets.token}`,
     },
   });
-  return await res.json();
+  const body: unknown = await res.json();
+  return body;
 }
 
 const PATHS: Record<
@@ -144,7 +146,7 @@ async function readRepo(
   repo: string,
   raw: Record<string, unknown>,
   window: { since: Date }
-): Promise<SyncRead> {
+) {
   const cursor = Cursor.parse(raw);
   const run = cursor.run ?? {
     since: cursor.next ?? window.since.toISOString(),
@@ -178,7 +180,7 @@ async function readRepo(
       page,
       cursor: { ...cursor, run: { ...run, page: run.page + 1 } },
       done: false,
-    };
+    } satisfies SyncRead;
   }
   const nextStage = STAGES[STAGES.indexOf(run.stage) + 1];
   if (nextStage) {
@@ -186,12 +188,12 @@ async function readRepo(
       page,
       cursor: { ...cursor, run: { ...run, stage: nextStage, page: 1 } },
       done: false,
-    };
+    } satisfies SyncRead;
   }
   const next = new Date(
     new Date(run.started).getTime() - OVERLAP_MS
   ).toISOString();
-  return { page, cursor: { next }, done: true };
+  return { page, cursor: { next }, done: true } satisfies SyncRead;
 }
 
 const FeedItem = z.object({
@@ -286,7 +288,7 @@ async function titlesFor(
   return titles;
 }
 
-function issueDeliveries(raw: unknown): { type: string; payload: Payload }[] {
+function issueDeliveries(raw: unknown) {
   const parsed = GiteaIssue.safeParse(raw);
   if (!parsed.success) {
     return [];
@@ -304,7 +306,7 @@ function issueDeliveries(raw: unknown): { type: string; payload: Payload }[] {
   };
   if (i.pull_request) {
     const pr = { ...item, draft: i.pull_request.draft === true };
-    return [
+    const deliveries: { type: string; payload: Payload }[] = [
       ...(pr.draft
         ? []
         : [
@@ -330,8 +332,9 @@ function issueDeliveries(raw: unknown): { type: string; payload: Payload }[] {
           ]
         : []),
     ];
+    return deliveries;
   }
-  return [
+  const deliveries: { type: string; payload: Payload }[] = [
     {
       type: "issues",
       payload: { action: "opened", issue: item, sender: user },
@@ -352,6 +355,7 @@ function issueDeliveries(raw: unknown): { type: string; payload: Payload }[] {
         ]
       : []),
   ];
+  return deliveries;
 }
 
 function commentDelivery(
@@ -469,10 +473,10 @@ export function normalizeGiteaPage(
   payload: unknown,
   receivedAt: Date,
   settings: Record<string, unknown>
-): Normalized {
+) {
   const page = Page.safeParse(payload);
   if (!page.success) {
-    return { events: [], ignored: "malformed sync page" };
+    return { events: [], ignored: "malformed sync page" } satisfies Normalized;
   }
   const { repo, since, stage, items, titles } = page.data;
   const deliveries = items.flatMap((item) => {
@@ -505,7 +509,7 @@ export function normalizeGiteaPage(
         ? `nothing new in ${repo.full_name} ${stage}`
         : undefined,
     skipped: normalized.filter((e) => e.length === 0).length,
-  };
+  } satisfies Normalized;
 }
 
 const reposOf = (conn: ConnectionView) =>

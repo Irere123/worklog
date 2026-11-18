@@ -70,7 +70,7 @@ async function ensureOne(
   conn: ConnectionView,
   repo: string,
   hook: { url: string; secret: string }
-): Promise<HookResult> {
+) {
   try {
     const hooks = z
       .array(Hook)
@@ -81,7 +81,7 @@ async function ensureOne(
         method: "POST",
         body: config(hook),
       });
-      return { target: repo, state: "created" };
+      return { target: repo, state: "created" } satisfies HookResult;
     }
     if (ours.active === false) {
       await request(
@@ -94,15 +94,15 @@ async function ensureOne(
           body: config(hook),
         }
       );
-      return { target: repo, state: "repaired" };
+      return { target: repo, state: "repaired" } satisfies HookResult;
     }
-    return { target: repo, state: "ok" };
+    return { target: repo, state: "ok" } satisfies HookResult;
   } catch (error) {
     return {
       target: repo,
       state: "failed",
       error: error instanceof Error ? error.message : String(error),
-    };
+    } satisfies HookResult;
   }
 }
 

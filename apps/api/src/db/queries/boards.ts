@@ -55,7 +55,7 @@ export async function findActiveBoard(
 export async function listBoardsWithColumns(
   db: DbOrTx,
   params: { workspaceId: string }
-): Promise<BoardWithColumns[]> {
+) {
   const rows = await listBoards(db, params);
   if (!rows.length) {
     return [];
@@ -79,7 +79,7 @@ export async function listBoardsWithColumns(
 export async function getBoardWithColumns(
   db: DbOrTx,
   params: { workspaceId: string; id: string }
-): Promise<BoardWithColumns> {
+) {
   const [board] = await db
     .select()
     .from(boards)

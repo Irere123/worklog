@@ -9,7 +9,7 @@ const schemeOf = (theme: Theme) => (theme === "system" ? "light dark" : theme);
 
 export const THEME_SCRIPT = `try{var t=localStorage.getItem("${KEY}");document.documentElement.style.colorScheme=t==="light"||t==="dark"?t:"light dark"}catch(e){}`;
 
-function read(): Theme {
+function read() {
   const stored = localStorage.getItem(KEY);
   return stored === "light" || stored === "dark" ? stored : "system";
 }
@@ -28,8 +28,9 @@ export function setTheme(theme: Theme) {
   }
 }
 
-export function useTheme(): Theme {
-  return useSyncExternalStore(subscribe, read, () => "system");
+export function useTheme() {
+  const theme: Theme = useSyncExternalStore(subscribe, read, () => "system");
+  return theme;
 }
 
 function subscribe(listener: () => void) {

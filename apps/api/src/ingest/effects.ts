@@ -36,7 +36,7 @@ export async function findCardIds(
   ctx: AppContext,
   workspaceId: string,
   refs: WorklogEvent["cardRefs"]
-): Promise<string[]> {
+) {
   if (!refs) {
     return [];
   }
@@ -52,7 +52,7 @@ async function memberFor(
   scope: BoardScope,
   who: ExternalActor,
   at: Date
-): Promise<Member | null> {
+) {
   const known = scope.people?.get(who.id);
   if (known) {
     return known.member;
@@ -101,7 +101,7 @@ async function applyBoardEffect(
   effect: BoardEffect,
   card: CardRow | undefined,
   by: { actor: Member | null; at: Date }
-): Promise<string | null> {
+) {
   const silent = { silent: true };
   switch (effect.type) {
     case "upsert_card": {
@@ -269,15 +269,17 @@ async function resolvedSince(
   return through !== null && through >= at;
 }
 
-function capForBots(priority: Priority, actorIsBot: boolean): Priority {
-  return actorIsBot && priority === "high" ? "normal" : priority;
+function capForBots(priority: Priority, actorIsBot: boolean) {
+  const capped: Priority =
+    actorIsBot && priority === "high" ? "normal" : priority;
+  return capped;
 }
 
 function describeSignal(
   signal: Exclude<Signal, { type: "resolve" }>,
   event: WorklogEvent,
   actorName: string
-): Notice {
+) {
   const what = event.object?.title ?? event.title;
   const thread = event.thread ?? event.id;
   if (signal.type === "review_requested") {
@@ -286,7 +288,7 @@ function describeSignal(
       title: `${actorName} wants your review: ${what}`,
       priority: "high",
       dedupeKey: `review:${thread}`,
-    };
+    } satisfies Notice;
   }
   if (signal.type === "mentioned") {
     return {
@@ -295,7 +297,7 @@ function describeSignal(
       body: signal.excerpt ?? null,
       priority: signal.priority ?? "high",
       dedupeKey: `mention:${event.id}`,
-    };
+    } satisfies Notice;
   }
   if (signal.type === "assigned") {
     return {
@@ -303,7 +305,7 @@ function describeSignal(
       title: `You were assigned ${what}`,
       priority: "normal",
       dedupeKey: `assigned:${thread}`,
-    };
+    } satisfies Notice;
   }
   return {
     kind: "pr.review",
@@ -311,7 +313,7 @@ function describeSignal(
     body: event.body?.slice(0, 280) ?? null,
     priority: REVIEW_PRIORITY[signal.state] ?? "normal",
     dedupeKey: `review-result:${thread}`,
-  };
+  } satisfies Notice;
 }
 
 function mentionPlace(event: WorklogEvent, what: string) {

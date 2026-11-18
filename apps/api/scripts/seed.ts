@@ -10,7 +10,7 @@ async function call<T = Json>(
   method: string,
   path: string,
   body?: unknown
-): Promise<T> {
+) {
   const res = await fetch(`${BASE}${path}`, {
     method,
     headers: {

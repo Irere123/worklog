@@ -183,7 +183,7 @@ function levelOf(count: number, scale: number) {
   return Math.min(4, Math.max(1, Math.ceil(Math.sqrt(count / scale) * 4)));
 }
 
-function daysOf(counts: number[], today: string): Day[] {
+function daysOf(counts: number[], today: string) {
   const end = Date.parse(today);
   return counts.map((count, i) => {
     const at = new Date(end - (counts.length - 1 - i) * DAY_MS);

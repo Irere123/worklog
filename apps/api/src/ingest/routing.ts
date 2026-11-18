@@ -20,14 +20,14 @@ export async function receiveForApp(
   ctx: AppContext,
   provider: string,
   req: InboundRequest
-): Promise<Reply> {
+) {
   const connector = getConnector(provider);
   const app = connector?.app ? await loadApp(ctx, provider) : null;
   if (!connector?.app || !app) {
     return {
       status: 404,
       body: { error: `no ${provider} app on this server` },
-    };
+    } satisfies Reply;
   }
   let received = await connector.receive(req, {
     secrets: app.credentials,
@@ -44,10 +44,16 @@ export async function receiveForApp(
   }
   if (received.type === "reject") {
     ctx.tally.appRejected(provider, req.receivedAt, received.error);
-    return { status: received.status, body: { error: received.error } };
+    return {
+      status: received.status,
+      body: { error: received.error },
+    } satisfies Reply;
   }
   if (received.type === "respond") {
-    return { status: received.status ?? 200, body: received.body };
+    return {
+      status: received.status ?? 200,
+      body: received.body,
+    } satisfies Reply;
   }
   const externalId = connector.app.route(received);
   const conn = externalId
@@ -58,7 +64,7 @@ export async function receiveForApp(
     return {
       status: 200,
       body: { ok: true, ignored: "no connection for this installation" },
-    };
+    } satisfies Reply;
   }
   const change =
     received.type === "event"
@@ -74,10 +80,13 @@ export async function receiveForApp(
       partitionKey: received.partition ?? "",
     });
     if (!stored) {
-      return { status: 200, body: { ok: true, duplicate: true } };
+      return {
+        status: 200,
+        body: { ok: true, duplicate: true },
+      } satisfies Reply;
     }
     await applyChange(ctx, conn, change);
-    return { status: 200, body: { ok: true } };
+    return { status: 200, body: { ok: true } } satisfies Reply;
   }
   return await accept(
     ctx,

@@ -4,14 +4,7 @@ import type { Pool, PoolClient } from "pg";
  * A session-level advisory lock on a connection of its own, held until `release` or until that
  * connection drops, which `alive` notices. Null when another session holds it.
  */
-export async function tryHoldLock(
-  pool: Pool,
-  key: number
-): Promise<{
-  release: () => Promise<void>;
-  /** False once the connection holding it is gone: the lock went with it. */
-  alive: () => Promise<boolean>;
-} | null> {
+export async function tryHoldLock(pool: Pool, key: number) {
   const client: PoolClient = await pool.connect();
   try {
     const { rows } = await client.query<{ held: boolean }>(

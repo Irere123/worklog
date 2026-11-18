@@ -29,7 +29,7 @@ export type CardAction =
   | { type: "watch" }
   | { type: "unwatch" };
 
-async function perform(number: number, action: CardAction): Promise<unknown> {
+async function perform(number: number, action: CardAction) {
   const path: Path = { params: { path: { number } } };
   switch (action.type) {
     case "edit": {
@@ -88,19 +88,16 @@ async function perform(number: number, action: CardAction): Promise<unknown> {
       return await unwrap(api.DELETE("/v1/cards/{number}/watch", path));
     }
     default: {
-      return undefined;
+      const unhandled: never = action;
+      throw new Error(`Unknown card action: ${JSON.stringify(unhandled)}`);
     }
   }
 }
 
-function predict(
-  card: Card,
-  action: CardAction,
-  columns: Map<string, string>
-): Card {
+function predict(card: Card, action: CardAction, columns: Map<string, string>) {
   switch (action.type) {
     case "edit": {
-      return { ...card, ...action.set };
+      return { ...card, ...action.set } satisfies Card;
     }
     case "move": {
       return {
@@ -108,10 +105,15 @@ function predict(
         stage: "active",
         columnId: action.columnId,
         columnName: columns.get(action.columnId) ?? card.columnName,
-      };
+      } satisfies Card;
     }
     case "triage": {
-      return { ...card, stage: "triage", columnId: null, columnName: null };
+      return {
+        ...card,
+        stage: "triage",
+        columnId: null,
+        columnName: null,
+      } satisfies Card;
     }
     case "later": {
       return {
@@ -119,7 +121,7 @@ function predict(
         stage: "not_now",
         postponedAt: new Date().toISOString(),
         autoPostponed: false,
-      };
+      } satisfies Card;
     }
     case "resume":
     case "reopen": {
@@ -128,28 +130,32 @@ function predict(
         stage: card.columnId ? "active" : "triage",
         closedAt: null,
         postponedAt: null,
-      };
+      } satisfies Card;
     }
     case "close": {
-      return { ...card, stage: "done", closedAt: new Date().toISOString() };
+      return {
+        ...card,
+        stage: "done",
+        closedAt: new Date().toISOString(),
+      } satisfies Card;
     }
     case "gild": {
-      return { ...card, golden: true };
+      return { ...card, golden: true } satisfies Card;
     }
     case "ungild": {
-      return { ...card, golden: false };
+      return { ...card, golden: false } satisfies Card;
     }
     case "assign": {
       return {
         ...card,
         assigneeIds: [...new Set([...card.assigneeIds, action.memberId])],
-      };
+      } satisfies Card;
     }
     case "unassign": {
       return {
         ...card,
         assigneeIds: card.assigneeIds.filter((id) => id !== action.memberId),
-      };
+      } satisfies Card;
     }
     case "watch":
     case "unwatch": {

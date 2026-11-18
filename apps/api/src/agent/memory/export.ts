@@ -15,10 +15,7 @@ export type MemoryFile = { path: string; content: string };
  * shared and `private/` kept back. Lines come in the order they were learned, and nothing depends
  * on when the export ran, so committing every export to git gives a diff of what changed.
  */
-export async function exportMemory(
-  ctx: AppContext,
-  member: Member
-): Promise<MemoryFile[]> {
+export async function exportMemory(ctx: AppContext, member: Member) {
   const tz = timezoneOf(
     member,
     await getWorkspaceById(ctx.db, { id: member.workspaceId })
@@ -56,12 +53,7 @@ export async function exportMemory(
   return files.toSorted((a, b) => a.path.localeCompare(b.path));
 }
 
-function bullets(
-  path: string,
-  title: string,
-  rows: MemoryRow[],
-  tz: string
-): MemoryFile[] {
+function bullets(path: string, title: string, rows: MemoryRow[], tz: string) {
   if (!rows.length) {
     return [];
   }

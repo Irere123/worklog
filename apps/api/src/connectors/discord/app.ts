@@ -11,7 +11,7 @@ export const API = "https://discord.com/api/v10";
  * A call with the app's one bot token. Refused, it says the app's token is wrong, not that one
  * server's connection went away, so it's a failure to fix, never a revocation.
  */
-export async function asApp<T>(run: () => Promise<T>): Promise<T> {
+export async function asApp<T>(run: () => Promise<T>) {
   try {
     return await run();
   } catch (error) {
@@ -105,13 +105,7 @@ const rolesLetIn = (overwrites: Overwrite[]) =>
     overwrites.filter((o) => o.type === 0 && grants(o.allow)).map((o) => o.id)
   );
 
-function membersRole(
-  hidden: Overwrite[][],
-  readable: number
-): string | undefined {
-  if (hidden.length < 2 || hidden.length <= readable / 2) {
-    return undefined;
-  }
+function membersRole(hidden: Overwrite[][], readable: number) {
   const counts = new Map<string, number>();
   for (const overwrites of hidden) {
     for (const role of rolesLetIn(overwrites)) {
@@ -119,7 +113,12 @@ function membersRole(
     }
   }
   const [role, n] = [...counts].toSorted((a, b) => b[1] - a[1])[0] ?? [];
-  return n !== undefined && n > hidden.length / 2 ? role : undefined;
+  return hidden.length >= 2 &&
+    hidden.length > readable / 2 &&
+    n !== undefined &&
+    n > hidden.length / 2
+    ? role
+    : undefined;
 }
 
 const READABLE = new Set([0, 5]);
@@ -129,7 +128,7 @@ export async function guildChannels(
   ctx: AppContext,
   guildId: string | null,
   botToken: string | undefined
-): Promise<Source[]> {
+) {
   if (!guildId || !botToken) {
     throw new ProviderError(
       "Choosing channels needs the server's Discord app",
@@ -155,17 +154,20 @@ export async function guildChannels(
     readable.length
   );
   return readable
-    .map((c) => ({
-      id: c.id,
-      name: c.name ?? c.id,
-      private:
-        hiddenFromEveryone(c.overwrites, guildId) &&
-        !(members !== undefined && rolesLetIn(c.overwrites).has(members)),
-    }))
+    .map(
+      (c) =>
+        ({
+          id: c.id,
+          name: c.name ?? c.id,
+          private:
+            hiddenFromEveryone(c.overwrites, guildId) &&
+            !(members !== undefined && rolesLetIn(c.overwrites).has(members)),
+        }) satisfies Source
+    )
     .toSorted((a, b) => a.name.localeCompare(b.name));
 }
 
-export function discordApp(commands: unknown[]): AppSpec {
+export function discordApp(commands: unknown[]) {
   return {
     credentials: [
       {
@@ -281,5 +283,5 @@ export function discordApp(commands: unknown[]): AppSpec {
         settings: {},
       };
     },
-  };
+  } satisfies AppSpec;
 }

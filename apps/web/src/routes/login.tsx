@@ -26,9 +26,12 @@ export const Route = createFileRoute("/login")({
     links: DISPLAY_FONT,
   }),
   ssr: false,
-  validateSearch: (search: Record<string, unknown>): Search => ({
-    next: typeof search.next === "string" ? search.next : undefined,
-  }),
+  validateSearch: (search: Record<string, unknown>) => {
+    const result: Search = {
+      next: typeof search.next === "string" ? search.next : undefined,
+    };
+    return result;
+  },
   component: Login,
 });
 

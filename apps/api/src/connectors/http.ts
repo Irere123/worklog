@@ -27,7 +27,7 @@ export class ProviderError extends Error {
 
 const MINUTE_MS = 60_000;
 
-function retryAfter(res: Response, now: Date): Date | null {
+function retryAfter(res: Response, now: Date) {
   const after = res.headers.get("retry-after");
   if (after && /^\d+$/u.test(after)) {
     return new Date(now.getTime() + Number(after) * 1000);
@@ -52,7 +52,7 @@ export async function call(
   what: string,
   url: string,
   init: RequestInit = {}
-): Promise<Response> {
+) {
   const res = await ctx.fetch(url, init);
   if (res.ok) {
     return res;
@@ -89,7 +89,8 @@ export async function callJson(
   what: string,
   url: string,
   init: RequestInit = {}
-): Promise<unknown> {
+) {
   const res = await call(ctx, what, url, init);
-  return await res.json();
+  const body: unknown = await res.json();
+  return body;
 }

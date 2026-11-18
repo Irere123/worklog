@@ -30,7 +30,7 @@ export function rememberSignedIn(signedIn: boolean) {
  * The boot script's response for `path`, once: later calls go to the network, so a refetch
  * never returns the page's first answer again.
  */
-export async function takeBootResponse(path: string): Promise<Response | null> {
+export async function takeBootResponse(path: string) {
   const boot = globalThis.__worklogBoot;
   const response = boot?.[path];
   if (!(boot && response)) {

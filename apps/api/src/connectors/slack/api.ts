@@ -48,7 +48,7 @@ export async function slackApi(
     /** Errors that are an answer, not a failure: the body comes back with `ok: false`. */
     soft?: string[];
   } = {}
-): Promise<Record<string, unknown>> {
+) {
   const query = new URLSearchParams();
   for (const [k, v] of Object.entries(params)) {
     if (v !== undefined) {
@@ -77,7 +77,7 @@ export async function slackOAuth(
   ctx: AppContext,
   method: string,
   form: Record<string, string>
-): Promise<Record<string, unknown>> {
+) {
   const res = await call(ctx, `Slack ${method}`, `${API}/${method}`, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },

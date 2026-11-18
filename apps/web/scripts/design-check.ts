@@ -61,11 +61,12 @@ if (failures.length > 0) {
 }
 console.log("Design rules hold.");
 
-function* walk(dir: string): Generator<string> {
+function* walk(dir: string) {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     const full = path.join(dir, entry.name);
     if (entry.isDirectory()) {
-      yield* walk(full);
+      const nested: Iterable<string> = walk(full);
+      yield* nested;
     } else if (/\.tsx?$/u.test(entry.name) && !entry.name.endsWith(".gen.ts")) {
       yield full;
     }

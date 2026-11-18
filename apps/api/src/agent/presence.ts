@@ -58,10 +58,7 @@ const sending = new Map<string, Promise<void>>();
  * for an OK, or done with something they haven't looked at yet. A teammate's question shows only
  * that one is being answered: what they asked is theirs.
  */
-export async function assistantPresence(
-  ctx: AppContext,
-  ownerId: string
-): Promise<Presence> {
+export async function assistantPresence(ctx: AppContext, ownerId: string) {
   const now = ctx.now();
   const agent = await getPersonalAgent(ctx.db, { ownerId });
   const [turns, automations, waiting, unseen] = await Promise.all([
@@ -71,21 +68,21 @@ export async function assistantPresence(
     listUnseenReplies(ctx.db, { askerId: ownerId, agentId: agent.id }),
   ]);
   const working: Working[] = [
-    ...turns.map((turn): Working =>
+    ...turns.map((turn) =>
       turn.askerId === ownerId
-        ? {
+        ? ({
             kind: "reply",
             conversationId: turn.id,
             title: turn.title,
             inbox: turn.inbox,
             step: turn.step,
-          }
-        : { kind: "teammate" }
+          } satisfies Working)
+        : ({ kind: "teammate" } satisfies Working)
     ),
-    ...automations.flatMap((a): Working[] =>
+    ...automations.flatMap((a) =>
       a.runningSince !== null &&
       now.getTime() - a.runningSince.getTime() < RUN_STALE_MS
-        ? [
+        ? ([
             {
               kind: "routine",
               automationId: a.id,
@@ -93,7 +90,7 @@ export async function assistantPresence(
               name: a.name,
               since: a.runningSince,
             },
-          ]
+          ] satisfies Working[])
         : []
     ),
   ];
@@ -109,7 +106,7 @@ export async function assistantPresence(
     done,
     next: nextRoutine(automations, now),
     asOf: now,
-  };
+  } satisfies Presence;
 }
 
 /**
@@ -181,8 +178,8 @@ export function showsAtWork(automation: Pick<Automation, "kind">) {
 }
 
 /** The same tools, each calling `report` as it starts. */
-export function reportingSteps(tools: ToolSet, report: ReportStep): ToolSet {
-  return Object.fromEntries(
+export function reportingSteps(tools: ToolSet, report: ReportStep) {
+  const reported: ToolSet = Object.fromEntries(
     Object.entries(tools).map(([name, tool]) => {
       const { execute } = tool;
       if (execute === undefined) {
@@ -196,6 +193,7 @@ export function reportingSteps(tools: ToolSet, report: ReportStep): ToolSet {
       return [name, { ...tool, execute: reporting }];
     })
   );
+  return reported;
 }
 
 async function sendAfter(
@@ -237,7 +235,7 @@ async function ownerOf(ctx: AppContext, conversation: ConversationRow) {
   return agent?.ownerId ?? null;
 }
 
-function nextRoutine(automations: Automation[], now: Date): Presence["next"] {
+function nextRoutine(automations: Automation[], now: Date) {
   let next: Presence["next"] = null;
   for (const a of automations) {
     if (
@@ -253,33 +251,30 @@ function nextRoutine(automations: Automation[], now: Date): Presence["next"] {
   return next;
 }
 
-function stateOf(
-  working: Working[],
-  waiting: number,
-  done: unknown[]
-): Presence["state"] {
+function stateOf(working: Working[], waiting: number, done: unknown[]) {
   if (working.length > 0) {
-    return "working";
+    return "working" satisfies Presence["state"];
   }
   if (waiting > 0) {
-    return "waiting";
+    return "waiting" satisfies Presence["state"];
   }
-  return done.length > 0 ? "done" : "idle";
+  const state: Presence["state"] = done.length > 0 ? "done" : "idle";
+  return state;
 }
 
-function stepInput(input: unknown): Record<string, unknown> {
+function stepInput(input: unknown) {
   if (typeof input !== "object" || input === null) {
     return {};
   }
   return Object.fromEntries(
-    Object.entries(input).flatMap(([key, value]): [string, unknown][] => {
+    Object.entries(input).flatMap(([key, value]) => {
+      let kept: [string, unknown][] = [];
       if (typeof value === "string") {
-        return [[key, value.slice(0, STEP_TEXT_CHARS)]];
+        kept = [[key, value.slice(0, STEP_TEXT_CHARS)]];
+      } else if (typeof value === "number" || typeof value === "boolean") {
+        kept = [[key, value]];
       }
-      if (typeof value === "number" || typeof value === "boolean") {
-        return [[key, value]];
-      }
-      return [];
+      return kept;
     })
   );
 }

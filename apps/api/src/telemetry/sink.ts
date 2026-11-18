@@ -121,7 +121,7 @@ export function emit(datasource: Datasource, row: Record<string, unknown>) {
  * crash and tests. One send runs at a time; calls that come while one runs share a single send
  * after it, so an outage can't pile up waiting flushes.
  */
-export async function flush(): Promise<void> {
+export async function flush() {
   if (running === null) {
     running = sendOnce();
     await running;
@@ -177,10 +177,10 @@ async function sendAll() {
 
 type Outcome = { retry: false } | { retry: true; retryAfterMs: number | null };
 
-async function send(datasource: Datasource, rows: string[]): Promise<Outcome> {
+async function send(datasource: Datasource, rows: string[]) {
   const { tinybirdHost, tinybirdToken } = current;
   if (!tinybirdToken) {
-    return { retry: false };
+    return { retry: false } satisfies Outcome;
   }
   const url = new URL("/v0/events", tinybirdHost);
   url.searchParams.set("name", datasource);
@@ -198,19 +198,19 @@ async function send(datasource: Datasource, rows: string[]): Promise<Outcome> {
     const text = await res.text();
     if (res.ok) {
       noteQuarantined(datasource, text);
-      return { retry: false };
+      return { retry: false } satisfies Outcome;
     }
     warn(
       `Tinybird answered ${res.status} for ${datasource}: ${text.slice(0, 200)}`
     );
     if (res.status === 429 || res.status >= 500) {
-      return { retry: true, retryAfterMs: retryAfterMs(res) };
+      return { retry: true, retryAfterMs: retryAfterMs(res) } satisfies Outcome;
     }
     counts.dropped += rows.length;
-    return { retry: false };
+    return { retry: false } satisfies Outcome;
   } catch (error) {
     warn(`can't reach Tinybird: ${String(error)}`);
-    return { retry: true, retryAfterMs: null };
+    return { retry: true, retryAfterMs: null } satisfies Outcome;
   }
 }
 

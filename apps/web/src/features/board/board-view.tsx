@@ -268,21 +268,27 @@ function moveFocus(board: HTMLElement, dx: number, dy: number) {
   target?.scrollIntoView({ block: "nearest", inline: "nearest" });
 }
 
-function actionFor(card: Card, target: Target): CardAction | null {
+function actionFor(card: Card, target: Target) {
   switch (target.kind) {
     case "column": {
       return card.stage === "active" && card.columnId === target.columnId
         ? null
-        : { type: "move", columnId: target.columnId };
+        : ({ type: "move", columnId: target.columnId } satisfies CardAction);
     }
     case "triage": {
-      return card.stage === "triage" ? null : { type: "triage" };
+      return card.stage === "triage"
+        ? null
+        : ({ type: "triage" } satisfies CardAction);
     }
     case "later": {
-      return card.stage === "not_now" ? null : { type: "later" };
+      return card.stage === "not_now"
+        ? null
+        : ({ type: "later" } satisfies CardAction);
     }
     case "done": {
-      return card.stage === "done" ? null : { type: "close" };
+      return card.stage === "done"
+        ? null
+        : ({ type: "close" } satisfies CardAction);
     }
     default: {
       return null;
@@ -300,7 +306,7 @@ function useEdgeColumns(boardId: string) {
   return [edges, setOpen] as const;
 }
 
-function readEdges(key: string): Edges {
+function readEdges(key: string) {
   try {
     const saved: unknown = JSON.parse(localStorage.getItem(key) ?? "{}");
     if (typeof saved !== "object" || saved === null) {

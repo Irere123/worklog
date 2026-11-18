@@ -131,7 +131,7 @@ async function readProject(
   path: string,
   raw: Record<string, unknown>,
   window: { since: Date }
-): Promise<SyncRead> {
+) {
   const cursor = Cursor.parse(raw);
   const run = cursor.run ?? {
     since: cursor.next ?? window.since.toISOString(),
@@ -170,7 +170,7 @@ async function readProject(
       page,
       cursor: { ...cursor, run: { ...run, page: run.page + 1 } },
       done: false,
-    };
+    } satisfies SyncRead;
   }
   const nextStage = STAGES[STAGES.indexOf(run.stage) + 1];
   if (nextStage) {
@@ -178,12 +178,12 @@ async function readProject(
       page,
       cursor: { ...cursor, run: { ...run, stage: nextStage, page: 1 } },
       done: false,
-    };
+    } satisfies SyncRead;
   }
   const next = new Date(
     new Date(run.started).getTime() - OVERLAP_MS
   ).toISOString();
-  return { page, cursor: { next }, done: true };
+  return { page, cursor: { next }, done: true } satisfies SyncRead;
 }
 
 async function projectOf(ctx: AppContext, conn: ConnectionView, path: string) {
@@ -199,7 +199,7 @@ async function projectOf(ctx: AppContext, conn: ConnectionView, path: string) {
 
 type Delivery = { type: string; payload: GitlabInput };
 
-function mergeRequestDeliveries(raw: unknown): Delivery[] {
+function mergeRequestDeliveries(raw: unknown) {
   const parsed = MergeRequest.safeParse(raw);
   if (!parsed.success) {
     return [];
@@ -255,7 +255,7 @@ function mergeRequestDeliveries(raw: unknown): Delivery[] {
   return deliveries;
 }
 
-function issueDeliveries(raw: unknown): Delivery[] {
+function issueDeliveries(raw: unknown) {
   const parsed = Issue.safeParse(raw);
   if (!parsed.success || parsed.data.confidential === true) {
     return [];
@@ -269,7 +269,7 @@ function issueDeliveries(raw: unknown): Delivery[] {
     created_at: i.created_at,
     updated_at: i.created_at,
   };
-  return [
+  const deliveries: Delivery[] = [
     {
       type: "issue",
       payload: {
@@ -294,9 +294,10 @@ function issueDeliveries(raw: unknown): Delivery[] {
         ]
       : []),
   ];
+  return deliveries;
 }
 
-function releaseDelivery(raw: unknown): Delivery[] {
+function releaseDelivery(raw: unknown) {
   const parsed = Release.safeParse(raw);
   if (!parsed.success || parsed.data.upcoming_release === true) {
     return [];
@@ -315,11 +316,11 @@ function releaseDelivery(raw: unknown): Delivery[] {
         created_at: r.created_at ?? undefined,
         user: r.author ?? undefined,
       },
-    },
+    } satisfies Delivery,
   ];
 }
 
-function pushDelivery(raw: unknown): Delivery[] {
+function pushDelivery(raw: unknown) {
   const parsed = PushEvent.safeParse(raw);
   if (!parsed.success) {
     return [];
@@ -349,7 +350,7 @@ function pushDelivery(raw: unknown): Delivery[] {
           },
         ],
       },
-    },
+    } satisfies Delivery,
   ];
 }
 
@@ -366,10 +367,10 @@ export function normalizeGitlabPage(
   payload: unknown,
   receivedAt: Date,
   settings: Record<string, unknown>
-): Normalized {
+) {
   const page = Page.safeParse(payload);
   if (!page.success) {
-    return { events: [], ignored: "malformed sync page" };
+    return { events: [], ignored: "malformed sync page" } satisfies Normalized;
   }
   const { project, since, stage, items } = page.data;
   const from = gitlabTime(since) ?? new Date(0);
@@ -393,7 +394,7 @@ export function normalizeGitlabPage(
         ? `nothing new in ${project.path_with_namespace} ${stage}`
         : undefined,
     skipped: normalized.filter((e) => e.length === 0).length,
-  };
+  } satisfies Normalized;
 }
 
 export const gitlabSync: SyncSpec = {

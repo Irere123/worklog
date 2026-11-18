@@ -76,7 +76,7 @@ export async function gatherBriefData(
   member: Member,
   period: Period,
   visibility: Visibility = "private"
-): Promise<BriefData & { _key: Date }> {
+) {
   const ws = await getWorkspaceById(ctx.db, { id: member.workspaceId });
   const tz = timezoneOf(member, ws);
   const { start, end, key } = briefWindow(
@@ -127,7 +127,7 @@ export async function gatherBriefData(
     ]);
   const attention = everything ? open : await teamVisibleAttention(ctx, open);
 
-  const item = (a: (typeof mine)[number]): Item => ({
+  const item = (a: (typeof mine)[number]) => ({
     title: a.title,
     kind: a.kind,
     source: a.source,
@@ -244,7 +244,7 @@ export async function composeTeamBrief(
   return { title, body, data };
 }
 
-export function templateBrief(data: BriefData): string {
+export function templateBrief(data: BriefData) {
   const out: string[] = [];
   if (data.needsAttention.length) {
     out.push("## Needs your attention");

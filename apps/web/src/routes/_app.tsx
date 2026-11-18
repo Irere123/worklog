@@ -10,9 +10,11 @@ export type AppSearch = { card?: number };
 
 export const Route = createFileRoute("/_app")({
   ssr: false,
-  validateSearch: (search: Record<string, unknown>): AppSearch => {
+  validateSearch: (search: Record<string, unknown>) => {
     const card = Number(search.card);
-    return Number.isInteger(card) && card > 0 ? { card } : {};
+    const result: AppSearch =
+      Number.isInteger(card) && card > 0 ? { card } : {};
+    return result;
   },
   beforeLoad: async ({ context, location }) => {
     try {

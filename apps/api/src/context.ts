@@ -41,7 +41,7 @@ export async function createContext(
   overrides: Partial<
     Pick<AppContext, "models" | "mailer" | "fetch" | "now">
   > & { service?: string } = {}
-): Promise<AppContext> {
+) {
   const { db, close } = await openDb(env.DATABASE_URL, env.DATABASE_POOL_SIZE);
   const rawFetch = overrides.fetch ?? fetch;
   const stopTelemetry = startTelemetry(env, {

@@ -3,7 +3,7 @@ import type { AppContext } from "#context";
 import type { ConnectionRow } from "#db/queries/connections";
 
 /** A connection as connector code sees it, with its secrets opened. */
-export function viewOf(ctx: AppContext, conn: ConnectionRow): ConnectionView {
+export function viewOf(ctx: AppContext, conn: ConnectionRow) {
   return {
     id: conn.id,
     workspaceId: conn.workspaceId,
@@ -11,5 +11,5 @@ export function viewOf(ctx: AppContext, conn: ConnectionRow): ConnectionView {
     externalId: conn.externalId,
     settings: conn.settings,
     secrets: ctx.secrets.open(conn.secrets),
-  };
+  } satisfies ConnectionView;
 }

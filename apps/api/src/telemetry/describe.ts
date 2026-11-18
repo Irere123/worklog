@@ -46,7 +46,7 @@ export function scrub(text: string) {
   return out;
 }
 
-export function describeError(error: unknown): ErrorInfo {
+export function describeError(error: unknown) {
   if (!(error instanceof Error)) {
     const text = clip(scrub(String(error)), 200);
     return {
@@ -56,7 +56,7 @@ export function describeError(error: unknown): ErrorInfo {
       code: "",
       frame: "",
       key: text,
-    };
+    } satisfies ErrorInfo;
   }
   const own = messageOf(error);
   const message = [own, ...causesOf(error)].filter(Boolean).join(" ← ");
@@ -68,7 +68,7 @@ export function describeError(error: unknown): ErrorInfo {
     code: codeOf(error),
     frame: ownFrame(stack),
     key: keyOf(error, own),
-  };
+  } satisfies ErrorInfo;
 }
 
 /**
@@ -115,16 +115,17 @@ function messageOf(error: Error) {
   return error.message;
 }
 
-function causesOf(error: Error, depth = 0): string[] {
+function causesOf(error: Error, depth = 0) {
   const { cause } = error;
   if (!(cause instanceof Error) || depth >= 3) {
     return [];
   }
   const own = messageOf(cause);
-  return [
+  const causes: string[] = [
     own ? `caused by ${cause.name}: ${own}` : `caused by ${cause.name}`,
     ...causesOf(cause, depth + 1),
   ];
+  return causes;
 }
 
 function keyOf(error: Error, own: string) {
@@ -135,16 +136,18 @@ function keyOf(error: Error, own: string) {
   return firstLine;
 }
 
-function codeOf(error: Error, depth = 0): string {
+function codeOf(error: Error, depth = 0) {
   for (const key of ["code", "kind", "statusCode"]) {
     const value: unknown = Reflect.get(error, key);
     if (typeof value === "string" || typeof value === "number") {
       return String(value);
     }
   }
-  return error.cause instanceof Error && depth < 3
-    ? codeOf(error.cause, depth + 1)
-    : "";
+  const code: string =
+    error.cause instanceof Error && depth < 3
+      ? codeOf(error.cause, depth + 1)
+      : "";
+  return code;
 }
 
 function framesOf(stack: string) {
