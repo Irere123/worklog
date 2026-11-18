@@ -20,7 +20,7 @@ jobs:
   lint:
     name: Format & lint
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 1
     steps:
       - uses: actions/checkout@v5
         with:
@@ -34,13 +34,13 @@ jobs:
         if: github.event_name == 'pull_request'
         run: >-
           bun --bun commitlint --verbose --from ${{ github.event.pull_request.base.sha }} --to ${{ github.event.pull_request.head.sha }}
-      - run: bun run format:check
-      - run: bun run lint
+      - run: bash .github/budget.sh 5 bun run format:check
+      - run: bash .github/budget.sh 15 bun run lint
 
   typecheck:
     name: Typecheck
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 1
     steps:
       - uses: actions/checkout@v5
         with:
@@ -49,12 +49,12 @@ jobs:
         with:
           bun-version-file: package.json
       - run: bun install --frozen-lockfile
-      - run: bun run typecheck
+      - run: bash .github/budget.sh 5 bun run typecheck
 
   test:
     name: Test
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 1
     steps:
       - name: Postgres starts while the rest sets up
         run: >-
@@ -67,13 +67,13 @@ jobs:
           bun-version-file: package.json
       - run: bun install --frozen-lockfile
       - name: Postgres is ready
-        run: timeout 60 sh -c 'until docker exec postgres pg_isready -U postgres -q 2> /dev/null; do sleep 0.2; done' || { cat postgres.log; exit 1; }
-      - run: bun run test
+        run: timeout 30 sh -c 'until docker exec postgres pg_isready -U postgres -q 2> /dev/null; do sleep 0.2; done' || { cat postgres.log; exit 1; }
+      - run: bash .github/budget.sh 60 bun run test
 
   build:
     name: Build
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 1
     steps:
       - uses: actions/checkout@v5
         with:
@@ -85,12 +85,12 @@ jobs:
       - name: Colours meet contrast targets
         run: bun run --filter @worklog/web contrast
       - name: Web app builds
-        run: bun run --filter @worklog/web build
+        run: bash .github/budget.sh 30 bun run --filter @worklog/web build
 
   images:
     name: Images build, start and serve together
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 2
     env:
       DATABASE_URL: postgres://postgres@127.0.0.1:5432/worklog
       PUBLIC_URL: http://127.0.0.1:8080
@@ -114,7 +114,7 @@ jobs:
           files: docker-bake.hcl
           load: true
       - name: Postgres is ready
-        run: timeout 60 sh -c 'until docker exec postgres pg_isready -U postgres -q 2> /dev/null; do sleep 0.2; done' || { cat postgres.log; exit 1; }
+        run: timeout 30 sh -c 'until docker exec postgres pg_isready -U postgres -q 2> /dev/null; do sleep 0.2; done' || { cat postgres.log; exit 1; }
       - name: Production refuses to start without its secrets
         run: |
           if docker run --rm -e NODE_ENV=production -e DATABASE_URL worklog-api:ci 2> stderr.txt; then
