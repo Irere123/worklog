@@ -58,7 +58,7 @@ jobs:
     steps:
       - name: Postgres starts while the rest sets up
         run: >-
-          docker run -d --name postgres -p 5432:5432 -e POSTGRES_PASSWORD=postgres postgres:18 -c fsync=off -c synchronous_commit=off -c full_page_writes=off > postgres.log 2>&1 &
+          docker run -d --name postgres -p 5432:5432 -e POSTGRES_HOST_AUTH_METHOD=trust postgres:18 -c fsync=off -c synchronous_commit=off -c full_page_writes=off > postgres.log 2>&1 &
       - uses: actions/checkout@v5
         with:
           filter: blob:none
