@@ -23,10 +23,7 @@ export async function testEnv() {
   shared ??= openTestContext();
   const ctx = await shared;
   const reset = () => {
-    ctx.models = null;
-    ctx.now = () => new Date();
-    ctx.fetch = fetchStub();
-    (ctx.mailer as ConsoleMailer).sent.length = 0;
+    resetContext(ctx);
   };
   reset();
   const app = createApp(ctx);
@@ -130,13 +127,30 @@ export async function freshDatabase(name: string) {
   return url.href;
 }
 
+export async function resetSharedContext() {
+  if (shared !== null) {
+    resetContext(await shared);
+  }
+}
+
+function resetContext(ctx: AppContext) {
+  ctx.models = null;
+  ctx.now = () => new Date();
+  ctx.fetch = fetchStub();
+  (ctx.mailer as ConsoleMailer).sent.length = 0;
+}
+
+function workerDatabase() {
+  const name = new URL(TEST_DATABASE_URL).pathname.slice(1);
+  const worker = process.env.BUN_TEST_WORKER_ID;
+  return worker === undefined ? name : `${name}_${worker}`;
+}
+
 async function openTestContext() {
   return await createContext(
     loadConfig({
       NODE_ENV: "test",
-      DATABASE_URL: await freshDatabase(
-        new URL(TEST_DATABASE_URL).pathname.slice(1)
-      ),
+      DATABASE_URL: await freshDatabase(workerDatabase()),
       SETUP_SECRET: "test-secret",
       PUBLIC_URL: "https://worklog.test",
     }),

@@ -1643,14 +1643,26 @@ async function toldWhen(
   owner: Parameters<typeof ownerEvents>[0],
   matches: (presence: any) => boolean
 ) {
-  for (let tries = 0; tries < 200; tries += 1) {
+  const told = Promise.withResolvers<any>();
+  const unsubscribe = env.ctx.bus.subscribe((e) => {
+    if (
+      e.type === "assistant.updated" &&
+      e.workspaceId === owner.workspace.id &&
+      (e.audienceId === null || e.audienceId === owner.member.id) &&
+      matches(e.data)
+    ) {
+      told.resolve(e.data);
+    }
+  });
+  try {
     const last = (await ownerEvents(owner)).at(-1);
     if (last !== undefined && matches(last)) {
       return last;
     }
-    await Bun.sleep(10);
+    return await told.promise;
+  } finally {
+    unsubscribe();
   }
-  throw new Error("presence was never announced as expected");
 }
 
 describe("presence", () => {
@@ -1662,7 +1674,7 @@ describe("presence", () => {
         await Bun.sleep(5);
       }
     })();
-    const { model, prompts } = scriptedModel([
+    const { model } = scriptedModel([
       { tool: "search_activity", input: { query: "blocked" } },
       { text: "Nothing is blocked.", until: held },
     ]);
@@ -1687,9 +1699,15 @@ describe("presence", () => {
       token: owner.token,
       body: { message: "What's blocked?" },
     });
-    while (prompts.length < 2) {
-      await Bun.sleep(10);
-    }
+    expect(
+      await toldWhen(
+        owner,
+        (p) => p.working[0]?.step?.tool === "search_activity"
+      )
+    ).toMatchObject({
+      state: "working",
+      working: [{ kind: "reply", conversationId: id }],
+    });
     expect(await presence()).toMatchObject({
       state: "working",
       working: [
@@ -1700,16 +1718,6 @@ describe("presence", () => {
           step: { tool: "search_activity", input: { query: "blocked" } },
         },
       ],
-    });
-
-    expect(
-      await toldWhen(
-        owner,
-        (p) => p.working[0]?.step?.tool === "search_activity"
-      )
-    ).toMatchObject({
-      state: "working",
-      working: [{ kind: "reply", conversationId: id }],
     });
 
     turn.answering = false;
@@ -1725,7 +1733,7 @@ describe("presence", () => {
     ).body;
     expect(listed.seenAt).toBeNull();
     expect(listed.repliedAt).toEqual(after.done[0].at);
-    expect((await ownerEvents(owner)).at(-1)).toEqual({
+    expect(await toldWhen(owner, (p) => p.state === "done")).toEqual({
       ...after,
       asOf: expect.any(String),
     });
@@ -1735,7 +1743,9 @@ describe("presence", () => {
     });
     expect(seen.status).toBe(200);
     expect(await presence()).toMatchObject({ state: "idle", done: [] });
-    expect((await ownerEvents(owner)).at(-1)).toMatchObject({
+    expect(
+      await toldWhen(owner, (p) => p.state === "idle" && p.done.length === 0)
+    ).toMatchObject({
       state: "idle",
       done: [],
     });

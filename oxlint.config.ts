@@ -99,7 +99,7 @@ export default defineConfig({
       "error",
       {
         allow: {
-          "apps/api/test/assistant.test.ts": 15,
+          "apps/api/test/assistant.test.ts": 14,
           "apps/api/test/board.test.ts": 1,
           "apps/api/src/ingest/discord-gateway.test.ts": 3,
           "apps/api/test/mcp.test.ts": 2,

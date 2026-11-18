@@ -1,0 +1,2 @@
+[test]
+preload = ["./test/after-each-file.ts"]

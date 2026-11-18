@@ -107,12 +107,9 @@ function slack(
   ]);
 }
 
-async function installed() {
-  const owner = await env.workspace();
-  const email = `sam-${randomInt(1_000_000, 9_000_000)}@example.com`;
-  const sam = await env.teammate(owner.token, "Sam", { email });
+async function registerApp(token: string) {
   const registered = await env.call("PUT", "/v1/apps/slack", {
-    token: owner.token,
+    token,
     headers: SETUP,
     body: {
       credentials: {
@@ -124,6 +121,13 @@ async function installed() {
     },
   });
   expect(registered.status).toBe(200);
+}
+
+async function installed() {
+  const owner = await env.workspace();
+  const email = `sam-${randomInt(1_000_000, 9_000_000)}@example.com`;
+  const sam = await env.teammate(owner.token, "Sam", { email });
+  await registerApp(owner.token);
   const team = `T${randomInt(1_000_000, 9_000_000)}`;
   const fetch = slack(team, [], email);
   env.ctx.fetch = fetch;
@@ -440,6 +444,7 @@ describe("Slack app", () => {
 
   test("a refused code connects nothing", async () => {
     const owner = await env.workspace();
+    await registerApp(owner.token);
     env.ctx.fetch = slack("T0NEVER");
     const link = await env.call("POST", "/v1/apps/slack/install", {
       token: owner.token,

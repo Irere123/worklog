@@ -21,7 +21,7 @@
     "github-app": "bun scripts/github-app.ts",
     "seed": "bun scripts/seed.ts",
     "typecheck": "bun check",
-    "test": "bun test --timeout 60000"
+    "test": "bun test --timeout 60000 --parallel --no-isolate --randomize"
   },
   "dependencies": {
     "@better-auth/cimd": "1.7.25",

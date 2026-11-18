@@ -24,7 +24,7 @@ Run from the repo root unless noted. Bun only: no npm, yarn, pnpm or other lockf
 bun install            # dependencies and git hooks
 bun run dev            # API on :4000 and web app on :3000; needs Postgres (DATABASE_URL in apps/api/.env)
 bun run seed           # fills an empty server with a demo team and prints its API key
-bun run test           # recreates the worklog_test database each run
+bun run test           # files in parallel and random order; each worker recreates worklog_test_<n>
 bun run typecheck
 bun run lint           # `bun run lint:fix` applies safe fixes
 bun run format         # `bun run format:check` only checks
@@ -140,6 +140,8 @@ Read [docs/DESIGN.md](docs/DESIGN.md) before building a screen: it covers who Wo
 - A test that imports a module to test it sits beside that module in `src/` (`src/db/migrate.test.ts`) and imports the harness as `#test/harness`. A test that goes through the API stays in `apps/api/test/` and takes helpers such as `hmacHex` from the harness. Lint (`colocated-tests`) checks which is which.
 - No retries, raised timeouts or fixed sleeps: await the event instead. The sleeps and timeouts already in place are counted per file in `oxlint.config.ts`; lower a count when you remove one.
 - Use `scriptedModel()` for AI, `fetchStub()` for HTTP, and `env.drain()` after a webhook.
+- Files run in parallel workers, in random order, and share their worker's process and database. So a test sets up everything it needs (its own workspace, its own app registration) and never counts on another test or file running first; a spy is restored in `finally`; and a test waits on the event it needs (the bus, a promise), never a sleep or a poll against a deadline. `test/after-each-file.ts` restores mocks and resets the shared context after every file.
+- A failure under one seed is a real bug, not a flake: rerun with the `--seed` the run printed until you find it.
 - To fix a failing test, fix the code, not the assertion.
 
 ## Code style
