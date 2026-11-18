@@ -657,6 +657,7 @@ describe("turns", () => {
     const { id } = (
       await env.call("POST", "/v1/conversations", { token: owner.token })
     ).body.conversation;
+    // oxlint-disable-next-line landmines-testing/no-test-doubles -- the overlapping turn logs an expected error; muting keeps the run readable
     const errors = spyOn(console, "error").mockImplementation(() => {});
     try {
       const streamed = (async () => {
@@ -1138,6 +1139,7 @@ describe("turns", () => {
     env.ctx.models = { main: model, fast: model };
     const warnings: string[] = [];
     // A log line is its message and then its fields.
+    // oxlint-disable-next-line landmines-testing/no-test-doubles -- captures the log line under test instead of printing it
     const warn = spyOn(console, "warn").mockImplementation(
       (...parts: unknown[]) => {
         warnings.push(parts.map((p) => JSON.stringify(p)).join(" "));
@@ -1406,6 +1408,7 @@ describe("automatic review", () => {
       { text: "Logged it privately." },
     ]);
     env.ctx.models = { main: model, fast: model };
+    // oxlint-disable-next-line landmines-testing/no-test-doubles -- the "not json" check reply logs an expected warning; muting keeps the run readable
     const warn = spyOn(console, "warn").mockImplementation(() => {});
     try {
       await env.call("POST", "/v1/conversations", {

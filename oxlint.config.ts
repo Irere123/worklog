@@ -17,6 +17,11 @@ export default defineConfig({
     "apps/web/src/routeTree.gen.ts",
   ],
   options: { typeAware: true },
+  // Landmines' testing rules (https://github.com/interfere-inc/landmines) catch tests that
+  // pass without proving anything.
+  jsPlugins: [
+    { name: "landmines-testing", specifier: "@interfere/landmines/testing" },
+  ],
   overrides: [
     {
       // Tests read untyped JSON responses and assert on their shape; a wrong
@@ -119,5 +124,36 @@ export default defineConfig({
     // Imports that leave their folder use the `#` aliases (apps/api/package.json), so they read
     // the same from every file and one search finds every importer of a module.
     "import/no-relative-parent-imports": "error",
+    // Each allowance is the file's count when the rule came in. The rule fails once a file
+    // drops below it, so the list only shrinks: lower the number, or delete the entry at zero.
+    "landmines-testing/no-fixed-sleep": [
+      "error",
+      {
+        allow: {
+          "apps/api/test/assistant.test.ts": 15,
+          "apps/api/test/board.test.ts": 1,
+          "apps/api/test/discord-gateway.test.ts": 3,
+          "apps/api/test/mcp.test.ts": 2,
+          "apps/api/test/memory.test.ts": 1,
+          "apps/api/test/pipeline.test.ts": 1,
+          "apps/api/test/realtime.test.ts": 4,
+          "apps/api/test/scale.test.ts": 1,
+        },
+      },
+    ],
+    "landmines-testing/no-flake-masking": [
+      "error",
+      {
+        allow: {
+          "apps/api/test/discord-gateway.test.ts": 2,
+          "apps/api/test/order.test.ts": 1,
+          "apps/api/test/pipeline.test.ts": 1,
+          "apps/api/test/scale.test.ts": 1,
+        },
+      },
+    ],
+    "landmines-testing/no-test-doubles": "error",
+    "landmines-testing/no-unsignaled-poll": "error",
+    "landmines-testing/strict-msw": "error",
   },
 });

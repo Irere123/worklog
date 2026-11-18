@@ -217,6 +217,7 @@ describe("telemetry", () => {
   });
 
   test("a kept span says how many it stands for, so counts survive sampling", async () => {
+    // oxlint-disable-next-line landmines-testing/no-test-doubles -- pins the sampling roll, which is otherwise random
     const random = spyOn(Math, "random").mockReturnValue(0.1);
     try {
       const sent = tinybird({ sampleRate: 0.25 });
