@@ -51,6 +51,7 @@ export default defineConfig({
       "/api/auth": { target: API, changeOrigin: true },
     },
   },
+  preview: { host: "127.0.0.1" },
   plugins: [
     phosphorWeights(),
     stylex({
