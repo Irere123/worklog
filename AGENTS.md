@@ -55,6 +55,7 @@ apps/api/src/
   work/          activity, board, drift, attention, manual logs, snapshots, members
   automations/   scheduled routines, briefs, delivery
   agent/         all model work: loop, generate, prompts/, tools/, memory/
+  mcp/           the MCP server coding agents connect to: server, instructions, tools/
   jobs/          Graphile Worker tasks and cron
   emails/        React Email templates: sign-in, invite, brief
   db/            schema, queries/ (one file per area), transact
@@ -81,6 +82,7 @@ apps/web/src/
 | domain logic | the module it belongs to, as a function taking `ctx` first |
 | a prompt | `agent/prompts/<name>.md` |
 | an assistant tool | `agent/tools/<name>.ts`, registered in `agent/tools.ts` |
+| a coding-agent (MCP) tool | `mcp/tools/<name>.ts`, registered in `mcp/tools.ts` under the scope it needs |
 | a connector | `connectors/<name>.ts`, registered in `connectors.ts` |
 | a background task | `jobs/tasks.ts` |
 | an email | `emails/<name>.tsx` on `Layout`, with a written text part, exported from `emails.ts` |
