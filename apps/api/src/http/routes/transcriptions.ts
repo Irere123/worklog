@@ -5,6 +5,7 @@ import type { AudioType } from "#agent/transcribe";
 import { errors, json, respond, router } from "#http/router";
 import { ErrorSchema } from "#http/schemas/common";
 import { Transcript } from "#http/schemas/transcriptions";
+import { readBounded } from "#lib/body";
 import { badRequest, tooLarge } from "#lib/errors";
 
 const Audio = { schema: z.string().openapi({ format: "binary" }) };
@@ -35,7 +36,10 @@ export const transcriptionRoutes = router().openapi(
   }),
   async (c) => {
     const type = audioType(c.req.header("content-type"));
-    const bytes = await boundedBytes(c.req.raw);
+    const bytes = await readBounded(c.req.raw, MAX_AUDIO_BYTES);
+    if (bytes === null) {
+      throw tooLong();
+    }
     if (bytes.byteLength === 0) {
       throw badRequest("The recording is empty");
     }
@@ -62,35 +66,6 @@ function audioType(header: string | undefined) {
   }
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- checked against AUDIO_FORMATS' keys on the line above
   return type as AudioType;
-}
-
-async function boundedBytes(req: Request) {
-  if (Number(req.headers.get("content-length") ?? 0) > MAX_AUDIO_BYTES) {
-    throw tooLong();
-  }
-  if (!req.body) {
-    return new Uint8Array();
-  }
-  const reader = req.body.getReader();
-  const chunks: Uint8Array[] = [];
-  let size = 0;
-  for (;;) {
-    const read = await reader.read();
-    if (read.done) {
-      break;
-    }
-    const chunk: unknown = read.value;
-    if (!(chunk instanceof Uint8Array)) {
-      throw new TypeError("A request body chunk wasn't bytes");
-    }
-    size += chunk.byteLength;
-    if (size > MAX_AUDIO_BYTES) {
-      await reader.cancel();
-      throw tooLong();
-    }
-    chunks.push(chunk);
-  }
-  return Buffer.concat(chunks);
 }
 
 function tooLong() {

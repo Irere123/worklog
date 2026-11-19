@@ -4,6 +4,7 @@ import type { Context } from "hono";
 import type { AppContext } from "#context";
 import { receive } from "#ingest/pipeline";
 import { receiveForApp } from "#ingest/routing";
+import { readBounded } from "#lib/body";
 
 type HookEnv = { Variables: { ctx: AppContext } };
 
@@ -56,30 +57,8 @@ async function handle(
 const MAX_BODY = 25 * 1024 * 1024;
 
 async function boundedBody(req: Request) {
-  const declared = Number(req.headers.get("content-length") ?? 0);
-  if (declared > MAX_BODY || !req.body) {
-    return declared > MAX_BODY ? null : "";
-  }
-  const reader = req.body.getReader();
-  const chunks: Uint8Array[] = [];
-  let size = 0;
-  for (;;) {
-    const read = await reader.read();
-    if (read.done) {
-      break;
-    }
-    const chunk: unknown = read.value;
-    if (!(chunk instanceof Uint8Array)) {
-      throw new TypeError("A request body chunk wasn't bytes");
-    }
-    size += chunk.byteLength;
-    if (size > MAX_BODY) {
-      await reader.cancel();
-      return null;
-    }
-    chunks.push(chunk);
-  }
-  return new TextDecoder().decode(Buffer.concat(chunks));
+  const bytes = await readBounded(req, MAX_BODY);
+  return bytes === null ? null : new TextDecoder().decode(bytes);
 }
 
 function tooLarge() {
