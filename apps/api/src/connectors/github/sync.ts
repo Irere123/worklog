@@ -132,6 +132,7 @@ const SyncPayload = z.object({
   nodes: z.array(z.unknown()),
 });
 
+const USER = `__typename login databaseId name`;
 const ACTOR = `__typename login ... on User { databaseId name } ... on Bot { databaseId }`;
 const COMMENTS = `comments(last: 30) { nodes { databaseId body url createdAt author { ${ACTOR} } } }`;
 const CLOSER = `timelineItems(last: 1, itemTypes: [CLOSED_EVENT]) { nodes { ... on ClosedEvent { actor { ${ACTOR} } } } }`;
@@ -145,7 +146,7 @@ const QUERIES: Record<GraphStage, string> = {
         nodes {
           number title url body isDraft createdAt updatedAt closedAt mergedAt
           author { ${ACTOR} } mergedBy { ${ACTOR} }
-          reviewRequests(first: 10) { nodes { requestedReviewer { ... on User { ${ACTOR} } } } }
+          reviewRequests(first: 10) { nodes { requestedReviewer { ... on User { ${USER} } } } }
           reviews(last: 30) { nodes { databaseId state body url submittedAt author { ${ACTOR} }
             comments(first: 20) { nodes { databaseId body url createdAt author { ${ACTOR} } } } } }
           ${COMMENTS}
@@ -173,7 +174,7 @@ const QUERIES: Record<GraphStage, string> = {
       databaseId
       items: releases(first: 20, after: $after, orderBy: { field: CREATED_AT, direction: DESC }) {
         pageInfo { hasNextPage endCursor }
-        nodes { databaseId tagName name url description isDraft isPrerelease publishedAt author { ${ACTOR} } }
+        nodes { databaseId tagName name url description isDraft isPrerelease publishedAt author { ${USER} } }
       }
     }
   }`,
