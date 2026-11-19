@@ -39,6 +39,8 @@ beforeAll(async () => {
   );
 });
 
+const PAGE = { headers: { accept: "text/html,application/xhtml+xml" } };
+
 function webApp() {
   return createApp({
     ...env.ctx,
@@ -89,23 +91,24 @@ describe("serving the web app", () => {
 
   test("app routes get the shell, never cached, and API paths keep their own 404s", async () => {
     const app = webApp();
-    const page = await app.request("/inbox?item=1");
+    const page = await app.request("/inbox?item=1", PAGE);
     expect(page.status).toBe(200);
     expect(page.headers.get("cache-control")).toBe("no-cache");
     expect(await page.text()).toContain("<title>Worklog</title>");
 
-    const outside = await app.request("/..%2f..%2f..%2fetc%2fpasswd");
+    const outside = await app.request("/..%2f..%2f..%2fetc%2fpasswd", PAGE);
     expect(await outside.text()).toContain("<title>Worklog</title>");
     const outsideAssets = await app.request(
-      "/assets/..%2f..%2f..%2fetc%2fpasswd"
+      "/assets/..%2f..%2f..%2fetc%2fpasswd",
+      PAGE
     );
     expect(outsideAssets.status).toBe(404);
     expect(await outsideAssets.text()).not.toContain("root:");
 
-    const gone = await app.request("/assets/app-old999.js");
+    const gone = await app.request("/assets/app-old999.js", PAGE);
     expect(gone.status).toBe(404);
 
-    const malformed = await app.request("/%E0%A4%A");
+    const malformed = await app.request("/%E0%A4%A", PAGE);
     expect(malformed.status).toBe(200);
     expect(await malformed.text()).toContain("<title>Worklog</title>");
 
@@ -115,6 +118,43 @@ describe("serving the web app", () => {
     });
     expect(missing.status).toBe(404);
     expect(missing.headers.get("content-type")).toContain("application/json");
+  });
+
+  test("only a browser opening a page gets the shell: agents probing for metadata get a 404", async () => {
+    const app = webApp();
+    for (const url of [
+      "/.well-known/openid-configuration",
+      "/.well-known/oauth-authorization-server/nowhere",
+      "/inbox",
+    ]) {
+      const probe = await app.request(url, {
+        headers: { accept: "application/json" },
+      });
+      expect(probe.status).toBe(404);
+      expect(await probe.text()).not.toContain("<title>");
+    }
+    const discovery = await app.request(
+      "/.well-known/oauth-protected-resource/mcp",
+      PAGE
+    );
+    expect(discovery.headers.get("content-type")).toContain("application/json");
+  });
+
+  test("without a build to serve, a page no route answers is marked for the web server to give the shell", async () => {
+    const app = createApp(env.ctx);
+    const page = await app.request("/board/12", PAGE);
+    expect(page.status).toBe(404);
+    expect(page.headers.get("worklog-shell")).toBe("1");
+
+    for (const [method, url, accept] of [
+      ["GET", "/board/12", "application/json"],
+      ["POST", "/board/12", "text/html"],
+      ["GET", "/.well-known/openid-configuration", "*/*"],
+    ] as const) {
+      const other = await app.request(url, { method, headers: { accept } });
+      expect(other.status).toBe(404);
+      expect(other.headers.get("worklog-shell")).toBeNull();
+    }
   });
 
   test("prerendered pages are served as the build made them, never cached", async () => {
@@ -129,10 +169,10 @@ describe("serving the web app", () => {
       expect(await pricing.text()).toContain("Pricing · Worklog");
     }
 
-    const home = await app.request("/home");
+    const home = await app.request("/home", PAGE);
     expect(await home.text()).toContain("<title>Worklog</title>");
 
-    const escaped = await app.request("/..%2f..%2f/");
+    const escaped = await app.request("/..%2f..%2f/", PAGE);
     expect(await escaped.text()).toContain("<title>Worklog</title>");
   });
 

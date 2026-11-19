@@ -1,4 +1,4 @@
-# The web app's server: the built app from /srv, and the API's paths passed through to it, so
+# The web app's server: the built app from /srv, and everything else passed through to the API, so
 # the browser sees one origin and the session cookie and event streams need no CORS.
 #
 # SITE_ADDRESS  `:8080` (the default) serves plain HTTP behind a platform or proxy that holds
@@ -14,50 +14,66 @@
 	}
 }
 
-{$SITE_ADDRESS::8080} {
-	@api path /v1/* /api/* /hooks/* /oauth/* /docs /docs/* /openapi.json
-	handle @api {
-		reverse_proxy {$API_UPSTREAM:api:4000} {
-			# Event streams and the assistant's replies reach the browser as they're written.
-			flush_interval -1
-		}
+(app_headers) {
+	header {
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+		X-Frame-Options DENY
+		-Server
 	}
+}
 
+(app_files) {
+	root * /srv
+	import app_headers
+	file_server {
+		precompressed br gzip
+	}
+}
+
+{$SITE_ADDRESS::8080} {
 	# What Railway's deploy check asks, on the site itself.
 	handle /health {
 		respond "ok" 200
 	}
 
+	# Built files carry a content hash in their names, so a cached copy is never stale. One missing
+	# is a tab on an older build asking for its chunks: a 404 lets it fail cleanly, where the shell
+	# would arrive as a script and break with a MIME error.
+	handle /assets/* {
+		header Cache-Control "public, max-age=31536000, immutable"
+		import app_files
+	}
+
+	# A file the build made, or a page it prerendered (the front page is its folder's index.html).
+	# These name this build's assets, so they're never served from a cache.
+	@built file {
+		root /srv
+		try_files {path} {path}/index.html
+	}
+	handle @built {
+		header Cache-Control no-cache
+		rewrite * {file_match.relative}
+		import app_files
+	}
+
+	# Everything else is the API's to answer, so no list here has to keep up with its routes: a new
+	# endpoint, or a path a standard fixes like /.well-known, works through this server as it is.
+	# A browser page the API has no route for comes back marked, and gets the app's shell, which
+	# routes in the browser.
 	handle {
-		root * /srv
-		header {
-			X-Content-Type-Options nosniff
-			Referrer-Policy strict-origin-when-cross-origin
-			X-Frame-Options DENY
-			-Server
-		}
+		reverse_proxy {$API_UPSTREAM:api:4000} {
+			# Event streams and the assistant's replies reach the browser as they're written.
+			flush_interval -1
 
-		# Built files carry a content hash in their names, so a cached copy is never stale. The
-		# shell names this build's files, so it's never served from a cache.
-		@hashed path /assets/*
-		@app not path /assets/*
-		header @hashed Cache-Control "public, max-age=31536000, immutable"
-		header @app Cache-Control no-cache
-
-		# One missing is a tab on an older build asking for its chunks: a 404 lets it fail cleanly,
-		# where the shell would arrive as a script and break with a MIME error.
-		handle @hashed {
-			file_server {
-				precompressed br gzip
+			@shell {
+				status 404
+				header Worklog-Shell 1
 			}
-		}
-
-		# A page the build prerendered (the front page) is its folder's index.html. Any other path
-		# that isn't a file is a route the app handles in the browser.
-		handle {
-			try_files {path} {path}/index.html /_shell.html
-			file_server {
-				precompressed br gzip
+			handle_response @shell {
+				header Cache-Control no-cache
+				rewrite * /_shell.html
+				import app_files
 			}
 		}
 	}

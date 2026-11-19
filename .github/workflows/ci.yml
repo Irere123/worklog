@@ -150,12 +150,20 @@ jobs:
           curl -fsS http://127.0.0.1:4000/health | grep -q '"release":"${{ github.sha }}"'
           curl -fsS http://127.0.0.1:4001/health | grep -q '"db":true'
           curl -fsS $site/ | grep -qi '<!doctype html>'
-          curl -fsS $site/board/12 | grep -qi '<!doctype html>'
+          curl -fsS -H 'accept: text/html' $site/board/12 | grep -qi '<!doctype html>'
           [ "$(curl -s -o /dev/null -w '%{http_code}' $site/assets/gone-0000.js)" = 404 ]
           asset=$(curl -fsS $site/ | grep -o '/assets/[^"]*\.js' | head -1)
           curl -fsSI -H 'accept-encoding: br' "$site$asset" | grep -qi '^content-encoding: br'
           curl -fsSI "$site$asset" | grep -qi '^cache-control: public, max-age=31536000, immutable'
           [ "$(curl -s -o /dev/null -w '%{http_code}' $site/v1/me)" = 401 ]
+          # The web server sends the API whatever isn't a built file, so routes it was never told
+          # about, like the MCP endpoint and the metadata agents sign in by, answer through it.
+          curl -fsS $site/.well-known/oauth-protected-resource/mcp | jq -e '.resource == "http://127.0.0.1:8080/mcp"'
+          curl -fsS $site/.well-known/oauth-authorization-server/api/auth | jq -e .authorization_endpoint
+          [ "$(curl -s -o /dev/null -w '%{http_code}' $site/.well-known/openid-configuration)" = 404 ]
+          curl -s -D mcp.txt -o /dev/null -X POST $site/mcp -H 'content-type: application/json' -d '{}'
+          grep -q '^HTTP/1.1 401' mcp.txt
+          grep -qi '^www-authenticate: Bearer' mcp.txt
           token=$(curl -fsS -X POST $site/v1/setup -H 'content-type: application/json' \
             -d '{"workspaceName":"CI","name":"Ana","email":"ana@example.com"}' | jq -r .token.token)
           # An event stream must reach the browser as it's written, not when the proxy's buffer fills.

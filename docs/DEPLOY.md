@@ -7,8 +7,8 @@ Worklog runs as three processes and a database. Each process has its own image, 
         │  HTTPS
         ▼
  ┌─ web ─────────────────────┐   the only public service
- │ Caddy: the built web app, │   /v1, /api/auth, /hooks, /oauth,
- │ and the API's paths ──────┼──▶ /docs, /openapi.json
+ │ Caddy: the built web app; │   anything that isn't a built file:
+ │ everything else ──────────┼──▶ /v1, /api/auth, /hooks, /mcp…
  └───────────────────────────┘            │  private network
                                           ▼
  ┌─ api ────────────────┐      ┌─ worker ────────────────────┐
@@ -25,7 +25,7 @@ Worklog runs as three processes and a database. Each process has its own image, 
 | `ghcr.io/irere123/worklog-worker` | `apps/api/Dockerfile`, target `worker` | `bun src/worker.ts`; serves only its health check on 4001 | `GET :4001/health` |
 
 - **The API and the worker build from one Dockerfile,** so the two can't run different code against the same database. Their images hold the API's production dependencies only (about 90 MB of them), and run as a non-root user.
-- **The browser sees one origin.** `web` passes the API's paths to `api`, so the session cookie and event streams need no CORS, and the API needs no public address. It flushes event streams and the assistant's replies as they're written, serves the app's files precompressed (Brotli, gzip), caches hashed files for good and never the HTML, answers `/` with the prerendered front page and any other deep link with the shell, and a missing `/assets/` file with a 404.
+- **The browser sees one origin.** `web` serves the files the build made and passes every other request to `api`, so the session cookie and event streams need no CORS, the API needs no public address, and a new API route needs no change here. When the API has no route for a page a browser opened, it marks its 404 (`Worklog-Shell`) and `web` answers with the app's shell instead, so deep links work while agents and API clients still get real 404s. It flushes event streams and the assistant's replies as they're written, serves the app's files precompressed (Brotli, gzip), caches hashed files for good and never the HTML, answers `/` with the prerendered front page, and a missing `/assets/` file with a 404.
 - **Health checks ask the database.** `/health` on the API and the worker answers 503 once Postgres stops answering, and names the running release.
 - **Migrations are their own step:** `bun scripts/migrate.ts` (`bun run db:migrate`), run once per deploy before the new processes start, so a migration that fails stops the rollout while the old version keeps serving. The processes also migrate at startup (a no-op after the step), so a setup without it still works. Keep migrations additive (add, then backfill, then remove in a later release): during a rollout, and after a rollback, the old code runs against the new schema.
 - **Shutdown drains.** On SIGTERM the API stops taking requests, gives open ones 10 seconds, then cuts event streams (browsers reconnect with `Last-Event-ID` and miss nothing), closes the database and flushes telemetry. The worker lets running jobs finish. Give the API 30 seconds and the worker 2 minutes before a hard kill; both setups below do.
@@ -111,6 +111,6 @@ Pass `--build-arg WORKLOG_RELEASE=$(git rev-parse --short HEAD)` to name the rel
 
 - **`.github/workflows/ci.yml`,** on every pull request and push to `main`:
   - `check`: commit messages, format, lint, typecheck, tests, colour contrast, and the web build.
-  - `images`: builds the three images, then starts them together against Postgres the way production does (migrate, then the API, worker and web) and probes them through the web server: health, the app and a deep link, a missing asset's 404, Brotli and cache headers, the API's 401, an event stream arriving unbuffered, HTTPS served by Caddy as its own user, production refusing to start without its secrets, and every container stopping within its grace period.
+  - `images`: builds the three images, then starts them together against Postgres the way production does (migrate, then the API, worker and web) and probes them through the web server: health, the app and a deep link, a missing asset's 404, Brotli and cache headers, the API's 401, MCP and its sign-in metadata, an event stream arriving unbuffered, HTTPS served by Caddy as its own user, production refusing to start without its secrets, and every container stopping within its grace period.
   - `publish` (pushes only, once both pass): pushes the images to GHCR as `latest` (from `main`), `sha-<commit>`, and the version for a `v1.2.0` tag.
 - **`.github/workflows/tinybird.yml`,** when `tinybird/` changes: builds the project on Tinybird Local, and from `main` deploys it to Tinybird Cloud once the repository has the `TINYBIRD_HOST` and `TINYBIRD_DEPLOY_TOKEN` secrets (a workspace admin token, not the append token the API uses).

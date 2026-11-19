@@ -35,7 +35,7 @@ import {
 import { transcriptionRoutes } from "./http/routes/transcriptions";
 import { workRoutes } from "./http/routes/work";
 import { traceRequests } from "./http/trace";
-import { webAppRoutes } from "./http/web";
+import { isPageRequest, SHELL_HEADER, webAppRoutes } from "./http/web";
 import { webOrigins } from "./lib/auth";
 import { ApiError } from "./lib/errors";
 import { log } from "./telemetry/log";
@@ -120,8 +120,11 @@ export function createApp(ctx: AppContext) {
   app.use("/v1/*", authMiddleware(ctx));
 
   app.onError(handleError);
-  app.notFound((c) =>
-    c.json(
+  app.notFound((c) => {
+    if (isPageRequest(c.req.raw)) {
+      c.header(SHELL_HEADER, "1");
+    }
+    return c.json(
       {
         error: {
           code: "not_found",
@@ -129,8 +132,8 @@ export function createApp(ctx: AppContext) {
         },
       },
       404
-    )
-  );
+    );
+  });
 
   app.get("/health", async (c) => {
     const { status, body } = await healthReport(ctx);

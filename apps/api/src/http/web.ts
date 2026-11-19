@@ -7,8 +7,6 @@ import type { Context } from "hono";
 
 import { router } from "./router";
 
-const API_PATH = /^\/(?:v1|api|hooks|docs|openapi\.json|health)(?:\/|$)/u;
-
 const IMMUTABLE = "public, max-age=31536000, immutable";
 
 const COMPRESSIBLE =
@@ -26,9 +24,24 @@ type Served = {
 };
 
 /**
+ * A browser opening a page, as opposed to an API client, a webhook or an agent probing for
+ * metadata. Only these fall back to the web app's shell: anyone else asking for a path no route
+ * answers needs the API's 404, not a page.
+ */
+export function isPageRequest(request: Request) {
+  return (
+    (request.method === "GET" || request.method === "HEAD") &&
+    (request.headers.get("accept") ?? "").includes("text/html")
+  );
+}
+
+/** Marks a 404 the web server in front should answer with the app's shell (apps/web/Caddyfile). */
+export const SHELL_HEADER = "worklog-shell";
+
+/**
  * The built web app (apps/web/dist/client), served beside the API from one origin, so the
- * session cookie and the event stream need no CORS. Any other path gets the app's shell, which
- * routes on the client.
+ * session cookie and the event stream need no CORS. A page no file answers gets the app's shell,
+ * which routes on the client.
  */
 export function webAppRoutes(dist: string) {
   const root = path.resolve(dist);
@@ -48,9 +61,6 @@ export function webAppRoutes(dist: string) {
   void warm(root, load);
 
   return router().get("*", async (c) => {
-    if (API_PATH.test(c.req.path)) {
-      return await c.notFound();
-    }
     const name = decoded(c.req.path);
     const wanted = name === null ? null : path.resolve(root, `.${name}`);
     const asset =
@@ -73,7 +83,7 @@ export function webAppRoutes(dist: string) {
         return send(c, page);
       }
     }
-    if (c.req.path.startsWith("/assets/")) {
+    if (c.req.path.startsWith("/assets/") || !isPageRequest(c.req.raw)) {
       return await c.notFound();
     }
     const shell = await load(`${root}/_shell.html`);
