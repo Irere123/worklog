@@ -380,7 +380,7 @@ export function githubManifest(
       issues: "read",
       metadata: "read",
       pull_requests: "read",
-      email_addresses: "read",
+      emails: "read",
     },
     default_events: [
       "issues",
