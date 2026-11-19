@@ -7,68 +7,58 @@ import { SOURCE } from "./links";
 import { Site } from "./site";
 import { links, page, type } from "./styles";
 
-type Entry = { date: string; title: string; body: string; tags: string[] };
+type Entry = { date: string; title: string; body: string };
 
 const ENTRIES: Entry[] = [
   {
+    date: "2026-11-19",
+    title: "Invite links and profile pictures",
+    body: "Send an invite link that works with any account, and upload your own picture. The sidebar resizes to the width you like.",
+  },
+  {
+    date: "2026-11-16",
+    title: "Coding agents on the board",
+    body: "Claude Code, Codex and other agents connect themselves, show on the cards they’re working on, and ask you when they need a decision.",
+  },
+  {
     date: "2026-11-15",
-    title: "Open source, and open to every team",
-    body: "Worklog is now licensed under the AGPL-3.0. Anyone can sign in and start a workspace, and a team’s own server can stay invite-only with SIGNUP=closed. The front page, pricing and these notes are new.",
-    tags: ["Open source", "Sign-up"],
+    title: "Open source",
+    body: "Worklog is AGPL-3.0, and anyone can start a workspace.",
   },
   {
     date: "2026-11-14",
     title: "An assistant you can read at a glance",
-    body: "The assistant’s ghost shows what it’s doing, thinking, writing or done, and agents show their state the same way. Dictation now spells your team’s names right, because it’s transcribed with the workspace’s names in mind.",
-    tags: ["Assistant", "Voice"],
-  },
-  {
-    date: "2026-11-13",
-    title: "Real logos for connected tools",
-    body: "GitHub, Slack, GitLab and the rest appear in their own colors wherever they’re named, and status badges carry a filled glyph of their own shape.",
-    tags: ["Design"],
+    body: "Its face shows whether it’s thinking, writing or done, and dictation spells your team’s names right.",
   },
   {
     date: "2026-11-10",
-    title: "People, with their working hours",
-    body: "A roster shows each teammate’s working hours and a square for every day of activity. The sidebar is grouped by whose things are whose, and Worklog has a hand-drawn mark.",
-    tags: ["People", "Design"],
-  },
-  {
-    date: "2026-11-09",
-    title: "See what the assistant is doing",
-    body: "The assistant reports each step as it works, and its memory is grounded in evidence it can point to. Who’s online now arrives as whole snapshots over the event stream.",
-    tags: ["Assistant", "Live"],
+    title: "People and their hours",
+    body: "See each teammate’s working hours and how their weeks have gone.",
   },
   {
     date: "2026-11-03",
-    title: "Email-first sign-in",
-    body: "Sign in with a link sent to your email, or with GitHub or Discord. Servers gained health checks, a separate migrate step and a graceful shutdown, and can trace requests, jobs and model calls to Tinybird.",
-    tags: ["Sign-in", "Self-hosting"],
+    title: "Sign in with email",
+    body: "Sign in with a link sent to your inbox, or with GitHub or Discord.",
   },
   {
     date: "2026-11-02",
-    title: "Faster, and at home on a phone",
-    body: "Pages load faster, responses are compressed, every screen has a phone layout, and the assistant’s replies say more about what they found.",
-    tags: ["Performance", "Phone"],
+    title: "At home on a phone",
+    body: "Every screen works on a phone, and pages load faster.",
   },
   {
     date: "2026-11-01",
     title: "The web app",
-    body: "Home, inbox, board, activity, the assistant, briefs, people and settings, in one app. GitLab joins the connectors, and bun run seed fills an empty server with a demo team.",
-    tags: ["Web app", "Connectors"],
+    body: "Home, inbox, boards, activity, briefs, people and your assistant, in one app.",
   },
   {
     date: "2026-10-28",
-    title: "Connectors that install in a click",
-    body: "GitHub, Gitea, Slack and Discord install as apps and bring their recent history. Events flow through ingestion lanes, and scheduled routines run as jobs on any worker.",
-    tags: ["Connectors"],
+    title: "Connectors in a click",
+    body: "GitHub, Gitea, Slack and Discord install as apps and bring their recent history with them.",
   },
   {
     date: "2026-10-27",
     title: "An assistant with a constitution",
-    body: "Every assistant follows a written constitution and its owner’s voice. Each memory keeps where it came from, memory exports as Markdown, and long conversations are compacted so they start from what matters.",
-    tags: ["Assistant", "Memory"],
+    body: "Every assistant follows written rules and its owner’s voice, and remembers where each memory came from.",
   },
 ];
 
@@ -106,13 +96,6 @@ export function Changelog() {
                 {entry.title}
               </h2>
               <p {...stylex.props(styles.text)}>{entry.body}</p>
-              <ul {...stylex.props(styles.tags)}>
-                {entry.tags.map((tag) => (
-                  <li key={tag} {...stylex.props(type.chip)}>
-                    {tag}
-                  </li>
-                ))}
-              </ul>
             </div>
           </li>
         ))}
@@ -166,14 +149,5 @@ const styles = stylex.create({
     lineHeight: "24px",
     color: color.fgMuted,
     textWrap: "pretty",
-  },
-  tags: {
-    display: "flex",
-    flexWrap: "wrap",
-    gap: space.sm,
-    margin: 0,
-    marginTop: space.xs,
-    padding: 0,
-    listStyle: "none",
   },
 });
