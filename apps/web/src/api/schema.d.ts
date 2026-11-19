@@ -102,6 +102,26 @@ export interface paths {
         patch: operations["me.update"];
         trace?: never;
     };
+    "/v1/me/avatar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Upload your profile picture
+         * @description The image is the raw body: WebP, PNG or JPEG, up to 2 MB. Send it square; it's shown as is, in a circle. It replaces your picture, and the one you uploaded before is deleted. Remove it with `PATCH /v1/me {avatarUrl: null}`. 503 when the server has no file storage (`uploads` on `GET /v1/me`).
+         */
+        put: operations["me.setAvatar"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/members": {
         parameters: {
             query?: never;
@@ -2856,6 +2876,8 @@ export interface operations {
                         assistant: components["schemas"]["Member"] & (Record<string, never> | null);
                         /** @description Whether this server has a model. Without one, AI features fall back: dictation uses the browser's own recognition, briefs use templates. */
                         ai: boolean;
+                        /** @description Whether this server stores files. Without it, `PUT /v1/me/avatar` answers 503 and a picture can only be a link. */
+                        uploads: boolean;
                     };
                 };
             };
@@ -2939,6 +2961,77 @@ export interface operations {
             };
             /** @description Not found */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    "me.setAvatar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "image/webp": string;
+                "image/png": string;
+                "image/jpeg": string;
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Member"];
+                };
+            };
+            /** @description Invalid request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid credentials */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Image too large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description No file storage on this server */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };

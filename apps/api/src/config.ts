@@ -49,6 +49,12 @@ const Env = z.object({
   WORKLOG_FAST_MODEL: z.string().default("anthropic/claude-haiku-5.5"),
   WORKLOG_TRANSCRIBE_MODEL: z.string().default("openai/whisper-large-v3-turbo"),
 
+  R2_ACCOUNT_ID: z.string().optional(),
+  R2_ACCESS_KEY_ID: z.string().optional(),
+  R2_SECRET_ACCESS_KEY: z.string().optional(),
+  R2_BUCKET: z.string().optional(),
+  R2_PUBLIC_URL: z.url().optional(),
+
   RESEND_API_KEY: z.string().optional(),
   SMTP_URL: z.string().optional(),
   MAIL_FROM: z.string().default("Worklog <worklog@localhost>"),

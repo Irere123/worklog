@@ -56,7 +56,7 @@ Worklog runs as three processes and a database. Each process has its own image, 
 ### From then on
 
 - **Deploys:** merge to `main`. CI checks the code, builds the three images, starts them together against Postgres and probes them; Railway waits for those checks (`checkSuites`) before building, so what deploys is what CI tested. `api` runs migrations as its pre-deploy step; each service keeps serving until its replacement passes its health check.
-- **Integrations** (AI, email, GitHub, Slack, Discord, Tinybird): set the variable as a shared variable, add its name to `INTEGRATIONS` in `.railway/railway.ts`, commit, then `railway config apply`. [`apps/api/.env.example`](../apps/api/.env.example) lists them all.
+- **Integrations** (AI, email, file storage, GitHub, Slack, Discord, Tinybird): set the variable as a shared variable, add its name to `INTEGRATIONS` in `.railway/railway.ts`, commit, then `railway config apply`. [`apps/api/.env.example`](../apps/api/.env.example) lists them all.
 - **The GitHub App:** one app serves every workspace on the server, so teams install it with one click from Settings → Connections. Create it once, against the deployed domain:
   1. `bun run github-app --url https://your-domain` from a checkout, and open the address it prints in a browser on the same machine (over SSH, forward the port first, or paste back the address GitHub leaves you on). GitHub asks you to confirm the app's name; `--org acme` creates it under an organization, and `--private` limits installs to its owner.
   2. Set each line of the `github-app.env` it writes as a shared variable, then delete the file.

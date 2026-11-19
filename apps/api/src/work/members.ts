@@ -31,6 +31,8 @@ import { generateId } from "#lib/ids";
 import { isValidTimeZone } from "#lib/time";
 import { log } from "#telemetry/log";
 
+import { removeUpload } from "./avatars";
+
 function slugify(value: string) {
   return (
     value
@@ -282,10 +284,14 @@ export async function updateMember(
   const settings = patch.settings
     ? { ...member.settings, ...patch.settings }
     : undefined;
-  return await updateMemberById(ctx.db, {
+  const updated = await updateMemberById(ctx.db, {
     id: member.id,
     set: { ...patch, ...(settings ? { settings } : {}) },
   });
+  if (patch.avatarUrl !== undefined && patch.avatarUrl !== member.avatarUrl) {
+    await removeUpload(ctx, member, member.avatarUrl);
+  }
+  return updated;
 }
 
 export async function createToken(

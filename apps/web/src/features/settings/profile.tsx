@@ -20,6 +20,7 @@ import { Field, Input, Select, Stepper, Switch, TimeSelect } from "#ui/field";
 import { color, media, radius, space, text } from "#ui/tokens.stylex";
 
 import { Card, Row, SettingsPage, settingsStyles } from "./frame";
+import { ProfilePicture } from "./profile-picture";
 
 type Settings = Schemas["MemberSettings"];
 
@@ -104,14 +105,18 @@ export function Profile() {
         }
       >
         <div {...stylex.props(settingsStyles.pad, styles.profile)}>
-          <form.Subscribe selector={(s) => s.values.avatarUrl}>
-            {(draft) => (
-              <Avatar
-                person={{ ...member, avatarUrl: draft.trim() || null }}
-                size={56}
-              />
-            )}
-          </form.Subscribe>
+          {me.uploads ? (
+            <ProfilePicture member={member} />
+          ) : (
+            <form.Subscribe selector={(s) => s.values.avatarUrl}>
+              {(draft) => (
+                <Avatar
+                  person={{ ...member, avatarUrl: draft.trim() || null }}
+                  size={56}
+                />
+              )}
+            </form.Subscribe>
+          )}
           <div {...stylex.props(styles.fields)}>
             <form.Field name="name">
               {(field) => (
@@ -143,25 +148,27 @@ export function Profile() {
                 </Field>
               )}
             </form.Field>
-            <form.Field name="avatarUrl">
-              {(field) => (
-                <Field
-                  label="Picture"
-                  hint="A link to an image. Signing in with Google or GitHub fills it in for you."
-                >
-                  {(id) => (
-                    <Input
-                      id={id}
-                      type="url"
-                      inputMode="url"
-                      placeholder="https://"
-                      value={field.state.value}
-                      onChange={(e) => field.handleChange(e.target.value)}
-                    />
-                  )}
-                </Field>
-              )}
-            </form.Field>
+            {!me.uploads && (
+              <form.Field name="avatarUrl">
+                {(field) => (
+                  <Field
+                    label="Picture"
+                    hint="A link to an image. Signing in with Google or GitHub fills it in for you."
+                  >
+                    {(id) => (
+                      <Input
+                        id={id}
+                        type="url"
+                        inputMode="url"
+                        placeholder="https://"
+                        value={field.state.value}
+                        onChange={(e) => field.handleChange(e.target.value)}
+                      />
+                    )}
+                  </Field>
+                )}
+              </form.Field>
+            )}
             <form.Field name="email">
               {(field) => (
                 <Field

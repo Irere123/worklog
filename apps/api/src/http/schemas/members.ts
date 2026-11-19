@@ -189,6 +189,10 @@ export const MeResponse = z.object({
     description:
       "Whether this server has a model. Without one, AI features fall back: dictation uses the browser's own recognition, briefs use templates.",
   }),
+  uploads: z.boolean().openapi({
+    description:
+      "Whether this server stores files. Without it, `PUT /v1/me/avatar` answers 503 and a picture can only be a link.",
+  }),
 });
 
 export const SetupRequest = z.object({

@@ -3,6 +3,7 @@ import { NumberField } from "@base-ui/react/number-field";
 import { Radio } from "@base-ui/react/radio";
 import { RadioGroup } from "@base-ui/react/radio-group";
 import { Select as BaseSelect } from "@base-ui/react/select";
+import { Slider as BaseSlider } from "@base-ui/react/slider";
 import { Switch as BaseSwitch } from "@base-ui/react/switch";
 import {
   CaretUpDownIcon,
@@ -333,6 +334,50 @@ export function Switch({
   );
 }
 
+/** A value along a range, dragged or stepped with the arrow keys. */
+export function Slider({
+  value,
+  onValueChange,
+  min = 0,
+  max = 100,
+  step = 1,
+  label,
+  sx,
+}: {
+  value: number;
+  onValueChange: (value: number) => void;
+  min?: number;
+  max?: number;
+  step?: number;
+  label: string;
+  sx?: StyleXStyles;
+}) {
+  return (
+    <BaseSlider.Root
+      value={value}
+      onValueChange={(next) => {
+        if (typeof next === "number") {
+          onValueChange(next);
+        }
+      }}
+      min={min}
+      max={max}
+      step={step}
+      {...stylex.props(styles.slider, sx)}
+    >
+      <BaseSlider.Control {...stylex.props(styles.sliderControl)}>
+        <BaseSlider.Track {...stylex.props(styles.sliderTrack)}>
+          <BaseSlider.Indicator {...stylex.props(styles.sliderFill)} />
+          <BaseSlider.Thumb
+            aria-label={label}
+            {...stylex.props(styles.sliderThumb)}
+          />
+        </BaseSlider.Track>
+      </BaseSlider.Control>
+    </BaseSlider.Root>
+  );
+}
+
 /** A row of mutually exclusive options: filters and small view toggles. */
 export function Segmented<T extends string>({
   value,
@@ -560,6 +605,34 @@ const styles = stylex.create({
     transitionDuration: motion.base,
     transitionTimingFunction: motion.out,
     translate: { default: "0 0", ":is([data-checked])": "12px 0" },
+  },
+  slider: { width: "100%" },
+  sliderControl: {
+    display: "flex",
+    alignItems: "center",
+    height: 24,
+    touchAction: "none",
+  },
+  sliderTrack: {
+    position: "relative",
+    width: "100%",
+    height: 4,
+    borderRadius: radius.full,
+    backgroundColor: color.uiActive,
+  },
+  sliderFill: { borderRadius: radius.full, backgroundColor: color.accent },
+  sliderThumb: {
+    width: 16,
+    height: 16,
+    borderRadius: "50%",
+    backgroundColor: "oklch(1 0 0)",
+    boxShadow: `0 0 0 1px ${color.lineStrong}, 0 1px 2px oklch(0 0 0 / 0.25)`,
+    outline: {
+      default: "none",
+      ":has(:focus-visible)": `2px solid ${color.focus}`,
+    },
+    outlineOffset: 2,
+    cursor: "grab",
   },
   segmented: {
     display: "inline-flex",

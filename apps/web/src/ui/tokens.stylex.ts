@@ -48,6 +48,7 @@ export const color = stylex.defineVars({
 
   focus: "light-dark(oklch(0.6 0.19 268), oklch(0.7 0.16 268))",
   scrim: "light-dark(oklch(0.2 0.01 80 / 0.28), oklch(0 0 0 / 0.55))",
+  veil: "light-dark(oklch(0 0 0 / 0.55), oklch(0 0 0 / 0.55))",
 
   sheen: "light-dark(oklch(1 0 0 / 0.12), oklch(1 0 0 / 0.12))",
   shade: "light-dark(oklch(0 0 0 / 0.1), oklch(0 0 0 / 0.1))",

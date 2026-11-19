@@ -8,6 +8,7 @@ import { createContext } from "#context";
 import type { AppContext } from "#context";
 import { runJobsOnce } from "#jobs/tasks";
 import { ConsoleMailer } from "#lib/mailer";
+import { createStorage } from "#lib/storage";
 
 export { hmacHex } from "#lib/crypto";
 export { DAY_MS } from "#lib/time";
@@ -135,6 +136,7 @@ export async function resetSharedContext() {
 
 function resetContext(ctx: AppContext) {
   ctx.models = null;
+  ctx.storage = null;
   ctx.now = () => new Date();
   ctx.fetch = fetchStub();
   (ctx.mailer as ConsoleMailer).sent.length = 0;
@@ -163,6 +165,22 @@ function urlOf(input: string | URL | Request) {
     return input;
   }
   return input instanceof URL ? input.href : input.url;
+}
+
+/** Gives the context an R2 bucket at `R2_PUBLIC_URL` https://files.worklog.test, reached through `fetch`. */
+export function attachBucket(ctx: AppContext, fetch: typeof globalThis.fetch) {
+  ctx.fetch = fetch;
+  ctx.storage = createStorage(
+    {
+      ...ctx.config,
+      R2_ACCOUNT_ID: "acct",
+      R2_ACCESS_KEY_ID: "key",
+      R2_SECRET_ACCESS_KEY: "secret",
+      R2_BUCKET: "worklog",
+      R2_PUBLIC_URL: "https://files.worklog.test",
+    },
+    () => ctx.fetch
+  );
 }
 
 export function fetchStub() {

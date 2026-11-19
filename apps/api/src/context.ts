@@ -16,6 +16,8 @@ import type { Auth } from "./lib/auth";
 import { SecretBox } from "./lib/crypto";
 import { createMailer } from "./lib/mailer";
 import type { Mailer } from "./lib/mailer";
+import { createStorage } from "./lib/storage";
+import type { Storage } from "./lib/storage";
 import { tracedFetch } from "./telemetry/instrument";
 import { startTelemetry } from "./telemetry/start";
 import { agentWorkspace } from "./work/agents";
@@ -30,6 +32,8 @@ export type AppContext = {
   tally: Tally;
   secrets: SecretBox;
   models: Models | null;
+  /** Null without the R2_* variables: uploads are refused and everything else works. */
+  storage: Storage | null;
   mailer: Mailer;
   fetch: typeof fetch;
   now: () => Date;
@@ -77,6 +81,7 @@ export async function createContext(
     secrets,
     models:
       "models" in overrides ? (overrides.models ?? null) : createModels(config),
+    storage: createStorage(config, () => ctx.fetch),
     mailer,
     fetch: tracedFetch(rawFetch),
     now: overrides.now ?? (() => new Date()),

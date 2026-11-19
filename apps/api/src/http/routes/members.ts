@@ -15,6 +15,7 @@ import {
   respond,
   router,
 } from "#http/router";
+import { ErrorSchema } from "#http/schemas/common";
 import {
   CreateMemberRequest,
   CreateTokenRequest,
@@ -27,8 +28,13 @@ import {
   TokenInfo,
   UpdateMeRequest,
 } from "#http/schemas/members";
+import { readBounded } from "#lib/body";
+import { tooLarge } from "#lib/errors";
 import { log } from "#telemetry/log";
+import { AVATAR_TYPES, MAX_AVATAR_BYTES, setAvatar } from "#work/avatars";
 import * as people from "#work/members";
+
+const Image = { schema: z.string().openapi({ format: "binary" }) };
 
 export const memberRoutes = router()
   .openapi(
@@ -51,7 +57,13 @@ export const memberRoutes = router()
       return respond(
         c,
         MeResponse,
-        { member: me, workspace, assistant, ai: ctx.models !== null },
+        {
+          member: me,
+          workspace,
+          assistant,
+          ai: ctx.models !== null,
+          uploads: ctx.storage !== null,
+        },
         200
       );
     }
@@ -77,6 +89,43 @@ export const memberRoutes = router()
         ),
         200
       )
+  )
+  .openapi(
+    createRoute({
+      method: "put",
+      path: "/v1/me/avatar",
+      operationId: "me.setAvatar",
+      tags: ["People"],
+      summary: "Upload your profile picture",
+      description:
+        "The image is the raw body: WebP, PNG or JPEG, up to 2 MB. Send it square; it's shown as is, in a circle. It replaces your picture, and the one you uploaded before is deleted. Remove it with `PATCH /v1/me {avatarUrl: null}`. 503 when the server has no file storage (`uploads` on `GET /v1/me`).",
+      request: {
+        body: {
+          required: true,
+          content: Object.fromEntries(
+            Object.keys(AVATAR_TYPES).map((type) => [type, Image])
+          ),
+        },
+      },
+      responses: {
+        200: json(MemberResponse),
+        ...errors,
+        413: json(ErrorSchema, "Image too large"),
+        503: json(ErrorSchema, "No file storage on this server"),
+      },
+    }),
+    async (c) => {
+      const bytes = await readBounded(c.req.raw, MAX_AVATAR_BYTES);
+      if (bytes === null) {
+        throw tooLarge("That picture is over 2 MB");
+      }
+      return respond(
+        c,
+        MemberResponse,
+        await setAvatar(c.get("ctx"), c.get("member"), bytes),
+        200
+      );
+    }
   )
   .openapi(
     createRoute({
