@@ -3,7 +3,7 @@ import { useRef } from "react";
 import type { KeyboardEvent, PointerEvent } from "react";
 
 import { SIDEBAR_WIDTH, setSidebarWidth, useSidebarWidth } from "#lib/sidebar";
-import { color, media, motion } from "#ui/tokens.stylex";
+import { color, panel } from "#ui/tokens.stylex";
 
 const STEP = 16;
 const BIG_STEP = 64;
@@ -84,11 +84,11 @@ export function SidebarResizer({
 const styles = stylex.create({
   handle: {
     position: "absolute",
-    top: 0,
-    bottom: 0,
-    left: -5,
+    top: panel.inset,
+    bottom: panel.inset,
+    left: -4,
     zIndex: 5,
-    width: 9,
+    width: 8,
     cursor: "col-resize",
     touchAction: "none",
     outline: "none",
@@ -98,21 +98,14 @@ const styles = stylex.create({
       top: 0,
       bottom: 0,
       left: 3,
-      width: 3,
-      borderRadius: 2,
-      backgroundColor: color.focus,
-      opacity: {
-        default: 0,
-        ":hover": { default: null, [media.hover]: 1 },
-        ":active": 1,
-        ":focus-visible": 1,
-      },
-      transitionProperty: "opacity",
-      transitionDuration: motion.fast,
-      transitionDelay: {
-        default: "0s",
-        ":hover": { default: null, [media.hover]: "120ms" },
-      },
+      width: panel.radius,
+      borderLeftWidth: 2,
+      borderLeftStyle: "solid",
+      borderLeftColor: color.focus,
+      borderTopLeftRadius: panel.radius,
+      borderBottomLeftRadius: panel.radius,
+      pointerEvents: "none",
+      opacity: { default: 0, ":focus-visible": 1 },
     },
   },
 });

@@ -143,6 +143,12 @@ export const motion = stylex.defineVars({
   inOut: "cubic-bezier(0.65, 0, 0.35, 1)",
 });
 
+/** The main panel's gap from the window edge and its corner radius, beside the sidebar. */
+export const panel = stylex.defineConsts({
+  inset: "6px",
+  radius: "10px",
+});
+
 export const media = stylex.defineConsts({
   hover: "@media (hover: hover) and (pointer: fine)",
   touch: "@media (hover: none) and (pointer: coarse)",

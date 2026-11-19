@@ -21,7 +21,7 @@ import {
   useSidebarFolded,
   useSidebarWidth,
 } from "#lib/sidebar";
-import { color, motion } from "#ui/tokens.stylex";
+import { color, motion, panel } from "#ui/tokens.stylex";
 
 import { InShell } from "./fallbacks";
 import { MobileBar } from "./mobile-bar";
@@ -324,9 +324,9 @@ const styles = stylex.create({
     flexDirection: "column",
     minWidth: 0,
     minHeight: 0,
-    margin: { default: 6, "@media (max-width: 860px)": 0 },
+    margin: { default: panel.inset, "@media (max-width: 860px)": 0 },
     marginLeft: 0,
-    borderRadius: { default: 10, "@media (max-width: 860px)": 0 },
+    borderRadius: { default: panel.radius, "@media (max-width: 860px)": 0 },
     backgroundColor: color.bg,
     boxShadow: {
       default: `0 0 0 1px ${color.line}`,
