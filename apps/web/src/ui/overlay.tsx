@@ -30,6 +30,7 @@ export function Tooltip({
   shortcut,
   side = "bottom",
   disabled = false,
+  delay,
   children,
 }: {
   label: ReactNode;
@@ -37,11 +38,16 @@ export function Tooltip({
   side?: "top" | "bottom" | "left" | "right";
   /** Off without unmounting, so a trigger that only sometimes needs a tooltip keeps its state. */
   disabled?: boolean;
+  /** Milliseconds before it opens; 0 for a dense grid you sweep across, where the wait feels broken. */
+  delay?: number;
   children: ReactElement;
 }) {
   return (
     <BaseTooltip.Root disabled={disabled}>
-      <BaseTooltip.Trigger render={children} />
+      <BaseTooltip.Trigger
+        render={children}
+        {...(delay === undefined ? {} : { delay })}
+      />
       <BaseTooltip.Portal>
         <BaseTooltip.Positioner
           side={side}
