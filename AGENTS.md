@@ -15,8 +15,11 @@ Code carries its meaning in names and structure; the reason for a change goes in
 - TSDoc on exported public API.
 
 If code seems to need a comment, rename or extract instead. The same rules apply to commit messages and PR descriptions: say why, never narrate.
+
 # Working here
+
 - Commit only when asked. Conventional commits with scope api, mobile, web or none; one short line, no co-author, no body or trailers.
+
 ## Commands
 
 Run from the repo root unless noted. Bun only: no npm, yarn, pnpm or other lockfiles.
