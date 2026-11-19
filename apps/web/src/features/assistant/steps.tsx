@@ -17,9 +17,9 @@ import {
   NoteIcon,
   NotePencilIcon,
   PlusSquareIcon,
-  FootprintsIcon,
+  ClockCountdownIcon,
   ThumbsUpIcon,
-  TrayIcon,
+  MailboxIcon,
   UserFocusIcon,
   UsersThreeIcon,
   WarningCircleIcon,
@@ -333,12 +333,12 @@ function Thought({ step }: { step: Extract<Step, { kind: "thought" }> }) {
 const MEMORY_WRITES = new Set(["remember", "forget"]);
 
 const ICONS: Record<string, ComponentType<IconProps>> = {
-  search_activity: FootprintsIcon,
+  search_activity: ClockCountdownIcon,
   search_cards: MagnifyingGlassIcon,
   get_card: CardsIcon,
   work_snapshot: UserFocusIcon,
   team_directory: UsersThreeIcon,
-  my_attention: TrayIcon,
+  my_attention: MailboxIcon,
   recall: BookOpenIcon,
   remember: BookmarkSimpleIcon,
   forget: EraserIcon,

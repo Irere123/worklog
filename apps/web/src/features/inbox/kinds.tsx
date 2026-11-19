@@ -2,7 +2,7 @@ import {
   AlarmIcon,
   ChatCenteredDotsIcon,
   KanbanIcon,
-  TrayIcon,
+  MailboxIcon,
   UserPlusIcon,
   WarningCircleIcon,
 } from "@phosphor-icons/react";
@@ -82,7 +82,7 @@ export function kindOf(kind: string) {
   return (
     KINDS[kind] ?? {
       label: kind.replaceAll(/[._]/gu, " "),
-      icon: <TrayIcon size={13} weight="fill" />,
+      icon: <MailboxIcon size={13} weight="fill" />,
       tone: "neutral" as Tone,
     }
   );

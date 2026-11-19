@@ -1,4 +1,8 @@
-import { ListIcon, MagnifyingGlassIcon, TrayIcon } from "@phosphor-icons/react";
+import {
+  ListIcon,
+  MagnifyingGlassIcon,
+  MailboxIcon,
+} from "@phosphor-icons/react";
 import * as stylex from "@stylexjs/stylex";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
@@ -68,7 +72,7 @@ export function MobileBar({
         aria-label={`Inbox, ${waiting} waiting`}
         {...stylex.props(styles.icon, styles.inbox)}
       >
-        <TrayIcon size={18} />
+        <MailboxIcon size={18} />
         {waiting > 0 && (
           <span {...stylex.props(styles.badge)}>
             <Count tone="accent">{waiting}</Count>

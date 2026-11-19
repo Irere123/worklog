@@ -1,7 +1,7 @@
 import {
   CalendarDotsIcon,
   EnvelopeSimpleIcon,
-  PaperPlaneRightIcon,
+  PaperPlaneTiltIcon,
   PlusIcon,
   TrashIcon,
   WebhooksLogoIcon,
@@ -496,7 +496,7 @@ export function Delivery() {
         )}
         {targets.data?.length === 0 && (
           <EmptyState
-            icon={<PaperPlaneRightIcon size={20} />}
+            icon={<PaperPlaneTiltIcon size={20} />}
             title="Nowhere to send yet"
           >
             Briefs still appear in Worklog. Add your email or a Slack channel to

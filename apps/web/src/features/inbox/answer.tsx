@@ -1,4 +1,4 @@
-import { PaperPlaneRightIcon } from "@phosphor-icons/react";
+import { PaperPlaneTiltIcon } from "@phosphor-icons/react";
 import * as stylex from "@stylexjs/stylex";
 import { useHotkey } from "@tanstack/react-hotkeys";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -112,7 +112,7 @@ function AnswerForm({
           type="submit"
           variant="primary"
           size="sm"
-          icon={<PaperPlaneRightIcon size={14} />}
+          icon={<PaperPlaneTiltIcon size={14} />}
           busy={send.isPending}
           disabled={answer === ""}
           trailing={touch ? undefined : <Kbd sx={styles.kbd}>⌘ ↵</Kbd>}

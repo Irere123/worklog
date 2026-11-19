@@ -4,7 +4,7 @@ import {
   CalendarDotsIcon,
   IdentificationBadgeIcon,
   KeyIcon,
-  PaperPlaneRightIcon,
+  PaperPlaneTiltIcon,
   PlugIcon,
   ScrollIcon,
   ThumbsUpIcon,
@@ -95,7 +95,7 @@ const GROUPS: {
       {
         to: "/settings/delivery",
         label: "Delivery",
-        icon: <PaperPlaneRightIcon size={15} />,
+        icon: <PaperPlaneTiltIcon size={15} />,
       },
     ],
   },

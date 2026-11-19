@@ -6,13 +6,13 @@ import {
   KanbanIcon,
   KeyboardIcon,
   MoonIcon,
-  NewspaperIcon,
+  NewspaperClippingIcon,
   NotePencilIcon,
   PlusIcon,
-  FootprintsIcon,
+  ClockCountdownIcon,
   SignOutIcon,
   SunIcon,
-  TrayIcon,
+  MailboxIcon,
   UsersIcon,
 } from "@phosphor-icons/react";
 import * as stylex from "@stylexjs/stylex";
@@ -188,14 +188,14 @@ export function CommandPalette({
             Home
           </Item>
           <Item
-            icon={<TrayIcon size={15} />}
+            icon={<MailboxIcon size={15} />}
             onSelect={go("/inbox")}
             hint={<Kbd>G I</Kbd>}
           >
             Inbox
           </Item>
           <Item
-            icon={<FootprintsIcon size={15} />}
+            icon={<ClockCountdownIcon size={15} />}
             onSelect={go("/activity")}
             hint={<Kbd>G A</Kbd>}
           >
@@ -209,7 +209,7 @@ export function CommandPalette({
             Assistant
           </Item>
           <Item
-            icon={<NewspaperIcon size={15} />}
+            icon={<NewspaperClippingIcon size={15} />}
             onSelect={go("/briefs")}
             hint={<Kbd>G R</Kbd>}
           >

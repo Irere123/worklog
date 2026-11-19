@@ -1,13 +1,13 @@
 import {
   CaretUpDownIcon,
-  FootprintsIcon,
+  ClockCountdownIcon,
   HouseIcon,
   KanbanIcon,
   ListIcon,
   MagnifyingGlassIcon,
-  NewspaperIcon,
+  NewspaperClippingIcon,
   NotePencilIcon,
-  TrayIcon,
+  MailboxIcon,
   UsersIcon,
 } from "@phosphor-icons/react";
 import type { Icon } from "@phosphor-icons/react";
@@ -80,7 +80,7 @@ export function AppWindow({
             Home
           </Item>
           <Item
-            icon={TrayIcon}
+            icon={MailboxIcon}
             on={nav === "inbox"}
             trailing={
               inbox > 0 ? (
@@ -98,10 +98,10 @@ export function AppWindow({
         </div>
         <div {...stylex.props(styles.group)}>
           <span {...stylex.props(styles.groupHead)}>Team</span>
-          <Item icon={FootprintsIcon} on={nav === "activity"}>
+          <Item icon={ClockCountdownIcon} on={nav === "activity"}>
             Activity
           </Item>
-          <Item icon={NewspaperIcon} on={nav === "briefs"}>
+          <Item icon={NewspaperClippingIcon} on={nav === "briefs"}>
             Briefs
           </Item>
           <Item icon={UsersIcon} on={nav === "people"}>
@@ -128,7 +128,7 @@ export function AppWindow({
         <span {...stylex.props(styles.workspaceName)}>{WORKSPACE}</span>
         <MagnifyingGlassIcon size={18} />
         <span {...stylex.props(styles.mobileInbox)}>
-          <TrayIcon size={18} />
+          <MailboxIcon size={18} />
           {inbox > 0 && (
             <span {...stylex.props(styles.count, styles.mobileCount)}>
               <Roll value={inbox} />

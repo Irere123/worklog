@@ -1,4 +1,8 @@
-import { CaretDownIcon, NewspaperIcon, PlusIcon } from "@phosphor-icons/react";
+import {
+  CaretDownIcon,
+  NewspaperClippingIcon,
+  PlusIcon,
+} from "@phosphor-icons/react";
 import * as stylex from "@stylexjs/stylex";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
@@ -95,7 +99,7 @@ export function Briefs({ selectedId }: { selectedId?: string }) {
         <div {...stylex.props(styles.reader)}>
           {briefs.isSuccess && list.length === 0 && (
             <EmptyState
-              icon={<NewspaperIcon size={20} />}
+              icon={<NewspaperClippingIcon size={20} />}
               title="No briefs yet"
               action={
                 <Button

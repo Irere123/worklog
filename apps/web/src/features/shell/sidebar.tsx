@@ -8,14 +8,14 @@ import {
   MagnifyingGlassIcon,
   MonitorIcon,
   MoonIcon,
-  NewspaperIcon,
+  NewspaperClippingIcon,
   NotePencilIcon,
   PlusIcon,
   SidebarSimpleIcon,
-  FootprintsIcon,
+  ClockCountdownIcon,
   SignOutIcon,
   SunIcon,
-  TrayIcon,
+  MailboxIcon,
   UserCircleIcon,
   UsersIcon,
 } from "@phosphor-icons/react";
@@ -107,7 +107,7 @@ export function Sidebar({
         </NavItem>
         <NavItem
           to="/inbox"
-          icon={TrayIcon}
+          icon={MailboxIcon}
           rail={rail}
           trailing={open > 0 ? <Count tone="accent">{open}</Count> : null}
         >
@@ -126,10 +126,10 @@ export function Sidebar({
             {...stylex.props(styles.rule, rail && styles.ruleIn)}
           />
         </div>
-        <NavItem to="/activity" icon={FootprintsIcon} rail={rail}>
+        <NavItem to="/activity" icon={ClockCountdownIcon} rail={rail}>
           Activity
         </NavItem>
-        <NavItem to="/briefs" icon={NewspaperIcon} rail={rail}>
+        <NavItem to="/briefs" icon={NewspaperClippingIcon} rail={rail}>
           Briefs
         </NavItem>
         <NavItem to="/people" icon={UsersIcon} rail={rail}>
