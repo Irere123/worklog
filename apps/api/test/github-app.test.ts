@@ -784,6 +784,7 @@ describe("GitHub App", () => {
   });
 
   test("registering an app on a server with several workspaces takes the setup secret", async () => {
+    await env.workspace("Elsewhere");
     const owner = await env.workspace();
     const res = await env.call("PUT", "/v1/apps/github", {
       token: owner.token,
