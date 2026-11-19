@@ -1,13 +1,14 @@
 import {
-  CaretUpDownIcon,
   ClockCountdownIcon,
+  GearIcon,
   HouseIcon,
-  KanbanIcon,
   ListIcon,
   MagnifyingGlassIcon,
   NewspaperClippingIcon,
   NotePencilIcon,
   MailboxIcon,
+  PlusIcon,
+  SidebarSimpleIcon,
   UsersIcon,
 } from "@phosphor-icons/react";
 import type { Icon } from "@phosphor-icons/react";
@@ -15,7 +16,7 @@ import * as stylex from "@stylexjs/stylex";
 import type { StyleXStyles } from "@stylexjs/stylex";
 import type { ReactNode } from "react";
 
-import { Avatar } from "#ui/avatar";
+import { Avatar, hueOf } from "#ui/avatar";
 import { Ghost } from "#ui/ghost";
 import { Logo } from "#ui/logo";
 import { color, font, radius, space, text } from "#ui/tokens.stylex";
@@ -63,7 +64,11 @@ export function AppWindow({
         <div {...stylex.props(styles.workspace)}>
           <Logo size={20} />
           <span {...stylex.props(styles.workspaceName)}>{WORKSPACE}</span>
-          <CaretUpDownIcon size={12} {...stylex.props(styles.faint)} />
+          <SidebarSimpleIcon
+            size={14}
+            weight="fill"
+            {...stylex.props(styles.faint)}
+          />
         </div>
         <div {...stylex.props(styles.actions)}>
           <span {...stylex.props(styles.search)}>
@@ -109,17 +114,23 @@ export function AppWindow({
           </Item>
         </div>
         <div {...stylex.props(styles.group)}>
-          <span {...stylex.props(styles.groupHead)}>Boards</span>
-          <Item icon={KanbanIcon} on={nav === "referrals"}>
+          <span {...stylex.props(styles.groupHead)}>
+            Boards
+            <PlusIcon size={12} />
+          </span>
+          <Item board on={nav === "referrals"}>
             Referrals
           </Item>
-          <Item icon={KanbanIcon} on={nav === "platform"}>
+          <Item board on={nav === "platform"}>
             Platform
           </Item>
         </div>
-        <div {...stylex.props(styles.me)}>
-          <Avatar person={ada} size={20} />
-          <span>{ada.name}</span>
+        <div {...stylex.props(styles.footer)}>
+          <span {...stylex.props(styles.me)}>
+            <Avatar person={ada} size={20} />
+            <span {...stylex.props(styles.workspaceName)}>{ada.name}</span>
+          </span>
+          <GearIcon size={14} {...stylex.props(styles.faint)} />
         </div>
       </aside>
       <div {...stylex.props(styles.mobileBar)}>
@@ -147,23 +158,33 @@ export function AppWindow({
 function Item({
   icon: Glyph,
   ghost = false,
+  board = false,
   on,
   trailing,
   children,
 }: {
   icon?: Icon;
   ghost?: boolean;
+  board?: boolean;
   on: boolean;
   trailing?: ReactNode;
   children: string;
 }) {
+  let mark: ReactNode = null;
+  if (ghost) {
+    mark = <Ghost size={14} still />;
+  } else if (board) {
+    mark = (
+      <span {...stylex.props(styles.board, styles.tint(hueOf(children)))}>
+        {children.charAt(0)}
+      </span>
+    );
+  } else if (Glyph) {
+    mark = <Glyph size={14} weight={on ? "fill" : "regular"} />;
+  }
   return (
     <span {...stylex.props(styles.item, on && styles.itemOn)}>
-      {ghost ? (
-        <Ghost size={14} still />
-      ) : (
-        Glyph && <Glyph size={14} weight={on ? "fill" : "regular"} />
-      )}
+      {mark}
       <span {...stylex.props(styles.grow)}>{children}</span>
       {trailing}
     </span>
@@ -352,6 +373,9 @@ const styles = stylex.create({
     gap: space.xxs,
   },
   groupHead: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingInline: space.md,
     paddingBottom: space.xxs,
     fontSize: text.meta,
@@ -366,14 +390,28 @@ const styles = stylex.create({
     paddingInline: space.md,
     borderRadius: radius.md,
     color: color.fgMuted,
+    fontWeight: 500,
     transitionProperty: "background-color, color",
     transitionDuration: "200ms",
   },
   itemOn: {
     backgroundColor: color.uiActive,
     color: color.fg,
-    fontWeight: 500,
   },
+  board: {
+    display: "grid",
+    placeItems: "center",
+    width: 14,
+    height: 14,
+    borderRadius: 4,
+    fontSize: 9,
+    fontWeight: 600,
+    lineHeight: 1,
+  },
+  tint: (hue: number) => ({
+    color: `light-dark(oklch(0.38 0.09 ${hue}), oklch(0.9 0.06 ${hue}))`,
+    backgroundColor: `light-dark(oklch(0.9 0.05 ${hue}), oklch(0.36 0.07 ${hue}))`,
+  }),
   grow: {
     flexGrow: 1,
     minWidth: 0,
@@ -391,11 +429,23 @@ const styles = stylex.create({
     fontWeight: 600,
     lineHeight: "18px",
   },
+  footer: {
+    display: "flex",
+    alignItems: "center",
+    gap: space.sm,
+    marginTop: "auto",
+    paddingTop: space.md,
+    paddingInlineEnd: space.sm,
+    borderTopWidth: 1,
+    borderTopStyle: "solid",
+    borderTopColor: color.line,
+  },
   me: {
     display: "flex",
     alignItems: "center",
     gap: space.md,
-    marginTop: "auto",
+    flexGrow: 1,
+    minWidth: 0,
     paddingInline: space.sm,
     fontWeight: 500,
   },
