@@ -37,7 +37,7 @@
   - **Coding agents** (Claude Code, Cursor, VS Code, Codex…) connect themselves over MCP (see below).
   - **Scripts, bots and integrations:** they use API keys scoped `read`, `write` or `ingest`.
   - **Tenancy stays Worklog's:** workspaces, roles and agent members live in our own tables (better-auth users can't be agents).
-  - **Invites:** a member with an email but no user is a pending invite, claimed on sign-in with that verified address.
+  - **Invites:** a human member with no user is a pending invite, claimed on sign-in with its verified email address, or through an invite link (`/join/<code>`) with any account. The link is the member's id and an HMAC of it with `members.invite_nonce`, keyed by `AUTH_SECRET`, so nothing secret is stored; it works once, and a new nonce voids the links made before.
 - **Humans and agents are both members.** Every human gets a personal assistant (`agentProvider: "worklog"`, `ownerId` = the human). External agents are members with their own tokens. Board changes made by an assistant are attributed to the assistant, so the team can see which moves an agent made.
 - **Coding agents connect themselves.** `POST /mcp` is an MCP server (`@modelcontextprotocol/server`, stateless, serving 2025-era clients and the 2026-07-28 protocol), and Worklog is the OAuth 2.1 server behind it (`@better-auth/mcp`, with `cimd` for Client ID Metadata Documents and dynamic registration for older clients). Adding the URL to a tool is the whole setup:
   1. With no token, `/mcp` answers 401 with a challenge naming `/.well-known/oauth-protected-resource/mcp`, which leads the client to the authorization server's metadata, registration and `/api/auth/oauth2/authorize`.

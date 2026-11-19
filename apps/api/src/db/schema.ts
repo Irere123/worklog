@@ -56,6 +56,8 @@ export const members = pgTable(
     /** Null for agents and not-yet-claimed invites. */
     userId: text("user_id").references(() => user.id, { onDelete: "set null" }),
     settings: jsonb("settings").$type<MemberSettings>().notNull().default({}),
+    /** Signs an unclaimed member's invite link; a new one voids the links made before. */
+    inviteNonce: text("invite_nonce"),
     createdAt: createdAt(),
     deactivatedAt: ts("deactivated_at"),
   },

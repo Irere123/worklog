@@ -215,6 +215,7 @@ export async function createMember(
         activeHours: { start: "08:00", end: "19:00" },
         workdays: [1, 2, 3, 4, 5],
       },
+      inviteNonce: null,
       createdAt: tx.now(),
       deactivatedAt: null,
     };

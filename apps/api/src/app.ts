@@ -24,6 +24,7 @@ import { connectionRoutes } from "./http/routes/connections";
 import { deliveryRoutes } from "./http/routes/delivery";
 import { eventRoutes } from "./http/routes/events";
 import { identityRoutes } from "./http/routes/identities";
+import { inviteRoutes } from "./http/routes/invites";
 import { memberRoutes } from "./http/routes/members";
 import { memoryRoutes } from "./http/routes/memory";
 import {
@@ -141,6 +142,7 @@ export function createApp(ctx: AppContext) {
     .route("/", authConfigRoutes)
     .route("/", sessionRoutes)
     .route("/", memberRoutes)
+    .route("/", inviteRoutes)
     .route("/", identityRoutes)
     .route("/", boardRoutes)
     .route("/", activityRoutes)

@@ -26,6 +26,15 @@ export const q = {
       queryFn: async () => await unwrap(api.GET("/v1/auth/config")),
       staleTime: Number.POSITIVE_INFINITY,
     }),
+  invite: (code: string) =>
+    queryOptions({
+      queryKey: ["invite", code],
+      queryFn: async () =>
+        await unwrap(
+          api.GET("/v1/invites/{code}", { params: { path: { code } } })
+        ),
+      retry: false,
+    }),
   session: () =>
     queryOptions({
       queryKey: ["session"],

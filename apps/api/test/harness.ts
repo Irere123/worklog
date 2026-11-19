@@ -109,7 +109,38 @@ export async function testEnv() {
     await ctx.tally.flush();
   };
 
-  return { ctx, app, call, workspace, teammate, reset, drain };
+  async function signIn(email: string) {
+    const mailer = ctx.mailer as ConsoleMailer;
+    const before = mailer.sent.length;
+    const start = await app.request("/api/auth/sign-in/magic-link", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        origin: "https://worklog.test",
+      },
+      body: JSON.stringify({ email, callbackURL: "/" }),
+    });
+    if (start.status !== 200) {
+      throw new Error(`sign-in failed: ${start.status}`);
+    }
+    for (let tries = 0; tries < 100; tries += 1) {
+      const mail = mailer.sent.slice(before).findLast((m) => m.to === email);
+      const link = mail ? /https?:\/\/\S+/u.exec(mail.text)?.[0] : undefined;
+      if (link) {
+        const url = new URL(link);
+        const verify = await app.request(url.pathname + url.search);
+        const token = verify.headers.get("set-auth-token");
+        if (!token) {
+          throw new Error("sign-in link gave no session");
+        }
+        return token;
+      }
+      await Bun.sleep(10);
+    }
+    throw new Error(`No sign-in email reached ${email}`);
+  }
+
+  return { ctx, app, call, workspace, teammate, reset, drain, signIn };
 }
 
 export async function freshDatabase(name: string) {

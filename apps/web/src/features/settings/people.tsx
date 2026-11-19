@@ -1,6 +1,8 @@
 import {
+  ArrowsClockwiseIcon,
   CopyIcon,
   KeyIcon,
+  LinkSimpleIcon,
   PlusIcon,
   TrashIcon,
   UserPlusIcon,
@@ -22,7 +24,7 @@ import { Badge } from "#ui/chip";
 import { EmptyState, Skeleton } from "#ui/feedback";
 import { Checkbox, Field, Input, Segmented, Select } from "#ui/field";
 import { Ghost } from "#ui/ghost";
-import { Dialog, Tooltip } from "#ui/overlay";
+import { Dialog, Menu, MenuItem, Tooltip } from "#ui/overlay";
 import { color, radius, space, text } from "#ui/tokens.stylex";
 
 import { ConnectAgentSteps } from "./connect-agent";
@@ -448,6 +450,7 @@ function MemberRow({
       {m.role !== "member" && (
         <Badge tone="accent">{m.role === "owner" ? "Owner" : "Admin"}</Badge>
       )}
+      {admin && !self && <InviteLinkMenu member={m} />}
       <KeyButton open={openKey} name={m.name} />
       {link && (admin || m.ownerId === me?.member.id) && (
         <DisconnectButton agent={m} />
@@ -516,6 +519,94 @@ function DisconnectButton({ agent }: { agent: Schemas["Member"] }) {
   );
 }
 
+function InviteLinkMenu({ member }: { member: Schemas["Member"] }) {
+  const pending = member.kind === "human" && !member.signedUp;
+  const [busy, setBusy] = useState(false);
+  const copy = async (reset: boolean) => {
+    setBusy(true);
+    await copyInviteLink(member, reset);
+    setBusy(false);
+  };
+  if (!pending) {
+    return null;
+  }
+  return (
+    <Menu
+      align="end"
+      trigger={
+        <Button
+          size="sm"
+          variant="ghost"
+          icon={<LinkSimpleIcon size={13} />}
+          busy={busy}
+          aria-label={`Invite link for ${member.name}`}
+        >
+          Invite link
+        </Button>
+      }
+    >
+      <MenuItem
+        icon={<CopyIcon size={14} />}
+        onClick={() => {
+          void copy(false);
+        }}
+      >
+        Copy invite link
+      </MenuItem>
+      <MenuItem
+        icon={<ArrowsClockwiseIcon size={14} />}
+        detail="Voids the old one"
+        onClick={() => {
+          void copy(true);
+        }}
+      >
+        Make a new link
+      </MenuItem>
+    </Menu>
+  );
+}
+
+async function copyInviteLink(member: Schemas["Member"], reset: boolean) {
+  try {
+    await copyWhenReady(inviteLinkFor(member.id, reset));
+    toast.success(
+      reset
+        ? `Copied a new invite link for ${member.name}. The old one no longer works.`
+        : `Copied ${member.name}’s invite link. It works once, with any account.`
+    );
+  } catch (error) {
+    toast.error(
+      error instanceof Error
+        ? error.message
+        : "The link didn’t copy. Try again."
+    );
+  }
+}
+
+async function inviteLinkFor(id: string, reset = false) {
+  const { url } = await unwrap(
+    api.POST("/v1/members/{ref}/invite-link", {
+      params: { path: { ref: id } },
+      body: reset ? { reset } : {},
+    })
+  );
+  return url;
+}
+
+async function copyWhenReady(pending: Promise<string>) {
+  try {
+    await navigator.clipboard.write([
+      new ClipboardItem({
+        "text/plain": pending.then(
+          (value) => new Blob([value], { type: "text/plain" })
+        ),
+      }),
+    ]);
+  } catch {
+    await navigator.clipboard.writeText(await pending);
+  }
+}
+
 function KeyButton({ open, name }: { open?: () => void; name: string }) {
   if (!open) {
     return null;
@@ -536,7 +627,8 @@ function KeyButton({ open, name }: { open?: () => void; name: string }) {
 const ADD_COPY = {
   human: {
     title: "Invite a teammate",
-    description: "They’ll get a sign-in link by email.",
+    description:
+      "You’ll get a link to send them. Add their email and we’ll send it there too.",
   },
   agent: {
     title: "Add an agent",
@@ -549,6 +641,28 @@ const KEY_COPY = {
   description:
     "It won’t be shown again. The agent sends it as a Bearer token to log work and report progress.",
 };
+
+function dialogCopy(state: {
+  kind: "human" | "agent" | null;
+  token: string | null;
+  link: string | null;
+  name: string;
+  email: string;
+}) {
+  if (state.token !== null) {
+    return KEY_COPY;
+  }
+  if (state.link === null) {
+    return ADD_COPY[state.kind ?? "human"];
+  }
+  const once = "It works once, with any account they sign in with.";
+  return {
+    title: `Send ${state.name.trim()} this link`,
+    description: state.email.trim()
+      ? `We emailed ${state.email.trim()} too. ${once}`
+      : once,
+  };
+}
 
 type AgentPath = "tool" | "key";
 
@@ -570,7 +684,8 @@ function AddMember({
   const [title, setTitle] = useState("");
   const [provider, setProvider] = useState("");
   const [token, setToken] = useState<string | null>(null);
-  const copy = token === null ? ADD_COPY[kind ?? "human"] : KEY_COPY;
+  const [link, setLink] = useState<string | null>(null);
+  const copy = dialogCopy({ kind, token, link, name, email });
   const client = useQueryClient();
   const add = useMutation({
     mutationFn: async () =>
@@ -589,16 +704,18 @@ function AddMember({
           },
         })
       ),
-    onSuccess: (result) => {
+    onSuccess: async (result) => {
       void client.invalidateQueries({ queryKey: ["members"] });
-      if (result.token === null) {
-        toast.success(
-          result.invited ? `Invite sent to ${email}` : `${name} added`
-        );
-        close();
-      } else {
+      if (result.token !== null) {
         setToken(result.token.token);
+        return;
       }
+      if (result.member.kind === "human") {
+        setLink(await inviteLinkFor(result.member.id));
+        return;
+      }
+      toast.success(`${name} added`);
+      close();
     },
     onError: (error) => toast.error(error.message),
   });
@@ -609,6 +726,7 @@ function AddMember({
     setTitle("");
     setProvider("");
     setToken(null);
+    setLink(null);
     setPath("tool");
     onClose();
   };
@@ -623,7 +741,7 @@ function AddMember({
       title={copy.title}
       description={copy.description}
       footer={
-        token || connecting ? (
+        token || link || connecting ? (
           <Button variant="primary" onClick={close}>
             Done
           </Button>
@@ -634,11 +752,11 @@ function AddMember({
             </Button>
             <Button
               variant="primary"
-              disabled={!name.trim() || (kind === "human" && !email.trim())}
+              disabled={!name.trim()}
               busy={add.isPending}
               onClick={() => add.mutate()}
             >
-              {kind === "agent" ? "Add agent" : "Send invite"}
+              {kind === "agent" ? "Add agent" : "Invite"}
             </Button>
           </>
         )
@@ -657,8 +775,9 @@ function AddMember({
           />
         )}
         {token !== null && <SecretField value={token} />}
+        {link !== null && <SecretField value={link} />}
         {token === null && connecting && <ConnectAgentSteps />}
-        {token === null && !connecting && (
+        {token === null && link === null && !connecting && (
           <>
             <Field label="Name">
               {(id) => (
@@ -672,7 +791,10 @@ function AddMember({
               )}
             </Field>
             {kind === "human" && (
-              <Field label="Email">
+              <Field
+                label="Email"
+                hint="Optional. Signing in with this address also joins them."
+              >
                 {(id) => (
                   <Input
                     id={id}

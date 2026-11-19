@@ -30,6 +30,16 @@ export function enabledSocialProviders(config: Config) {
   return out;
 }
 
+/** Signs sessions, and anything else that should stop working when it changes. */
+export function authSecret(config: Config) {
+  return (
+    config.AUTH_SECRET ??
+    createHash("sha256")
+      .update("worklog-insecure-dev-auth-secret")
+      .digest("hex")
+  );
+}
+
 /** Where people use the web app: this server when it serves the build, else the first web origin. */
 export function webAppUrl(config: Config) {
   const [, first] = webOrigins(config);
@@ -105,11 +115,7 @@ export function createAuth(
     appName: "Worklog",
     baseURL: config.PUBLIC_URL,
     basePath: "/api/auth",
-    secret:
-      config.AUTH_SECRET ??
-      createHash("sha256")
-        .update("worklog-insecure-dev-auth-secret")
-        .digest("hex"),
+    secret: authSecret(config),
     trustedOrigins: webOrigins(config),
     database: drizzleAdapter(db, {
       provider: "pg",

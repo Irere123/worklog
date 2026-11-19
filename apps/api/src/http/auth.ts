@@ -97,8 +97,13 @@ const IDENTITY_ONLY = new Set([
   "GET /v1/session",
   "POST /v1/workspaces",
   "GET /v1/agent-approval",
+  "POST /v1/invites/{code}/accept",
 ]);
-const PUBLIC = new Set(["POST /v1/setup", "GET /v1/auth/config"]);
+const PUBLIC = new Set([
+  "POST /v1/setup",
+  "GET /v1/auth/config",
+  "GET /v1/invites/{code}",
+]);
 
 export function authMiddleware(ctx: AppContext) {
   return createMiddleware<Env>(async (c, next: Next) => {
@@ -112,7 +117,7 @@ export function authMiddleware(ctx: AppContext) {
 }
 
 async function admit(ctx: AppContext, c: Context<Env>) {
-  const route = `${c.req.method} ${c.req.path}`;
+  const route = `${c.req.method} ${c.req.path.replace(/^\/v1\/invites\/[^/]+/u, "/v1/invites/{code}")}`;
   if (PUBLIC.has(route)) {
     return null;
   }

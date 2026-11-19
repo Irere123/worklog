@@ -169,6 +169,13 @@
       "when": 1794826063783,
       "tag": "0023_agent_oauth",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1795082205349,
+      "tag": "0024_invite_links",
+      "breakpoints": true
     }
   ]
 }

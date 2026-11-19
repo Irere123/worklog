@@ -196,6 +196,63 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/members/{ref}/invite-link": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Get a link that lets an invited person join with any account (admins)
+         * @description For someone added but not yet joined. Whoever opens the link and signs in, with any email or account, joins as this person, so send it only to them. It works once, and stops working when they join, are removed, or you ask with `reset`.
+         */
+        post: operations["member.inviteLink"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/invites/{code}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Who an invite link is for, before signing in
+         * @description Public: the link is the credential. 404 once it's used or replaced.
+         */
+        get: operations["invite.get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/invites/{code}/accept": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Join the workspace an invite link is for, as the signed-in person */
+        post: operations["invite.accept"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/members/{ref}/identities": {
         parameters: {
             query?: never;
@@ -1680,6 +1737,21 @@ export interface components {
         Ok: {
             /** @enum {boolean} */
             ok: true;
+        };
+        InviteLink: {
+            /** @example https://worklog.example.com/join/… */
+            url: string;
+        };
+        Invite: {
+            /** @description Who the invite is for */
+            name: string;
+            workspace: {
+                name: string;
+            };
+        };
+        InviteAccepted: {
+            member: components["schemas"]["Member"];
+            workspace: components["schemas"]["Workspace"];
         };
         Identity: {
             id: string;
@@ -3338,6 +3410,163 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Ok"];
+                };
+            };
+            /** @description Invalid request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid credentials */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    "member.inviteLink": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Member id, handle, or "me" */
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description Make a new link; the ones made before stop working */
+                    reset?: boolean;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InviteLink"];
+                };
+            };
+            /** @description Invalid request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid credentials */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    "invite.get": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The last part of an invite link */
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Invite"];
+                };
+            };
+            /** @description Invalid request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid credentials */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    "invite.accept": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The last part of an invite link */
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InviteAccepted"];
                 };
             };
             /** @description Invalid request */

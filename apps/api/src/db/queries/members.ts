@@ -197,6 +197,33 @@ export async function listPendingInvites(
     );
 }
 
+export async function setInviteNonce(
+  db: DbOrTx,
+  params: { id: string; nonce: string }
+) {
+  await db
+    .update(members)
+    .set({ inviteNonce: params.nonce })
+    .where(eq(members.id, params.id));
+}
+
+/** Undefined when someone else claimed it first or it was removed. */
+export async function claimInvite(
+  db: DbOrTx,
+  params: { id: string; userId: string; email: string | null }
+) {
+  const [row] = await db
+    .update(members)
+    .set({
+      userId: params.userId,
+      inviteNonce: null,
+      ...(params.email === null ? {} : { email: params.email }),
+    })
+    .where(and(eq(members.id, params.id), isNull(members.userId), active))
+    .returning();
+  return row;
+}
+
 export async function setMembersUser(
   db: DbOrTx,
   params: { ids: string[]; userId: string }

@@ -26,6 +26,7 @@ import { Route as AppInboxRouteImport } from './routes/_app/inbox'
 import { Route as AppSettingsRouteImport } from './routes/_app/settings'
 import { Route as ConnectIndexRouteImport } from './routes/connect.index'
 import { Route as ConnectSignInRouteImport } from './routes/connect.sign-in'
+import { Route as JoinCodeRouteImport } from './routes/join.$code'
 import { Route as AppAssistantIndexRouteImport } from './routes/_app/assistant.index'
 import { Route as AppAssistantConversationIdRouteImport } from './routes/_app/assistant.$conversationId'
 import { Route as AppBoardsIndexRouteImport } from './routes/_app/boards.index'
@@ -128,6 +129,11 @@ const ConnectIndexRoute = ConnectIndexRouteImport.update({
 const ConnectSignInRoute = ConnectSignInRouteImport.update({
   id: '/connect/sign-in',
   path: '/connect/sign-in',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const JoinCodeRoute = JoinCodeRouteImport.update({
+  id: '/join/$code',
+  path: '/join/$code',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AppAssistantIndexRoute = AppAssistantIndexRouteImport.update({
@@ -246,6 +252,7 @@ export interface FileRoutesByFullPath {
   '/inbox': typeof AppInboxRoute
   '/settings': typeof AppSettingsRouteWithChildren
   '/connect/sign-in': typeof ConnectSignInRoute
+  '/join/$code': typeof JoinCodeRoute
   '/connect/': typeof ConnectIndexRoute
   '/assistant/$conversationId': typeof AppAssistantConversationIdRoute
   '/boards/$boardId': typeof AppBoardsBoardIdRoute
@@ -281,6 +288,7 @@ export interface FileRoutesByTo {
   '/home': typeof AppHomeRoute
   '/inbox': typeof AppInboxRoute
   '/connect/sign-in': typeof ConnectSignInRoute
+  '/join/$code': typeof JoinCodeRoute
   '/connect': typeof ConnectIndexRoute
   '/assistant/$conversationId': typeof AppAssistantConversationIdRoute
   '/boards/$boardId': typeof AppBoardsBoardIdRoute
@@ -320,6 +328,7 @@ export interface FileRoutesById {
   '/_app/inbox': typeof AppInboxRoute
   '/_app/settings': typeof AppSettingsRouteWithChildren
   '/connect/sign-in': typeof ConnectSignInRoute
+  '/join/$code': typeof JoinCodeRoute
   '/connect/': typeof ConnectIndexRoute
   '/_app/assistant/$conversationId': typeof AppAssistantConversationIdRoute
   '/_app/boards/$boardId': typeof AppBoardsBoardIdRoute
@@ -359,6 +368,7 @@ export interface FileRouteTypes {
     | '/inbox'
     | '/settings'
     | '/connect/sign-in'
+    | '/join/$code'
     | '/connect/'
     | '/assistant/$conversationId'
     | '/boards/$boardId'
@@ -394,6 +404,7 @@ export interface FileRouteTypes {
     | '/home'
     | '/inbox'
     | '/connect/sign-in'
+    | '/join/$code'
     | '/connect'
     | '/assistant/$conversationId'
     | '/boards/$boardId'
@@ -432,6 +443,7 @@ export interface FileRouteTypes {
     | '/_app/inbox'
     | '/_app/settings'
     | '/connect/sign-in'
+    | '/join/$code'
     | '/connect/'
     | '/_app/assistant/$conversationId'
     | '/_app/boards/$boardId'
@@ -465,6 +477,7 @@ export interface RootRouteChildren {
   SetupRoute: typeof SetupRoute
   TermsRoute: typeof TermsRoute
   ConnectSignInRoute: typeof ConnectSignInRoute
+  JoinCodeRoute: typeof JoinCodeRoute
   ConnectIndexRoute: typeof ConnectIndexRoute
 }
 
@@ -587,6 +600,13 @@ declare module '@tanstack/react-router' {
       path: '/connect/sign-in'
       fullPath: '/connect/sign-in'
       preLoaderRoute: typeof ConnectSignInRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/join/$code': {
+      id: '/join/$code'
+      path: '/join/$code'
+      fullPath: '/join/$code'
+      preLoaderRoute: typeof JoinCodeRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_app/assistant/': {
@@ -815,6 +835,7 @@ const rootRouteChildren: RootRouteChildren = {
   SetupRoute: SetupRoute,
   TermsRoute: TermsRoute,
   ConnectSignInRoute: ConnectSignInRoute,
+  JoinCodeRoute: JoinCodeRoute,
   ConnectIndexRoute: ConnectIndexRoute,
 }
 export const routeTree = rootRouteImport
