@@ -15,12 +15,18 @@ import type { SentNews } from "#api/live";
 import { CardPreviews } from "#features/cards/card-preview";
 import { kindOf } from "#features/inbox/kinds";
 import { showDesktopAlert } from "#lib/desktop-alerts";
-import { setSidebarFolded, useNarrow, useSidebarFolded } from "#lib/sidebar";
+import {
+  setSidebarFolded,
+  useNarrow,
+  useSidebarFolded,
+  useSidebarWidth,
+} from "#lib/sidebar";
 import { color, motion } from "#ui/tokens.stylex";
 
 import { InShell } from "./fallbacks";
 import { MobileBar } from "./mobile-bar";
 import { Sidebar } from "./sidebar";
+import { SidebarResizer } from "./sidebar-resizer";
 
 const loaders = {
   palette: async () => await import("./command"),
@@ -117,6 +123,8 @@ export function Shell() {
   const narrow = useNarrow();
   const folded = useSidebarFolded();
   const rail = folded && !narrow;
+  const width = useSidebarWidth();
+  const [resizing, setResizing] = useState(false);
   const toggleSidebar = () => {
     if (narrow) {
       setDrawer(false);
@@ -190,7 +198,14 @@ export function Shell() {
   });
 
   return (
-    <div {...stylex.props(styles.shell, rail && styles.shellRail)}>
+    <div
+      {...stylex.props(
+        styles.shell,
+        !narrow && !rail && styles.width(width),
+        rail && styles.shellRail,
+        resizing && styles.resizing
+      )}
+    >
       <a href="#main" {...stylex.props(styles.skip)}>
         Skip to content
       </a>
@@ -213,6 +228,7 @@ export function Shell() {
         />
       )}
       <div {...stylex.props(styles.column)}>
+        {!narrow && !rail && <SidebarResizer onResizing={setResizing} />}
         <MobileBar
           onMenu={() => setDrawer(true)}
           onSearch={() => show("palette")}
@@ -264,6 +280,14 @@ const styles = stylex.create({
     overflow: "hidden",
     backgroundColor: color.sidebar,
   },
+  width: (width: number) => ({
+    gridTemplateColumns: `${width}px minmax(0, 1fr)`,
+  }),
+  resizing: {
+    transitionDuration: "0s",
+    cursor: "col-resize",
+    userSelect: "none",
+  },
   shellRail: {
     gridTemplateColumns: {
       default: "56px minmax(0, 1fr)",
@@ -288,6 +312,7 @@ const styles = stylex.create({
     outline: "none",
   },
   column: {
+    position: "relative",
     display: "flex",
     flexDirection: "column",
     minWidth: 0,
