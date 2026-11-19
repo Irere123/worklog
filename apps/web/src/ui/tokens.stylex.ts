@@ -32,7 +32,6 @@ export const color = stylex.defineVars({
   green: "light-dark(oklch(0.62 0.15 152), oklch(0.7 0.15 152))",
   greenFg: "light-dark(oklch(0.47 0.12 152), oklch(0.8 0.12 152))",
   greenSubtle: "light-dark(oklch(0.965 0.03 152), oklch(0.25 0.045 152))",
-  fgOnGreen: "light-dark(oklch(0.22 0.01 80), oklch(0.165 0.004 80))",
   amber: "light-dark(oklch(0.74 0.16 68), oklch(0.78 0.15 70))",
   amberFg: "light-dark(oklch(0.5 0.13 60), oklch(0.84 0.12 75))",
   amberSubtle: "light-dark(oklch(0.97 0.035 80), oklch(0.26 0.045 70))",
